@@ -56,6 +56,30 @@ normalize_host() {
     echo "${value,,}"
 }
 
+detect_public_ip() {
+    curl -s -4 ifconfig.me 2>/dev/null ||
+        curl -s -4 icanhazip.com 2>/dev/null ||
+        curl -s -4 ipinfo.io/ip 2>/dev/null ||
+        curl -s ifconfig.me 2>/dev/null ||
+        curl -s icanhazip.com 2>/dev/null ||
+        echo "localhost"
+}
+
+format_host_for_url() {
+    local host="${1}"
+    case "${host}" in
+        \[*\]) echo "${host}" ;;
+        *:*) echo "[${host}]" ;;
+        *) echo "${host}" ;;
+    esac
+}
+
+build_origin() {
+    local scheme="${1}"
+    local host="${2}"
+    echo "${scheme}://$(format_host_for_url "${host}")"
+}
+
 normalize_database_engine() {
     case "${1,,}" in
         postgres|postgresql) echo "postgres" ;;
@@ -304,13 +328,13 @@ if [ -n "${TELEGRAM_BOT_TOKEN_INPUT}" ]; then
     set_env_var "TELEGRAM_BOT_TOKEN" "${TELEGRAM_BOT_TOKEN_INPUT}"
 fi
 
-# Get server IP
-SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+# Get server IP, preferring IPv4 for raw-IP installs.
+SERVER_IP=$(detect_public_ip)
 PUBLIC_HOST="${SERVER_IP}"
 if [ -n "${PANEL_DOMAIN}" ]; then
     PUBLIC_HOST="${PANEL_DOMAIN}"
 fi
-PUBLIC_ORIGIN="http://${PUBLIC_HOST}"
+PUBLIC_ORIGIN="$(build_origin "http" "${PUBLIC_HOST}")"
 PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
 PUBLIC_SHARE_ORIGIN=""
 PUBLIC_SHARE_URL=""
@@ -319,11 +343,11 @@ HTTPS_NOTE="HTTP reverse proxy enabled on port 80."
 IP_FALLBACK_URL=""
 
 if [ -n "${PANEL_DOMAIN}" ] && [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
-    IP_FALLBACK_URL="http://${SERVER_IP}/${PANEL_PATH}/"
+    IP_FALLBACK_URL="$(build_origin "http" "${SERVER_IP}")/${PANEL_PATH}/"
 fi
 
 if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
-    PUBLIC_SHARE_ORIGIN="http://${PUBLIC_SHARE_DOMAIN}"
+    PUBLIC_SHARE_ORIGIN="$(build_origin "http" "${PUBLIC_SHARE_DOMAIN}")"
     PUBLIC_SHARE_URL="${PUBLIC_SHARE_ORIGIN}/${PANEL_PATH}/"
 fi
 
@@ -385,21 +409,21 @@ if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
     if APP_PORT="${PANEL_PORT}" PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
         HTTPS_ENABLED=true
         if [ -n "${PANEL_DOMAIN}" ]; then
-            PUBLIC_ORIGIN="https://${PANEL_DOMAIN}"
+            PUBLIC_ORIGIN="$(build_origin "https" "${PANEL_DOMAIN}")"
             if [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
-                IP_FALLBACK_URL="https://${SERVER_IP}/${PANEL_PATH}/"
+                IP_FALLBACK_URL="$(build_origin "https" "${SERVER_IP}")/${PANEL_PATH}/"
                 HTTPS_NOTE="HTTPS enabled for ${PANEL_DOMAIN}. The original IP remains available over HTTPS as a fallback."
             else
                 IP_FALLBACK_URL=""
                 HTTPS_NOTE="HTTPS enabled for ${PANEL_DOMAIN}. Raw IP traffic redirects to the domain."
             fi
         else
-            PUBLIC_ORIGIN="https://${SERVER_IP}"
+            PUBLIC_ORIGIN="$(build_origin "https" "${SERVER_IP}")"
             HTTPS_NOTE="HTTPS enabled with a short-lived Let's Encrypt IP certificate. Renewal timer is installed automatically."
         fi
         PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
         if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
-            PUBLIC_SHARE_ORIGIN="https://${PUBLIC_SHARE_DOMAIN}"
+            PUBLIC_SHARE_ORIGIN="$(build_origin "https" "${PUBLIC_SHARE_DOMAIN}")"
             PUBLIC_SHARE_URL="${PUBLIC_SHARE_ORIGIN}/${PANEL_PATH}/"
         fi
         set_env_var "APP_URL" "${PUBLIC_ORIGIN}"

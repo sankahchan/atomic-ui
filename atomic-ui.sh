@@ -24,6 +24,37 @@ GITHUB_REPO="sankahchan/atomic-ui"
 SCRIPT_VERSION="1.4.1"
 DEFAULT_PORT=2053
 
+detect_public_ip() {
+    curl -s -4 ifconfig.me 2>/dev/null ||
+        curl -s -4 icanhazip.com 2>/dev/null ||
+        curl -s -4 ipinfo.io/ip 2>/dev/null ||
+        curl -s ifconfig.me 2>/dev/null ||
+        curl -s icanhazip.com 2>/dev/null ||
+        echo "localhost"
+}
+
+format_host_for_url() {
+    local host="${1}"
+    case "${host}" in
+        \[*\]) echo "${host}" ;;
+        *:*) echo "[${host}]" ;;
+        *) echo "${host}" ;;
+    esac
+}
+
+build_origin() {
+    local scheme="$1"
+    local host="$2"
+    local port="${3:-}"
+    local formatted_host
+    formatted_host=$(format_host_for_url "${host}")
+    if [ -n "${port}" ]; then
+        echo "${scheme}://${formatted_host}:${port}"
+    else
+        echo "${scheme}://${formatted_host}"
+    fi
+}
+
 # Get current port from saved file or default
 get_current_port() {
     if [ -f "$INSTALL_DIR/.panel_port" ]; then
@@ -70,8 +101,8 @@ get_public_origin() {
     local fallback_port
     fallback_port=$(get_current_port)
     local fallback_ip
-    fallback_ip=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
-    echo "http://${fallback_ip}:${fallback_port}"
+    fallback_ip=$(detect_public_ip)
+    build_origin "http" "${fallback_ip}" "${fallback_port}"
 }
 
 get_public_share_origin() {
@@ -358,8 +389,9 @@ setup_environment() {
         sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
     fi
     
-    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+    SERVER_IP=$(detect_public_ip)
     DB_PATH="${INSTALL_DIR}/prisma/data/atomic-ui.db"
+    SERVER_ORIGIN=$(build_origin "http" "${SERVER_IP}" "${NEW_PORT}")
     
     # Update port in .env
     if grep -q "^PORT=" .env; then
@@ -368,9 +400,17 @@ setup_environment() {
         echo "PORT=${NEW_PORT}" >> .env
     fi
     
-    # Update APP_URL with new port
-    sed -i "s|http://localhost:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
-    sed -i "s|http://${SERVER_IP}:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
+    # Update public app URL to the preferred IPv4 origin when no custom domain is set.
+    if grep -q "^APP_URL=" .env; then
+        sed -i "s|^APP_URL=.*|APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
+    if grep -q "^NEXT_PUBLIC_APP_URL=" .env; then
+        sed -i "s|^NEXT_PUBLIC_APP_URL=.*|NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
 
     # Save port to file
     echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
@@ -556,7 +596,8 @@ setup_firewall() {
 # Print completion message
 print_completion() {
     local PORT=$1
-    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "YOUR_SERVER_IP")
+    SERVER_IP=$(detect_public_ip)
+    PANEL_ORIGIN=$(build_origin "http" "${SERVER_IP}" "${PORT}")
 
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
@@ -565,7 +606,7 @@ print_completion() {
     echo ""
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
     echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
-    echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}:${PORT}${NC}"
+    echo -e "${CYAN}│${NC}  URL: ${GREEN}${PANEL_ORIGIN}${NC}"
     echo -e "${CYAN}│${NC}"
     echo -e "${CYAN}│${NC}  ${YELLOW}Your panel port:${NC} ${GREEN}${PORT}${NC}"
     echo -e "${CYAN}│${NC}"
@@ -1259,8 +1300,8 @@ remove_custom_domain() {
     fi
 
     rm -f "$INSTALL_DIR/.panel_domain"
-    SERVER_IP=$(curl -s ifconfig.me || echo "YOUR_SERVER_IP")
-    echo "http://${SERVER_IP}" > "$INSTALL_DIR/.public_origin"
+    SERVER_IP=$(detect_public_ip)
+    echo "$(build_origin "http" "${SERVER_IP}")" > "$INSTALL_DIR/.public_origin"
 
     CURRENT_PORT=$(get_current_port)
     CURRENT_PATH=$(get_current_path)
@@ -1371,8 +1412,18 @@ change_port() {
     fi
     
     # Update APP_URL
-    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
-    sed -i "s|http://${SERVER_IP}:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
+    SERVER_IP=$(detect_public_ip)
+    SERVER_ORIGIN=$(build_origin "http" "${SERVER_IP}" "${NEW_PORT}")
+    if grep -q "^APP_URL=" .env; then
+        sed -i "s|^APP_URL=.*|APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
+    if grep -q "^NEXT_PUBLIC_APP_URL=" .env; then
+        sed -i "s|^NEXT_PUBLIC_APP_URL=.*|NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
     
     # Save new port
     echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
