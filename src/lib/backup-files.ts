@@ -1,6 +1,7 @@
 export type BackupFileKind =
   | 'sqlite'
   | 'sqlite_archive'
+  | 'postgres_archive'
   | 'postgres_dump'
   | 'postgres_sql'
   | 'unknown';
@@ -19,6 +20,13 @@ export function inferBackupFileKind(filename: string, header?: string | null): B
 
   if (normalizedHeader.startsWith('PGDMP')) {
     return 'postgres_dump';
+  }
+
+  if (
+    normalizedFilename.endsWith('.postgres.zip') ||
+    normalizedFilename.endsWith('.pg.zip')
+  ) {
+    return 'postgres_archive';
   }
 
   if (normalizedFilename.endsWith('.zip')) {
@@ -52,6 +60,8 @@ export function buildOfflineRestoreCommand(filename: string, absolutePath: strin
       return `pg_restore --clean --if-exists --no-owner --no-privileges --dbname "$DATABASE_URL" ${absolutePath}`;
     case 'postgres_sql':
       return `psql "$DATABASE_URL" < ${absolutePath}`;
+    case 'postgres_archive':
+      return `Upload ${absolutePath} in the dashboard and use Restore. The bundle contains the Postgres dump plus restore encryption metadata.`;
     case 'sqlite_archive':
     case 'sqlite':
     case 'unknown':

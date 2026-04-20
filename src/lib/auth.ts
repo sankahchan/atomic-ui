@@ -44,6 +44,52 @@ export interface SessionMetadata {
   userAgent?: string | null;
 }
 
+function getConfiguredSessionOrigin() {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    process.env.NEXTAUTH_URL?.trim() ||
+    ''
+  );
+}
+
+export function shouldUseSecureSessionCookie() {
+  return process.env.NODE_ENV === 'production' && getConfiguredSessionOrigin().startsWith('https://');
+}
+
+export function buildSessionCookieOptions() {
+  const secure = shouldUseSecureSessionCookie();
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? ('strict' as const) : ('lax' as const),
+    priority: 'high' as const,
+    maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60,
+    path: '/',
+  };
+}
+
+function isExpectedSessionVerificationError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (
+    [
+      'JWTExpired',
+      'JWTInvalid',
+      'JWTClaimValidationFailed',
+      'JWSInvalid',
+      'JWSSignatureVerificationFailed',
+    ].includes(error.name)
+  ) {
+    return true;
+  }
+
+  return /jwt|jws|signature|compact/i.test(error.message);
+}
+
 /**
  * Hash a password using bcrypt
  * The cost factor of 12 provides good security while maintaining reasonable performance
@@ -107,22 +153,27 @@ export async function createSession(
  * Returns the payload if valid, null if invalid or expired
  */
 export async function verifySession(token: string): Promise<SessionPayload | null> {
+  let payload: Awaited<ReturnType<typeof jwtVerify>>['payload'];
   try {
-    const { payload } = await jwtVerify(token, getJwtSecretBytes());
-
-    // Check if the session exists in the database (not revoked)
-    const session = await db.session.findUnique({
-      where: { token },
-    });
-
-    if (!session || session.expiresAt < new Date()) {
+    ({ payload } = await jwtVerify(token, getJwtSecretBytes()));
+  } catch (error) {
+    if (isExpectedSessionVerificationError(error)) {
       return null;
     }
 
-    return payload as unknown as SessionPayload;
-  } catch {
+    console.error('[Auth] Unexpected session verification failure:', error);
+    throw error;
+  }
+
+  const session = await db.session.findUnique({
+    where: { token },
+  });
+
+  if (!session || session.expiresAt < new Date()) {
     return null;
   }
+
+  return payload as unknown as SessionPayload;
 }
 
 /**
@@ -130,47 +181,42 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
  * Returns null if not authenticated
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME);
 
-    if (!sessionCookie?.value) {
-      return null;
-    }
-
-    const payload = await verifySession(sessionCookie.value);
-
-    if (!payload) {
-      return null;
-    }
-
-    if (payload.role === 'ADMIN') {
-      await normalizeLegacyAdminScopes();
-    }
-
-    // Fetch the full user from the database
-    const user = await db.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        adminScope: true,
-        passwordHash: false, // Explicitly exclude hash
-      },
-    });
-
-    if (!user) return null;
-
-    return {
-      id: user.id,
-      email: user.email || '',
-      role: user.role,
-      adminScope: user.adminScope,
-    };
-  } catch {
+  if (!sessionCookie?.value) {
     return null;
   }
+
+  const payload = await verifySession(sessionCookie.value);
+
+  if (!payload) {
+    return null;
+  }
+
+  if (payload.role === 'ADMIN') {
+    await normalizeLegacyAdminScopes();
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: payload.userId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      adminScope: true,
+      passwordHash: false,
+    },
+  });
+
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    email: user.email || '',
+    role: user.role,
+    adminScope: user.adminScope,
+  };
 }
 
 /**
@@ -178,16 +224,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  */
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
-
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    // Only use secure cookies if we are definitely using HTTPS
-    // This fixes login loops when accessing via HTTP/IP address
-    secure: process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_URL?.startsWith('https'),
-    sameSite: 'lax',
-    maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60, // Convert days to seconds
-    path: '/',
-  });
+  cookieStore.set(SESSION_COOKIE_NAME, token, buildSessionCookieOptions());
 }
 
 /**

@@ -29,6 +29,10 @@ test('resolveBackupRuntimeCompatibilityMessage rejects Postgres backups on SQLit
     resolveBackupRuntimeCompatibilityMessage('postgres_dump', 'file:./data/atomic-ui.db'),
     'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
   );
+  assert.equal(
+    resolveBackupRuntimeCompatibilityMessage('postgres_archive', 'file:./data/atomic-ui.db'),
+    'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
+  );
 });
 
 test('resolveBackupRuntimeCompatibilityMessage rejects SQLite backups on Postgres runtimes', () => {

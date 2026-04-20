@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { router, adminProcedure, protectedProcedure } from '../trpc';
+import { router, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { writeAuditLog } from '@/lib/audit';
@@ -61,6 +61,13 @@ import {
 } from '@/lib/services/telegram-bot';
 import { getTelegramWebhookSecret } from '@/lib/services/telegram-runtime';
 import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
+import {
+  maskTelegramBotSettingsForClient,
+  parseTelegramBotSettingsValue,
+  serializeTelegramBotSettingsValue,
+  shouldRetainMaskedTelegramSecret,
+  telegramBotSettingsNeedSecretMigration,
+} from '@/lib/telegram-bot-settings';
 
 const TELEGRAM_ORDER_ACTIVE_WORKFLOW_STATUSES = new Set([
   'AWAITING_KEY_SELECTION',
@@ -149,18 +156,6 @@ function mapRevenueSummary(revenue: Map<string, number>) {
     currency,
     amount,
   }));
-}
-
-function parseTelegramBotSettingsValue(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 function assertTelegramReviewScope(scope?: string | null) {
@@ -322,7 +317,8 @@ export const telegramBotRouter = router({
   /**
    * Get Telegram bot settings.
    */
-  getSettings: protectedProcedure.query(async () => {
+  getSettings: adminProcedure.query(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
     const settings = await db.settings.findUnique({
       where: { key: 'telegram_bot' },
     });
@@ -349,9 +345,25 @@ export const telegramBotRouter = router({
     }
 
     try {
-      const parsed = JSON.parse(settings.value);
+      const parsed = parseTelegramBotSettingsValue(settings.value);
+      if (!parsed) {
+        throw new Error('Invalid Telegram bot settings payload');
+      }
+
+      if (telegramBotSettingsNeedSecretMigration(settings.value)) {
+        void db.settings
+          .update({
+            where: { key: 'telegram_bot' },
+            data: { value: serializeTelegramBotSettingsValue(parsed) },
+          })
+          .catch((error) => {
+            console.error('Failed to migrate Telegram bot settings secrets:', error);
+          });
+      }
+
+      const masked = maskTelegramBotSettingsForClient(parsed);
       return {
-        botToken: parsed.botToken || '',
+        botToken: masked.botToken || '',
         botUsername: parsed.botUsername || '',
         welcomeMessage: parsed.welcomeMessage || DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
         keyNotFoundMessage: parsed.keyNotFoundMessage || DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
@@ -406,22 +418,28 @@ export const telegramBotRouter = router({
         select: { value: true },
       });
       const existingConfig = parseTelegramBotSettingsValue(existingSettings?.value);
-      const nextValue = JSON.stringify({
+      const botToken = shouldRetainMaskedTelegramSecret(input.botToken)
+        ? typeof existingConfig?.botToken === 'string'
+          ? existingConfig.botToken
+          : ''
+        : input.botToken;
+      const nextValue = {
         ...input,
         webhookSecretToken: getTelegramWebhookSecret(
-          input.botToken,
+          botToken,
           existingConfig?.webhookSecretToken,
         ),
-      });
+        botToken,
+      } satisfies Record<string, unknown>;
 
       await db.settings.upsert({
         where: { key: 'telegram_bot' },
         create: {
           key: 'telegram_bot',
-          value: nextValue,
+          value: serializeTelegramBotSettingsValue(nextValue),
         },
         update: {
-          value: nextValue,
+          value: serializeTelegramBotSettingsValue(nextValue),
         },
       });
 
@@ -1757,8 +1775,8 @@ export const telegramBotRouter = router({
     }
 
     try {
-      const parsed = JSON.parse(settings.value);
-      if (!parsed.botToken) {
+      const parsed = parseTelegramBotSettingsValue(settings.value);
+      if (!parsed?.botToken) {
         return { webhookSet: false };
       }
 
@@ -1795,8 +1813,8 @@ export const telegramBotRouter = router({
         });
       }
 
-      const parsed = JSON.parse(settings.value);
-      if (!parsed.botToken) {
+      const parsed = parseTelegramBotSettingsValue(settings.value);
+      if (!parsed?.botToken) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Bot token not configured',
@@ -1845,8 +1863,8 @@ export const telegramBotRouter = router({
       return { success: true };
     }
 
-    const parsed = JSON.parse(settings.value);
-    if (!parsed.botToken) {
+    const parsed = parseTelegramBotSettingsValue(settings.value);
+    if (!parsed?.botToken) {
       return { success: true };
     }
 

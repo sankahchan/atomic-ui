@@ -10,6 +10,12 @@ import {
   shouldReuseSchedulerFailureVerification,
   type BackupVerificationSummary,
 } from './backup-verification';
+import {
+  POSTGRES_BACKUP_BUNDLE_DUMP,
+  POSTGRES_BACKUP_BUNDLE_MANIFEST,
+  POSTGRES_BACKUP_BUNDLE_RESTORE_ENV,
+  buildPostgresBackupBundleManifest,
+} from '@/lib/portable-backup';
 
 function ensureSqliteCli() {
   const result = spawnSync('sqlite3', ['-version'], { encoding: 'utf8' });
@@ -162,6 +168,50 @@ test('inspectBackupFile rejects Postgres dumps on SQLite runtimes with a clear m
     result.error,
     'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
   );
+});
+
+test('inspectBackupFile rejects portable Postgres bundles on SQLite runtimes with a clear message', async (t) => {
+  const previousDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = 'file:./data/atomic-ui.db';
+  t.after(() => {
+    if (typeof previousDatabaseUrl === 'undefined') {
+      delete process.env.DATABASE_URL;
+      return;
+    }
+
+    process.env.DATABASE_URL = previousDatabaseUrl;
+  });
+
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const filename = `test-postgres-bundle-${process.pid}-${Date.now()}.postgres.zip`;
+  const filePath = path.join(BACKUP_DIR, filename);
+  t.after(() => {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  });
+
+  const header = Buffer.alloc(32);
+  header.write('PGDMP');
+  const archive = new AdmZip();
+  archive.addFile(POSTGRES_BACKUP_BUNDLE_DUMP, header);
+  archive.addFile(
+    POSTGRES_BACKUP_BUNDLE_MANIFEST,
+    Buffer.from(JSON.stringify(buildPostgresBackupBundleManifest()), 'utf8'),
+  );
+  archive.addFile(POSTGRES_BACKUP_BUNDLE_RESTORE_ENV, Buffer.from('SETTINGS_ENCRYPTION_KEY="x"\n'));
+  archive.writeZip(filePath);
+
+  const result = await inspectBackupFile(filename);
+
+  assert.equal(result.status, 'FAILED');
+  assert.equal(result.restoreReady, false);
+  assert.equal(
+    result.error,
+    'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.',
+  );
+  assert.equal(result.details.format, 'postgres_archive');
+  assert.equal(result.details.restoreEnvAvailable, true);
 });
 
 test('shouldReuseSchedulerFailureVerification only reuses identical failed summaries', () => {

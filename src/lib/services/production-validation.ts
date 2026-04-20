@@ -59,7 +59,13 @@ export function validateProductionEnvironment(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  const required = ['DATABASE_URL', 'JWT_SECRET', 'TOTP_ENCRYPTION_KEY', 'CRON_SECRET'];
+  const required = [
+    'DATABASE_URL',
+    'JWT_SECRET',
+    'TOTP_ENCRYPTION_KEY',
+    'SETTINGS_ENCRYPTION_KEY',
+    'CRON_SECRET',
+  ];
   for (const key of required) {
     if (!env[key]?.trim()) {
       errors.push(`${key} is required for production`);
@@ -76,6 +82,16 @@ export function validateProductionEnvironment(
     if (!isHex && value.length < 32) {
       errors.push(
         'TOTP_ENCRYPTION_KEY must be a 64-char hex key or a passphrase of at least 32 characters',
+      );
+    }
+  }
+
+  if (env.SETTINGS_ENCRYPTION_KEY) {
+    const value = env.SETTINGS_ENCRYPTION_KEY.trim();
+    const isHex = /^[a-fA-F0-9]{64,}$/.test(value);
+    if (!isHex && value.length < 32) {
+      errors.push(
+        'SETTINGS_ENCRYPTION_KEY must be a 64-char hex key or a passphrase of at least 32 characters',
       );
     }
   }

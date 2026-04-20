@@ -1305,7 +1305,7 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Upload a downloaded <code>.db</code>, <code>.dump</code>, <code>.sql</code>, or legacy <code>.zip</code> backup to add it back to this restore list.
+                  Upload a downloaded <code>.db</code>, <code>.dump</code>, <code>.sql</code>, portable <code>.postgres.zip</code>, or legacy <code>.zip</code> backup to add it back to this restore list.
                 </p>
 
                 <div className="space-y-3 md:hidden">

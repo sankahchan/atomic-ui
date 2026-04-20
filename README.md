@@ -71,7 +71,7 @@ docker-compose up -d --build
 wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
 ```
 
-Fresh VPS installs now default to a local Postgres runtime so production `.dump` backups can be restored onto replacement servers without an extra database conversion step.
+Fresh VPS installs now default to a local Postgres runtime so production `.postgres.zip` backup bundles can be restored onto replacement servers without an extra database conversion step.
 
 The installer now prefers HTTPS by default. If HTTPS setup fails, it falls back to HTTP and prints the next steps.
 
@@ -127,9 +127,9 @@ npm run smoke:telegram
 ### Operator notes
 
 - SQLite restore runs offline only. Stop `atomic-ui.service`, then run `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip`.
-- Dashboard backup creation follows the active runtime: SQLite creates `.db` file-copy backups, and Postgres creates `.dump` archives via `pg_dump`. Postgres restore stays offline-only via `pg_restore --dbname "$DATABASE_URL" /absolute/path/to/backup.dump`.
+- Dashboard backup creation follows the active runtime: SQLite creates `.db` file-copy backups, and Postgres creates portable `.postgres.zip` bundles containing `backup.dump` plus restore encryption metadata. Raw `.dump` and `.sql` restores remain supported for older backups.
 - Postgres backup creation, verification, and restore require the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) on the host. On Debian/Ubuntu installs, use `apt-get install -y postgresql-client`.
-- Runtime types must match the backup: SQLite backups restore onto SQLite runtimes, and Postgres `.dump` backups restore onto servers configured with a PostgreSQL `DATABASE_URL`.
+- Runtime types must match the backup: SQLite backups restore onto SQLite runtimes, and Postgres `.postgres.zip`, `.dump`, or `.sql` backups restore onto servers configured with a PostgreSQL `DATABASE_URL`.
 - Telegram webhook set/reset in the dashboard registers a secret token with Telegram. Incoming webhook calls without a matching `x-telegram-bot-api-secret-token` header are rejected with `401`. Set `TELEGRAM_WEBHOOK_SECRET` only if you need to override the derived default.
 - Subscription branding no longer supports custom CSS. Legacy `subscriptionCustomCss` values are ignored and cleared on save.
 
@@ -174,6 +174,8 @@ Set these in `.env` before production use:
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | SQLite DSN such as `file:./data/atomic-ui.db` or a Postgres DSN such as `postgresql://user:pass@host:5432/atomic_ui` |
 | `JWT_SECRET` | Yes | Session signing secret |
+| `TOTP_ENCRYPTION_KEY` | Yes | Encrypts 2FA/TOTP secrets; generate with `openssl rand -hex 32` |
+| `SETTINGS_ENCRYPTION_KEY` | Yes | Encrypts provider tokens, webhook secrets, and other database-backed setting secrets; generate with `openssl rand -hex 32` |
 | `CRON_SECRET` | Strongly recommended | Protects scheduled task endpoints |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical admin/app URL |
 | `APP_URL` | Recommended | Server-side admin/app base URL |
@@ -185,7 +187,7 @@ Set these in `.env` before production use:
 | `SMTP_USER` | Optional | SMTP username |
 | `SMTP_PASS` | Optional | SMTP password |
 | `SMTP_FROM` | Optional | Sender address for email delivery |
-| `DIGITALOCEAN_TOKEN` | Optional | Enables DO provisioning from the UI |
+| `DIGITALOCEAN_ACCESS_TOKEN` | Optional | Enables DO provisioning from the UI when no token is saved in settings |
 | `LOG_LEVEL` | Optional | `debug`, `info`, `warn`, `error` |
 | `LOG_VERBOSE_SCOPES` | Optional | Temporary verbose scopes such as `sync,trpc` |
 

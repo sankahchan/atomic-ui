@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/db';
-import { sendTelegramDocument } from '@/lib/services/telegram-runtime';
+import { getTelegramConfig, sendTelegramDocument } from '@/lib/services/telegram-runtime';
 import { logger } from '@/lib/logger';
 import { writeAuditLog } from '@/lib/audit';
 import { verifyBackupFile } from '@/lib/services/backup-verification';
@@ -132,28 +132,23 @@ export const backupRouter = router({
 
             // Send to Telegram Admins (Fire and forget, or await safely)
             try {
-                const settings = await db.settings.findUnique({ where: { key: 'telegram_bot' } });
-                if (settings) {
-                    const botSettings = JSON.parse(settings.value);
-                    const { botToken, isEnabled, adminChatIds } = botSettings;
+                const botSettings = await getTelegramConfig();
+                if (botSettings?.botToken && botSettings.adminChatIds.length > 0) {
+                    const fileBuffer = fs.readFileSync(backupPath);
 
-                    if (isEnabled && botToken && adminChatIds && Array.isArray(adminChatIds) && adminChatIds.length > 0) {
-                        const fileBuffer = fs.readFileSync(backupPath);
-
-                        await Promise.all(adminChatIds.map((chatId: string) =>
-                            sendTelegramDocument(
-                                botToken,
-                                chatId,
-                                fileBuffer,
-                                backupFilename,
-                                `Backup created via Dashboard at ${new Date().toLocaleString()}`
-                            ).then((sent) => {
-                                if (!sent) {
-                                    logger.error(`Failed to send backup to ${chatId}: Telegram send returned false`);
-                                }
-                            }).catch(e => logger.error(`Failed to send backup to ${chatId}:`, e))
-                        ));
-                    }
+                    await Promise.all(botSettings.adminChatIds.map((chatId: string) =>
+                        sendTelegramDocument(
+                            botSettings.botToken,
+                            chatId,
+                            fileBuffer,
+                            backupFilename,
+                            `Backup created via Dashboard at ${new Date().toLocaleString()}`
+                        ).then((sent) => {
+                            if (!sent) {
+                                logger.error(`Failed to send backup to ${chatId}: Telegram send returned false`);
+                            }
+                        }).catch(e => logger.error(`Failed to send backup to ${chatId}:`, e))
+                    ));
                 }
             } catch (err) {
                 logger.error('Failed to auto-send backup to Telegram:', err);

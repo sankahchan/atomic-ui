@@ -3,7 +3,7 @@ import path from 'path';
 import { inferBackupFileKind, isSupportedBackupFileKind } from '@/lib/backup-files';
 
 export const INVALID_BACKUP_UPLOAD_MESSAGE =
-  'Invalid backup upload. Please choose a .db, .dump, .sql, or .zip backup file and try again.';
+  'Invalid backup upload. Please choose a .db, .dump, .sql, .postgres.zip, or .zip backup file and try again.';
 
 function sanitizeBackupUploadFilename(filename: string) {
   const sanitized = path.basename(filename).replace(/[\r\n"]/g, '_').trim();

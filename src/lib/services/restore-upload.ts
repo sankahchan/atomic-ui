@@ -10,7 +10,7 @@ const INVALID_CONTENT_TYPE_ERROR: RestoreUploadParseError = {
 
 const INVALID_FORM_DATA_ERROR: RestoreUploadParseError = {
   status: 400,
-  error: 'Invalid backup upload. Please choose a .db, .dump, .sql, or .zip backup file and try again.',
+  error: 'Invalid backup upload. Please choose a .db, .dump, .sql, .postgres.zip, or .zip backup file and try again.',
 };
 
 export function isMultipartFormDataContentType(contentType: string | null | undefined) {

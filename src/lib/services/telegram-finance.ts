@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import { parseTelegramBotSettingsValue } from '@/lib/telegram-bot-settings';
 import { withAbsoluteBasePath } from '@/lib/base-path';
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
@@ -239,8 +240,9 @@ async function getTelegramAdminConfig() {
   }
 
   try {
-    const value = JSON.parse(settings.value) as Record<string, unknown>;
+    const value = parseTelegramBotSettingsValue(settings.value);
     if (
+      value &&
       value.isEnabled &&
       typeof value.botToken === 'string' &&
       value.botToken.trim() &&

@@ -328,12 +328,19 @@ cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
 sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
 TOTP_ENCRYPTION_KEY=$(openssl rand -hex 32)
+SETTINGS_ENCRYPTION_KEY=$(openssl rand -hex 32)
 CRON_SECRET=$(openssl rand -hex 24)
 
 if grep -q "^TOTP_ENCRYPTION_KEY=" .env; then
     sed -i "s|^TOTP_ENCRYPTION_KEY=.*|TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}|g" .env
 else
     echo "TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}" >> .env
+fi
+
+if grep -q "^SETTINGS_ENCRYPTION_KEY=" .env; then
+    sed -i "s|^SETTINGS_ENCRYPTION_KEY=.*|SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}|g" .env
+else
+    echo "SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}" >> .env
 fi
 
 if grep -q "^CRON_SECRET=" .env; then

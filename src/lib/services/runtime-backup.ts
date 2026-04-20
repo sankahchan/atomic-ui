@@ -2,8 +2,17 @@ import { promisify } from 'util';
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import AdmZip from 'adm-zip';
 import { resolveDatabaseEngine, resolveSqliteDbPathFromUrl } from '@/lib/database-engine';
 import { resolvePostgresCliErrorMessage } from '@/lib/services/postgres-cli-errors';
+import {
+  POSTGRES_BACKUP_BUNDLE_DUMP,
+  POSTGRES_BACKUP_BUNDLE_MANIFEST,
+  POSTGRES_BACKUP_BUNDLE_RESTORE_ENV,
+  buildPostgresBackupBundleManifest,
+  buildPostgresBackupRestoreEnvFile,
+} from '@/lib/portable-backup';
 
 const execFileAsync = promisify(execFile);
 
@@ -65,6 +74,29 @@ async function createPostgresDump(filePath: string, databaseUrl: string) {
   );
 }
 
+async function createPostgresBundle(filePath: string, databaseUrl: string) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-pg-backup-'));
+  const tempDumpPath = path.join(tempDir, POSTGRES_BACKUP_BUNDLE_DUMP);
+
+  try {
+    await createPostgresDump(tempDumpPath, databaseUrl);
+
+    const archive = new AdmZip();
+    archive.addLocalFile(tempDumpPath, '', POSTGRES_BACKUP_BUNDLE_DUMP);
+    archive.addFile(
+      POSTGRES_BACKUP_BUNDLE_MANIFEST,
+      Buffer.from(JSON.stringify(buildPostgresBackupBundleManifest(), null, 2), 'utf8'),
+    );
+    archive.addFile(
+      POSTGRES_BACKUP_BUNDLE_RESTORE_ENV,
+      Buffer.from(buildPostgresBackupRestoreEnvFile(), 'utf8'),
+    );
+    archive.writeZip(filePath);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 export async function createRuntimeBackup(outputDir: string, databaseUrl = process.env.DATABASE_URL) {
   ensureDirectory(outputDir);
 
@@ -93,11 +125,11 @@ export async function createRuntimeBackup(outputDir: string, databaseUrl = proce
       throw new Error('DATABASE_URL is not configured.');
     }
 
-    const filename = `backup-${timestamp}.dump`;
+    const filename = `backup-${timestamp}.postgres.zip`;
     const filePath = path.join(outputDir, filename);
 
     try {
-      await createPostgresDump(filePath, databaseUrl);
+      await createPostgresBundle(filePath, databaseUrl);
     } catch (error) {
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
