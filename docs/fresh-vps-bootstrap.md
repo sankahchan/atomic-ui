@@ -27,7 +27,8 @@ For turning a fresh server into a restored copy of an existing production server
    - panel domain only
    - panel domain + public share subdomain
 5. Choose non-default admin credentials for production.
-6. Decide whether to keep the default Postgres runtime or explicitly opt into SQLite.
+6. Decide whether to keep the generated random panel path or set a fixed one such as `control-center`.
+7. Decide whether to keep the default Postgres runtime or explicitly opt into SQLite.
 
 ## Quick usage
 
@@ -58,6 +59,19 @@ BOOTSTRAP_TELEGRAM_BOT_TOKEN='123456:ABCDEF' \
 bash scripts/bootstrap-vps.sh
 ```
 
+### Predictable first-login path
+
+Use this when you want the panel to come up at a fixed path instead of a generated random one:
+
+```bash
+BOOTSTRAP_HOST=152.42.255.135 \
+BOOTSTRAP_PASSWORD='your-vps-password' \
+BOOTSTRAP_PANEL_PATH='control-center' \
+BOOTSTRAP_DEFAULT_ADMIN_USERNAME='admin' \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
+bash scripts/bootstrap-vps.sh
+```
+
 ### Opt into SQLite instead
 
 Use this only when you explicitly want a SQLite runtime on the fresh VPS:
@@ -85,6 +99,7 @@ If you already have a managed Postgres database, pass `BOOTSTRAP_DATABASE_URL` i
 | `BOOTSTRAP_INSTALL_HTTPS` | `auto`, `require`, or `false`. Defaults to `auto`. |
 | `BOOTSTRAP_DATABASE_ENGINE` | `postgres` or `sqlite`. Defaults to `postgres` for fresh VPS installs. |
 | `BOOTSTRAP_DATABASE_URL` | Optional Postgres connection string. If set, the installer uses it instead of creating a local Postgres database. |
+| `BOOTSTRAP_PANEL_PATH` | Optional fixed panel path such as `control-center`. If omitted, the installer generates a random path. |
 | `BOOTSTRAP_POSTGRES_HOST` | Host for installer-managed Postgres. Keep this local (`127.0.0.1` or `localhost`). |
 | `BOOTSTRAP_POSTGRES_PORT` | Port for installer-managed Postgres. Defaults to `5432`. |
 | `BOOTSTRAP_POSTGRES_DB` | Database name for installer-managed Postgres. Defaults to `atomic_ui`. |

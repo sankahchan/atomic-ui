@@ -82,6 +82,7 @@ sudo env ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubuserconte
 sudo env INSTALL_HTTPS=false bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env INSTALL_HTTPS=require ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env PANEL_DOMAIN=admin.example.com PUBLIC_SHARE_DOMAIN=share.example.com ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+sudo env INSTALL_PANEL_PATH=control-center bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env INSTALL_DATABASE_ENGINE=sqlite bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 ```
 
@@ -100,6 +101,7 @@ See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for domain/HTTPS 
 
 If the new server needs to become a restored copy of an existing production server, follow [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md) after bootstrap.
 Fresh VPS bootstrap now defaults to Postgres too. If you intentionally want SQLite instead, set `BOOTSTRAP_DATABASE_ENGINE=sqlite`.
+If you want a predictable first-login path instead of a generated random one, set `BOOTSTRAP_PANEL_PATH=control-center` or `INSTALL_PANEL_PATH=control-center`.
 
 ## Production Workflow
 
