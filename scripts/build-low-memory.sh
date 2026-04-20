@@ -17,7 +17,14 @@ export NEXT_PUBLIC_APP_VERSION
 
 sh scripts/prisma-command.sh generate >/dev/null
 rm -rf .next/standalone
-npx next build
+# Next occasionally prints a benign compiler worker SIGTERM notice near the end
+# of successful low-memory builds. Filter only that noise and keep all real
+# build output and failures intact.
+npx next build 2>&1 | awk '
+  $0 == "Compiler server unexpectedly exited with code: null and signal: SIGTERM" { next }
+  $0 == "Compiler client unexpectedly exited with code: null and signal: SIGTERM" { next }
+  { print }
+'
 
 if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   echo "[build-low-memory] publishing standalone server bundle"
