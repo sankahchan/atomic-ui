@@ -126,11 +126,13 @@ npm run smoke:telegram
 
 ### Operator notes
 
+- For the full fresh-VPS restore runbook, including the short checklist and Telegram cutover rules, see [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md).
 - SQLite restore runs offline only. Stop `atomic-ui.service`, then run `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip`.
 - Dashboard backup creation follows the active runtime: SQLite creates `.db` file-copy backups, and Postgres creates portable `.postgres.zip` bundles containing `backup.dump` plus restore encryption metadata. Raw `.dump` and `.sql` restores remain supported for older backups.
 - Postgres backup creation, verification, and restore require the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) on the host. On Debian/Ubuntu installs, use `apt-get install -y postgresql-client`.
 - Runtime types must match the backup: SQLite backups restore onto SQLite runtimes, and Postgres `.postgres.zip`, `.dump`, or `.sql` backups restore onto servers configured with a PostgreSQL `DATABASE_URL`.
 - Telegram webhook set/reset in the dashboard registers a secret token with Telegram. Incoming webhook calls without a matching `x-telegram-bot-api-secret-token` header are rejected with `401`. Set `TELEGRAM_WEBHOOK_SECRET` only if you need to override the derived default.
+- Restoring a production backup onto a test server copies the Telegram bot settings, but Telegram keeps sending updates to the currently registered live webhook until you explicitly switch it. Do not reset the webhook on a test restore host.
 - Subscription branding no longer supports custom CSS. Legacy `subscriptionCustomCss` values are ignored and cleared on save.
 
 ### Low-memory VPS deploy
