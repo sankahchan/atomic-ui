@@ -29,6 +29,7 @@ CLEANUP_ON_FAILURE=true
 INSTALL_HTTPS_MODE="${INSTALL_HTTPS:-auto}"
 INSTALL_DATABASE_ENGINE_INPUT="${INSTALL_DATABASE_ENGINE:-${DATABASE_ENGINE:-postgres}}"
 INSTALL_DATABASE_URL_INPUT="${INSTALL_DATABASE_URL:-}"
+INSTALL_PANEL_PATH_INPUT="${INSTALL_PANEL_PATH:-${PANEL_PATH:-}}"
 INSTALL_POSTGRES_HOST_INPUT="${INSTALL_POSTGRES_HOST:-127.0.0.1}"
 INSTALL_POSTGRES_PORT_INPUT="${INSTALL_POSTGRES_PORT:-5432}"
 INSTALL_POSTGRES_DB_INPUT="${INSTALL_POSTGRES_DB:-atomic_ui}"
@@ -54,6 +55,12 @@ normalize_host() {
     value="${value#https://}"
     value="${value%%/*}"
     echo "${value,,}"
+}
+
+normalize_panel_path() {
+    local value="${1#/}"
+    value="${value%/}"
+    echo "${value}"
 }
 
 detect_public_ip() {
@@ -102,6 +109,14 @@ require_simple_postgres_identifier() {
     local value="$2"
     if [[ ! "${value}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
         echo -e "${RED}[✗]${NC} ${label} must match ^[A-Za-z_][A-Za-z0-9_]*$ for installer-managed Postgres"
+        exit 1
+    fi
+}
+
+require_valid_panel_path() {
+    local value="$1"
+    if [[ ! "${value}" =~ ^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$ ]]; then
+        echo -e "${RED}[✗]${NC} INSTALL_PANEL_PATH must contain only letters, numbers, hyphens, underscores, and optional slash-separated segments"
         exit 1
     fi
 }
@@ -166,6 +181,7 @@ fi
 
 PANEL_DOMAIN="$(normalize_host "${PANEL_DOMAIN_INPUT}")"
 PUBLIC_SHARE_DOMAIN="$(normalize_host "${PUBLIC_SHARE_DOMAIN_INPUT}")"
+INSTALL_PANEL_PATH="$(normalize_panel_path "${INSTALL_PANEL_PATH_INPUT}")"
 ALLOW_IP_FALLBACK="$(normalize_bool "${ALLOW_IP_FALLBACK_INPUT}")"
 INSTALL_DATABASE_ENGINE="$(normalize_database_engine "${INSTALL_DATABASE_ENGINE_INPUT}")"
 
@@ -197,6 +213,10 @@ if [ -n "${PANEL_DOMAIN}" ] && [ "${PUBLIC_SHARE_DOMAIN}" = "${PANEL_DOMAIN}" ];
     exit 1
 fi
 
+if [ -n "${INSTALL_PANEL_PATH}" ]; then
+    require_valid_panel_path "${INSTALL_PANEL_PATH}"
+fi
+
 # Check system
 echo -e "${BLUE}[*]${NC} Checking system requirements..."
 if [ -f /etc/os-release ]; then
@@ -210,10 +230,16 @@ fi
 PANEL_PORT=${DEFAULT_PORT}
 echo -e "${GREEN}[✓]${NC} Panel port: ${CYAN}${PANEL_PORT}${NC} (fixed)"
 
-# Generate random path for security
-echo -e "${BLUE}[*]${NC} Generating secure random path..."
-PANEL_PATH=$(generate_random_path)
-echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC}"
+# Resolve panel path
+if [ -n "${INSTALL_PANEL_PATH}" ]; then
+    echo -e "${BLUE}[*]${NC} Using custom panel path..."
+    PANEL_PATH="${INSTALL_PANEL_PATH}"
+    echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC} ${YELLOW}(custom)${NC}"
+else
+    echo -e "${BLUE}[*]${NC} Generating secure random path..."
+    PANEL_PATH=$(generate_random_path)
+    echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC}"
+fi
 
 # Check for port conflicts
 echo -e "${BLUE}[*]${NC} Checking for port conflicts..."
