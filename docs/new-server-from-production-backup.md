@@ -13,6 +13,30 @@ After this runbook:
 - dashboard backup upload, verify, and restore work on the new server too
 - you log in with the source server's admin account, not the temporary bootstrap admin
 
+## Fast checklist
+
+Use this shorter operator flow when you already know the server should stay on Postgres:
+
+1. Bootstrap the fresh VPS on the current `main` branch.
+2. Confirm the new server is using a Postgres `DATABASE_URL`.
+3. Upload the latest production `.postgres.zip` in `Settings -> Backup & Restore`.
+4. Verify the backup becomes `Restore ready`.
+5. Click `Restore` and wait for the restore job to finish.
+6. Log in with the source server owner/admin account.
+7. Confirm users, servers, keys, and backup verification all look correct.
+8. Decide whether the restored server is only for testing or should become live.
+
+## Test restore vs live promotion
+
+These are different operations:
+
+- Test restore only:
+  Restore the backup, validate the app, then leave DNS and Telegram pointed at the main server.
+- Live promotion:
+  Restore the backup, point the real app domain and HTTPS at the new server, then set the Telegram webhook from the new server dashboard.
+
+Restoring a production backup copies the Telegram bot settings and secrets, but it does not automatically make the restored server the active Telegram endpoint. Telegram keeps delivering to whichever webhook URL is already registered until you explicitly change it.
+
 ## Before you start
 
 You need:
@@ -205,6 +229,17 @@ Check:
 - `Settings -> Backup & Restore` still verifies current backups successfully
 - Telegram settings and webhook configuration match the source environment
 
+If this server is only a test or standby restore target:
+
+- do not repoint DNS
+- do not reset the Telegram webhook here
+- keep the main production server as the active Telegram endpoint
+
+If this server is meant to replace production:
+
+- move the app domain and HTTPS to the restored server first
+- then use the restored dashboard to set the Telegram webhook on the new live URL
+
 Useful probes:
 
 ```bash
@@ -218,8 +253,9 @@ Once the restored server looks correct:
 
 1. Create a fresh new Postgres backup on the target server.
 2. Keep the migration safety snapshot until you are fully satisfied.
-3. Remove stale incompatible backup files and verification rows if they are no longer needed.
-4. Record the target server's SSH port, panel path, and backup status in your ops notes.
+3. If this was only a restore test, destroy or lock down the temporary server after validation because it contains production data and secrets.
+4. Remove stale incompatible backup files and verification rows if they are no longer needed.
+5. Record the target server's SSH port, panel path, and backup status in your ops notes.
 
 ## Troubleshooting
 
