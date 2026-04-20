@@ -18,6 +18,12 @@ import {
   resolveBackupRuntimeCompatibilityMessage,
   resolvePostgresCliErrorMessage,
 } from '@/lib/services/postgres-cli-errors';
+import {
+  POSTGRES_BACKUP_BUNDLE_DUMP,
+  POSTGRES_BACKUP_BUNDLE_FORMAT,
+  POSTGRES_BACKUP_BUNDLE_MANIFEST,
+  POSTGRES_BACKUP_BUNDLE_RESTORE_ENV,
+} from '@/lib/portable-backup';
 
 const execFileAsync = promisify(execFile);
 
@@ -330,6 +336,145 @@ async function inspectSqliteArchiveBackupFile(
   }
 }
 
+function findPostgresDumpArchiveEntry(entries: AdmZip.IZipEntry[]) {
+  return (
+    entries.find((entry) => entry.entryName === POSTGRES_BACKUP_BUNDLE_DUMP) ||
+    entries.find((entry) => path.posix.basename(entry.entryName).toLowerCase().endsWith('.dump'))
+  );
+}
+
+function parsePostgresArchiveManifest(entries: AdmZip.IZipEntry[]) {
+  const manifestEntry = entries.find((entry) => entry.entryName === POSTGRES_BACKUP_BUNDLE_MANIFEST);
+  if (!manifestEntry) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(manifestEntry.getData().toString('utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function inspectPostgresArchiveBackupFile(
+  filename: string,
+  filePath: string,
+  fileSizeBytes: bigint,
+  fileHashSha256: string,
+): Promise<BackupVerificationSummary> {
+  const details: Record<string, unknown> = {
+    filePath,
+    format: 'postgres_archive',
+    runtimeEngine: resolveDatabaseEngine(),
+  };
+
+  try {
+    const archive = new AdmZip(filePath);
+    const entries = archive.getEntries().filter((entry) => !entry.isDirectory);
+    const manifest = parsePostgresArchiveManifest(entries);
+    const dumpEntry = findPostgresDumpArchiveEntry(entries);
+
+    details.archiveEntries = entries.map((entry) => entry.entryName);
+    details.manifest = manifest;
+    details.restoreEnvAvailable = entries.some((entry) => entry.entryName === POSTGRES_BACKUP_BUNDLE_RESTORE_ENV);
+
+    if (manifest && manifest.format !== POSTGRES_BACKUP_BUNDLE_FORMAT) {
+      return buildFailedVerificationSummary(
+        filename,
+        fileSizeBytes,
+        fileHashSha256,
+        'Backup archive manifest is not a supported Atomic-UI Postgres backup bundle.',
+        details,
+      );
+    }
+
+    if (!dumpEntry) {
+      return buildFailedVerificationSummary(
+        filename,
+        fileSizeBytes,
+        fileHashSha256,
+        'Backup archive does not contain a Postgres dump payload.',
+        details,
+      );
+    }
+
+    const dumpBuffer = dumpEntry.getData();
+    const header = dumpBuffer.subarray(0, 16).toString('utf8');
+    details.archiveDumpEntry = dumpEntry.entryName;
+    details.header = header;
+
+    if (!header.startsWith('PGDMP')) {
+      return buildFailedVerificationSummary(
+        filename,
+        fileSizeBytes,
+        fileHashSha256,
+        'Backup archive does not contain a valid Postgres custom dump.',
+        details,
+      );
+    }
+
+    const compatibilityError = resolveBackupRuntimeCompatibilityMessage('postgres_archive');
+    if (compatibilityError) {
+      details.runtimeCompatibilityError = compatibilityError;
+      return buildFailedVerificationSummary(
+        filename,
+        fileSizeBytes,
+        fileHashSha256,
+        compatibilityError,
+        details,
+      );
+    }
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-postgres-archive-verify-'));
+    const tempDumpPath = path.join(tempDir, `${randomUUID()}.dump`);
+    fs.writeFileSync(tempDumpPath, dumpBuffer);
+
+    try {
+      const { stdout } = await execFileAsync('pg_restore', ['--list', tempDumpPath], {
+        maxBuffer: 4 * 1024 * 1024,
+      });
+      const tocLines = stdout
+        .split('\n')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0 && !value.startsWith(';'));
+      const missingTables = BACKUP_EXPECTED_TABLES.filter((tableName) => {
+        const tablePattern = new RegExp(`\\b(?:TABLE|TABLE DATA)\\b[^\\n]*\\b${tableName}\\b`, 'i');
+        return !tablePattern.test(stdout);
+      });
+      const tableCount = tocLines.filter((line) => /\bTABLE\b/i.test(line) && !/\bTABLE DATA\b/i.test(line)).length;
+      const restoreReady = missingTables.length === 0;
+
+      details.missingTables = missingTables;
+      details.tocEntryCount = tocLines.length;
+
+      return {
+        filename,
+        status: restoreReady ? 'SUCCESS' : 'FAILED',
+        triggeredBy: undefined,
+        fileSizeBytes,
+        fileHashSha256,
+        restoreReady,
+        integrityCheck: 'pg_restore list ok',
+        tableCount,
+        accessKeyCount: null,
+        userCount: null,
+        error: restoreReady ? null : `Missing expected tables: ${missingTables.join(', ')}`,
+        details,
+      };
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  } catch (error) {
+    return buildFailedVerificationSummary(
+      filename,
+      fileSizeBytes,
+      fileHashSha256,
+      error instanceof Error ? error.message : 'Backup archive verification failed.',
+      details,
+    );
+  }
+}
+
 async function inspectPostgresDumpFile(
   filename: string,
   filePath: string,
@@ -431,7 +576,21 @@ export async function inspectBackupFile(filename: string): Promise<BackupVerific
     return inspectSqliteBackupFile(filename, filePath, fileSizeBytes, fileHashSha256, header);
   }
 
+  if (fileKind === 'postgres_archive') {
+    return inspectPostgresArchiveBackupFile(filename, filePath, fileSizeBytes, fileHashSha256);
+  }
+
   if (fileKind === 'sqlite_archive') {
+    try {
+      const archive = new AdmZip(filePath);
+      const entries = archive.getEntries().filter((entry) => !entry.isDirectory);
+      if (findPostgresDumpArchiveEntry(entries)) {
+        return inspectPostgresArchiveBackupFile(filename, filePath, fileSizeBytes, fileHashSha256);
+      }
+    } catch {
+      // Let the SQLite archive inspector return the user-facing archive error.
+    }
+
     return inspectSqliteArchiveBackupFile(filename, filePath, fileSizeBytes, fileHashSha256);
   }
 

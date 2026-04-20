@@ -51,3 +51,15 @@ test('storeUploadedBackupFile stores sqlite archive uploads', () => {
   assert.equal(result.fileKind, 'sqlite_archive');
   assert.equal(fs.existsSync(result.filePath), true);
 });
+
+test('storeUploadedBackupFile stores portable postgres archive uploads', () => {
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-upload-'));
+  const result = storeUploadedBackupFile({
+    filename: 'atomic-backup.postgres.zip',
+    buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+    outputDir,
+  });
+
+  assert.equal(result.fileKind, 'postgres_archive');
+  assert.equal(fs.existsSync(result.filePath), true);
+});

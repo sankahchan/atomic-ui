@@ -11,6 +11,7 @@ test('inferBackupFileKind detects sqlite files', () => {
 test('inferBackupFileKind detects postgres dump files', () => {
   assert.equal(inferBackupFileKind('backup-2026-04-15.dump'), 'postgres_dump');
   assert.equal(inferBackupFileKind('backup-2026-04-15.anything', 'PGDMP'), 'postgres_dump');
+  assert.equal(inferBackupFileKind('backup-2026-04-15.postgres.zip'), 'postgres_archive');
 });
 
 test('buildOfflineRestoreCommand returns engine-specific commands', () => {
@@ -29,5 +30,9 @@ test('buildOfflineRestoreCommand returns engine-specific commands', () => {
   assert.equal(
     buildOfflineRestoreCommand('backup.zip', '/tmp/backup.zip'),
     'npm run restore:sqlite -- --backup /tmp/backup.zip',
+  );
+  assert.equal(
+    buildOfflineRestoreCommand('backup.postgres.zip', '/tmp/backup.postgres.zip'),
+    'Upload /tmp/backup.postgres.zip in the dashboard and use Restore. The bundle contains the Postgres dump plus restore encryption metadata.',
   );
 });

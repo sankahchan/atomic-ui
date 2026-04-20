@@ -2,7 +2,19 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
+const AdmZip = require('adm-zip');
+
+const POSTGRES_BACKUP_BUNDLE_MANIFEST = 'atomic-ui-backup-manifest.json';
+const POSTGRES_BACKUP_BUNDLE_RESTORE_ENV = 'atomic-ui-restore.env';
+const POSTGRES_BACKUP_BUNDLE_DUMP = 'backup.dump';
+const POSTGRES_RESTORE_ENV_KEYS = new Set([
+  'SETTINGS_ENCRYPTION_KEY',
+  'TOTP_ENCRYPTION_KEY',
+  'JWT_SECRET',
+  'TELEGRAM_WEBHOOK_SECRET',
+]);
 
 function parseArgs(argv) {
   const args = [...argv];
@@ -65,6 +77,9 @@ function applyEnvDefaults(appRoot) {
 
 function inferBackupFileKind(filename) {
   const normalized = filename.trim().toLowerCase();
+  if (normalized.endsWith('.postgres.zip') || normalized.endsWith('.pg.zip')) {
+    return 'postgres_archive';
+  }
   if (normalized.endsWith('.dump')) {
     return 'postgres_dump';
   }
@@ -75,6 +90,85 @@ function inferBackupFileKind(filename) {
     return 'sqlite';
   }
   return 'unknown';
+}
+
+function parseRestoreEnv(content) {
+  return content
+    .split(/\r?\n/)
+    .reduce((acc, line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) {
+        return acc;
+      }
+
+      const separator = trimmed.indexOf('=');
+      if (separator === -1) {
+        return acc;
+      }
+
+      const key = trimmed.slice(0, separator).trim();
+      if (!POSTGRES_RESTORE_ENV_KEYS.has(key)) {
+        return acc;
+      }
+
+      let value = trimmed.slice(separator + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      acc[key] = value;
+      return acc;
+    }, {});
+}
+
+function quoteEnvValue(value) {
+  return JSON.stringify(value);
+}
+
+function applyRestoreEnv(appRoot, values, jobId) {
+  const entries = Object.entries(values).filter(([, value]) => typeof value === 'string' && value.trim());
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const envPath = path.join(appRoot, '.env');
+  const backupPath = `${envPath}.pre-restore-${jobId}`;
+  const existingContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+  if (fs.existsSync(envPath) && !fs.existsSync(backupPath)) {
+    fs.copyFileSync(envPath, backupPath);
+  }
+
+  const lines = existingContent ? existingContent.split(/\r?\n/) : [];
+  const pending = new Map(entries);
+  const nextLines = lines.map((line) => {
+    const separator = line.indexOf('=');
+    if (separator === -1) {
+      return line;
+    }
+
+    const key = line.slice(0, separator).trim();
+    if (!pending.has(key)) {
+      return line;
+    }
+
+    const value = pending.get(key);
+    pending.delete(key);
+    return `${key}=${quoteEnvValue(value)}`;
+  });
+
+  for (const [key, value] of pending.entries()) {
+    nextLines.push(`${key}=${quoteEnvValue(value)}`);
+  }
+
+  fs.writeFileSync(envPath, nextLines.join('\n').replace(/\n*$/, '\n'));
+  for (const [key, value] of entries) {
+    process.env[key] = value;
+  }
+
+  return backupPath;
 }
 
 function readJob(jobFile) {
@@ -195,6 +289,46 @@ function restorePostgresSql(backupPath) {
   }
 }
 
+function findPostgresDumpArchiveEntry(zip) {
+  const entries = zip.getEntries().filter((entry) => !entry.isDirectory);
+  return (
+    entries.find((entry) => entry.entryName === POSTGRES_BACKUP_BUNDLE_DUMP) ||
+    entries.find((entry) => path.posix.basename(entry.entryName).toLowerCase().endsWith('.dump'))
+  );
+}
+
+function isPostgresArchiveBackup(backupPath) {
+  try {
+    const zip = new AdmZip(backupPath);
+    return Boolean(zip.getEntry(POSTGRES_BACKUP_BUNDLE_MANIFEST) || findPostgresDumpArchiveEntry(zip));
+  } catch {
+    return false;
+  }
+}
+
+function restorePostgresArchive(appRoot, backupPath, jobId) {
+  const zip = new AdmZip(backupPath);
+  const dumpEntry = findPostgresDumpArchiveEntry(zip);
+  if (!dumpEntry) {
+    throw new Error('Postgres backup bundle is missing backup.dump.');
+  }
+
+  const restoreEnvEntry = zip.getEntry(POSTGRES_BACKUP_BUNDLE_RESTORE_ENV);
+  if (restoreEnvEntry) {
+    applyRestoreEnv(appRoot, parseRestoreEnv(restoreEnvEntry.getData().toString('utf8')), jobId);
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-postgres-restore-'));
+  const tempDumpPath = path.join(tempDir, POSTGRES_BACKUP_BUNDLE_DUMP);
+
+  try {
+    fs.writeFileSync(tempDumpPath, dumpEntry.getData());
+    restorePostgresDump(tempDumpPath);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 function restoreSqlite(appRoot, backupPath) {
   runCommand(process.execPath, [path.join(appRoot, 'scripts', 'restore-sqlite-backup.js'), '--backup', backupPath], {
     cwd: appRoot,
@@ -225,8 +359,14 @@ function main() {
 
     writeJob(jobFile, { status: 'RESTORING' });
 
-    const fileKind = inferBackupFileKind(backupFilename);
-    if (fileKind === 'postgres_dump') {
+    let fileKind = inferBackupFileKind(backupFilename);
+    if (fileKind === 'sqlite' && backupFilename.trim().toLowerCase().endsWith('.zip') && isPostgresArchiveBackup(backupPath)) {
+      fileKind = 'postgres_archive';
+    }
+
+    if (fileKind === 'postgres_archive') {
+      restorePostgresArchive(appRoot, backupPath, args['job-id']);
+    } else if (fileKind === 'postgres_dump') {
       restorePostgresDump(backupPath);
     } else if (fileKind === 'postgres_sql') {
       restorePostgresSql(backupPath);

@@ -9,11 +9,15 @@ import {
   MAX_NOTIFICATION_COOLDOWN_MINUTES,
   MAX_NOTIFICATION_WEBHOOK_HEADERS,
   NOTIFICATION_WEBHOOK_RESERVED_HEADERS,
+  buildStoredNotificationChannelConfig,
   channelSupportsEvent,
   isValidWebhookHeaderName,
+  notificationChannelNeedsSecretMigration,
   notificationChannelTypeSchema,
   notificationEventSchema,
   parseNotificationChannelRecord,
+  parseWebhookHeaders,
+  sanitizeNotificationChannelForClient,
   sendNotificationToChannel,
 } from '@/lib/services/notification-channels';
 import {
@@ -148,9 +152,14 @@ function buildChannelConfig(
     case 'WEBHOOK':
       return {
         ...existingConfig,
+        ...buildStoredNotificationChannelConfig(
+          {
+            signingSecret: input.webhookSigningSecret?.trim() ?? '',
+            headers: buildWebhookHeaders(input.webhookHeaders),
+          },
+          existingConfig,
+        ),
         url: input.webhookUrl ?? '',
-        headers: JSON.stringify(buildWebhookHeaders(input.webhookHeaders)),
-        signingSecret: input.webhookSigningSecret?.trim() ?? '',
         cooldownMinutes: String(input.cooldownMinutes),
         eventCooldowns: JSON.stringify(input.eventCooldowns),
       };
@@ -250,9 +259,43 @@ export const notificationsRouter = router({
       orderBy: { createdAt: 'desc' },
     });
 
+    await Promise.allSettled(
+      channels.map(async (channel) => {
+        const existingConfig = parseConfig(channel.config);
+        if (!notificationChannelNeedsSecretMigration(existingConfig)) {
+          return;
+        }
+
+        await db.notificationChannel.update({
+          where: { id: channel.id },
+          data: {
+            config: JSON.stringify(
+              {
+                ...existingConfig,
+                ...buildStoredNotificationChannelConfig(
+                  {
+                    signingSecret:
+                      typeof existingConfig.signingSecret === 'string'
+                        ? existingConfig.signingSecret
+                        : '',
+                    headers:
+                      typeof existingConfig.headers === 'string'
+                        ? parseWebhookHeaders(existingConfig.headers)
+                        : {},
+                  },
+                  existingConfig,
+                ),
+              },
+            ),
+          },
+        });
+      }),
+    );
+
     return channels
       .map((channel) => parseNotificationChannelRecord(channel))
-      .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel));
+      .filter((channel): channel is NonNullable<typeof channel> => Boolean(channel))
+      .map((channel) => sanitizeNotificationChannelForClient(channel));
   }),
   queueStatus: adminProcedure.query(async ({ ctx }) => {
     assertNotificationViewScope(ctx.user.adminScope);
@@ -275,7 +318,9 @@ export const notificationsRouter = router({
         });
       }
 
-      const existingConfig = existingChannel ? parseConfig(existingChannel.config) : {};
+      const existingConfig = existingChannel
+        ? (parseNotificationChannelRecord(existingChannel)?.config ?? parseConfig(existingChannel.config))
+        : {};
       const webhookHeaderCount = input.type === 'WEBHOOK' ? Object.keys(buildWebhookHeaders(input.webhookHeaders)).length : 0;
       const channel = await db.notificationChannel.upsert({
         where: { id: input.id ?? '__create__' },
@@ -327,7 +372,7 @@ export const notificationsRouter = router({
         },
       });
 
-      return parsedChannel;
+      return sanitizeNotificationChannelForClient(parsedChannel);
     }),
   deleteChannel: adminProcedure
     .input(z.object({ id: z.string().min(1) }))

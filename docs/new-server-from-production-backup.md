@@ -2,7 +2,7 @@
 
 Use this when you need a replacement Atomic-UI server that becomes a working copy of an existing production server.
 
-This runbook is for the case where the source server already creates Postgres `.dump` backups in the dashboard.
+This runbook is for the case where the source server already creates Postgres `.postgres.zip` backup bundles in the dashboard. Older raw `.dump` files are still supported, but portable bundles are preferred for new server restores.
 
 ## Outcome
 
@@ -29,7 +29,9 @@ You need:
 
 Fresh VPS installs through `install.sh` and `scripts/bootstrap-vps.sh` now default to Postgres.
 
-A Postgres `.dump` backup can only be restored onto a server that is also configured with a Postgres `DATABASE_URL`.
+A Postgres `.postgres.zip`, `.dump`, or `.sql` backup can only be restored onto a server that is also configured with a Postgres `DATABASE_URL`.
+
+Use `.postgres.zip` when moving to a fresh VPS. It contains the Postgres dump plus the restore encryption keys needed for database-backed Telegram/provider secrets to keep decrypting after restore. Treat it like a full secret-bearing production backup.
 
 If you skip the Postgres conversion step below, restore will fail with the expected message:
 
@@ -140,7 +142,7 @@ You can either:
 Example with `scp`:
 
 ```bash
-scp -P 22022 /absolute/path/to/backup.dump root@your-server-ip:/opt/atomic-ui/storage/backups/
+scp -P 22022 /absolute/path/to/backup.postgres.zip root@your-server-ip:/opt/atomic-ui/storage/backups/
 ```
 
 ### 5. Verify the backup in the dashboard

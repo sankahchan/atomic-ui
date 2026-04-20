@@ -9,15 +9,117 @@ import { z } from 'zod';
 import { router, adminProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/db';
+import {
+    decryptSettingSecret,
+    encryptSettingSecret,
+    isEncryptedSettingSecret,
+} from '@/lib/settings-crypto';
 import digitalocean from 'digitalocean';
+
+const DIGITALOCEAN_TOKEN_SETTING_KEY = 'digitalOceanToken';
+
+export interface ProvisionTokenInspection {
+    hasToken: boolean;
+    token?: string;
+    encrypted: boolean;
+    needsMigration: boolean;
+    error: string | null;
+}
+
+export function parseProvisionTokenValue(value: string) {
+    const parsed = JSON.parse(value);
+    if (typeof parsed !== 'string' || parsed.trim().length === 0) {
+        throw new Error('Stored provider token is invalid.');
+    }
+
+    return decryptSettingSecret(parsed);
+}
+
+export function serializeProvisionTokenValue(token: string) {
+    return JSON.stringify(encryptSettingSecret(token));
+}
+
+export function isProvisionTokenValueEncrypted(value: string) {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'string' && isEncryptedSettingSecret(parsed);
+}
+
+export function inspectProvisionTokenValue(value: string | null | undefined): ProvisionTokenInspection {
+    if (!value?.trim()) {
+        return {
+            hasToken: false,
+            encrypted: false,
+            needsMigration: false,
+            error: null,
+        };
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed !== 'string' || parsed.trim().length === 0) {
+            return {
+                hasToken: false,
+                encrypted: false,
+                needsMigration: false,
+                error: 'Stored DigitalOcean token is invalid.',
+            };
+        }
+
+        const encrypted = isEncryptedSettingSecret(parsed);
+        const token = decryptSettingSecret(parsed).trim();
+        if (!token) {
+            return {
+                hasToken: false,
+                encrypted,
+                needsMigration: false,
+                error: 'Stored DigitalOcean token is empty.',
+            };
+        }
+
+        return {
+            hasToken: true,
+            token,
+            encrypted,
+            needsMigration: !encrypted,
+            error: null,
+        };
+    } catch {
+        return {
+            hasToken: false,
+            encrypted: false,
+            needsMigration: false,
+            error: 'Stored DigitalOcean token could not be decrypted. Save the provider token again.',
+        };
+    }
+}
+
+function getEnvDigitalOceanToken() {
+    return (
+        process.env.DIGITALOCEAN_ACCESS_TOKEN?.trim() ||
+        process.env.DIGITALOCEAN_TOKEN?.trim() ||
+        ''
+    );
+}
 
 // Helper to get DO client
 async function getDOClient() {
     const setting = await db.settings.findUnique({
-        where: { key: 'digitalOceanToken' },
+        where: { key: DIGITALOCEAN_TOKEN_SETTING_KEY },
     });
 
-    const token = setting ? JSON.parse(setting.value) : process.env.DIGITALOCEAN_ACCESS_TOKEN;
+    let token: string | undefined;
+    if (setting) {
+        const inspection = inspectProvisionTokenValue(setting.value);
+        if (!inspection.hasToken || !inspection.token) {
+            throw new TRPCError({
+                code: 'PRECONDITION_FAILED',
+                message: inspection.error || 'DigitalOcean API Token not configured.',
+            });
+        }
+        token = inspection.token;
+    } else {
+        token = getEnvDigitalOceanToken();
+    }
 
     if (!token) {
         throw new TRPCError({
@@ -35,10 +137,27 @@ export const provisionRouter = router({
      */
     checkConfig: adminProcedure.query(async () => {
         const setting = await db.settings.findUnique({
-            where: { key: 'digitalOceanToken' },
+            where: { key: DIGITALOCEAN_TOKEN_SETTING_KEY },
         });
+
+        if (setting) {
+            const inspection = inspectProvisionTokenValue(setting.value);
+            return {
+                hasToken: inspection.hasToken,
+                source: 'settings' as const,
+                tokenEncrypted: inspection.encrypted,
+                needsTokenMigration: inspection.needsMigration,
+                tokenError: inspection.error,
+            };
+        }
+
+        const envToken = getEnvDigitalOceanToken();
         return {
-            hasToken: !!(setting?.value || process.env.DIGITALOCEAN_ACCESS_TOKEN),
+            hasToken: envToken.length > 0,
+            source: envToken ? 'env' as const : null,
+            tokenEncrypted: null,
+            needsTokenMigration: false,
+            tokenError: null,
         };
     }),
 
@@ -49,13 +168,13 @@ export const provisionRouter = router({
         .input(z.object({ token: z.string().min(1) }))
         .mutation(async ({ input }) => {
             await db.settings.upsert({
-                where: { key: 'digitalOceanToken' },
+                where: { key: DIGITALOCEAN_TOKEN_SETTING_KEY },
                 create: {
-                    key: 'digitalOceanToken',
-                    value: JSON.stringify(input.token),
+                    key: DIGITALOCEAN_TOKEN_SETTING_KEY,
+                    value: serializeProvisionTokenValue(input.token),
                 },
                 update: {
-                    value: JSON.stringify(input.token),
+                    value: serializeProvisionTokenValue(input.token),
                 },
             });
             return { success: true };

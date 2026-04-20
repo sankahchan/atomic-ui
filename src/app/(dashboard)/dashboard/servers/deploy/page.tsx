@@ -78,7 +78,12 @@ export default function DeployServerPage() {
   );
 
   useEffect(() => {
-    if (configQuery.data?.hasToken && step === 1) {
+    if (
+      configQuery.data?.hasToken &&
+      !configQuery.data.needsTokenMigration &&
+      !configQuery.data.tokenError &&
+      step === 1
+    ) {
       setStep(2);
     }
   }, [configQuery.data, step]);
@@ -127,6 +132,13 @@ export default function DeployServerPage() {
     () => sizeOptions.find((item) => item.slug === size) ?? null,
     [sizeOptions, size]
   );
+  const tokenStatusLabel = configQuery.data?.tokenError
+    ? 'Invalid'
+    : configQuery.data?.needsTokenMigration
+      ? 'Needs resave'
+      : configQuery.data?.hasToken
+        ? 'Configured'
+        : 'Required';
 
   const handleSaveToken = () => {
     if (!token) return;
@@ -216,7 +228,7 @@ export default function DeployServerPage() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">API token</p>
-                  <p className="mt-2 text-sm font-medium">{configQuery.data?.hasToken ? 'Configured' : 'Required'}</p>
+                  <p className="mt-2 text-sm font-medium">{tokenStatusLabel}</p>
                 </div>
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet state</p>
@@ -302,8 +314,16 @@ export default function DeployServerPage() {
                     onChange={(e) => setToken(e.target.value)}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Generate a token with read/write access from DigitalOcean API settings. It is stored so future deploys can skip this step.
+                    Generate a token with read/write access from DigitalOcean API settings. It is encrypted before storage so future deploys can skip this step.
                   </p>
+                  {configQuery.data?.needsTokenMigration ? (
+                    <p className="text-sm font-medium text-amber-600 dark:text-amber-300">
+                      The saved token came from an older plaintext format. Re-enter it once to encrypt it at rest.
+                    </p>
+                  ) : null}
+                  {configQuery.data?.tokenError ? (
+                    <p className="text-sm font-medium text-destructive">{configQuery.data.tokenError}</p>
+                  ) : null}
                 </div>
                 <Button
                   onClick={handleSaveToken}

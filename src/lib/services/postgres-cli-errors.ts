@@ -50,7 +50,7 @@ export function resolveBackupRuntimeCompatibilityMessage(
     }
   }
 
-  if (fileKind === 'postgres_dump' || fileKind === 'postgres_sql') {
+  if (fileKind === 'postgres_dump' || fileKind === 'postgres_sql' || fileKind === 'postgres_archive') {
     if (runtimeEngine === 'sqlite') {
       return 'This server is using SQLite. Postgres backups can only be restored on servers configured with a PostgreSQL DATABASE_URL.';
     }

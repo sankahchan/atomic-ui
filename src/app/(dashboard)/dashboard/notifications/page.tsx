@@ -107,6 +107,11 @@ const RESERVED_WEBHOOK_HEADERS = new Set([
   'x-atomic-timestamp',
   'x-atomic-signature',
 ]);
+const MASKED_SECRET_PLACEHOLDER = '********';
+
+function isMaskedSecretInput(value: string | undefined) {
+  return value?.trim() === MASKED_SECRET_PLACEHOLDER;
+}
 
 /**
  * Channel type configuration with icons and descriptions
@@ -1652,9 +1657,14 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   };
   const utils = trpc.useUtils();
   const currentUserQuery = trpc.auth.me.useQuery();
-  const settingsQuery = trpc.telegramBot.getSettings.useQuery();
+  const canManageAnnouncements = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
+  const settingsQuery = trpc.telegramBot.getSettings.useQuery(undefined, {
+    enabled: canManageAnnouncements,
+    refetchOnWindowFocus: false,
+  });
   const webhookInfoQuery = trpc.telegramBot.getWebhookInfo.useQuery(undefined, {
-    refetchInterval: 30_000,
+    enabled: canManageAnnouncements,
+    refetchInterval: canManageAnnouncements ? 30_000 : false,
   });
   const [form, setForm] = useState<TelegramSettings>(DEFAULT_TELEGRAM_SETTINGS);
   const [adminChatIdsInput, setAdminChatIdsInput] = useState('');
@@ -1921,7 +1931,6 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       enabled: isAnalyticsTabActive,
     },
   );
-  const canManageAnnouncements = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
   const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
     onSuccess: async (result) => {
       await Promise.all([
@@ -2135,6 +2144,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
 
   const isSaving = saveSettingsMutation.isPending;
   const hasToken = form.botToken.trim().length > 0;
+  const hasTestableToken = hasToken && !isMaskedSecretInput(form.botToken);
   const announcementFilters = {
     tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
     segment:
@@ -2470,7 +2480,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                     variant="outline"
                     className="shrink-0"
                     onClick={() => testConnectionMutation.mutate({ botToken: form.botToken.trim() })}
-                    disabled={!hasToken || testConnectionMutation.isPending}
+                    disabled={!hasTestableToken || testConnectionMutation.isPending}
                   >
                     {testConnectionMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube className="mr-2 h-4 w-4" />}
                     {t('settings.telegram.test')}
@@ -3222,11 +3232,13 @@ function ChannelDialog({
   onOpenChange,
   editChannel,
   onSuccess,
+  canLoadTelegramAdminChats,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editChannel?: Channel | null;
   onSuccess: () => void;
+  canLoadTelegramAdminChats: boolean;
 }) {
   const { toast } = useToast();
   const { t } = useLocale();
@@ -3268,7 +3280,7 @@ function ChannelDialog({
     events: editChannel?.events || [],
   });
   const telegramSettingsQuery = trpc.telegramBot.getSettings.useQuery(undefined, {
-    enabled: open && formData.type === 'TELEGRAM',
+    enabled: canLoadTelegramAdminChats && open && formData.type === 'TELEGRAM',
     refetchOnWindowFocus: false,
   });
 
@@ -9678,6 +9690,7 @@ export default function NotificationsPage() {
   const { t, locale } = useLocale();
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
+  const currentUserQuery = trpc.auth.me.useQuery();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -9705,6 +9718,7 @@ export default function NotificationsPage() {
     params.set('workspace', workspace);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
+  const canManageAnnouncementSettings = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
 
   const { data: channels = [], isLoading: isChannelsLoading } = trpc.notifications.listChannels.useQuery(
     undefined,
@@ -10193,6 +10207,7 @@ export default function NotificationsPage() {
         onSuccess={() => {
           setEditChannel(null);
         }}
+        canLoadTelegramAdminChats={canManageAnnouncementSettings}
       />
     </div>
   );
