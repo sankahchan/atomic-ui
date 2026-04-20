@@ -3,6 +3,7 @@ import https from 'https';
 import os from 'os';
 import path from 'path';
 import { execFileSync, spawn, type ChildProcess } from 'child_process';
+import { X509Certificate } from 'crypto';
 
 import bcrypt from 'bcryptjs';
 
@@ -36,6 +37,12 @@ function setSmokeEnv() {
   process.env.NODE_ENV = 'development';
 }
 
+type GeneratedSelfSignedCertificate = {
+  key: Buffer;
+  cert: Buffer;
+  fingerprint256: string;
+};
+
 function generateSelfSignedCertificate() {
   const certDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-playwright-'));
   const keyPath = path.join(certDir, 'key.pem');
@@ -68,10 +75,15 @@ function generateSelfSignedCertificate() {
     );
   }
 
+  const key = fs.readFileSync(keyPath);
+  const cert = fs.readFileSync(certPath);
+  const fingerprint256 = new X509Certificate(cert).fingerprint256;
+
   return {
-    key: fs.readFileSync(keyPath),
-    cert: fs.readFileSync(certPath),
-  };
+    key,
+    cert,
+    fingerprint256,
+  } satisfies GeneratedSelfSignedCertificate;
 }
 
 function readJsonBody(request: import('http').IncomingMessage): Promise<Record<string, unknown>> {
@@ -111,7 +123,14 @@ function createMockOutlineServer() {
   >();
   let keyCounter = 1;
 
-  return https.createServer(certificate, async (request, response) => {
+  return {
+    fingerprint256: certificate.fingerprint256,
+    server: https.createServer(
+      {
+        key: certificate.key,
+        cert: certificate.cert,
+      },
+      async (request, response) => {
     const requestUrl = new URL(request.url || '/', outlineUrl);
 
     if (request.method === 'GET' && requestUrl.pathname === '/server') {
@@ -206,10 +225,12 @@ function createMockOutlineServer() {
 
     response.writeHead(404, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ error: 'Not found', path: requestUrl.pathname }));
-  });
+      },
+    ),
+  };
 }
 
-async function resetAndSeedDatabase() {
+async function resetAndSeedDatabase(outlineCertSha256: string) {
   fs.mkdirSync(path.dirname(smokeDbPath), { recursive: true });
   if (fs.existsSync(smokeDbPath)) {
     fs.rmSync(smokeDbPath, { force: true });
@@ -350,7 +371,7 @@ async function resetAndSeedDatabase() {
         id: 'smoke-server',
         name: 'Playwright SG',
         apiUrl: outlineUrl,
-        apiCertSha256: 'playwright-smoke',
+        apiCertSha256: outlineCertSha256,
         countryCode: 'SG',
         location: 'Singapore',
         isActive: true,
@@ -599,9 +620,9 @@ function startNextServer(): ChildProcess {
 
 async function main() {
   setSmokeEnv();
-  await resetAndSeedDatabase();
+  const { server: outlineServer, fingerprint256 } = createMockOutlineServer();
+  await resetAndSeedDatabase(fingerprint256);
 
-  const outlineServer = createMockOutlineServer();
   await new Promise<void>((resolve) => {
     outlineServer.listen(outlinePort, '127.0.0.1', () => resolve());
   });
