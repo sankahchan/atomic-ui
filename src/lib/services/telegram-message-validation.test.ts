@@ -115,3 +115,30 @@ test('telegram payment and refund reply strings stay compact and HTML-safe', () 
   assert.doesNotMatch(ui.orderProofPending('ORD-123'), /It is now waiting for admin review/);
   assert.doesNotMatch(ui.refundRequested('ORD-123'), /after admin review/);
 });
+
+test('telegram premium prompts and order outcomes stay compact and HTML-safe', () => {
+  const ui = getTelegramUi('en');
+  const samples = [
+    ui.premiumRegionPrompt('Onn', 'SG, JP, US'),
+    ui.premiumRegionRequestSubmitted('Onn', 'SG'),
+    ui.premiumRouteIssueSubmitted('Onn'),
+    ui.premiumSupportRequestPending('PRM-123'),
+    ui.premiumFollowUpPrompt('PRM-123', 'Onn'),
+    ui.premiumFollowUpSubmitted('PRM-123'),
+    ui.orderRejected('ORD-123'),
+    ui.orderApproved('ORD-123'),
+    ui.receiptFooter,
+  ];
+
+  for (const sample of samples) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.ok(sample.split('\n').length <= 4);
+  }
+
+  assert.doesNotMatch(ui.premiumRegionPrompt('Onn', 'SG, JP, US'), /manual review/);
+  assert.doesNotMatch(ui.premiumRegionRequestSubmitted('Onn', 'SG'), /follow up/);
+  assert.doesNotMatch(ui.premiumRouteIssueSubmitted('Onn'), /has been sent to the admin/);
+  assert.doesNotMatch(ui.premiumFollowUpSubmitted('PRM-123'), /has been sent to the admin/);
+  assert.doesNotMatch(ui.orderRejected('ORD-123'), /please contact the admin/i);
+  assert.doesNotMatch(ui.receiptFooter, /client URL/i);
+});

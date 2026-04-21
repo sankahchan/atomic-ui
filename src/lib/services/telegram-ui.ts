@@ -64,19 +64,19 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumReportRouteIssue: isMyanmar ? 'Premium route issue တိုင်ကြားရန်' : 'Report premium route issue',
     premiumRegionPrompt: (keyName: string, available: string) =>
       isMyanmar
-        ? `🌍 <b>${keyName}</b> အတွက် ဦးစားပေး region ကို ရွေးပါ။\n\nရွေးချယ်နိုင်သော region များ: ${available}\n\nဤတောင်းဆိုချက်ကို admin ထံပို့ပြီး manual review ပြုလုပ်ပါမည်။`
-        : `🌍 Choose the preferred region for <b>${keyName}</b>.\n\nAvailable regions: ${available}\n\nThis request will be sent to the admin for manual review.`,
+        ? `🌍 <b>${keyName}</b> အတွက် ဦးစားပေး region ကို ရွေးပါ။\nAvailable: ${available}\nရွေးချယ်ပြီးနောက် admin review စောင့်ပါ။`
+        : `🌍 Choose the preferred region for <b>${keyName}</b>.\nAvailable: ${available}\nAfter you choose one, wait for admin review.`,
     premiumNoRegions: isMyanmar
       ? 'ℹ️ ဤ premium key အတွက် ရွေးချယ်နိုင်သော region မရှိသေးပါ။ Admin/support ကို ဆက်သွယ်ပေးပါ။'
       : 'ℹ️ There are no region choices configured for this premium key yet. Please contact admin/support.',
     premiumRegionRequestSubmitted: (keyName: string, regionLabel: string) =>
       isMyanmar
-        ? `📨 <b>${keyName}</b> အတွက် preferred region ကို <b>${regionLabel}</b> ဟု တောင်းဆိုထားပါသည်။ Admin က စစ်ဆေးပြီး ပြန်လည်အကြောင်းကြားပါမည်။`
-        : `📨 The preferred region for <b>${keyName}</b> was requested as <b>${regionLabel}</b>. The admin will review it and follow up.`,
+        ? `📨 <b>${keyName}</b> အတွက် preferred region ကို <b>${regionLabel}</b> ဟု တောင်းဆိုထားပါသည်။\nAdmin review စောင့်ပါ။`
+        : `📨 Preferred region for <b>${keyName}</b> requested as <b>${regionLabel}</b>.\nWait for admin review.`,
     premiumRouteIssueSubmitted: (keyName: string) =>
       isMyanmar
-        ? `🚨 <b>${keyName}</b> အတွက် premium route issue ကို admin ထံ ပို့ပြီးပါပြီ။ နောက်ဆက်တွဲအတွက် support ကိုလည်း အသုံးပြုနိုင်ပါသည်။`
-        : `🚨 A premium route issue report for <b>${keyName}</b> has been sent to the admin. You can also use support for follow-up.`,
+        ? `🚨 <b>${keyName}</b> အတွက် premium route issue ကို ပို့ပြီးပါပြီ။\nလိုအပ်ပါက Reply သို့မဟုတ် /support ကို အသုံးပြုပါ။`
+        : `🚨 Premium route issue sent for <b>${keyName}</b>.\nUse Reply or /support if you need to add detail.`,
     premiumSupportRequestSent: isMyanmar
       ? 'Premium support request ကို ပို့ပြီးပါပြီ။'
       : 'Premium support request sent.',
@@ -102,17 +102,17 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumRequestCodeLabel: isMyanmar ? 'Support request code' : 'Support request code',
     premiumSupportRequestPending: (requestCode: string) =>
       isMyanmar
-        ? `ℹ️ Pending premium support request <b>${requestCode}</b> ရှိပြီးသားဖြစ်ပါသည်။ Admin က စစ်ဆေးပြီး ပြန်လည်အကြောင်းကြားပါမည်။`
-        : `ℹ️ Premium support request <b>${requestCode}</b> is already pending. The admin will review it and follow up.`,
+        ? `ℹ️ Premium support request <b>${requestCode}</b> သည် ဖွင့်ထားပြီးဖြစ်ပါသည်။\nAdmin update ကို ဒီ chat မှာ စောင့်ပါ။`
+        : `ℹ️ Premium support request <b>${requestCode}</b> is already open.\nWait for the admin update here.`,
     premiumReplyToRequest: isMyanmar ? 'Request ကို ပြန်စာပို့ရန်' : 'Reply to request',
     premiumFollowUpPrompt: (requestCode: string, keyName: string) =>
       isMyanmar
-        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် နောက်ဆက်တွဲ message ကို ယခုပို့ပါ။\n\nလိုအပ်ပါက route issue အသေးစိတ်၊ လက်ရှိ region၊ error message စသည်တို့ကို ထည့်ပေးပါ။ မပို့တော့လိုပါက /cancel ကို အသုံးပြုပါ။`
-        : `✍️ Send your follow-up message now for <b>${requestCode}</b> (${keyName}).\n\nInclude any extra route details, current region, or error notes. Use /cancel if you want to stop.`,
+        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် update message ကို ယခုပို့ပါ။\nRoute, region သို့မဟုတ် error detail ကို ထည့်နိုင်ပါသည်။\nမပို့တော့လိုပါက /cancel ကို အသုံးပြုပါ။`
+        : `✍️ Send your update now for <b>${requestCode}</b> (${keyName}).\nInclude route, region, or error detail.\nUse /cancel to stop.`,
     premiumFollowUpSubmitted: (requestCode: string) =>
       isMyanmar
-        ? `📨 <b>${requestCode}</b> အတွက် နောက်ဆက်တွဲ message ကို admin ထံ ပို့ပြီးပါပြီ။`
-        : `📨 Your follow-up for <b>${requestCode}</b> has been sent to the admin.`,
+        ? `📨 <b>${requestCode}</b> အတွက် update ကို ပို့ပြီးပါပြီ။`
+        : `📨 Update sent for <b>${requestCode}</b>.`,
     premiumFollowUpCancelled: isMyanmar
       ? 'Premium request နောက်ဆက်တွဲ message ကို ပယ်ဖျက်ပြီးပါပြီ။'
       : 'Cancelled the premium follow-up message.',
@@ -644,12 +644,12 @@ export function getTelegramUi(locale: SupportedLocale) {
       : 'You can continue without the discount, or use /support if you need help.',
     orderRejected: (code: string, customerMessage?: string | null, supportLink?: string | null) =>
       isMyanmar
-        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${customerMessage ? `\n\n${customerMessage}` : ''}\n\nလိုအပ်ပါက admin ကို ဆက်သွယ်ပြီး အော်ဒါအခြေအနေကို ဆက်လက်မေးမြန်းနိုင်ပါသည်။ Screenshot အသစ်ဖြင့် /buy သို့မဟုတ် /renew ကိုလည်း ပြန်စနိုင်ပါသည်။${supportLink ? `\n\n🛟 အကူအညီ: ${supportLink}` : '\n\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`
-        : `❌ Order <b>${code}</b> was rejected.${customerMessage ? `\n\n${customerMessage}` : ''}\n\nIf needed, please contact the admin for follow-up on this order. You can also start again with /buy or /renew and send a new screenshot.${supportLink ? `\n\n🛟 Support: ${supportLink}` : '\n\nIf you need help, use /support.'}`,
+        ? `❌ Order <b>${code}</b> ကို ငြင်းပယ်ထားပါသည်။${customerMessage ? `\n\n${customerMessage}` : ''}\n\n/buy သို့မဟုတ် /renew ဖြင့် screenshot အသစ်တင်ပြီး ပြန်စနိုင်ပါသည်။${supportLink ? `\n🛟 အကူအညီ: ${supportLink}` : '\nအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'}`
+        : `❌ Order <b>${code}</b> was rejected.${customerMessage ? `\n\n${customerMessage}` : ''}\n\nStart again with /buy or /renew and upload a new screenshot.${supportLink ? `\n🛟 Support: ${supportLink}` : '\nUse /support if you need help.'}`,
     orderApproved: (code: string) =>
       isMyanmar
-        ? `✅ Order <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။ Access details ကို ယခု ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
-        : `✅ Order <b>${code}</b> has been approved. Your access details will be delivered in the next message.`,
+        ? `✅ Order <b>${code}</b> ကို အတည်ပြုပြီးပါပြီ။\nAccess details ကို နောက်မက်ဆေ့ခ်ျတွင် ပို့ပါမည်။`
+        : `✅ Order <b>${code}</b> has been approved.\nAccess details are in the next message.`,
     receiptTitle: isMyanmar ? '🧾 <b>ငွေပေးချေမှု အတည်ပြုလက်ခံစာ</b>' : '🧾 <b>Payment receipt</b>',
     refundReceiptTitle: isMyanmar ? '🧾 <b>Refund confirmation</b>' : '🧾 <b>Refund confirmation</b>',
     receiptNumberLabel: isMyanmar ? 'Receipt' : 'Receipt',
@@ -660,8 +660,8 @@ export function getTelegramUi(locale: SupportedLocale) {
     receiptTypePremium: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
     receiptTypeTrial: isMyanmar ? 'Free trial key' : 'Free trial key',
     receiptFooter: isMyanmar
-      ? 'Share page၊ client URL နှင့် setup details ကို နောက်မက်ဆေ့ခ်ျတွင် ဆက်လက် ပို့ပါမည်။'
-      : 'The share page, client URL, and setup details will be delivered in the next message.',
+      ? 'Share page နှင့် setup details ကို နောက်မက်ဆေ့ခ်ျတွင် ဆက်ပို့ပါမည်။'
+      : 'The share page and setup details are in the next message.',
     receiptActionPrintable: isMyanmar ? 'Printable receipt' : 'Printable receipt',
     receiptActionDownloadPdf: isMyanmar ? 'PDF ဒေါင်းလုဒ်' : 'Download PDF',
     orderSupportHint: isMyanmar
