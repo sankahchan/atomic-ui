@@ -87,11 +87,11 @@ function resolveTelegramOrderDisplayPlanLabel(
   return order.planName || order.planCode || null;
 }
 
-async function normalizeTelegramOrderPlanLabels<T extends { planCode?: string | null; planName?: string | null }>(
+function normalizeTelegramOrderPlanLabels<T extends { planCode?: string | null; planName?: string | null }>(
   orders: T[],
   locale: SupportedLocale,
+  settings: TelegramSalesSettings,
 ) {
-  const settings = await getTelegramSalesSettings();
   return orders.map((order) => ({
     ...order,
     displayPlanLabel: resolveTelegramOrderDisplayPlanLabel(order, locale, settings),
@@ -757,13 +757,14 @@ export async function handleOrdersCommand(input: {
         : filter === 'COMPLETED'
           ? completedOrders
           : orders;
+  const salesSettings = await getTelegramSalesSettings();
   const [normalizedAttentionOrders, normalizedReviewOrders, normalizedCompletedOrders, normalizedFilteredOrders] =
-    await Promise.all([
-      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale),
-      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale),
-      normalizeTelegramOrderPlanLabels(completedOrders, input.locale),
-      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale),
-    ]);
+    [
+      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(completedOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale, salesSettings),
+    ];
   const summaryMessage = buildTelegramOrdersSummaryMessage({
     locale: input.locale,
     filter,
@@ -850,13 +851,14 @@ export async function handleTelegramOrdersCommerceView(input: {
         : filter === 'COMPLETED'
           ? completedOrders
           : orders;
+  const salesSettings = await getTelegramSalesSettings();
   const [normalizedAttentionOrders, normalizedReviewOrders, normalizedCompletedOrders, normalizedFilteredOrders] =
-    await Promise.all([
-      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale),
-      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale),
-      normalizeTelegramOrderPlanLabels(completedOrders, input.locale),
-      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale),
-    ]);
+    [
+      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(completedOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale, salesSettings),
+    ];
 
   if (input.action === 'detail') {
     const order = orders.find((candidate) => candidate.id === input.primary);
