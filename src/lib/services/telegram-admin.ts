@@ -831,129 +831,83 @@ export function buildTelegramHelpMessage(input: {
 }) {
   const isMyanmar = input.locale === 'my';
   let message = isMyanmar
-    ? `📚 <b>အသုံးပြုနိုင်သော Command များ</b>
+    ? `📚 <b>အမြန် command guide</b>
 
-<b>Customer actions</b>
-/buy - key အသစ် မှာယူမည်
-/offers - active coupon နှင့် promo offer များကို ကြည့်မည်
+<b>Start here</b>
+/buy - order အသစ် စတင်မည်
+/mykeys - key နှင့် renew ကို စစ်မည်
+/orders - မကြာသေးသော order များကို ကြည့်မည်
+/support - help center ကို ဖွင့်မည်
+
+<b>Updates</b>
+/inbox - notice, refund, reply များကို ကြည့်မည်
+/notifications - alert preference များကို ပြောင်းမည်
+/premium - premium center ကို ဖွင့်မည်
+/supportstatus - support thread summary ကို ကြည့်မည်
+
+<b>More tools</b>
+/renew - renew ကို တိုက်ရိုက် စတင်မည်
+<code>/order ORDER-CODE</code> - order တစ်ခုကို အသေးစိတ်ကြည့်မည်
+/usage - usage နှင့် setup info ရယူမည်
+/sub - share page နှင့် sub link များ ရယူမည်
+/offers - active promo များကို ကြည့်မည်
 /trial - free trial ရယူမည်
-/renew - လက်ရှိ key ကို သက်တမ်းတိုးမည်
-/mykeys - ချိတ်ထားသော key များကို ကြည့်မည်
-/orders - မိမိ order များကို ကြည့်မည်
-/order [code] - order အခြေအနေ အသေးစိတ်ကြည့်မည်
-
-<b>Updates & support</b>
-/inbox - announcement နှင့် notice များကို ကြည့်မည်
-/inbox orders|support|refunds|announcements|premium - inbox ကို category အလိုက် ကြည့်မည်
-/notifications - notice preference များကို ပြောင်းမည်
-/premium - premium shortcut များကို ကြည့်မည်
-/premiumregion - premium region အခြေအနေကို ကြည့်မည်
-/supportstatus - support thread နှင့် premium request အခြေအနေကို ကြည့်မည်
-/support - category အလိုက် support thread စတင်မည်
-/server - normal key အတွက် server ပြောင်းရန် တောင်းဆိုမည်
-/refund - refund တောင်းဆိုနိုင်သော order များကို ကြည့်မည်
-
-<b>Utilities</b>
-/usage - အသုံးပြုမှုနှင့် QR/setup info ရယူမည်
-/sub - Share page များကို လက်ခံမည်
+/server - server change request စတင်မည်
+/refund - refund လုပ်နိုင်သော order များကို ကြည့်မည်
 /language - ဘာသာစကား ပြောင်းမည်
-/cancel - လက်ရှိ order ကို ပယ်ဖျက်မည်
-/start - Telegram account ကို ချိတ်ဆက်မည်
-/help - ဤ help စာမျက်နှာကို ပြမည်`
-    : `📚 <b>Available Commands</b>
+/cancel - လက်ရှိ flow ကို ပယ်ဖျက်မည်
+/start - start menu ကို ပြန်ဖွင့်မည်
 
-<b>Customer actions</b>
-/buy - Start a new key order
-/offers - Show active coupon and promo offers
-/trial - Claim the free trial
-/renew - Renew one of your existing keys
-/mykeys - List your linked keys
+Tip: <code>/inbox orders|support|refunds|announcements|premium</code> ဖြင့် category တစ်ခုချင်း ကြည့်နိုင်ပါသည်။`
+    : `📚 <b>Quick command guide</b>
+
+<b>Start here</b>
+/buy - Start a new order
+/mykeys - See your keys and renew buttons
 /orders - Show your recent orders
-/order [code] - Show one order in detail
+/support - Open the help center
 
-<b>Updates & support</b>
-/inbox - Show announcements and notices
-/inbox orders|support|refunds|announcements|premium - Filter the inbox by category
-/notifications - Manage notice preferences
-/premium - Open premium shortcuts
-/premiumregion - View premium region health
-/supportstatus - Check your support threads and premium requests
-/support - Start a support thread by category
-/server - Request a server change for a normal key
+<b>Updates</b>
+/inbox - Notices, refunds, and replies
+/notifications - Manage alert preferences
+/premium - Open the premium center
+/supportstatus - Show your support thread summary
+
+<b>More tools</b>
+/renew - Start a renewal directly
+<code>/order ORDER-CODE</code> - Show one order in detail
+/usage - Fetch usage and setup info
+/sub - Receive your share pages and sub links
+/offers - Show active promos
+/trial - Claim the free trial
+/server - Start a server-change request
 /refund - Show refund-eligible orders
-
-<b>Utilities</b>
-/usage - Fetch usage and QR/setup info
-/sub - Receive your share pages
 /language - Change the bot language
-/cancel - Cancel the current order
-/start - Link your Telegram account
-/help - Show this help message`;
+/cancel - Cancel the current flow
+/start - Re-open the start menu
+
+Tip: <code>/inbox orders|support|refunds|announcements|premium</code> narrows the inbox to one category.`;
 
   if (input.isAdmin) {
     message += isMyanmar
-      ? `\n\n<b>Admin Commands</b>
-/admin - Admin summary hub
-/reviewqueue [mine|unclaimed] - pending review queue ကို chat ထဲတွင် ဖွင့်မည်
-/status - Server အခြေအနေအနှစ်ချုပ်
-/expiring [days] - မကြာမီ သက်တမ်းကုန်မည့် key များ
-/find &lt;query&gt; - Key ကို ရှာမည်
-/createkey [recipient] - normal key wizard ကို စတင်မည်
-/createdynamic [recipient] - dynamic key wizard ကို စတင်မည်
-/managekey [query] - normal key quota/expiry/access ကို စီမံမည်
-/managedynamic [query] - dynamic key quota/expiry/access ကို စီမံမည်
-/disable &lt;key-id&gt; - Key ကို ပိတ်မည်
-/enable &lt;key-id&gt; - Key ကို ပြန်ဖွင့်မည်
-/resend &lt;key-id&gt; - Share page ကို ပြန်ပို့မည်
-/announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Announcement ပို့မည်
-/announceuser &lt;user&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - User တစ်ယောက်ထံသာ message ပို့မည်
-/announcements - မကြာသေးမီ announcement များကို ကြည့်မည်
-/announcehistory - announcement history ကို ကြည့်မည်
-/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - အချိန်ဇယားဖြင့် announcement သိမ်းမည်
-/supportqueue - support console ကို chat ထဲတွင် ဖွင့်မည်
-/supportthreads [admin|user] - customer support thread queue ကို chat ထဲတွင် ဖွင့်မည်
-/finance - Finance အနှစ်ချုပ်ကို ကြည့်မည်
-/sendfinance - Finance digest ကို ယခုချက်ချင်း ပို့မည်
-/refunds - pending refund request များကို ကြည့်မည်
-/claimrefund &lt;order&gt; - refund request ကို ကိုယ်တိုင် claim လုပ်မည်
-/reassignrefund &lt;order&gt; &lt;admin&gt; - refund reviewer ကို ပြန်သတ်မှတ်မည်
-/serverdown &lt;server&gt; - Server downtime notice ပို့မည်
-/maintenance &lt;server&gt; - Maintenance notice ပို့မည်
-/serverupdate &lt;server&gt; &lt;message&gt; - Follow-up update ပို့မည်
-/serverrecovered &lt;server&gt; [message] - Recovery update ပို့မည်
-/sysinfo - System resource usage
-/backup - Backup ဖန်တီးပြီး ဒေါင်းလုဒ်ဆွဲမည်`
-      : `\n\n<b>Admin Commands</b>
-/admin - Open the admin summary hub
-/reviewqueue [mine|unclaimed] - Open the pending review queue in chat
-/status - Server status summary
-/expiring [days] - Keys expiring soon
-/find &lt;query&gt; - Search for a key
-/createkey [recipient] - Start the normal-key wizard
-/createdynamic [recipient] - Start the dynamic-key wizard
-/managekey [query] - Manage a normal key from Telegram
-/managedynamic [query] - Manage a dynamic key from Telegram
-/disable &lt;key-id&gt; - Disable a key
-/enable &lt;key-id&gt; - Re-enable a key
-/resend &lt;key-id&gt; - Resend the share page
-/announce &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Send an announcement
-/announceuser &lt;user&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Send to one Telegram user
-/announcements - Show recent announcements
-/announcehistory - Show recent announcement history
-/scheduleannouncement &lt;yyyy-mm-ddThh:mm&gt; [repeat=daily|weekly] &lt;audience&gt; [filters] :: &lt;title&gt; :: &lt;message&gt; - Schedule an announcement
-/supportqueue - Open the support console in chat
-/supportthreads [admin|user] - Open the customer support thread queue in chat
-/finance - Show the finance summary
-/sendfinance - Send the finance digest now
-/refunds - Show pending refund requests
-/claimrefund &lt;order&gt; - Claim a pending refund request
-/reassignrefund &lt;order&gt; &lt;admin&gt; - Reassign a refund reviewer
-/serverdown &lt;server&gt; - Send a downtime notice
-/maintenance &lt;server&gt; - Send a maintenance notice
-/serverupdate &lt;server&gt; &lt;message&gt; - Send a follow-up update
-/serverrecovered &lt;server&gt; [message] - Send a recovery update
-/sysinfo - System resource usage
-/backup - Create and download a backup`;
+      ? `\n\n<b>Admin commands</b>
+/admin - admin hub
+/reviewqueue - pending review queue
+/createkey, /createdynamic - key creation
+/managekey, /managedynamic - key management
+/announcements, /announce, /announceuser - broadcast tools
+/supportqueue, /supportthreads - support queues
+/finance, /refunds, /claimrefund, /reassignrefund - finance and refunds
+/status, /expiring, /find, /sysinfo, /backup - ops shortcuts`
+      : `\n\n<b>Admin commands</b>
+/admin - Admin hub
+/reviewqueue - Pending review queue
+/createkey, /createdynamic - Key creation
+/managekey, /managedynamic - Key management
+/announcements, /announce, /announceuser - Broadcast tools
+/supportqueue, /supportthreads - Support queues
+/finance, /refunds, /claimrefund, /reassignrefund - Finance and refunds
+/status, /expiring, /find, /sysinfo, /backup - Ops shortcuts`;
   }
 
   message += isMyanmar

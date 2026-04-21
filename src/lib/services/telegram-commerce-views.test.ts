@@ -7,7 +7,10 @@ import {
 } from '@/lib/services/telegram-order-state';
 import { buildTelegramInboxSummaryMessage } from '@/lib/services/telegram-inbox-ui';
 import { buildTelegramKeysSummaryMessage } from '@/lib/services/telegram-keys';
-import { buildTelegramPremiumHubMessage } from '@/lib/services/telegram-premium';
+import {
+  buildTelegramPremiumHubMessage,
+  buildTelegramPremiumSupportStatusMessage,
+} from '@/lib/services/telegram-premium';
 import { buildTelegramOrdersSummaryMessage } from '@/lib/services/telegram-orders';
 import { buildTelegramSupportStatusSummaryMessage } from '@/lib/services/telegram-support-cards';
 
@@ -389,4 +392,61 @@ test('support status summary shows a short thread list instead of only the lates
   assert.match(message, /PRM-111/);
   assert.doesNotMatch(message, /Latest thread:/);
   assert.ok(message.split('\n').length <= 18);
+});
+
+test('premium support detail stays compact and avoids timeline dumps', () => {
+  const message = buildTelegramPremiumSupportStatusMessage({
+    locale: 'en',
+    request: {
+      id: 'req_1',
+      requestCode: 'PRM-123',
+      status: 'PENDING_REVIEW',
+      requestType: 'REGION_CHANGE',
+      followUpPending: true,
+      createdAt: new Date('2026-04-20T08:00:00.000Z'),
+      updatedAt: new Date('2026-04-20T10:00:00.000Z'),
+      reviewedAt: null,
+      handledAt: null,
+      dismissedAt: null,
+      requestedRegionCode: 'SG',
+      currentResolvedServerName: 'SG-2',
+      currentResolvedServerCountryCode: 'SG',
+      appliedPinServerName: null,
+      appliedPinExpiresAt: null,
+      customerMessage: 'Please move me back to Singapore.',
+      dynamicAccessKey: {
+        name: 'Onn',
+        accessKeys: [],
+        preferredCountryCodesJson: '["SG"]',
+        preferredServerIdsJson: '[]',
+        lastResolvedServerId: null,
+        pinnedAccessKeyId: null,
+        pinnedServerId: null,
+        pinnedAt: null,
+        pinExpiresAt: null,
+      },
+      replies: [
+        {
+          id: 'reply_1',
+          senderType: 'CUSTOMER',
+          message: 'Route feels unstable today.',
+          createdAt: new Date('2026-04-20T09:00:00.000Z'),
+        },
+        {
+          id: 'reply_2',
+          senderType: 'ADMIN',
+          message: 'We are checking the preferred region pool now.',
+          createdAt: new Date('2026-04-20T09:30:00.000Z'),
+        },
+      ],
+    } as any,
+  });
+
+  assert.match(message, /PRM-123/);
+  assert.match(message, /Next step:/);
+  assert.match(message, /Latest reply:/);
+  assert.doesNotMatch(message, /What happens next/);
+  assert.doesNotMatch(message, /Timeline/i);
+  assert.doesNotMatch(message, /Follow-up history/i);
+  assert.ok(message.split('\n').length < 22);
 });

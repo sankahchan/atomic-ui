@@ -81,45 +81,45 @@ type TelegramCommandShortcut = {
   command: string;
   labelEn: string;
   labelMy: string;
+  aliases?: string[];
 };
 
 const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
-    { command: '/buy', labelEn: '🛒 Buy key', labelMy: '🛒 Key ဝယ်မည်' },
-    { command: '/mykeys', labelEn: '🗂 My keys', labelMy: '🗂 Key များ' },
+    { command: '/buy', labelEn: '🛒 Buy', labelMy: '🛒 ဝယ်မည်', aliases: ['🛒 Buy key', '🛒 Key ဝယ်မည်'] },
+    { command: '/mykeys', labelEn: '🗂 Keys', labelMy: '🗂 Key များ', aliases: ['🗂 My keys'] },
   ],
   [
-    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offer များ' },
     { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
-  ],
-  [
     { command: '/orders', labelEn: '🧾 Orders', labelMy: '🧾 Orders' },
-    { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
   ],
   [
-    { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
-    { command: '/trial', labelEn: '🎁 Free trial', labelMy: '🎁 Free Trial' },
+    { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
+    { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
   ],
   [
     { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
     { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
   ],
   [
-    { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
-    { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
+    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offers', aliases: ['🎟 Offer များ'] },
+    { command: '/trial', labelEn: '🎁 Trial', labelMy: '🎁 Trial', aliases: ['🎁 Free trial', '🎁 Free Trial'] },
   ],
   [
-    { command: '/sub', labelEn: '📎 Sub links', labelMy: '📎 Sub Links' },
-    { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
-  ],
-  [
-    { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
+    { command: '/sub', labelEn: '📎 Links', labelMy: '📎 Links', aliases: ['📎 Sub links', '📎 Sub Links'] },
     { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
   ],
   [
     { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
     { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
   ],
+];
+
+const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
+  { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
+  { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
+  { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
+  { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
 ];
 
 const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
@@ -153,13 +153,21 @@ function getTelegramShortcutLabel(shortcut: TelegramCommandShortcut, locale: Sup
   return locale === 'my' ? shortcut.labelMy : shortcut.labelEn;
 }
 
-function listTelegramCommandShortcuts(isAdmin: boolean) {
+function listVisibleTelegramCommandShortcuts(isAdmin: boolean) {
   return [...TELEGRAM_USER_COMMAND_ROWS, ...(isAdmin ? TELEGRAM_ADMIN_COMMAND_ROWS : [])];
+}
+
+function listTelegramCommandShortcutAliases(isAdmin: boolean) {
+  return [
+    ...TELEGRAM_USER_COMMAND_ROWS.flat(),
+    ...TELEGRAM_HIDDEN_USER_SHORTCUTS,
+    ...(isAdmin ? TELEGRAM_ADMIN_COMMAND_ROWS.flat() : []),
+  ];
 }
 
 export function getCommandKeyboard(isAdmin: boolean, locale: SupportedLocale = 'en') {
   return {
-    keyboard: listTelegramCommandShortcuts(isAdmin).map((row) =>
+    keyboard: listVisibleTelegramCommandShortcuts(isAdmin).map((row) =>
       row.map((shortcut) => ({ text: getTelegramShortcutLabel(shortcut, locale) })),
     ),
     resize_keyboard: true,
@@ -176,17 +184,16 @@ export function normalizeTelegramReplyKeyboardCommand(
     return null;
   }
 
-  for (const row of listTelegramCommandShortcuts(isAdmin)) {
-    for (const shortcut of row) {
-      const aliases = [
-        shortcut.command,
-        shortcut.command.replace(/^\//, ''),
-        shortcut.labelEn,
-        shortcut.labelMy,
-      ];
-      if (aliases.some((alias) => alias.trim().toLowerCase() === normalized)) {
-        return shortcut.command;
-      }
+  for (const shortcut of listTelegramCommandShortcutAliases(isAdmin)) {
+    const aliases = [
+      shortcut.command,
+      shortcut.command.replace(/^\//, ''),
+      shortcut.labelEn,
+      shortcut.labelMy,
+      ...(shortcut.aliases || []),
+    ];
+    if (aliases.some((alias) => alias.trim().toLowerCase() === normalized)) {
+      return shortcut.command;
     }
   }
 

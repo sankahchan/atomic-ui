@@ -37,7 +37,6 @@ import {
   resolveTelegramSupportIssueLabel,
 } from '@/lib/services/telegram-support';
 import {
-  buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatExpirationSummary,
   formatTelegramDynamicPoolSummary,
@@ -787,8 +786,8 @@ export async function handleSupportCommand(input: {
       : `${openThreads.length} open support thread(s) • ${premiumRequests.length} premium support item(s)`,
     '',
     input.locale === 'my'
-      ? 'Order, key, server, billing, or general help အတွက် category ကို ရွေးပြီး support thread တစ်ခုကို စတင်နိုင်ပါသည်။'
-      : 'Choose a category to start a real support thread for orders, keys, servers, billing, or general help.',
+      ? 'လိုအပ်သော category ကို ရွေးပြီး support thread အသစ် စတင်နိုင်ပါသည်။'
+      : 'Choose the category you need and start a real support thread.',
   ];
 
   if (latestThread) {
@@ -797,32 +796,22 @@ export async function handleSupportCommand(input: {
       waitingOn: latestThread.waitingOn,
       locale,
     });
-    const latestReply = latestThread.replies[latestThread.replies.length - 1] || null;
     lines.push(
       '',
-      locale === 'my' ? '<b>Latest support thread</b>' : '<b>Latest support thread</b>',
-      `🧵 <b>${escapeHtml(latestThread.threadCode)}</b>`,
-      `${locale === 'my' ? 'Category' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(latestThread.issueCategory, locale))}</b>`,
-      `${locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
+      locale === 'my' ? '<b>Recent thread</b>' : '<b>Recent thread</b>',
+      `🧵 <b>${escapeHtml(latestThread.threadCode)}</b> • ${escapeHtml(resolveTelegramSupportIssueLabel(latestThread.issueCategory, locale))} • ${escapeHtml(state.label)}`,
       `${locale === 'my' ? 'Updated' : 'Updated'}: <b>${escapeHtml(formatTelegramDateTime(latestThread.updatedAt, locale))}</b>`,
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
-        locale,
-        maxLength: 120,
-      }).map((line) => escapeHtml(line)),
     );
   }
 
   if (latestPremiumRequest) {
-    const latestPremiumReply = latestPremiumRequest.replies?.[latestPremiumRequest.replies.length - 1] || null;
     lines.push(
       '',
-      locale === 'my' ? '<b>Latest premium thread</b>' : '<b>Latest premium thread</b>',
+      locale === 'my' ? '<b>Recent premium request</b>' : '<b>Recent premium request</b>',
       `💎 <b>${escapeHtml(latestPremiumRequest.requestCode)}</b>`,
-      `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramPremiumFollowUpState(latestPremiumRequest, ui))}</b>`,
-      `${escapeHtml(
+      `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramPremiumFollowUpState(latestPremiumRequest, ui))}</b> • ${escapeHtml(
         formatTelegramReplyStateLabel({
-          latestReplySenderType: latestPremiumReply?.senderType || null,
+          latestReplySenderType: latestPremiumRequest.replies?.[latestPremiumRequest.replies.length - 1]?.senderType || null,
           followUpPending: latestPremiumRequest.followUpPending,
           locale,
         }),
@@ -833,18 +822,7 @@ export async function handleSupportCommand(input: {
 
   lines.push(
     '',
-    locale === 'my' ? '<b>Quick paths</b>' : '<b>Quick paths</b>',
-    locale === 'my'
-      ? '• Category တစ်ခုရွေးပြီး message ပို့ပါ။ Admin reply ကို ဒီ chat ထဲမှာ thread အဖြစ် ပြန်ရပါမည်။'
-      : '• Choose a category and send your message. The admin reply comes back here in the same thread flow.',
-    ui.supportHubOrdersHint,
-    ui.supportHubInboxHint,
-    ui.supportHubServerHint,
-    ui.supportHubPremiumHint,
-    '',
-    locale === 'my'
-      ? '<b>When to use what</b>'
-      : '<b>When to use what</b>',
+    locale === 'my' ? '<b>Best path</b>' : '<b>Best path</b>',
     locale === 'my'
       ? '• Screenshot / payment / order problem များအတွက် Order / payment category ကို ရွေးပါ။'
       : '• Use Order / payment for screenshot, payment, and order-review problems.',
@@ -857,10 +835,6 @@ export async function handleSupportCommand(input: {
     locale === 'my'
       ? '• Premium route / preferred region အတွက် /premium သို့မဟုတ် /premiumregion ကို အသုံးပြုပါ။'
       : '• Use /premium or /premiumregion for preferred-region and routing issues.',
-    '',
-    locale === 'my'
-      ? 'အောက်ပါ button များထဲမှ တစ်ခုကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။'
-      : 'Use one of the buttons below to jump directly to the right place.',
   );
 
   if (supportLink) {
