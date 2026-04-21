@@ -577,48 +577,48 @@ export function getTelegramUi(locale: SupportedLocale) {
     trialExpiringBody: (hoursLeft: number) =>
       isMyanmar
         ? `လက်ရှိ free trial ကို အသုံးပြုနိုင်ရန် ${hoursLeft} နာရီခန့်သာ ကျန်ပါသည်။`
-        : `Your current free trial has about ${hoursLeft} hour(s) left.`,
+        : `${hoursLeft} hour(s) left on your free trial.`,
     trialExpiringUpsell: isMyanmar
-      ? 'ဆက်လက် အသုံးပြုလိုပါက အောက်ပါ button ကိုနှိပ်ပြီး paid plan တစ်ခုကို ရွေးချယ်နိုင်ပါသည်။'
-      : 'If you want to keep using the service, choose a paid plan with the button below before the trial expires.',
+      ? 'ဆက်သုံးလိုပါက အောက်ပါ button ဖြင့် paid plan ကို ရွေးပါ။'
+      : 'Choose a paid plan below to keep access.',
     trialCouponTitle: isMyanmar
-      ? '🏷 <b>Trial မှ paid plan သို့ အထူး offer</b>'
-      : '🏷 <b>Trial to paid special offer</b>',
+      ? '🏷 <b>Trial offer ready</b>'
+      : '🏷 <b>Trial offer ready</b>',
     trialCouponBody: (hoursLeft: number) =>
       isMyanmar
-        ? `Free trial မကုန်မီ ${hoursLeft} နာရီခန့် ကျန်ရှိနေသေးချိန်မှာ paid plan သို့ ပြောင်းရန် အထူး offer ပို့ပေးထားပါသည်။`
-        : `You still have about ${hoursLeft} hour(s) before the free trial ends, so here is a special offer to move to a paid plan.`,
+        ? `Free trial မကုန်မီ ${hoursLeft} နာရီခန့် ကျန်နေပါသည်။`
+        : `${hoursLeft} hour(s) left before the free trial ends.`,
     trialCouponOffer: (code: string, label: string) =>
       isMyanmar
-        ? `Coupon: <b>${code}</b>\nOffer: ${label}`
-        : `Coupon: <b>${code}</b>\nOffer: ${label}`,
+        ? `Coupon <b>${code}</b> • ${label}`
+        : `Coupon <b>${code}</b> • ${label}`,
     trialCouponHint: isMyanmar
-      ? 'Buy new key ကို နှိပ်ပါ သို့မဟုတ် /buy COUPON-CODE ကို သုံးပါ။ အကျိုးခံစားခွင့်ကို checkout ထဲတွင် အလိုအလျောက် တွက်ပေးပါမည်။'
-      : 'Tap Buy new key or use /buy COUPON-CODE. The discount will be applied automatically during checkout.',
+      ? 'Buy new key ကို နှိပ်ပါ။ Coupon ကို checkout ထဲတွင် အလိုအလျောက် သုံးပေးပါမည်။'
+      : 'Tap Buy new key. The coupon applies in checkout.',
     renewalCouponTitle: isMyanmar
       ? '🔁 <b>Renewal coupon ready</b>'
       : '🔁 <b>Renewal coupon ready</b>',
     renewalCouponBody: (daysLeft: number) =>
       isMyanmar
-        ? `သင့် key သက်တမ်းကုန်ရန် ${daysLeft} ရက်ခန့်သာ ကျန်ရှိသေးသည်။ Renewal လုပ်ရန် coupon offer ပို့ပေးထားပါသည်။`
-        : `Your key has about ${daysLeft} day(s) left. A renewal coupon is ready for you.`,
+        ? `သင့် key သက်တမ်းကုန်ရန် ${daysLeft} ရက်ခန့် ကျန်ပါသည်။`
+        : `${daysLeft} day(s) left on this key.`,
     premiumUpsellCouponTitle: isMyanmar
       ? '💎 <b>Premium upgrade offer</b>'
       : '💎 <b>Premium upgrade offer</b>',
     premiumUpsellCouponBody: (usagePercent: number) =>
       isMyanmar
-        ? `လက်ရှိ standard key အသုံးပြုမှုသည် ${usagePercent}% သို့ ရောက်နေပါပြီ။ ပိုမိုတည်ငြိမ်သော premium plan သို့ ပြောင်းရန် coupon offer ပို့ပေးထားပါသည်။`
-        : `Your standard key is already at ${usagePercent}% usage. Here is a coupon offer to upgrade to a more stable premium plan.`,
+        ? `လက်ရှိ standard key အသုံးပြုမှုသည် ${usagePercent}% ရှိနေပါသည်။`
+        : `This standard key is at ${usagePercent}% usage.`,
     winbackCouponTitle: isMyanmar
       ? '🎉 <b>Welcome back offer</b>'
       : '🎉 <b>Welcome back offer</b>',
     winbackCouponBody: (inactiveDays: number) =>
       isMyanmar
-        ? `${inactiveDays} ရက်ခန့် အော်ဒါအသစ် မလုပ်သေးသောကြောင့် ပြန်လည်အသုံးပြုရန် coupon offer ပို့ပေးထားပါသည်။`
-        : `It has been about ${inactiveDays} day(s) since your last paid order, so here is a welcome-back coupon.`,
+        ? `${inactiveDays} ရက်ခန့် အော်ဒါအသစ် မလုပ်သေးပါ။`
+        : `${inactiveDays} day(s) since your last paid order.`,
     couponReadyHint: isMyanmar
-      ? 'အောက်ပါ button ကို နှိပ်ပါ သို့မဟုတ် coupon code ကို အသုံးပြု၍ order စတင်နိုင်ပါသည်။'
-      : 'Use the button below or start an order with the coupon code.',
+      ? 'အောက်ပါ button ကို နှိပ်ပါ သို့မဟုတ် coupon code ဖြင့် စတင်နိုင်ပါသည်။'
+      : 'Use the button below or start with the coupon code.',
     couponUnavailableExpired: (code?: string | null) =>
       isMyanmar
         ? `⌛ ${code ? `Coupon <b>${code}</b>` : 'ဤ coupon'} သည် သက်တမ်းကုန်သွားပါပြီ။`

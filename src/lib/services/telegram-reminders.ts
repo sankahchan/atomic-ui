@@ -39,6 +39,10 @@ import {
   ensureAccessKeySubscriptionToken,
   getDynamicKeyMessagingUrls,
 } from '@/lib/services/telegram-links';
+import {
+  buildTelegramCommerceCard,
+  buildTelegramCommerceMessage,
+} from '@/lib/services/telegram-commerce-ui';
 
 const TELEGRAM_SALES_DIGEST_STATE_KEY = 'telegram_sales_digest_last_run';
 
@@ -57,6 +61,55 @@ function isSameLocalDay(left: Date, right: Date) {
     left.getMonth() === right.getMonth() &&
     left.getDate() === right.getDate()
   );
+}
+
+export function buildTelegramTrialExpiringReminderMessage(input: {
+  locale: 'en' | 'my';
+  keyName: string;
+  hoursLeft: number;
+}) {
+  const ui = getTelegramUi(input.locale);
+
+  return buildTelegramCommerceMessage({
+    title: ui.trialExpiringTitle,
+    cards: [
+      buildTelegramCommerceCard(`🔑 <b>${escapeHtml(input.keyName)}</b>`, [
+        ui.trialExpiringBody(Math.max(1, input.hoursLeft)),
+        ui.trialExpiringUpsell,
+      ]),
+    ],
+  });
+}
+
+export function buildTelegramCouponReminderMessage(input: {
+  locale: 'en' | 'my';
+  title: string;
+  body: string;
+  couponCode: string;
+  discountLabel: string;
+  hint: string;
+  keyName?: string | null;
+}) {
+  return buildTelegramCommerceMessage({
+    title: input.title,
+    cards: [
+      buildTelegramCommerceCard(
+        input.keyName?.trim()
+          ? `🔑 <b>${escapeHtml(input.keyName.trim())}</b>`
+          : input.locale === 'my'
+            ? '🏷 <b>Offer</b>'
+            : '🏷 <b>Offer</b>',
+        [
+          input.body,
+          getTelegramUi(input.locale).trialCouponOffer(
+            escapeHtml(input.couponCode),
+            escapeHtml(input.discountLabel),
+          ),
+          input.hint,
+        ],
+      ),
+    ],
+  });
 }
 
 function computeTelegramOrderDigestRisk(input: {
@@ -649,19 +702,11 @@ export async function sendAccessKeyTrialExpiryReminder(input: {
     ? buildShortShareUrl(key.publicSlug, { source: input.source || 'trial_expiry', lang: locale })
     : buildSharePageUrl(token, { source: input.source || 'trial_expiry', lang: locale });
 
-  const lines = [
-    ui.trialExpiringTitle,
-    '',
-    `🔑 ${escapeHtml(key.name)}`,
-    ui.trialExpiringBody(Math.max(1, input.hoursLeft)),
-    ui.trialExpiringUpsell,
-    '',
-    `${ui.sharePageLabel}: ${sharePageUrl}`,
-  ];
-
-  if (supportLink) {
-    lines.push(`${ui.supportLabel}: ${supportLink}`);
-  }
+  const message = buildTelegramTrialExpiringReminderMessage({
+    locale,
+    keyName: key.name,
+    hoursLeft: input.hoursLeft,
+  });
 
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
     [
@@ -682,7 +727,7 @@ export async function sendAccessKeyTrialExpiryReminder(input: {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }
 
-  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, message, {
     replyMarkup: { inline_keyboard: inlineKeyboard },
   });
 
@@ -770,20 +815,15 @@ export async function sendAccessKeyTrialCouponCampaign(input: {
     ? buildShortShareUrl(key.publicSlug, { source: input.source || 'trial_coupon', lang: locale })
     : buildSharePageUrl(token, { source: input.source || 'trial_coupon', lang: locale });
 
-  const lines = [
-    ui.trialCouponTitle,
-    '',
-    `🔑 ${escapeHtml(key.name)}`,
-    ui.trialCouponBody(Math.max(1, input.hoursLeft)),
-    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
-    ui.trialCouponHint,
-    '',
-    `${ui.sharePageLabel}: ${sharePageUrl}`,
-  ];
-
-  if (supportLink) {
-    lines.push(`${ui.supportLabel}: ${supportLink}`);
-  }
+  const message = buildTelegramCouponReminderMessage({
+    locale,
+    title: ui.trialCouponTitle,
+    keyName: key.name,
+    body: ui.trialCouponBody(Math.max(1, input.hoursLeft)),
+    couponCode: input.couponCode,
+    discountLabel: input.discountLabel,
+    hint: ui.trialCouponHint,
+  });
 
   const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
     [
@@ -804,7 +844,7 @@ export async function sendAccessKeyTrialCouponCampaign(input: {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
   }
 
-  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, message, {
     replyMarkup: { inline_keyboard: inlineKeyboard },
   });
 
@@ -891,20 +931,17 @@ export async function sendAccessKeyRenewalCouponCampaign(input: {
   const ui = getTelegramUi(locale);
   const supportLink = await getTelegramSupportLink();
 
-  const lines = [
-    ui.renewalCouponTitle,
-    '',
-    `🔑 ${escapeHtml(key.name)}`,
-    ui.renewalCouponBody(Math.max(1, input.daysLeft)),
-    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
-    ui.couponReadyHint,
-  ];
+  const message = buildTelegramCouponReminderMessage({
+    locale,
+    title: ui.renewalCouponTitle,
+    keyName: key.name,
+    body: ui.renewalCouponBody(Math.max(1, input.daysLeft)),
+    couponCode: input.couponCode,
+    discountLabel: input.discountLabel,
+    hint: ui.couponReadyHint,
+  });
 
-  if (supportLink) {
-    lines.push('', `${ui.supportLabel}: ${supportLink}`);
-  }
-
-  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, message, {
     replyMarkup: {
       inline_keyboard: [
         [
@@ -951,20 +988,17 @@ export async function sendAccessKeyPremiumUpsellCouponCampaign(input: {
   const ui = getTelegramUi(locale);
   const supportLink = await getTelegramSupportLink();
 
-  const lines = [
-    ui.premiumUpsellCouponTitle,
-    '',
-    `🔑 ${escapeHtml(key.name)}`,
-    ui.premiumUpsellCouponBody(Math.max(1, input.usagePercent)),
-    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
-    ui.couponReadyHint,
-  ];
+  const message = buildTelegramCouponReminderMessage({
+    locale,
+    title: ui.premiumUpsellCouponTitle,
+    keyName: key.name,
+    body: ui.premiumUpsellCouponBody(Math.max(1, input.usagePercent)),
+    couponCode: input.couponCode,
+    discountLabel: input.discountLabel,
+    hint: ui.couponReadyHint,
+  });
 
-  if (supportLink) {
-    lines.push('', `${ui.supportLabel}: ${supportLink}`);
-  }
-
-  const sent = await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
+  const sent = await sendTelegramMessage(config.botToken, destinationChatId, message, {
     replyMarkup: {
       inline_keyboard: [
         [
@@ -996,19 +1030,16 @@ export async function sendTelegramWinbackCouponCampaign(input: {
 
   const ui = getTelegramUi(input.locale);
   const supportLink = await getTelegramSupportLink();
-  const lines = [
-    ui.winbackCouponTitle,
-    '',
-    ui.winbackCouponBody(Math.max(1, input.inactiveDays)),
-    ui.trialCouponOffer(escapeHtml(input.couponCode), escapeHtml(input.discountLabel)),
-    ui.couponReadyHint,
-  ];
+  const message = buildTelegramCouponReminderMessage({
+    locale: input.locale,
+    title: ui.winbackCouponTitle,
+    body: ui.winbackCouponBody(Math.max(1, input.inactiveDays)),
+    couponCode: input.couponCode,
+    discountLabel: input.discountLabel,
+    hint: ui.couponReadyHint,
+  });
 
-  if (supportLink) {
-    lines.push('', `${ui.supportLabel}: ${supportLink}`);
-  }
-
-  const sent = await sendTelegramMessage(config.botToken, input.telegramChatId, lines.join('\n'), {
+  const sent = await sendTelegramMessage(config.botToken, input.telegramChatId, message, {
     replyMarkup: {
       inline_keyboard: [
         [

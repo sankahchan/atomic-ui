@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildTelegramHelpMessage } from '@/lib/services/telegram-admin';
 import {
+  buildTelegramCouponReminderMessage,
+  buildTelegramTrialExpiringReminderMessage,
+} from '@/lib/services/telegram-reminders';
+import {
+  buildTelegramSupportReplySubmittedMessage,
+  buildTelegramSupportThreadStartMessage,
+  resolveTelegramSupportIssuePrompt,
+} from '@/lib/services/telegram-support-cards';
+import {
   findUnsupportedTelegramHtmlTags,
   normalizeTelegramUtf8Text,
   sanitizeTelegramHtmlMessage,
@@ -141,4 +150,98 @@ test('telegram premium prompts and order outcomes stay compact and HTML-safe', (
   assert.doesNotMatch(ui.premiumFollowUpSubmitted('PRM-123'), /has been sent to the admin/);
   assert.doesNotMatch(ui.orderRejected('ORD-123'), /please contact the admin/i);
   assert.doesNotMatch(ui.receiptFooter, /client URL/i);
+});
+
+test('telegram promo reminder messages stay compact and keep links in buttons', () => {
+  const ui = getTelegramUi('en');
+  const samples = [
+    buildTelegramTrialExpiringReminderMessage({
+      locale: 'en',
+      keyName: 'Onn iPhone 15',
+      hoursLeft: 6,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.trialCouponTitle,
+      keyName: 'Onn iPhone 15',
+      body: ui.trialCouponBody(6),
+      couponCode: 'SAVE20',
+      discountLabel: '20% off',
+      hint: ui.trialCouponHint,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.renewalCouponTitle,
+      keyName: 'Onn iPhone 15',
+      body: ui.renewalCouponBody(3),
+      couponCode: 'RENEW10',
+      discountLabel: '10% off',
+      hint: ui.couponReadyHint,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.premiumUpsellCouponTitle,
+      keyName: 'Onn iPhone 15',
+      body: ui.premiumUpsellCouponBody(82),
+      couponCode: 'PREMIUM15',
+      discountLabel: '15% off',
+      hint: ui.couponReadyHint,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.winbackCouponTitle,
+      body: ui.winbackCouponBody(30),
+      couponCode: 'COMEHOME',
+      discountLabel: '25% off',
+      hint: ui.couponReadyHint,
+    }),
+  ];
+
+  for (const sample of samples) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.ok(sample.split('\n').length <= 7);
+    assert.doesNotMatch(sample, /https?:\/\//);
+  }
+
+  assert.doesNotMatch(ui.trialExpiringUpsell, /before the trial expires/i);
+  assert.doesNotMatch(ui.trialCouponHint, /\/buy COUPON-CODE/);
+  assert.doesNotMatch(ui.premiumUpsellCouponBody(82), /more stable premium plan/i);
+});
+
+test('telegram support intake messages stay compact and HTML-safe', () => {
+  const prompts = [
+    resolveTelegramSupportIssuePrompt('ORDER', 'en'),
+    resolveTelegramSupportIssuePrompt('KEY', 'en'),
+    resolveTelegramSupportIssuePrompt('SERVER', 'en'),
+    resolveTelegramSupportIssuePrompt('BILLING', 'en'),
+    resolveTelegramSupportIssuePrompt('GENERAL', 'en'),
+  ];
+
+  for (const prompt of prompts) {
+    assert.deepEqual(validateTelegramHtmlMessage(prompt), { valid: true, invalidTags: [] });
+    assert.ok(prompt.split('\n').length <= 2);
+    assert.doesNotMatch(prompt, /next message/i);
+  }
+
+  const start = buildTelegramSupportThreadStartMessage({
+    threadCode: 'SUP-123',
+    issueCategory: 'BILLING',
+    locale: 'en',
+  });
+  const submitted = buildTelegramSupportReplySubmittedMessage({
+    threadCode: 'SUP-123',
+    locale: 'en',
+  });
+
+  for (const sample of [start, submitted]) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.doesNotMatch(sample, /https?:\/\//);
+  }
+
+  assert.ok(start.split('\n').length <= 9);
+  assert.ok(submitted.split('\n').length <= 2);
+  assert.doesNotMatch(start, /\bSLA\b/);
+  assert.doesNotMatch(start, /\bAge\b/);
+  assert.doesNotMatch(submitted, /support queue/i);
+  assert.doesNotMatch(submitted, /as soon as it is available/i);
 });
