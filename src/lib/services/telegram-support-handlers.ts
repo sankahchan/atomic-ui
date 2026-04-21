@@ -1,12 +1,12 @@
 import { writeAuditLog } from '@/lib/audit';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import {
+  buildTelegramSupportStatusSummaryKeyboard,
+  buildTelegramSupportStatusSummaryMessage,
   buildTelegramSupportHubKeyboard,
   buildTelegramSupportThreadKeyboard,
   buildTelegramSupportThreadStatusMessage,
   resolveTelegramSupportIssuePrompt,
-  resolveTelegramSupportIssueLabel,
-  getTelegramSupportThreadState,
 } from '@/lib/services/telegram-support-cards';
 import {
   addTelegramSupportReply,
@@ -22,7 +22,6 @@ import {
 } from '@/lib/services/telegram-runtime';
 import {
   escapeHtml,
-  formatTelegramDateTime,
 } from '@/lib/services/telegram-ui';
 
 export async function handleTelegramSupportThreadStart(input: {
@@ -299,13 +298,18 @@ export async function handleTelegramSupportStatusCommand(input: {
   locale: SupportedLocale;
   botToken: string;
   premiumRequests?: Array<{
+    id: string;
     requestCode: string;
     status: string;
     requestType: string;
     createdAt: Date;
+    updatedAt?: Date | null;
     handledAt?: Date | null;
     dismissedAt?: Date | null;
     followUpPending?: boolean | null;
+    dynamicAccessKey: {
+      name: string;
+    };
   }>;
 }) {
   const supportLink = await getTelegramSupportLink();
@@ -314,69 +318,32 @@ export async function handleTelegramSupportStatusCommand(input: {
     telegramUserId: input.telegramUserId,
     limit: 5,
   });
-  const openThreads = threads.filter((thread) => thread.status !== 'HANDLED');
-  const latestThread = threads[0] || null;
+  const message = buildTelegramSupportStatusSummaryMessage({
+    locale: input.locale,
+    threads,
+    premiumRequests: (input.premiumRequests || []).map((request) => ({
+      id: request.id,
+      requestCode: request.requestCode,
+      requestType: request.requestType,
+      status: request.status,
+      followUpPending: request.followUpPending,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+      dynamicKeyName: request.dynamicAccessKey.name,
+    })),
+  });
 
-  const lines = [
-    input.locale === 'my'
-      ? '🧵 <b>Your support center</b>'
-      : '🧵 <b>Your support center</b>',
-    '',
-    input.locale === 'my'
-      ? `${openThreads.length} open • ${threads.length} recent`
-      : `${openThreads.length} open • ${threads.length} recent`,
-  ];
-
-  if (latestThread) {
-    const state = getTelegramSupportThreadState({
-      status: latestThread.status,
-      waitingOn: latestThread.waitingOn,
-      locale: input.locale,
-    });
-    lines.push(
-      '',
-      `${input.locale === 'my' ? 'Latest thread' : 'Latest thread'}: <b>${escapeHtml(latestThread.threadCode)}</b>`,
-      `${input.locale === 'my' ? 'Category' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(latestThread.issueCategory, input.locale))}</b>`,
-      `${input.locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
-      `${input.locale === 'my' ? 'Updated' : 'Updated'}: <b>${escapeHtml(formatTelegramDateTime(latestThread.updatedAt, input.locale))}</b>`,
-    );
-  }
-
-  if (input.premiumRequests && input.premiumRequests.length > 0) {
-    lines.push(
-      '',
-      input.locale === 'my'
-        ? '<b>Premium support</b>'
-        : '<b>Premium support</b>',
-      ...input.premiumRequests.slice(0, 2).map((request) => {
-        const statusLabel =
-          request.followUpPending
-            ? input.locale === 'my'
-              ? 'Waiting for admin'
-              : 'Waiting for admin'
-            : request.status;
-        return `• <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(statusLabel)}`;
-      }),
-    );
-  }
-
-  if (threads.length === 0 && (!input.premiumRequests || input.premiumRequests.length === 0)) {
-    lines.push(
-      '',
-      input.locale === 'my'
-        ? 'Support thread မရှိသေးပါ။ /support ကို ဖွင့်ပြီး category တစ်ခုကို ရွေးနိုင်ပါသည်။'
-        : 'There are no support threads yet. Open /support and choose a category to start.',
-    );
-  }
-
-  await sendTelegramMessage(input.botToken, input.chatId, lines.join('\n'), {
+  await sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup:
-      latestThread
-        ? buildTelegramSupportThreadKeyboard({
+      threads.length > 0 || (input.premiumRequests && input.premiumRequests.length > 0)
+        ? buildTelegramSupportStatusSummaryKeyboard({
             locale: input.locale,
-            threadId: latestThread.id,
+            threads,
+            premiumRequests: (input.premiumRequests || []).map((request) => ({
+              id: request.id,
+              requestCode: request.requestCode,
+            })),
             supportLink,
-            attachmentUrl: latestThread.replies[latestThread.replies.length - 1]?.mediaUrl || null,
           })
         : buildTelegramSupportHubKeyboard({
             locale: input.locale,
