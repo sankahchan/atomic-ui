@@ -5,9 +5,11 @@ import {
   buildTelegramBuySummaryMessage,
   buildTelegramRenewSummaryMessage,
 } from '@/lib/services/telegram-order-state';
+import { buildTelegramInboxSummaryMessage } from '@/lib/services/telegram-inbox-ui';
 import { buildTelegramKeysSummaryMessage } from '@/lib/services/telegram-keys';
 import { buildTelegramPremiumHubMessage } from '@/lib/services/telegram-premium';
 import { buildTelegramOrdersSummaryMessage } from '@/lib/services/telegram-orders';
+import { buildTelegramSupportStatusSummaryMessage } from '@/lib/services/telegram-support-cards';
 
 const samplePlans = [
   {
@@ -294,4 +296,97 @@ test('renew summary stays compact and removes repeated key-type copy', () => {
   assert.match(message, /Status: <b>ACTIVE<\/b>/);
   assert.match(message, /73 day\(s\) left \(6\/29\/2026\) • SG-2/);
   assert.ok(message.split('\n').length < 18);
+});
+
+test('inbox summary stays compact and avoids category dump walls', () => {
+  const message = buildTelegramInboxSummaryMessage({
+    locale: 'en',
+    mode: 'ALL',
+    summaryLine: '2 announcement(s) • 1 order update(s) • 1 support update(s)',
+    items: [
+      {
+        icon: '📣',
+        title: 'Flash sale',
+        detail: 'PROMO • Unread',
+        meta: 'Apr 20, 2026 11:00 AM',
+        sortAt: new Date('2026-04-20T11:00:00.000Z'),
+      },
+      {
+        icon: '🧾',
+        title: 'ORD-1',
+        detail: 'Awaiting review • Premium / 1 Month / 200 GB',
+        meta: 'Apr 20, 2026 10:30 AM',
+        sortAt: new Date('2026-04-20T10:30:00.000Z'),
+      },
+      {
+        icon: '💎',
+        title: 'PRM-1',
+        detail: 'Route issue • Waiting for admin',
+        meta: 'Apr 20, 2026 10:00 AM',
+        sortAt: new Date('2026-04-20T10:00:00.000Z'),
+      },
+      {
+        icon: '🔑',
+        title: 'LIMIT_NEAR',
+        detail: 'Key 90',
+        meta: 'Apr 20, 2026 09:00 AM',
+        sortAt: new Date('2026-04-20T09:00:00.000Z'),
+      },
+    ],
+  });
+
+  assert.match(message, /Your Notice Inbox/);
+  assert.match(message, /1\.\s+📣/);
+  assert.match(message, /2\.\s+🧾/);
+  assert.match(message, /3\.\s+💎/);
+  assert.doesNotMatch(message, /Announcements<\/b>/);
+  assert.doesNotMatch(message, /Order updates<\/b>/);
+  assert.doesNotMatch(message, /Support updates<\/b>/);
+  assert.ok(message.split('\n').length <= 18);
+});
+
+test('support status summary shows a short thread list instead of only the latest thread', () => {
+  const message = buildTelegramSupportStatusSummaryMessage({
+    locale: 'en',
+    threads: [
+      {
+        id: 'thread_1',
+        threadCode: 'SUP-AAA111',
+        issueCategory: 'ORDER',
+        status: 'OPEN',
+        waitingOn: 'ADMIN',
+        createdAt: new Date('2026-04-20T08:00:00.000Z'),
+        updatedAt: new Date('2026-04-20T10:00:00.000Z'),
+      },
+      {
+        id: 'thread_2',
+        threadCode: 'SUP-BBB222',
+        issueCategory: 'SERVER',
+        status: 'OPEN',
+        waitingOn: 'USER',
+        createdAt: new Date('2026-04-20T07:00:00.000Z'),
+        updatedAt: new Date('2026-04-20T09:00:00.000Z'),
+      },
+    ],
+    premiumRequests: [
+      {
+        id: 'request_1',
+        requestCode: 'PRM-111',
+        requestType: 'REGION_CHANGE',
+        status: 'OPEN',
+        followUpPending: true,
+        createdAt: new Date('2026-04-20T06:00:00.000Z'),
+        updatedAt: new Date('2026-04-20T09:30:00.000Z'),
+        dynamicKeyName: 'Onn',
+      },
+    ],
+  });
+
+  assert.match(message, /Your support center/);
+  assert.match(message, /2 open • 2 recent • 1 premium/);
+  assert.match(message, /SUP-AAA111/);
+  assert.match(message, /SUP-BBB222/);
+  assert.match(message, /PRM-111/);
+  assert.doesNotMatch(message, /Latest thread:/);
+  assert.ok(message.split('\n').length <= 18);
 });

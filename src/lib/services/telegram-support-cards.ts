@@ -1,6 +1,11 @@
 import { withAbsoluteBasePath } from '@/lib/base-path';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import {
+  buildTelegramCommerceCard,
+  buildTelegramCommerceMessage,
+} from '@/lib/services/telegram-commerce-ui';
+import {
+  buildTelegramCommerceViewCallbackData,
   buildTelegramMenuCallbackData,
   buildTelegramSupportThreadCallbackData,
 } from '@/lib/services/telegram-callbacks';
@@ -8,6 +13,7 @@ import {
   buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatTelegramDateTime,
+  formatTelegramPremiumSupportTypeLabel,
   getTelegramUi,
 } from '@/lib/services/telegram-ui';
 import {
@@ -282,6 +288,147 @@ export function buildTelegramSupportThreadKeyboard(input: {
   }
 
   return { inline_keyboard: rows };
+}
+
+export function buildTelegramSupportStatusSummaryMessage(input: {
+  locale: SupportedLocale;
+  threads: Array<{
+    id: string;
+    threadCode: string;
+    issueCategory: string;
+    status: string;
+    waitingOn: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+  premiumRequests?: Array<{
+    id: string;
+    requestCode: string;
+    requestType: string;
+    status: string;
+    followUpPending?: boolean | null;
+    createdAt: Date;
+    updatedAt?: Date | null;
+    dynamicKeyName?: string | null;
+  }>;
+}) {
+  const openThreads = input.threads.filter((thread) => thread.status !== 'HANDLED');
+  const requestCount = input.premiumRequests?.length || 0;
+  const stats = [
+    `${openThreads.length} open`,
+    `${input.threads.length} recent`,
+    requestCount > 0 ? `${requestCount} premium` : null,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
+  const threadCards = input.threads.slice(0, 3).map((thread, index) => {
+    const state = getTelegramSupportThreadState({
+      status: thread.status,
+      waitingOn: thread.waitingOn,
+      locale: input.locale,
+    });
+    return buildTelegramCommerceCard(
+      `${index + 1}. 🧵 <b>${escapeHtml(thread.threadCode)}</b>`,
+      [
+        `${escapeHtml(resolveTelegramSupportIssueLabel(thread.issueCategory, input.locale))} • ${escapeHtml(state.label)}`,
+        escapeHtml(formatTelegramDateTime(thread.updatedAt || thread.createdAt, input.locale)),
+      ],
+    );
+  });
+
+  const premiumCards = (input.premiumRequests || []).slice(0, 2).map((request) =>
+    buildTelegramCommerceCard(
+      `💎 <b>${escapeHtml(request.requestCode)}</b>`,
+      [
+        `${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, getTelegramUi(input.locale)))} • ${escapeHtml(
+          request.followUpPending
+            ? input.locale === 'my'
+              ? 'Waiting for admin'
+              : 'Waiting for admin'
+            : request.status,
+        )}`,
+        request.dynamicKeyName ? escapeHtml(request.dynamicKeyName) : null,
+      ],
+    ),
+  );
+
+  if (threadCards.length === 0 && premiumCards.length === 0) {
+    return input.locale === 'my'
+      ? '🧵 <b>Your support center</b>\n\nNo support threads yet. Use /support to start one.'
+      : '🧵 <b>Your support center</b>\n\nNo support threads yet. Use /support to start one.';
+  }
+
+  return buildTelegramCommerceMessage({
+    title: input.locale === 'my' ? '🧵 <b>Your support center</b>' : '🧵 <b>Your support center</b>',
+    statsLine: stats,
+    cards: [...threadCards, ...premiumCards].slice(0, 4),
+    footerLines: [
+      input.locale === 'my'
+        ? 'Use /support to start a new thread.'
+        : 'Use /support to start a new thread.',
+    ],
+  });
+}
+
+export function buildTelegramSupportStatusSummaryKeyboard(input: {
+  locale: SupportedLocale;
+  threads: Array<{
+    id: string;
+    threadCode: string;
+  }>;
+  premiumRequests?: Array<{
+    id: string;
+    requestCode: string;
+  }>;
+  supportLink?: string | null;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+
+  for (const thread of input.threads.slice(0, 3)) {
+    rows.push([
+      {
+        text: `${isMyanmar ? 'Open' : 'Open'} ${thread.threadCode}`,
+        callback_data: buildTelegramSupportThreadCallbackData('status', thread.id),
+      },
+    ]);
+  }
+
+  for (const request of (input.premiumRequests || []).slice(0, 2)) {
+    rows.push([
+      {
+        text: `${isMyanmar ? 'Premium' : 'Premium'} ${truncateTelegramSupportButtonLabel(request.requestCode)}`,
+        callback_data: buildTelegramCommerceViewCallbackData('supportstatus', 'detail', request.id, '1'),
+      },
+    ]);
+  }
+
+  rows.push([
+    {
+      text: isMyanmar ? '🛟 Support hub' : '🛟 Support hub',
+      callback_data: buildTelegramMenuCallbackData('support', 'home'),
+    },
+    {
+      text: isMyanmar ? '📬 Inbox' : '📬 Inbox',
+      callback_data: buildTelegramMenuCallbackData('support', 'inbox'),
+    },
+  ]);
+
+  if (input.supportLink) {
+    rows.push([{ text: isMyanmar ? '🛟 Contact admin' : '🛟 Contact admin', url: input.supportLink }]);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+function truncateTelegramSupportButtonLabel(value: string, maxLength = 18) {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, maxLength - 1)}…`;
 }
 
 export function buildTelegramSupportThreadStatusMessage(input: {

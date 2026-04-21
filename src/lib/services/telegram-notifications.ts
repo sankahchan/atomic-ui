@@ -1,36 +1,28 @@
 import type { SupportedLocale } from '@/lib/i18n/config';
 import { db } from '@/lib/db';
-import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import {
   buildTelegramMenuCallbackData,
   buildTelegramNotificationPreferenceCallbackData,
 } from '@/lib/services/telegram-callbacks';
+import {
+  buildTelegramInboxEmptyMessage,
+  buildTelegramInboxSummaryMessage,
+  type TelegramInboxMode,
+  type TelegramInboxSummaryItem,
+} from '@/lib/services/telegram-inbox-ui';
 import {
   getTelegramNotificationPreferenceLabel,
   getTelegramNotificationPreferences,
   sendTelegramMessage,
 } from '@/lib/services/telegram-runtime';
 import {
-  buildTelegramLatestReplyPreviewLines,
-  escapeHtml,
   formatTelegramDateTime,
   formatTelegramOrderStatusLabel,
-  formatTelegramPremiumFollowUpState,
   formatTelegramPremiumSupportTypeLabel,
   formatTelegramReplyStateLabel,
   formatTelegramRefundRequestStatusLabel,
   getTelegramUi,
 } from '@/lib/services/telegram-ui';
-
-type TelegramInboxMode =
-  | 'ALL'
-  | 'UNREAD'
-  | 'PINNED'
-  | 'ORDERS'
-  | 'SUPPORT'
-  | 'REFUNDS'
-  | 'ANNOUNCEMENTS'
-  | 'PREMIUM';
 
 function parseTelegramInboxMode(argsText: string): TelegramInboxMode {
   const normalized = argsText.trim().toLowerCase();
@@ -57,65 +49,6 @@ function parseTelegramInboxMode(argsText: string): TelegramInboxMode {
     default:
       return 'ALL';
   }
-}
-
-function buildTelegramInboxTitle(mode: TelegramInboxMode, locale: SupportedLocale) {
-  const isMyanmar = locale === 'my';
-  switch (mode) {
-    case 'UNREAD':
-      return isMyanmar ? '📬 <b>မဖတ်ရသေးသော Inbox</b>' : '📬 <b>Your unread inbox</b>';
-    case 'PINNED':
-      return isMyanmar ? '📌 <b>Pin လုပ်ထားသော Inbox</b>' : '📌 <b>Your pinned inbox</b>';
-    case 'ORDERS':
-      return isMyanmar ? '🧾 <b>Order inbox</b>' : '🧾 <b>Your order inbox</b>';
-    case 'SUPPORT':
-      return isMyanmar ? '🛟 <b>Support inbox</b>' : '🛟 <b>Your support inbox</b>';
-    case 'REFUNDS':
-      return isMyanmar ? '💸 <b>Refund inbox</b>' : '💸 <b>Your refund inbox</b>';
-    case 'ANNOUNCEMENTS':
-      return isMyanmar ? '📣 <b>Announcement inbox</b>' : '📣 <b>Your announcement inbox</b>';
-    case 'PREMIUM':
-      return isMyanmar ? '💎 <b>Premium inbox</b>' : '💎 <b>Your premium inbox</b>';
-    default:
-      return isMyanmar ? '📬 <b>သင်၏ Notice Inbox</b>' : '📬 <b>Your Notice Inbox</b>';
-  }
-}
-
-function buildTelegramInboxEmptyMessage(mode: TelegramInboxMode, locale: SupportedLocale) {
-  const isMyanmar = locale === 'my';
-  switch (mode) {
-    case 'UNREAD':
-      return isMyanmar ? '📭 မဖတ်ရသေးသော update မရှိသေးပါ။' : '📭 No unread updates right now.';
-    case 'PINNED':
-      return isMyanmar ? '📭 Pin လုပ်ထားသော update မရှိသေးပါ။' : '📭 No pinned updates right now.';
-    case 'ORDERS':
-      return isMyanmar ? '📭 မကြာသေးမီက order update မရှိသေးပါ။' : '📭 No recent order updates yet.';
-    case 'SUPPORT':
-      return isMyanmar ? '📭 မကြာသေးမီက support update မရှိသေးပါ။' : '📭 No recent support updates yet.';
-    case 'REFUNDS':
-      return isMyanmar ? '📭 မကြာသေးမီက refund update မရှိသေးပါ။' : '📭 No recent refund updates yet.';
-    case 'ANNOUNCEMENTS':
-      return isMyanmar ? '📭 မကြာသေးမီက announcement မရှိသေးပါ။' : '📭 No recent announcements yet.';
-    case 'PREMIUM':
-      return isMyanmar ? '📭 မကြာသေးမီက premium routing update မရှိသေးပါ။' : '📭 No recent premium updates yet.';
-    default:
-      return isMyanmar
-        ? '📭 မကြာသေးမီက notice သို့မဟုတ် announcement မရှိသေးပါ။'
-        : '📭 No recent notices or announcements yet.';
-  }
-}
-
-function buildTelegramInboxTip(mode: TelegramInboxMode, locale: SupportedLocale) {
-  const isMyanmar = locale === 'my';
-  if (mode === 'ALL') {
-    return isMyanmar
-      ? 'Tip: /inbox orders, /inbox support, /inbox refunds, /inbox announcements, /inbox premium, /inbox unread ကို သီးသန့်သုံးနိုင်သည်။'
-      : 'Tip: use /inbox orders, /inbox support, /inbox refunds, /inbox announcements, /inbox premium, or /inbox unread for a narrower view.';
-  }
-
-  return isMyanmar
-    ? 'Tip: /inbox ကို သုံးပြီး update အားလုံးကို တစ်နေရာတည်းမှာ ပြန်ကြည့်နိုင်သည်။'
-    : 'Tip: use /inbox to switch back to the combined view.';
 }
 
 function buildTelegramInboxKeyboard(locale: SupportedLocale, mode: TelegramInboxMode) {
@@ -447,12 +380,22 @@ export async function handleInboxCommand(input: {
   }
 
   const dynamicKeyNameById = new Map(dynamicKeys.map((key) => [key.id, key.name]));
+  const inboxItems: TelegramInboxSummaryItem[] = [];
   const summaryParts: string[] = [];
   if (announcements.length) {
     summaryParts.push(
       input.locale === 'my'
         ? `Announcement ${announcements.length} ခု`
         : `${announcements.length} announcement(s)`,
+    );
+    inboxItems.push(
+      ...announcements.map((delivery) => ({
+        icon: delivery.isPinned ? '📌' : '📣',
+        title: delivery.announcement.title,
+        detail: `${delivery.announcement.type} • ${delivery.readAt ? 'Read' : 'Unread'}`,
+        meta: formatTelegramDateTime(delivery.sentAt || delivery.createdAt, input.locale),
+        sortAt: delivery.sentAt || delivery.createdAt,
+      })),
     );
   }
   if (orderUpdates.length) {
@@ -461,12 +404,39 @@ export async function handleInboxCommand(input: {
         ? `Order ${orderUpdates.length} ခု`
         : `${orderUpdates.length} order update(s)`,
     );
+    inboxItems.push(
+      ...orderUpdates.map((order) => {
+        const lastActivity =
+          order.fulfilledAt ||
+          order.rejectedAt ||
+          order.reviewedAt ||
+          order.paymentSubmittedAt ||
+          order.updatedAt;
+
+        return {
+          icon: '🧾',
+          title: order.orderCode,
+          detail: `${formatTelegramOrderStatusLabel(order.status, ui)} • ${order.planName || order.planCode || order.kind}`,
+          meta: formatTelegramDateTime(lastActivity, input.locale),
+          sortAt: lastActivity,
+        };
+      }),
+    );
   }
   if (keyLogs.length) {
     summaryParts.push(
       input.locale === 'my'
         ? `Key notice ${keyLogs.length} ခု`
         : `${keyLogs.length} key notice(s)`,
+    );
+    inboxItems.push(
+      ...keyLogs.map((log) => ({
+        icon: '🔑',
+        title: log.event,
+        detail: log.accessKey?.name || 'Key',
+        meta: formatTelegramDateTime(log.sentAt, input.locale),
+        sortAt: log.sentAt,
+      })),
     );
   }
   if (premiumSupportUpdates.length) {
@@ -475,12 +445,38 @@ export async function handleInboxCommand(input: {
         ? `Support ${premiumSupportUpdates.length} ခု`
         : `${premiumSupportUpdates.length} support update(s)`,
     );
+    inboxItems.push(
+      ...premiumSupportUpdates.map((request) => {
+        const latestReply = request.replies?.[request.replies.length - 1] || null;
+        const replyStateLabel = formatTelegramReplyStateLabel({
+          latestReplySenderType: latestReply?.senderType || null,
+          followUpPending: request.followUpPending,
+          locale: input.locale,
+        });
+        return {
+          icon: '💎',
+          title: request.requestCode,
+          detail: `${formatTelegramPremiumSupportTypeLabel(request.requestType, ui)} • ${replyStateLabel}`,
+          meta: formatTelegramDateTime(request.updatedAt || request.createdAt, input.locale),
+          sortAt: request.updatedAt || request.createdAt,
+        };
+      }),
+    );
   }
   if (refundUpdates.length) {
     summaryParts.push(
       input.locale === 'my'
         ? `Refund ${refundUpdates.length} ခု`
         : `${refundUpdates.length} refund update(s)`,
+    );
+    inboxItems.push(
+      ...refundUpdates.map((order) => ({
+        icon: '💸',
+        title: order.orderCode,
+        detail: `${formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui)} • ${order.planName || order.kind}`,
+        meta: formatTelegramDateTime(order.refundRequestReviewedAt || order.refundRequestedAt || order.updatedAt, input.locale),
+        sortAt: order.refundRequestReviewedAt || order.refundRequestedAt || order.updatedAt,
+      })),
     );
   }
   if (premiumRoutingEvents.length) {
@@ -489,133 +485,22 @@ export async function handleInboxCommand(input: {
         ? `Premium routing ${premiumRoutingEvents.length} ခု`
         : `${premiumRoutingEvents.length} premium routing update(s)`,
     );
-  }
-
-  const lines = [
-    buildTelegramInboxTitle(mode, input.locale),
-    '',
-    summaryParts.join(' • '),
-    '',
-  ];
-
-  if (announcements.length) {
-    lines.push(
-      mode === 'PINNED'
-        ? input.locale === 'my'
-          ? '<b>Pin လုပ်ထားသော announcement များ</b>'
-          : '<b>Pinned announcements</b>'
-        : mode === 'UNREAD'
-          ? input.locale === 'my'
-            ? '<b>မဖတ်ရသေးသော announcement များ</b>'
-            : '<b>Unread announcements</b>'
-          : input.locale === 'my'
-            ? '<b>Announcement များ</b>'
-            : '<b>Announcements</b>',
+    inboxItems.push(
+      ...premiumRoutingEvents.map((event) => ({
+        icon: '🧭',
+        title: dynamicKeyNameById.get(event.dynamicAccessKeyId) || 'Premium key',
+        detail: `${formatTelegramInboxRoutingEventLabel(event.eventType, input.locale)} • ${truncateTelegramInboxLine(event.reason || event.toServerName || 'Routing update', 52)}`,
+        meta: formatTelegramDateTime(event.createdAt, input.locale),
+        sortAt: event.createdAt,
+      })),
     );
-    for (const delivery of announcements) {
-      lines.push(
-        `• ${delivery.isPinned ? '📌 ' : '📣 '}<b>${escapeHtml(delivery.announcement.title)}</b>`,
-        `  ${escapeHtml(delivery.announcement.type)} • ${formatTelegramDateTime(delivery.sentAt || delivery.createdAt, input.locale)}`,
-        `  ${delivery.readAt ? '✅' : '🆕'} ${delivery.readAt ? (input.locale === 'my' ? 'Read' : 'Read') : (input.locale === 'my' ? 'Unread' : 'Unread')}`,
-      );
-    }
-    lines.push('');
   }
-
-  if (orderUpdates.length) {
-    lines.push(input.locale === 'my' ? '<b>Order updates</b>' : '<b>Order updates</b>');
-    for (const order of orderUpdates) {
-      const lastActivity =
-        order.fulfilledAt ||
-        order.rejectedAt ||
-        order.reviewedAt ||
-        order.paymentSubmittedAt ||
-        order.updatedAt;
-      lines.push(
-        `• 🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(
-          formatTelegramOrderStatusLabel(order.status, ui),
-        )}`,
-        `  ${escapeHtml(order.planName || order.planCode || order.kind)}`,
-        `  ${formatTelegramDateTime(lastActivity, input.locale)}`,
-      );
-    }
-    lines.push('');
-  }
-
-  if (premiumSupportUpdates.length) {
-    lines.push(input.locale === 'my' ? '<b>Support updates</b>' : '<b>Support updates</b>');
-    for (const request of premiumSupportUpdates) {
-      const latestReply = request.replies?.[request.replies.length - 1] || null;
-      const replyStateLabel = formatTelegramReplyStateLabel({
-        latestReplySenderType: latestReply?.senderType || null,
-        followUpPending: request.followUpPending,
-        locale: input.locale,
-      });
-      lines.push(
-        `• 💎 <b>${escapeHtml(request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}`,
-        `  ${escapeHtml(request.dynamicAccessKey.name)} • ${escapeHtml(formatTelegramPremiumFollowUpState(request, ui))}`,
-        `  ${escapeHtml(replyStateLabel)}`,
-        ...buildTelegramLatestReplyPreviewLines({
-          reply: latestReply,
-          locale: input.locale,
-          maxLength: 80,
-        }).map((line) => `  ${escapeHtml(line)}`),
-        `  ${formatTelegramDateTime(request.updatedAt || request.createdAt, input.locale)}`,
-      );
-    }
-    lines.push('');
-  }
-
-  if (refundUpdates.length) {
-    lines.push(input.locale === 'my' ? '<b>Refund & finance updates</b>' : '<b>Refund & finance updates</b>');
-    for (const order of refundUpdates) {
-      lines.push(
-        `• 💸 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(
-          formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui),
-        )}`,
-        `  ${order.planName ? escapeHtml(order.planName) : escapeHtml(order.kind)}`,
-        order.refundReviewReasonCode
-          ? `  ${escapeHtml(
-              resolveRefundReasonPresetLabel(order.refundReviewReasonCode) ||
-                order.refundReviewReasonCode,
-            )}`
-          : '',
-        `  ${formatTelegramDateTime(order.refundRequestReviewedAt || order.refundRequestedAt || order.updatedAt, input.locale)}`,
-      );
-    }
-    lines.push('');
-  }
-
-  if (premiumRoutingEvents.length) {
-    lines.push(input.locale === 'my' ? '<b>Premium routing updates</b>' : '<b>Premium routing updates</b>');
-    for (const event of premiumRoutingEvents) {
-      lines.push(
-        `• 💎 <b>${escapeHtml(dynamicKeyNameById.get(event.dynamicAccessKeyId) || 'Premium key')}</b> • ${escapeHtml(
-          formatTelegramInboxRoutingEventLabel(event.eventType, input.locale),
-        )}`,
-        `  ${escapeHtml(truncateTelegramInboxLine(event.reason || event.toServerName || 'Routing update', 96))}`,
-        `  ${formatTelegramDateTime(event.createdAt, input.locale)}`,
-      );
-    }
-    lines.push('');
-  }
-
-  if (keyLogs.length) {
-    lines.push(input.locale === 'my' ? '<b>Key Notice များ</b>' : '<b>Key notices</b>');
-    for (const log of keyLogs) {
-      lines.push(
-        `• <b>${escapeHtml(log.event)}</b>`,
-        `  ${escapeHtml(log.accessKey?.name || 'Key')} • ${formatTelegramDateTime(log.sentAt, input.locale)}`,
-      );
-    }
-  }
-
-  lines.push(
-    '',
-    buildTelegramInboxTip(mode, input.locale),
-  );
-
-  const message = lines.join('\n');
+  const message = buildTelegramInboxSummaryMessage({
+    locale: input.locale,
+    mode,
+    summaryLine: summaryParts.join(' • '),
+    items: inboxItems,
+  });
   if (input.botToken) {
     await sendTelegramMessage(input.botToken, input.chatId, message, {
       replyMarkup: buildTelegramInboxKeyboard(input.locale, mode),
