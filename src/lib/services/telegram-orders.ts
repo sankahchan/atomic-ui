@@ -926,49 +926,11 @@ export async function handleRefundCommand(input: {
   if (refundableOrders.length === 0 && recentRefundRequests.length === 0) {
     return [ui.refundNoEligibleOrders, '', ui.refundPolicySummary].join('\n');
   }
-
-  const summaryLines = [ui.refundCenterTitle, '', ui.refundPolicySummary];
-
-  if (recentRefundRequests.length > 0) {
-    summaryLines.push(
-      '',
-      `<b>${ui.refundRecentRequestsTitle}</b>`,
-      ...recentRefundRequests.map((order) => {
-        const details = [
-          escapeHtml(order.orderCode),
-          escapeHtml(formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || '', ui)),
-        ];
-        if (order.refundRequestedAt) {
-          details.push(escapeHtml(formatTelegramDateTime(order.refundRequestedAt, input.locale)));
-        }
-        if (order.refundReviewReasonCode) {
-          details.push(
-            escapeHtml(
-              resolveRefundReasonPresetLabel(order.refundReviewReasonCode) ||
-                order.refundReviewReasonCode,
-            ),
-          );
-        }
-        return `• ${details.join(' • ')}`;
-      }),
-    );
-  }
-
-  if (refundableOrders.length > 0) {
-    summaryLines.push(
-      '',
-      `<b>${ui.refundEligibleSectionTitle}</b>`,
-      ...refundableOrders.map(
-        ({ order, refundEligibility }, index) =>
-          `${index + 1}. ${escapeHtml(formatTelegramOrderStateLine(order))} • ${escapeHtml(
-            formatBytes(refundEligibility.usedBytes),
-          )}`,
-      ),
-      '',
-      ui.refundEligibleOrdersHint,
-    );
-  }
-  const summaryMessage = summaryLines.join('\n');
+  const summaryMessage = buildTelegramRefundSummaryMessage({
+    locale: input.locale,
+    recentRefundRequests,
+    refundableOrders,
+  });
   const sentSummary = await input.sendTelegramMessage(
     input.botToken,
     input.chatId,
@@ -985,4 +947,69 @@ export async function handleRefundCommand(input: {
   }
 
   return sentSummary ? null : summaryMessage;
+}
+
+export function buildTelegramRefundSummaryMessage(input: {
+  locale: SupportedLocale;
+  recentRefundRequests: Array<TelegramUserOrder>;
+  refundableOrders: Array<{
+    order: TelegramUserOrder;
+    refundEligibility: {
+      usedBytes: bigint | number;
+    };
+  }>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const cards: string[] = [];
+
+  if (input.recentRefundRequests.length > 0) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '💸 <b>Recent refund status</b>',
+        input.recentRefundRequests.slice(0, 3).map((order) => {
+          const details = [
+            `<b>${escapeHtml(order.orderCode)}</b>`,
+            escapeHtml(formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui)),
+            order.refundRequestedAt
+              ? escapeHtml(formatTelegramDateTime(order.refundRequestedAt, input.locale))
+              : null,
+            order.refundReviewReasonCode
+              ? escapeHtml(
+                  resolveRefundReasonPresetLabel(order.refundReviewReasonCode) ||
+                    order.refundReviewReasonCode,
+                )
+              : null,
+          ].filter(Boolean) as string[];
+          return details.join(' • ');
+        }),
+      ),
+    );
+  }
+
+  if (input.refundableOrders.length > 0) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '🧾 <b>Eligible now</b>',
+        input.refundableOrders.slice(0, 3).map(({ order, refundEligibility }, index) =>
+          `${index + 1}. ${escapeHtml(buildTelegramCompactOrderStateLine(order, ui))} • ${escapeHtml(
+            formatBytes(refundEligibility.usedBytes),
+          )}`,
+        ),
+      ),
+    );
+  }
+
+  return buildTelegramCommerceMessage({
+    title: ui.refundCenterTitle,
+    statsLine: `${input.recentRefundRequests.length} recent • ${input.refundableOrders.length} eligible`,
+    intro:
+      input.locale === 'my'
+        ? 'Refund summary ကို အတိုချုံးပြထားသည်။ Refund လုပ်နိုင်သော order card များကို အောက်တွင် ဆက်ပို့ပါမည်။'
+        : 'This refund summary stays short. Eligible order cards are sent below.',
+    cards,
+    footerLines: [
+      ui.refundPolicySummary,
+      input.refundableOrders.length > 0 ? ui.refundEligibleOrdersHint : null,
+    ],
+  });
 }

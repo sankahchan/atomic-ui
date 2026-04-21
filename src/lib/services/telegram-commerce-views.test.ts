@@ -13,12 +13,14 @@ import {
 import {
   buildTelegramPremiumDetailMessage,
   buildTelegramPremiumHubMessage,
+  buildTelegramPremiumRegionDetailMessage,
   buildTelegramPremiumSupportListMessage,
   buildTelegramPremiumSupportStatusMessage,
 } from '@/lib/services/telegram-premium';
 import {
   buildTelegramOrderStatusMessage,
   buildTelegramOrdersSummaryMessage,
+  buildTelegramRefundSummaryMessage,
 } from '@/lib/services/telegram-orders';
 import { buildTelegramSupportStatusSummaryMessage } from '@/lib/services/telegram-support-cards';
 
@@ -351,6 +353,52 @@ test('orders summary keeps timeline and next-step detail out of the list view', 
   assert.match(message, /Step 4\/4 • Delivered/);
 });
 
+test('refund summary stays compact and keeps the center view short', () => {
+  const message = buildTelegramRefundSummaryMessage({
+    locale: 'en',
+    recentRefundRequests: [
+      {
+        id: 'ord_1',
+        orderCode: 'ORD-1',
+        refundRequestStatus: 'PENDING_REVIEW',
+        refundRequestedAt: new Date('2026-04-20T08:00:00.000Z'),
+        refundReviewReasonCode: null,
+      },
+      {
+        id: 'ord_2',
+        orderCode: 'ORD-2',
+        refundRequestStatus: 'REJECTED',
+        refundRequestedAt: new Date('2026-04-19T08:00:00.000Z'),
+        refundReviewReasonCode: 'USAGE_OVER_LIMIT',
+      },
+    ] as any,
+    refundableOrders: [
+      {
+        order: {
+          id: 'ord_3',
+          orderCode: 'ORD-3',
+          kind: 'NEW',
+          status: 'FULFILLED',
+          planName: 'Premium / 1 Month / 200 GB',
+          planCode: 'premium_1m_200gb',
+          durationMonths: 1,
+          durationDays: null,
+          requestedName: 'Onn',
+        },
+        refundEligibility: {
+          usedBytes: 1024,
+        },
+      },
+    ] as any,
+  });
+
+  assert.match(message, /Refund center/);
+  assert.match(message, /Recent refund status/);
+  assert.match(message, /Eligible now/);
+  assert.doesNotMatch(message, /Request refund on one of the order cards below to submit a refund request\./);
+  assert.ok(message.split('\n').length <= 16);
+});
+
 test('renew summary stays compact and removes repeated key-type copy', () => {
   const message = buildTelegramRenewSummaryMessage({
     locale: 'en',
@@ -532,6 +580,87 @@ test('premium support detail stays compact and avoids timeline dumps', () => {
   assert.doesNotMatch(message, /Timeline/i);
   assert.doesNotMatch(message, /Follow-up history/i);
   assert.ok(message.split('\n').length < 22);
+});
+
+test('premium region detail stays compact and focuses on routing snapshot', () => {
+  const message = buildTelegramPremiumRegionDetailMessage({
+    locale: 'en',
+    key: {
+      id: 'dak_1',
+      name: 'Onn',
+      status: 'ACTIVE',
+      accessKeys: [],
+      preferredCountryCodesJson: '["SG","JP","US"]',
+      preferredServerIdsJson: '[]',
+      lastResolvedServerId: 'srv_sg',
+      pinnedAccessKeyId: null,
+      pinnedServerId: null,
+      pinnedAt: null,
+      pinExpiresAt: null,
+    } as any,
+    analysis: {
+      preferredRegions: ['SG', 'JP', 'US'],
+      currentServer: { name: 'SG-2', countryCode: 'SG' },
+      currentSummary: {
+        regionCode: 'SG',
+        status: 'UP',
+        latencyMs: 72,
+        latencyThresholdMs: 150,
+        serverCount: 2,
+        isCurrent: true,
+      },
+      regionSummaries: [
+        {
+          regionCode: 'SG',
+          status: 'UP',
+          latencyMs: 72,
+          latencyThresholdMs: 150,
+          serverCount: 2,
+          isCurrent: true,
+        },
+        {
+          regionCode: 'JP',
+          status: 'SLOW',
+          latencyMs: 210,
+          latencyThresholdMs: 180,
+          serverCount: 1,
+          isCurrent: false,
+        },
+        {
+          regionCode: 'US',
+          status: 'DOWN',
+          latencyMs: null,
+          latencyThresholdMs: null,
+          serverCount: 0,
+          isCurrent: false,
+        },
+        {
+          regionCode: 'DE',
+          status: 'UP',
+          latencyMs: 95,
+          latencyThresholdMs: 160,
+          serverCount: 1,
+          isCurrent: false,
+        },
+      ],
+      suggestedFallbacks: [{ regionCode: 'JP' }],
+    } as any,
+    latestRoutingEvent: {
+      eventType: 'AUTO_ROUTE',
+      reason: 'Latency normal again after SG route recovered.',
+      createdAt: new Date('2026-04-20T09:30:00.000Z'),
+    } as any,
+    index: 1,
+    total: 1,
+  });
+
+  assert.match(message, /Region status 1\/1/);
+  assert.match(message, /Routing snapshot/);
+  assert.match(message, /Health snapshot/);
+  assert.doesNotMatch(message, /Current routing/);
+  assert.doesNotMatch(message, /Region health/);
+  assert.doesNotMatch(message, /🇩🇪/);
+  assert.ok(message.split('\n').length <= 15);
 });
 
 test('order detail stays compact and keeps links in buttons', async () => {

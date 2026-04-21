@@ -747,10 +747,11 @@ export function buildTelegramPremiumRegionDetailMessage(input: {
   const currentRouteLabel = input.analysis.currentServer
     ? `${input.analysis.currentServer.name}${input.analysis.currentServer.countryCode ? ` ${getFlagEmoji(input.analysis.currentServer.countryCode)}` : ''}`
     : ui.premiumRegionUnknownStatus;
+  const preferredRegionsLabel = input.analysis.preferredRegions.join(', ') || ui.premiumRegionNoAttached;
   const regionLines =
-    input.analysis.preferredRegions.length === 0
+    input.analysis.regionSummaries.length === 0
       ? [ui.premiumRegionNoAttached]
-      : input.analysis.regionSummaries.slice(0, 5).map((summary) => {
+      : input.analysis.regionSummaries.slice(0, 3).map((summary) => {
           const markers: string[] = [];
           if (summary.isCurrent) {
             markers.push(ui.premiumRegionCurrentRouteLabel);
@@ -762,21 +763,19 @@ export function buildTelegramPremiumRegionDetailMessage(input: {
         });
 
   return buildTelegramCommerceMessage({
-    title: input.locale === 'my' ? `🌍 <b>Region status ${input.index}/${input.total}</b>` : `🌍 <b>Region status ${input.index}/${input.total}</b>`,
-    statsLine: `<b>${escapeHtml(input.key.name)}</b>`,
-    intro: escapeHtml(formatPremiumOverallStatusLine(input.analysis, input.locale)),
+    title: `🌍 <b>Region status ${input.index}/${input.total}</b>`,
+    statsLine: `<b>${escapeHtml(input.key.name)}</b> • ${escapeHtml(formatPremiumOverallStatusLine(input.analysis, input.locale))}`,
     cards: [
       buildTelegramCommerceCard(
-        '🌍 <b>Current routing</b>',
+        '🌍 <b>Routing snapshot</b>',
         [
-          `${ui.premiumRegionPreferredLabel}: ${escapeHtml(input.analysis.preferredRegions.join(', ') || ui.premiumRegionNoAttached)}`,
-          `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}`,
-          currentFallback ? `${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}` : null,
-          `${input.locale === 'my' ? 'Last routing event' : 'Last routing event'}: ${escapeHtml(formatTelegramPremiumRoutingEventSummary(input.latestRoutingEvent, input.locale))}`,
+          `${ui.premiumRegionPreferredLabel}: ${escapeHtml(preferredRegionsLabel)}`,
+          `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}${currentFallback ? ` • ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}` : ''}`,
+          `Last event: ${escapeHtml(formatTelegramPremiumRoutingEventSummary(input.latestRoutingEvent, input.locale))}`,
         ],
       ),
       buildTelegramCommerceCard(
-        '🩺 <b>Region health</b>',
+        '🩺 <b>Health snapshot</b>',
         regionLines.map((line) => escapeHtml(line)),
       ),
     ],

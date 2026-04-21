@@ -494,16 +494,16 @@ export function getTelegramUi(locale: SupportedLocale) {
     renewDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ renewal မလုပ်နိုင်သေးပါ။' : 'ℹ️ Renewals are not available through Telegram right now.',
     activeOrderPendingReview: (code: string) =>
       isMyanmar
-        ? `⏳ Order <b>${code}</b> ကို review စောင့်နေဆဲဖြစ်ပါသည်။ Screenshot အသစ် မပို့ပါနှင့်။ Admin အတည်ပြုပြီးနောက် access ကို ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
-        : `⏳ Order <b>${code}</b> is still waiting for review. Do not send another screenshot yet. Your access details will be delivered here after admin approval.`,
+        ? `⏳ Order <b>${code}</b> ကို review စောင့်နေဆဲဖြစ်ပါသည်။\nScreenshot အသစ် မပို့ပါနှင့်။ အတည်ပြုပြီးနောက် access ကို ဒီ chat ထဲပို့ပေးပါမည်။`
+        : `⏳ Order <b>${code}</b> is under review.\nDo not send another screenshot. Access will be sent here after approval.`,
     orderCancelled: (code: string) =>
       isMyanmar
         ? `🛑 Order <b>${code}</b> ကို ပယ်ဖျက်ပြီးပါပြီ။`
         : `🛑 Order <b>${code}</b> has been cancelled.`,
     noOrderToCancel: isMyanmar ? 'ℹ️ ပယ်ဖျက်ရန် pending Telegram order မရှိပါ။' : 'ℹ️ There is no pending Telegram order to cancel.',
     paymentProofRequired: isMyanmar
-      ? '🧾 ငွေပေးချေပြီးပါက payment screenshot ကို photo သို့မဟုတ် document အဖြစ် ဤ chat ထဲသို့ ပို့ပေးပါ။ Amount, transfer ID နှင့် အချိန်ကို ရှင်းလင်းစွာ မြင်ရပါမည်။ ပို့ပြီးနောက် review စောင့်ပါ။'
-      : '🧾 After payment, send the payment screenshot here as a photo or document. Make sure the amount, transfer ID, and time are clearly visible, then wait for review.',
+      ? '🧾 Payment screenshot ကို ဒီ chat ထဲ photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။\nAmount, transfer ID နှင့် အချိန်ကို ရှင်းလင်းစွာ မြင်ရပါမည်။'
+      : '🧾 Send your payment screenshot here as a photo or document.\nAmount, transfer ID, and time must be clearly visible.',
     orderPlanPrompt: (code: string) =>
       isMyanmar
         ? `🛒 <b>Order ${code}</b>\n\nသင့်အသုံးပြုမှုပုံစံနှင့် ကိုက်ညီသော package ကို ရွေးပါ။ Button ကိုနှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။`
@@ -540,20 +540,20 @@ export function getTelegramUi(locale: SupportedLocale) {
       : 'ℹ️ The free trial is only available once for each new user.',
     orderProofPending: (code: string) =>
       isMyanmar
-        ? `📨 Order <b>${code}</b> အတွက် payment proof ကို လက်ခံပြီးပါပြီ။ Admin review စောင့်နေပါသည်။ အတည်ပြုပြီးနောက် key ကို ဤ chat ထဲသို့ ပို့ပေးပါမည်။`
-        : `📨 Payment proof received for order <b>${code}</b>. It is now waiting for admin review. Your key will be delivered here after approval.`,
+        ? `📨 Order <b>${code}</b> အတွက် payment proof ကို လက်ခံပြီးပါပြီ။\nAdmin review စောင့်နေပါသည်။ အတည်ပြုပြီးနောက် key ကို ဒီ chat ထဲပို့ပေးပါမည်။`
+        : `📨 Payment proof received for order <b>${code}</b>.\nNow waiting for admin review. Your key will be sent here after approval.`,
     orderPaymentMethodReminder: (code: string) =>
       isMyanmar
         ? `⏰ Order <b>${code}</b> သည် payment method မရွေးရသေးပါ။ ဆက်လက်လုပ်ဆောင်ရန် နည်းလမ်းတစ်ခုကို ရွေးပေးပါ။`
         : `⏰ Order <b>${code}</b> is still waiting for a payment method. Choose one to continue.`,
     orderPaymentProofReminder: (code: string) =>
       isMyanmar
-        ? `⏰ Order <b>${code}</b> သည် payment screenshot မရသေးပါ။ ငွေပေးချေပြီးဖြစ်ပါက screenshot ကို ဤ chat ထဲသို့ ပို့ပေးပါ။`
-        : `⏰ Order <b>${code}</b> is still waiting for your payment screenshot. If you have already paid, send the screenshot in this chat.`,
+        ? `⏰ Order <b>${code}</b> သည် payment screenshot စောင့်နေပါသည်။\nငွေပေးချေပြီးဖြစ်ပါက ဒီ chat ထဲ screenshot ပို့ပေးပါ။`
+        : `⏰ Order <b>${code}</b> is still waiting for your payment screenshot.\nIf you already paid, send it in this chat.`,
     orderRejectedFollowUpReminder: (code: string) =>
       isMyanmar
-        ? `ℹ️ Order <b>${code}</b> ကို ယခင်က ပယ်ထားပြီးဖြစ်ပါသည်။ ဆက်လုပ်လိုပါက retry ကို နှိပ်ပြီး screenshot အသစ်တင်ပါ သို့မဟုတ် support ကို ဆက်သွယ်ပါ။`
-        : `ℹ️ Order <b>${code}</b> was rejected earlier. If you still want this plan, tap retry and upload a new screenshot, or contact support.`,
+        ? `ℹ️ Order <b>${code}</b> ကို ယခင်က ပယ်ထားပြီးဖြစ်ပါသည်။\nRetry ကို နှိပ်ပြီး screenshot အသစ်တင်ပါ သို့မဟုတ် /support ကို အသုံးပြုပါ။`
+        : `ℹ️ Order <b>${code}</b> was rejected earlier.\nTap retry to upload a new screenshot, or use /support.`,
     orderRejectedFollowUpNote: isMyanmar
       ? 'Rejected order အတွက် follow-up reminder ကို ပို့ခဲ့သည်။'
       : 'Sent a follow-up reminder for this rejected order.',
@@ -704,13 +704,13 @@ export function getTelegramUi(locale: SupportedLocale) {
     orderActionSent: isMyanmar ? 'အသေးစိတ်ကို Telegram တွင် ပို့ပြီးပါပြီ။' : 'Details sent in Telegram.',
     refundPolicySummary: isMyanmar
       ? 'Refund ကို fulfilled paid orders အတွက်သာ တောင်းဆိုနိုင်ပြီး paid purchase ၃ ကြိမ်ကျော်ရမည်။ အသုံးပြုမှု 5 GB ကျော်သွားလျှင် refund မရနိုင်တော့ပါ။'
-      : 'Refunds are available only on fulfilled paid orders after more than 3 paid purchases. Once usage goes above 5 GB, the refund option closes automatically.',
+      : 'Refund opens only for fulfilled paid orders after more than 3 paid purchases, and closes automatically above 5 GB of usage.',
     refundEligibleOrdersTitle: isMyanmar
       ? '💸 <b>Refund တောင်းဆိုနိုင်သော orders</b>'
       : '💸 <b>Refund-eligible orders</b>',
     refundEligibleOrdersHint: isMyanmar
-      ? 'အောက်ပါ order card များထဲမှ Request refund ကိုနှိပ်ပြီး refund request တင်နိုင်ပါသည်။'
-      : 'Tap Request refund on one of the order cards below to submit a refund request.',
+      ? 'အောက်ပါ order card များမှ refund request ကို တင်နိုင်ပါသည်။'
+      : 'Use the order cards below to request a refund.',
     refundNoEligibleOrders: isMyanmar
       ? 'Refund တောင်းဆိုနိုင်သော order မရှိသေးပါ။ Paid purchase ၃ ကြိမ်ကျော်ပြီး fulfilled order ဖြစ်ရမည်၊ အသုံးပြုမှု 5 GB အောက်တွင် ရှိရမည်။'
       : 'There are no refund-eligible orders right now. You need more than 3 paid purchases, a fulfilled paid order, and usage at or below 5 GB.',
@@ -743,12 +743,12 @@ export function getTelegramUi(locale: SupportedLocale) {
         : `Order <b>${code}</b> already has a pending refund request.`,
     refundRequested: (code: string) =>
       isMyanmar
-        ? `💸 Order <b>${code}</b> အတွက် refund request ကို ပို့ပြီးပါပြီ။ Admin review ပြီးသည်နှင့် အခြေအနေကို ဤ chat တွင် ပြန်ကြားပါမည်။`
-        : `💸 Refund request sent for order <b>${code}</b>. You will get an update here after admin review.`,
+        ? `💸 Order <b>${code}</b> အတွက် refund request ကို ပို့ပြီးပါပြီ။\nReview ပြီးသည်နှင့် ဒီ chat မှာ update ပို့ပေးပါမည်။`
+        : `💸 Refund request sent for order <b>${code}</b>.\nWe will update you here after review.`,
     refundRequestRejected: (code: string, customerMessage?: string | null) =>
       isMyanmar
         ? `❌ Order <b>${code}</b> အတွက် refund request ကို မအတည်ပြုနိုင်ပါ။${customerMessage ? `\n\n${customerMessage}` : ''}`
-        : `❌ Refund request for order <b>${code}</b> was not approved.${customerMessage ? `\n\n${customerMessage}` : ''}`,
+        : `❌ Refund not approved for order <b>${code}</b>.${customerMessage ? `\n\n${customerMessage}` : ''}`,
     refundRequestApproved: (code: string, customerMessage?: string | null) =>
       isMyanmar
         ? `✅ Order <b>${code}</b> အတွက် refund ကို အတည်ပြုပြီးပါပြီ။${customerMessage ? `\n\n${customerMessage}` : ''}`

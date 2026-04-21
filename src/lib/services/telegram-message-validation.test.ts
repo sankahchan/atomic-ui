@@ -91,3 +91,27 @@ test('telegram start surfaces stay summary-first', () => {
   assert.deepEqual(validateTelegramHtmlMessage(welcomeBack), { valid: true, invalidTags: [] });
   assert.deepEqual(validateTelegramHtmlMessage(linked), { valid: true, invalidTags: [] });
 });
+
+test('telegram payment and refund reply strings stay compact and HTML-safe', () => {
+  const ui = getTelegramUi('en');
+  const samples = [
+    ui.activeOrderPendingReview('ORD-123'),
+    ui.paymentProofRequired,
+    ui.orderProofPending('ORD-123'),
+    ui.orderPaymentProofReminder('ORD-123'),
+    ui.orderRejectedFollowUpReminder('ORD-123'),
+    ui.refundRequested('ORD-123'),
+    ui.refundRequestApproved('ORD-123'),
+    ui.refundRequestRejected('ORD-123'),
+  ];
+
+  for (const sample of samples) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.ok(sample.split('\n').length <= 3);
+  }
+
+  assert.doesNotMatch(ui.activeOrderPendingReview('ORD-123'), /waiting for review/);
+  assert.doesNotMatch(ui.paymentProofRequired, /Make sure the amount, transfer ID, and time are clearly visible, then wait for review\./);
+  assert.doesNotMatch(ui.orderProofPending('ORD-123'), /It is now waiting for admin review/);
+  assert.doesNotMatch(ui.refundRequested('ORD-123'), /after admin review/);
+});
