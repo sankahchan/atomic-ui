@@ -802,7 +802,7 @@ export async function handleSupportCommand(input: {
     '',
     input.locale === 'my'
       ? 'လိုအပ်သော category ကို ရွေးပြီး support thread အသစ် စတင်နိုင်ပါသည်။'
-      : 'Choose the category you need and start a real support thread.',
+      : 'Choose the category you need and start a new support thread.',
   ];
 
   if (latestThread) {

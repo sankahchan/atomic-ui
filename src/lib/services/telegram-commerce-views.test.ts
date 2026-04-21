@@ -353,6 +353,35 @@ test('orders summary keeps timeline and next-step detail out of the list view', 
   assert.match(message, /Step 4\/4 • Delivered/);
 });
 
+test('orders summary prefers normalized display labels over stored localized plan names', () => {
+  const message = buildTelegramOrdersSummaryMessage({
+    locale: 'en',
+    filter: 'ALL',
+    page: 1,
+    attentionOrders: [],
+    reviewOrders: [],
+    completedOrders: [],
+    filteredOrders: [
+      {
+        id: 'ord_1',
+        orderCode: 'ORD-1',
+        kind: 'NEW',
+        status: 'REJECTED',
+        planName: 'Premium / ၁ လ / 200 GB (၆,၀၀၀ ကျပ်)',
+        planCode: 'premium_1m_200gb',
+        displayPlanLabel: 'Premium / 1 Month / 200 GB',
+        durationMonths: 1,
+        durationDays: null,
+        requestedName: 'Two',
+      },
+    ] as any,
+  });
+
+  assert.match(message, /Premium \/ 1 Month \/ 200 GB • 1m • Two/);
+  assert.doesNotMatch(message, /၁ လ/);
+  assert.doesNotMatch(message, /၆,၀၀၀/);
+});
+
 test('refund summary stays compact and keeps the center view short', () => {
   const message = buildTelegramRefundSummaryMessage({
     locale: 'en',
