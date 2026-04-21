@@ -314,18 +314,18 @@ export function getTelegramUi(locale: SupportedLocale) {
     lifecycleExpiredBody: isMyanmar ? 'ဤ key ကို မလုပ်ဆောင်နိုင်တော့ပါ။ သက်တမ်းတိုးလိုပါက support ကို ဆက်သွယ်ပါ။' : 'The key is no longer active. Contact support if it should be renewed.',
     startLinked: (username: string) =>
       isMyanmar
-        ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\n<b>ယခု ချက်ချင်းလုပ်နိုင်သောအရာများ</b>\n• 🗂 Key များ ကြည့်ရန်\n• 🛒 အသစ်ဝယ်ရန်\n• 🔄 Renew လုပ်ရန်\n• 🛟 Support center ဖွင့်ရန်\n\nအောက်ရှိ keyboard menu ဖြင့် ဆက်လုပ်နိုင်ပါသည်။`
-        : `✅ Telegram linked for <b>${username}</b>.\n\n<b>You can now do these right away</b>\n• 🗂 view your keys\n• 🛒 buy a new one\n• 🔄 renew\n• 🛟 open the support center\n\nContinue from the keyboard below.`,
+        ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📬 /inbox ဖြင့် update များ ကြည့်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည်။`
+        : `✅ Telegram linked for <b>${username}</b>.\n\n<b>Start here</b>\n• 🗂 /mykeys for links and renewals\n• 🛒 /buy for a new order\n• 📬 /inbox for updates\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
     linkExpired: isMyanmar ? '⚠️ ဤ Telegram link သက်တမ်းကုန်သွားပါပြီ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '⚠️ This Telegram link has expired. Ask the admin to generate a new one.',
     linkInvalid: isMyanmar ? '❌ ဤ Telegram link ကို မသုံးနိုင်တော့ပါ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '❌ That Telegram link is not valid anymore. Ask the admin for a fresh link.',
     welcomeBack: (username: string) =>
       isMyanmar
-        ? `✅ <b>${username}</b> ကို ပြန်လည်ကြိုဆိုပါသည်!\n\n<b>ယခု ချက်ချင်းလုပ်နိုင်သောအရာများ</b>\n• 🛒 /buy ဖြင့် package အသစ် ဝယ်ရန်\n• 🗂 /mykeys ဖြင့် link, usage, renew ကို စစ်ရန်\n• 📬 /inbox ဖြင့် announcement နှင့် support update များ ကြည့်ရန်\n• 🛟 /support ဖြင့် help center ဖွင့်ရန်\n\nအောက်ရှိ keyboard menu ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။`
-        : `✅ Welcome back, <b>${username}</b>!\n\n<b>Start here</b>\n• 🛒 Use /buy for a new package\n• 🗂 Use /mykeys for links, usage, and renewals\n• 📬 Use /inbox for announcements and support updates\n• 🛟 Use /support for the help center\n\nYou can continue quickly from the keyboard below.`,
+        ? `✅ <b>${username}</b> ကို ပြန်လည်ကြိုဆိုပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📬 /inbox ဖြင့် update များ ကြည့်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။`
+        : `✅ Welcome back, <b>${username}</b>!\n\n<b>Start here</b>\n• 🗂 /mykeys for links and renewals\n• 🛒 /buy for a new order\n• 📬 /inbox for updates\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
     accountLinked: (username: string) =>
       isMyanmar
-        ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\nကြိုဆိုပါသည်၊ <b>${username}</b>!\n\n<b>ဒီ Telegram မှာ လုပ်နိုင်သောအရာများ</b>\n• Key အသစ် ဝယ်ရန်\n• လက်ရှိ key များကြည့်ရန်\n• Renew လုပ်ရန်\n• Support နှင့် inbox update များ ရယူရန်\n\nအောက်ရှိ menu ကို နှိပ်ပြီး စတင်နိုင်ပါသည်။`
-        : `✅ Account linked successfully!\n\nWelcome, <b>${username}</b>!\n\n<b>You can now do everything from Telegram</b>\n• buy a new key\n• view your current keys\n• renew an existing key\n• get support and inbox updates\n\nUse the menu below to get started.`,
+        ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key များ စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📬 /inbox ဖြင့် update များ ကြည့်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး စတင်နိုင်ပါသည်။`
+        : `✅ Account linked successfully!\n\n<b>Start here</b>\n• 🗂 /mykeys for your linked keys\n• 🛒 /buy for a new order\n• 📬 /inbox for updates\n• 🛟 /support for help\n\nUse the menu below to continue.`,
     adminRecognized: isMyanmar ? '\n\nသင့်ကို administrator အဖြစ် သတ်မှတ်ထားပါသည်။' : '\n\nYou are recognized as an administrator.',
     languagePrompt: isMyanmar ? '🌐 ဘာသာစကား ရွေးချယ်ပါ။' : '🌐 Choose your language.',
     languagePromptDesc: isMyanmar
@@ -340,8 +340,8 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အဓိက menu</b>\n• 🛒 Key ဝယ်ရန်\n• 🗂 လက်ရှိ key များ ကြည့်ရန်\n• 🔄 Renew လုပ်ရန်\n• 📬 Inbox update များ ကြည့်ရန်\n\n<b>အသုံးဝင်သော shortcut များ</b>\n• 🎁 Free Trial\n• 💎 Premium center\n• 🛠 Server change\n• 🛟 Support center\n\n<b>Tip</b>\nအောက်ရှိ keyboard button များကို နှိပ်ပါ။ Slash command များကိုလည်း အချိန်မရွေး ဆက်သုံးနိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Main menu</b>\n• 🛒 Buy a key\n• 🗂 View your current keys\n• 🔄 Renew an existing key\n• 📬 Check inbox updates\n\n<b>Useful shortcuts</b>\n• 🎁 Free trial\n• 💎 Premium center\n• 🛠 Server change\n• 🛟 Support center\n\n<b>Tip</b>\nUse the keyboard buttons below for the fastest path, or keep using slash commands any time.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အမြန် menu</b>\n• 🛒 /buy - order အသစ်\n• 🗂 /mykeys - ချိတ်ထားသော key များ\n• 🧾 /orders - မကြာသေးသော order များ\n• 🛟 /support - အကူအညီ စင်တာ\n\n<b>နောက်ထပ်</b>\n• 📬 /inbox - notice နှင့် reply များ\n• 🎁 /trial - free trial\n• 🌐 /language - ဘာသာစကားပြောင်းရန်\n\nအောက်ရှိ keyboard ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick menu</b>\n• 🛒 /buy - new order\n• 🗂 /mykeys - linked keys\n• 🧾 /orders - recent orders\n• 🛟 /support - help center\n\n<b>More</b>\n• 📬 /inbox - updates and replies\n• 🎁 /trial - free trial\n• 🌐 /language - switch language\n\nUse the keyboard below for the fastest path.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,

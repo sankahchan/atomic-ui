@@ -55,6 +55,9 @@ test('telegram help message stays valid HTML for user and admin variants', () =>
 
   assert.deepEqual(validateTelegramHtmlMessage(userHelp), { valid: true, invalidTags: [] });
   assert.deepEqual(validateTelegramHtmlMessage(adminHelp), { valid: true, invalidTags: [] });
+  assert.match(userHelp, /Quick command guide/);
+  assert.doesNotMatch(userHelp, /Available Commands/);
+  assert.match(adminHelp, /Admin commands/);
 });
 
 test('telegram usage and status hint strings stay HTML-safe', () => {
@@ -71,4 +74,20 @@ test('telegram usage and status hint strings stay HTML-safe', () => {
   for (const sample of samples) {
     assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
   }
+});
+
+test('telegram start surfaces stay summary-first', () => {
+  const ui = getTelegramUi('en');
+  const hello = ui.hello('User', 'Welcome text', 123456, '');
+  const welcomeBack = ui.welcomeBack('User');
+  const linked = ui.accountLinked('User');
+
+  assert.match(hello, /Quick menu/);
+  assert.doesNotMatch(hello, /Useful shortcuts/);
+  assert.match(welcomeBack, /Start here/);
+  assert.doesNotMatch(welcomeBack, /announcement and support updates/);
+  assert.doesNotMatch(linked, /everything from Telegram/);
+  assert.deepEqual(validateTelegramHtmlMessage(hello), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(welcomeBack), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(linked), { valid: true, invalidTags: [] });
 });

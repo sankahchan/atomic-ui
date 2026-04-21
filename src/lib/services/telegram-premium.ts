@@ -532,18 +532,14 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   const lines = [
     ui.premiumStatusTitle,
     '',
-    `${request.requestCode} • ${formatTelegramPremiumSupportStatusLabel(request.status, ui)}`,
-    '',
     `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(request.requestCode)}</b>`,
     `${ui.keyLabel}: <b>${escapeHtml(request.dynamicAccessKey.name)}</b>`,
     `${ui.premiumRequestType}: <b>${escapeHtml(
       formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
-    )}</b>`,
-    `${ui.statusLineLabel}: <b>${escapeHtml(
+    )}</b> • ${ui.statusLineLabel}: <b>${escapeHtml(
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
-    `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b>`,
-    `${escapeHtml(followUpIndicator)}`,
+    `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b> • ${escapeHtml(followUpIndicator)}`,
     `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`,
     `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
   ];
@@ -583,7 +579,7 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   }
 
   if (request.customerMessage?.trim()) {
-    lines.push('', `${ui.customerMessage}:`, escapeHtml(request.customerMessage.trim()));
+    lines.push('', `${ui.customerMessage}: ${escapeHtml(request.customerMessage.trim())}`);
   }
 
   if (latestReply) {
@@ -592,86 +588,27 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
       ...buildTelegramLatestReplyPreviewLines({
         reply: latestReply,
         locale: input.locale,
-        maxLength: 280,
+        maxLength: 180,
       }).map((line) => escapeHtml(line)),
     );
   }
 
-  lines.push(
-    '',
-    `<b>${input.locale === 'my' ? 'What happens next' : 'What happens next'}</b>`,
-    escapeHtml(
-      request.status === 'PENDING_REVIEW'
+  const nextStepText =
+    request.status === 'PENDING_REVIEW'
+      ? input.locale === 'my'
+        ? 'Admin review ကို စောင့်ပါ။ လိုအပ်ပါက extra detail တောင်းနိုင်ပါသည်။'
+        : 'Wait for admin review. The admin may ask for extra detail if needed.'
+      : currentState === ui.premiumAwaitingYourReply
         ? input.locale === 'my'
-          ? 'Admin review စောင့်ပါ။ လိုအပ်ပါက screenshot သို့မဟုတ် extra detail တောင်းနိုင်ပါသည်။'
-          : 'Wait for admin review. If needed, the admin may ask for more detail.'
-        : currentState === ui.premiumAwaitingYourReply
+          ? 'Admin reply ပို့ထားပါသည်။ Reply to request ဖြင့် thread ကို ဆက်လုပ်နိုင်ပါသည်။'
+          : 'The admin replied. Use Reply to request to continue the same thread.'
+        : currentState === ui.premiumAwaitingAdminReply
           ? input.locale === 'my'
-            ? 'Admin က reply ပို့ထားပါသည်။ Reply to request ဖြင့် ဆက်ပြောနိုင်ပါသည်။'
-            : 'The admin replied. Use Reply to request if you want to continue the same thread.'
-          : currentState === ui.premiumAwaitingAdminReply
-            ? input.locale === 'my'
-              ? 'သင့်နောက်ဆုံး message ကို admin စစ်နေပါသည်။'
-              : 'The admin is reviewing your latest message.'
-            : input.locale === 'my'
-              ? 'လက်ရှိ request ကို status နှင့် history အဖြစ် အောက်တွင် ဆက်လက်ကြည့်နိုင်ပါသည်။'
-              : 'You can continue to track the current request status and history below.',
-    ),
-  );
+            ? 'သင့်နောက်ဆုံး message ကို admin စစ်နေပါသည်။'
+            : 'The admin is reviewing your latest message.'
+          : ui.premiumStatusReplyHint;
 
-  lines.push('', `${ui.orderTimelineTitle}:`);
-  lines.push(
-    `• ${ui.premiumHistorySubmitted} · ${escapeHtml(
-      formatTelegramDateTime(request.createdAt, input.locale),
-    )}`,
-  );
-  if (request.reviewedAt) {
-    lines.push(
-      `• ${ui.premiumHistoryReviewed} · ${escapeHtml(
-        formatTelegramDateTime(request.reviewedAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.status === 'APPROVED' && request.reviewedAt) {
-    lines.push(
-      `• ${ui.premiumHistoryApproved} · ${escapeHtml(
-        formatTelegramDateTime(request.reviewedAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.handledAt) {
-    lines.push(
-      `• ${ui.premiumHistoryHandled} · ${escapeHtml(
-        formatTelegramDateTime(request.handledAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.dismissedAt) {
-    lines.push(
-      `• ${ui.premiumHistoryDismissed} · ${escapeHtml(
-        formatTelegramDateTime(request.dismissedAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.appliedPinServerName) {
-    lines.push(`• ${ui.premiumHistoryPinApplied} · ${escapeHtml(request.appliedPinServerName)}`);
-  }
-
-  if (request.replies?.length) {
-    lines.push('', `${ui.premiumFollowUpHistoryTitle}:`);
-    for (const reply of request.replies.slice(-3)) {
-      const senderLabel =
-        reply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
-      lines.push(
-        `• <b>${escapeHtml(senderLabel)}</b> · ${escapeHtml(
-          formatTelegramDateTime(reply.createdAt, input.locale),
-        )}`,
-        `  ${escapeHtml(reply.message)}`,
-      );
-    }
-  }
-
-  lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(ui.premiumStatusReplyHint)}`);
+  lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(nextStepText)}`);
 
   return lines.join('\n');
 }

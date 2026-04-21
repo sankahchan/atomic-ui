@@ -21,18 +21,22 @@ test('getCommandKeyboard renders localized customer labels', () => {
   const english = getCommandKeyboard(false, 'en');
   const myanmar = getCommandKeyboard(false, 'my');
 
-  assert.equal(english.keyboard[0]?.[0]?.text, '🛒 Buy key');
-  assert.equal(english.keyboard[0]?.[1]?.text, '🗂 My keys');
-  assert.equal(english.keyboard[1]?.[0]?.text, '🎟 Offers');
-  assert.equal(myanmar.keyboard[0]?.[0]?.text, '🛒 Key ဝယ်မည်');
+  assert.equal(english.keyboard[0]?.[0]?.text, '🛒 Buy');
+  assert.equal(english.keyboard[0]?.[1]?.text, '🗂 Keys');
+  assert.equal(english.keyboard[1]?.[0]?.text, '🔄 Renew');
+  assert.equal(english.keyboard.length, 7);
+  assert.equal(myanmar.keyboard[0]?.[0]?.text, '🛒 ဝယ်မည်');
   assert.equal(myanmar.keyboard[0]?.[1]?.text, '🗂 Key များ');
-  assert.equal(myanmar.keyboard[1]?.[0]?.text, '🎟 Offer များ');
+  assert.equal(myanmar.keyboard[4]?.[0]?.text, '🎟 Offers');
 });
 
 test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back to commands', () => {
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🛒 Buy', false), '/buy');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛒 Buy key', false), '/buy');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🗂 Key များ', false), '/mykeys');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🎟 Offers', false), '/offers');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🎁 Gift', false), '/gift');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🛠 Server change', false), '/server');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🌐 Language', false), '/language');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛑 Cancel', false), '/cancel');
 });
