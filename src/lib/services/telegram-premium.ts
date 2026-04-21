@@ -42,7 +42,6 @@ import {
 } from '@/lib/services/telegram-runtime';
 import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import {
-  buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
@@ -529,44 +528,32 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
     followUpPending: request.followUpPending,
     locale: input.locale,
   });
-  const lines = [
-    ui.premiumStatusTitle,
-    '',
-    `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(request.requestCode)}</b>`,
-    `${ui.keyLabel}: <b>${escapeHtml(request.dynamicAccessKey.name)}</b>`,
+  const routeSnapshotLines = [
+    `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
+    request.requestedRegionCode || request.currentResolvedServerName || request.currentResolvedServerCountryCode
+      ? [
+          request.requestedRegionCode
+            ? `${ui.premiumRequestedRegionLabel}: <b>${escapeHtml(request.requestedRegionCode)}</b>`
+            : null,
+          request.currentResolvedServerName || request.currentResolvedServerCountryCode
+            ? `${ui.premiumResolvedServer}: <b>${escapeHtml(
+                request.currentResolvedServerName ||
+                  request.currentResolvedServerCountryCode ||
+                  ui.premiumNoRequestedRegion,
+              )}</b>`
+            : null,
+        ].filter(Boolean).join(' • ')
+      : null,
+  ].filter(Boolean) as string[];
+
+  const threadMetaLines = [
     `${ui.premiumRequestType}: <b>${escapeHtml(
       formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
     )}</b> • ${ui.statusLineLabel}: <b>${escapeHtml(
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
     `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b> • ${escapeHtml(followUpIndicator)}`,
-    `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`,
-    `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
   ];
-
-  if (request.requestedRegionCode) {
-    lines.push(`${ui.premiumRequestedRegionLabel}: <b>${escapeHtml(request.requestedRegionCode)}</b>`);
-  }
-
-  if (request.currentResolvedServerName || request.currentResolvedServerCountryCode) {
-    lines.push(
-      `${ui.premiumResolvedServer}: <b>${escapeHtml(
-        request.currentResolvedServerName ||
-          request.currentResolvedServerCountryCode ||
-          ui.premiumNoRequestedRegion,
-      )}</b>`,
-    );
-  }
-
-  const updatedAt =
-    request.dismissedAt || request.handledAt || request.reviewedAt || request.updatedAt || null;
-  if (updatedAt) {
-    lines.push(
-      `${ui.premiumStatusUpdatedLabel}: ${escapeHtml(
-        formatTelegramDateTime(updatedAt, input.locale),
-      )}`,
-    );
-  }
 
   if (request.appliedPinServerName) {
     const pinSummary = request.appliedPinExpiresAt
@@ -575,21 +562,44 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
           input.locale,
         )})`
       : request.appliedPinServerName;
-    lines.push(`${ui.premiumCurrentPin}: <b>${escapeHtml(pinSummary)}</b>`);
+    routeSnapshotLines.push(`${ui.premiumCurrentPin}: <b>${escapeHtml(pinSummary)}</b>`);
   }
 
+  const cards = [
+    buildTelegramCommerceCard(
+      '🧾 <b>Request snapshot</b>',
+      threadMetaLines,
+    ),
+    buildTelegramCommerceCard(
+      '🌍 <b>Route snapshot</b>',
+      routeSnapshotLines,
+    ),
+  ];
+
   if (request.customerMessage?.trim()) {
-    lines.push('', `${ui.customerMessage}: ${escapeHtml(request.customerMessage.trim())}`);
+    cards.push(
+      buildTelegramCommerceCard(
+        '✍️ <b>Your note</b>',
+        [escapeHtml(request.customerMessage.trim())],
+      ),
+    );
   }
 
   if (latestReply) {
-    lines.push('', '<b>💬 Latest reply</b>');
-    lines.push(
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
-        locale: input.locale,
-        maxLength: 180,
-      }).map((line) => escapeHtml(line)),
+    const replySenderLabel =
+      latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
+    const replyMessage = latestReply.message.trim();
+    const replyPreview = replyMessage.length > 120 ? `${replyMessage.slice(0, 117)}...` : replyMessage;
+    cards.push(
+      buildTelegramCommerceCard(
+        '💬 <b>Latest reply</b>',
+        [
+          `${escapeHtml(replySenderLabel)} • ${escapeHtml(
+            formatTelegramDateTime(latestReply.createdAt, input.locale),
+          )}`,
+          escapeHtml(replyPreview),
+        ],
+      ),
     );
   }
 
@@ -608,9 +618,12 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
             : 'The admin is reviewing your latest message.'
           : ui.premiumStatusReplyHint;
 
-  lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(nextStepText)}`);
-
-  return lines.join('\n');
+  return buildTelegramCommerceMessage({
+    title: ui.premiumStatusTitle,
+    statsLine: `<b>${escapeHtml(request.requestCode)}</b> • <b>${escapeHtml(request.dynamicAccessKey.name)}</b>`,
+    cards,
+    footerLines: [`${ui.orderNextStepLabel}: ${escapeHtml(nextStepText)}`],
+  });
 }
 
 type TelegramPremiumHubItem = {

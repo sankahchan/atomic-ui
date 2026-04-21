@@ -574,12 +574,15 @@ test('premium support detail stays compact and avoids timeline dumps', () => {
   });
 
   assert.match(message, /PRM-123/);
+  assert.match(message, /Request snapshot/);
+  assert.match(message, /Route snapshot/);
   assert.match(message, /Next step:/);
-  assert.match(message, /Latest reply:/);
+  assert.match(message, /Latest reply/);
   assert.doesNotMatch(message, /What happens next/);
   assert.doesNotMatch(message, /Timeline/i);
   assert.doesNotMatch(message, /Follow-up history/i);
-  assert.ok(message.split('\n').length < 22);
+  assert.doesNotMatch(message, /Current premium pool: <b>.*<\/b>\nRequested region: <b>.*<\/b>\nResolved server: <b>.*<\/b>\nUpdated:/);
+  assert.ok(message.split('\n').length <= 20);
 });
 
 test('premium region detail stays compact and focuses on routing snapshot', () => {
