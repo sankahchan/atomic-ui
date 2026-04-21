@@ -643,34 +643,30 @@ export function buildTelegramPremiumHubMessage(input: {
   requestCount: number;
   page: number;
 }) {
+  const ui = getTelegramUi(input.locale);
   const pagination = paginateTelegramCommerce(input.items, input.page);
   const cards = pagination.pageItems.map((item) =>
     buildTelegramCommerceCard(
       `💎 <b>${escapeHtml(item.name)}</b>`,
       [
         escapeHtml(item.summaryLine),
-        `${getTelegramUi(input.locale).premiumRegionCurrentRouteLabel}: ${escapeHtml(item.currentRouteLabel)}`,
-        `${getTelegramUi(input.locale).premiumCurrentPoolLabel}: ${escapeHtml(item.poolSummary)}`,
+        `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(item.currentRouteLabel)}`,
+        `${ui.premiumCurrentPoolLabel}: ${escapeHtml(item.poolSummary)}`,
         item.latestRequestCode && item.latestRequestState
-          ? `${getTelegramUi(input.locale).premiumThreadStatusLabel}: ${escapeHtml(`${item.latestRequestCode} • ${item.latestRequestState}`)}`
+          ? `${ui.premiumThreadStatusLabel}: ${escapeHtml(`${item.latestRequestCode} • ${item.latestRequestState}`)}`
           : null,
       ],
     ),
   );
 
   return buildTelegramCommerceMessage({
-    title: getTelegramUi(input.locale).premiumHubTitle,
+    title: ui.premiumHubTitle,
     statsLine: `${input.items.length} key(s) • ${input.requestCount} recent request(s)`,
     intro:
       input.locale === 'my'
         ? 'Premium hub ကို အတိုချုံးပြထားသည်။ Region, issue, status, and More ကို အသုံးပြုနိုင်သည်။'
         : 'This premium hub stays short. Use Region, Issue, Status, or More for the next step.',
     cards,
-    footerLines: [
-      input.locale === 'my'
-        ? 'Share page links are available from the buttons instead of the text body.'
-        : 'Share page links stay in the buttons instead of the text body.',
-    ],
   });
 }
 
@@ -678,29 +674,31 @@ export function buildTelegramPremiumDetailMessage(input: {
   locale: SupportedLocale;
   item: TelegramPremiumHubItem;
 }) {
+  const ui = getTelegramUi(input.locale);
+  const detailLines = [
+    `${ui.statusLineLabel}: ${escapeHtml(input.item.summaryLine)}`,
+    `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(input.item.currentRouteLabel)}`,
+    `${ui.premiumCurrentPoolLabel}: ${escapeHtml(input.item.poolSummary)}`,
+    input.item.preferredRegions.length > 0
+      ? `${ui.premiumRequestedRegionLabel}: ${escapeHtml(input.item.preferredRegions.join(', '))}`
+      : null,
+    input.item.latestRequestCode && input.item.latestRequestState
+      ? `${ui.premiumThreadStatusLabel}: ${escapeHtml(`${input.item.latestRequestCode} • ${input.item.latestRequestState}`)}`
+      : null,
+  ].filter(Boolean) as string[];
+
   return buildTelegramCommerceMessage({
     title: '💎 <b>Premium key detail</b>',
     statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
-    intro: escapeHtml(input.item.summaryLine),
+    intro:
+      input.locale === 'my'
+        ? 'Open, region, issue, and status actions stay in the buttons below.'
+        : 'Open, region, issue, and status actions stay in the buttons below.',
     cards: [
       buildTelegramCommerceCard(
-        '💎 <b>Premium key</b>',
-        [
-          `${getTelegramUi(input.locale).premiumRegionCurrentRouteLabel}: ${escapeHtml(input.item.currentRouteLabel)}`,
-          `${getTelegramUi(input.locale).premiumCurrentPoolLabel}: ${escapeHtml(input.item.poolSummary)}`,
-          input.item.preferredRegions.length > 0
-            ? `${getTelegramUi(input.locale).premiumRequestedRegionLabel}: ${escapeHtml(input.item.preferredRegions.join(', '))}`
-            : null,
-          input.item.latestRequestCode && input.item.latestRequestState
-            ? `${getTelegramUi(input.locale).premiumThreadStatusLabel}: ${escapeHtml(`${input.item.latestRequestCode} • ${input.item.latestRequestState}`)}`
-            : null,
-        ],
+        '💎 <b>Premium summary</b>',
+        detailLines,
       ),
-    ],
-    footerLines: [
-      input.locale === 'my'
-        ? 'Buttons below keep the region change, issue report, and support thread actions separate.'
-        : 'Buttons below keep region change, issue reporting, and support-thread actions separate.',
     ],
   });
 }
@@ -710,22 +708,21 @@ export function buildTelegramPremiumSupportListMessage(input: {
   items: TelegramPremiumSupportListItem[];
   page: number;
 }) {
+  const ui = getTelegramUi(input.locale);
   const pagination = paginateTelegramCommerce(input.items, input.page);
   const cards = pagination.pageItems.map((item) =>
     buildTelegramCommerceCard(
       `🧾 <b>${escapeHtml(item.requestCode)}</b>`,
       [
         `${escapeHtml(item.keyName)} • ${escapeHtml(item.requestTypeLabel)}`,
-        `${getTelegramUi(input.locale).statusLineLabel}: ${escapeHtml(item.statusLabel)}`,
-        `${getTelegramUi(input.locale).premiumThreadStatusLabel}: ${escapeHtml(item.threadStateLabel)}`,
-        escapeHtml(item.replyStateLabel),
-        `${getTelegramUi(input.locale).createdAtLabel}: ${escapeHtml(item.createdAtLabel)}`,
+        `${ui.statusLineLabel}: ${escapeHtml(item.statusLabel)} • ${escapeHtml(item.threadStateLabel)}`,
+        `${escapeHtml(item.replyStateLabel)} • ${ui.createdAtLabel}: ${escapeHtml(item.createdAtLabel)}`,
       ],
     ),
   );
 
   return buildTelegramCommerceMessage({
-    title: getTelegramUi(input.locale).premiumStatusTitle,
+    title: ui.premiumStatusTitle,
     statsLine: `${input.items.length} request(s)`,
     intro:
       input.locale === 'my'

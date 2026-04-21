@@ -333,24 +333,39 @@ export function buildTelegramKeyDetailMessage(input: {
   locale: SupportedLocale;
   item: TelegramCommerceKeyItem;
 }) {
+  const ui = getTelegramUi(input.locale);
+  const detailLines =
+    input.item.kind === 'premium'
+      ? [
+          `${ui.statusLineLabel}: ${escapeHtml(input.item.summaryLine)}`,
+          ...input.item.detailLines.slice(0, 4).map((line) => escapeHtml(line)),
+        ]
+      : [
+          `${ui.statusLineLabel}: ${escapeHtml(input.item.summaryLine)}`,
+          `${ui.quotaLabel}: ${escapeHtml(input.item.quotaSummary)}`,
+          `${ui.expirationLabel}: ${escapeHtml(input.item.expirationSummary)}`,
+        ];
+
   return buildTelegramCommerceMessage({
     title: input.item.kind === 'premium' ? '💎 <b>Premium key detail</b>' : '🔑 <b>Key detail</b>',
     statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
-    intro: escapeHtml(input.item.summaryLine),
+    intro:
+      input.item.kind === 'premium'
+        ? input.locale === 'my'
+          ? 'Region, status, renew, and support actions stay in the buttons below.'
+          : 'Region, status, renew, and support actions stay in the buttons below.'
+        : input.locale === 'my'
+          ? 'Open, renew, and support actions stay in the buttons below.'
+          : 'Open, renew, and support actions stay in the buttons below.',
     cards: [
       buildTelegramCommerceCard(
         input.item.kind === 'premium'
-          ? '💎 <b>Premium key</b>'
+          ? '💎 <b>Premium summary</b>'
           : input.item.kind === 'trial'
-            ? '🎁 <b>Trial key</b>'
-            : '🔑 <b>Standard key</b>',
-        input.item.detailLines.map((line) => escapeHtml(line)),
+            ? '🎁 <b>Trial summary</b>'
+            : '🔑 <b>Key summary</b>',
+        detailLines,
       ),
-    ],
-    footerLines: [
-      input.locale === 'my'
-        ? 'Share page, renew, and support actions stay below this detail card.'
-        : 'Share page, renew, and support actions stay below this detail card.',
     ],
   });
 }
