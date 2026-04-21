@@ -64,6 +64,7 @@ async function loadStoredTelegramConfig() {
     return {
       botToken: null,
       webhookSecretToken: null,
+      decryptionFailed: false,
     };
   }
 
@@ -80,6 +81,7 @@ async function loadStoredTelegramConfig() {
     return {
       botToken: null,
       webhookSecretToken: null,
+      decryptionFailed: false,
     };
   } finally {
     await db.$disconnect().catch(() => undefined);
@@ -106,6 +108,12 @@ async function main() {
   });
   if (!webhookSecret) {
     const storedConfig = await loadStoredTelegramConfig();
+    if (storedConfig.decryptionFailed) {
+      throw new Error(
+        'Unable to decrypt persisted telegram_bot settings for smoke test. Check SETTINGS_ENCRYPTION_KEY before retrying.',
+      );
+    }
+
     webhookSecret = resolveTelegramSmokeWebhookSecret({
       explicitSecret: getArg('webhook-secret'),
       env: process.env,

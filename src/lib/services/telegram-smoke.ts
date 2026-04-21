@@ -1,8 +1,11 @@
+import { isEncryptedSettingSecret } from '@/lib/settings-crypto';
+import { parseTelegramBotSettingsValue } from '@/lib/telegram-bot-settings';
 import { resolveTelegramWebhookSecret } from '@/lib/telegram-webhook-secret';
 
 export interface TelegramSmokeStoredConfig {
   botToken: string | null;
   webhookSecretToken: string | null;
+  decryptionFailed: boolean;
 }
 
 function normalizeOptionalString(value: unknown) {
@@ -32,19 +35,33 @@ export function parseTelegramSmokeStoredConfig(rawValue: unknown): TelegramSmoke
     return {
       botToken: null,
       webhookSecretToken: null,
+      decryptionFailed: false,
     };
   }
 
   try {
-    const parsed = JSON.parse(rawValue) as Record<string, unknown>;
+    const rawParsed = JSON.parse(rawValue) as Record<string, unknown>;
+    const parsed = parseTelegramBotSettingsValue(rawValue);
+    const botToken = normalizeOptionalString(parsed?.botToken);
+    const webhookSecretToken = normalizeOptionalString(parsed?.webhookSecretToken);
+    const encryptedBotToken =
+      typeof rawParsed.botToken === 'string' && isEncryptedSettingSecret(rawParsed.botToken.trim());
+    const encryptedWebhookSecret =
+      typeof rawParsed.webhookSecretToken === 'string' &&
+      isEncryptedSettingSecret(rawParsed.webhookSecretToken.trim());
+
     return {
-      botToken: normalizeOptionalString(parsed.botToken),
-      webhookSecretToken: normalizeOptionalString(parsed.webhookSecretToken),
+      botToken,
+      webhookSecretToken,
+      decryptionFailed:
+        (encryptedBotToken && !botToken) ||
+        (encryptedWebhookSecret && !webhookSecretToken),
     };
   } catch {
     return {
       botToken: null,
       webhookSecretToken: null,
+      decryptionFailed: false,
     };
   }
 }
