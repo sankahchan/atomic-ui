@@ -4,9 +4,9 @@ import {
   buildTelegramSupportStatusSummaryKeyboard,
   buildTelegramSupportStatusSummaryMessage,
   buildTelegramSupportHubKeyboard,
+  buildTelegramSupportReplySubmittedMessage,
+  buildTelegramSupportThreadStartMessage,
   buildTelegramSupportThreadKeyboard,
-  buildTelegramSupportThreadStatusMessage,
-  resolveTelegramSupportIssuePrompt,
 } from '@/lib/services/telegram-support-cards';
 import {
   addTelegramSupportReply,
@@ -52,17 +52,11 @@ export async function handleTelegramSupportThreadStart(input: {
     threadId: thread.id,
   });
 
-  const message = [
-    buildTelegramSupportThreadStatusMessage({
-      thread,
-      locale: input.locale,
-    }),
-    '',
-    input.locale === 'my'
-      ? '<b>Next step</b>'
-      : '<b>Next step</b>',
-    escapeHtml(resolveTelegramSupportIssuePrompt(input.category, input.locale)),
-  ].join('\n');
+  const message = buildTelegramSupportThreadStartMessage({
+    threadCode: thread.threadCode,
+    issueCategory: thread.issueCategory,
+    locale: input.locale,
+  });
 
   await sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup: buildTelegramSupportThreadKeyboard({
@@ -155,15 +149,10 @@ export async function handleTelegramSupportReplyText(input: {
   await sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my'
-        ? `✅ <b>${escapeHtml(thread.threadCode)}</b> ကို support queue သို့ ပို့ပြီးပါပြီ။`
-        : `✅ <b>${escapeHtml(thread.threadCode)}</b> was sent to the support queue.`,
-      '',
-      input.locale === 'my'
-        ? 'Admin reply ရလာသည်နှင့် ဤ chat ထဲတွင် update ပြန်ပို့ပါမည်။'
-        : 'You will get the admin reply here in this chat as soon as it is available.',
-    ].join('\n'),
+    buildTelegramSupportReplySubmittedMessage({
+      threadCode: thread.threadCode,
+      locale: input.locale,
+    }),
     {
       replyMarkup: buildTelegramSupportThreadKeyboard({
         locale: input.locale,
@@ -270,15 +259,10 @@ export async function handleTelegramSupportReplyMedia(input: {
   await sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my'
-        ? `✅ <b>${escapeHtml(thread.threadCode)}</b> ကို support queue သို့ ပို့ပြီးပါပြီ။`
-        : `✅ <b>${escapeHtml(thread.threadCode)}</b> was sent to the support queue.`,
-      '',
-      input.locale === 'my'
-        ? 'Admin reply ရလာသည်နှင့် ဤ chat ထဲတွင် update ပြန်ပို့ပါမည်။'
-        : 'You will get the admin reply here in this chat as soon as it is available.',
-    ].join('\n'),
+    buildTelegramSupportReplySubmittedMessage({
+      threadCode: thread.threadCode,
+      locale: input.locale,
+    }),
     {
       replyMarkup: buildTelegramSupportThreadKeyboard({
         locale: input.locale,

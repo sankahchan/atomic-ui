@@ -82,26 +82,77 @@ export function resolveTelegramSupportIssuePrompt(
   switch (category) {
     case 'ORDER':
       return isMyanmar
-        ? 'Payment, screenshot, order status, review delay စသည့်ပြဿနာကို တစ်ကြောင်းနှစ်ကြောင်းဖြင့် ပို့ပါ။ Order code ရှိပါက ထည့်ပါ။'
-        : 'Send a short message about the payment, screenshot, order status, or review delay. Include the order code if you have it.';
+        ? 'Payment, screenshot, order status, review delay ပြဿနာကို ပို့ပါ။ Order code ရှိပါက ထည့်ပါ။'
+        : 'Tell us the payment, screenshot, order-status, or review issue. Include the order code if you have it.';
     case 'KEY':
       return isMyanmar
-        ? 'Key name, usage, connection, renew, share page ပြဿနာကို ပို့ပါ။ Key name ရှိပါက ထည့်ပါ။'
-        : 'Tell us about the key, usage, connection, renew, or share-page issue. Include the key name if you have it.';
+        ? 'Key, usage, connection, renew, share page ပြဿနာကို ပို့ပါ။ Key name ရှိပါက ထည့်ပါ။'
+        : 'Tell us the key, usage, connection, renew, or share-page issue. Include the key name if you have it.';
     case 'SERVER':
       return isMyanmar
         ? 'Server name, route issue, slow connection, region problem ကို ပို့ပါ။'
         : 'Tell us the server name, route issue, slow connection, or region problem.';
     case 'BILLING':
       return isMyanmar
-        ? 'Refund, receipt, billing, discount, coupon သို့ payment follow-up ပြဿနာကို ပို့ပါ။'
-        : 'Tell us about the refund, receipt, billing, discount, coupon, or payment follow-up issue.';
+        ? 'Refund, receipt, billing, discount, coupon, payment follow-up ပြဿနာကို ပို့ပါ။'
+        : 'Tell us the refund, receipt, billing, discount, coupon, or payment follow-up issue.';
     case 'GENERAL':
     default:
       return isMyanmar
-        ? 'ဘာအကူအညီလိုသည်ကို ပို့ပါ။ လိုအပ်ပါက key name, order code, screenshot detail များကို နောက် message တွင် ထပ်ပို့နိုင်ပါသည်။'
-        : 'Tell us what you need help with. You can follow up with a key name, order code, or more details in the next message.';
+        ? 'ဘာအကူအညီလိုသည်ကို ပို့ပါ။ Key name သို့ order code ရှိပါက ထည့်ပါ။'
+        : 'Tell us what you need help with. Add a key name or order code if you have one.';
   }
+}
+
+export function buildTelegramSupportThreadStartMessage(input: {
+  threadCode: string;
+  issueCategory: string;
+  locale: SupportedLocale;
+}) {
+  const prompt = resolveTelegramSupportIssuePrompt(
+    resolveTelegramSupportIssueCategory(input.issueCategory) || 'GENERAL',
+    input.locale,
+  );
+
+  return buildTelegramCommerceMessage({
+    title:
+      input.locale === 'my'
+        ? '🛟 <b>Support request started</b>'
+        : '🛟 <b>Support request started</b>',
+    statsLine: `🧵 <b>${escapeHtml(input.threadCode)}</b> • ${escapeHtml(
+      resolveTelegramSupportIssueLabel(input.issueCategory, input.locale),
+    )}`,
+    cards: [
+      buildTelegramCommerceCard(
+        input.locale === 'my' ? '✍️ <b>Next step</b>' : '✍️ <b>Next step</b>',
+        [
+          escapeHtml(prompt),
+          input.locale === 'my'
+            ? 'လိုအပ်ပါက screenshot သို့ file ကို နောက်တစ်ချက် ပို့နိုင်ပါသည်။'
+            : 'You can send a screenshot or file next if needed.',
+        ],
+      ),
+    ],
+    footerLines: [
+      input.locale === 'my'
+        ? 'ပို့ပြီးနောက် admin reply ကို ဒီ chat ထဲမှာ ရရှိပါမည်။'
+        : 'After you send it, the admin reply will come here.',
+    ],
+  });
+}
+
+export function buildTelegramSupportReplySubmittedMessage(input: {
+  threadCode: string;
+  locale: SupportedLocale;
+}) {
+  return [
+    input.locale === 'my'
+      ? `✅ <b>${escapeHtml(input.threadCode)}</b> ကို ပို့ပြီးပါပြီ။`
+      : `✅ <b>${escapeHtml(input.threadCode)}</b> sent.`,
+    input.locale === 'my'
+      ? 'Admin reply ကို ဒီ chat ထဲမှာ စောင့်နိုင်ပါသည်။'
+      : 'Wait here for the admin reply.',
+  ].join('\n');
 }
 
 export function getTelegramSupportThreadState(input: {
