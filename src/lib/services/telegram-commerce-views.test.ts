@@ -6,12 +6,20 @@ import {
   buildTelegramRenewSummaryMessage,
 } from '@/lib/services/telegram-order-state';
 import { buildTelegramInboxSummaryMessage } from '@/lib/services/telegram-inbox-ui';
-import { buildTelegramKeysSummaryMessage } from '@/lib/services/telegram-keys';
 import {
+  buildTelegramKeyDetailMessage,
+  buildTelegramKeysSummaryMessage,
+} from '@/lib/services/telegram-keys';
+import {
+  buildTelegramPremiumDetailMessage,
   buildTelegramPremiumHubMessage,
+  buildTelegramPremiumSupportListMessage,
   buildTelegramPremiumSupportStatusMessage,
 } from '@/lib/services/telegram-premium';
-import { buildTelegramOrdersSummaryMessage } from '@/lib/services/telegram-orders';
+import {
+  buildTelegramOrderStatusMessage,
+  buildTelegramOrdersSummaryMessage,
+} from '@/lib/services/telegram-orders';
 import { buildTelegramSupportStatusSummaryMessage } from '@/lib/services/telegram-support-cards';
 
 const samplePlans = [
@@ -161,6 +169,37 @@ test('my keys summary stays compact and omits raw urls and latest reply dumps', 
   assert.ok(message.split('\n').length < 16);
 });
 
+test('key detail stays compact and keeps actions out of the text body', () => {
+  const message = buildTelegramKeyDetailMessage({
+    locale: 'en',
+    item: {
+      id: 'dak_1',
+      kind: 'premium',
+      name: 'Onn',
+      status: 'ACTIVE',
+      sharePageUrl: 'https://share.example/dak_1',
+      quotaSummary: '12 GB / 200 GB',
+      expirationSummary: '73 day(s) left (6/29/2026)',
+      summaryLine: '🟢 ACTIVE • SG-2 🇸🇬',
+      detailLines: [
+        'Current pool: 1 preferred server',
+        'Current route: SG-2 🇸🇬',
+        'Requested region: SG',
+        'Quota: 12 GB / 200 GB',
+        'Thread: PRM-123 • Waiting for admin',
+      ],
+      renewSecondary: 'dynamic',
+      latestPremiumRequestId: 'req_1',
+    },
+  });
+
+  assert.match(message, /Premium key detail/);
+  assert.match(message, /buttons below/i);
+  assert.doesNotMatch(message, /Share page, renew, and support actions stay below this detail card/i);
+  assert.doesNotMatch(message, /https?:\/\//);
+  assert.ok(message.split('\n').length <= 14);
+});
+
 test('premium hub summary keeps links out of the text body', () => {
   const message = buildTelegramPremiumHubMessage({
     locale: 'en',
@@ -185,6 +224,50 @@ test('premium hub summary keeps links out of the text body', () => {
   assert.match(message, /Premium center/);
   assert.doesNotMatch(message, /https?:\/\//);
   assert.doesNotMatch(message, /Latest reply/i);
+});
+
+test('premium detail and request list stay compact', () => {
+  const detailMessage = buildTelegramPremiumDetailMessage({
+    locale: 'en',
+    item: {
+      id: 'dak_1',
+      name: 'Onn',
+      sharePageUrl: 'https://share.example/onn',
+      poolSummary: '1 preferred server',
+      currentRouteLabel: 'SG-2 🇸🇬',
+      preferredRegions: ['SG'],
+      summaryLine: 'Overall: Healthy',
+      latestRequestId: 'req_1',
+      latestRequestCode: 'PRM-123',
+      latestRequestState: 'Waiting for admin',
+    },
+  });
+  const listMessage = buildTelegramPremiumSupportListMessage({
+    locale: 'en',
+    page: 1,
+    items: [
+      {
+        id: 'req_1',
+        requestCode: 'PRM-123',
+        keyName: 'Onn',
+        requestTypeLabel: 'Route issue',
+        statusLabel: 'Pending review',
+        threadStateLabel: 'Waiting for admin',
+        replyStateLabel: 'Admin reply sent',
+        createdAtLabel: 'Apr 20, 2026 8:00 AM',
+      },
+    ],
+  });
+
+  assert.match(detailMessage, /Premium key detail/);
+  assert.match(detailMessage, /buttons below/i);
+  assert.doesNotMatch(detailMessage, /Buttons below keep the region change/i);
+  assert.doesNotMatch(detailMessage, /https?:\/\//);
+  assert.ok(detailMessage.split('\n').length <= 14);
+
+  assert.match(listMessage, /PRM-123/);
+  assert.doesNotMatch(listMessage, /\nStatus: [^\n]+\nThread status:/);
+  assert.ok(listMessage.split('\n').length <= 12);
 });
 
 test('orders summary keeps timeline and next-step detail out of the list view', () => {
@@ -449,4 +532,58 @@ test('premium support detail stays compact and avoids timeline dumps', () => {
   assert.doesNotMatch(message, /Timeline/i);
   assert.doesNotMatch(message, /Follow-up history/i);
   assert.ok(message.split('\n').length < 22);
+});
+
+test('order detail stays compact and keeps links in buttons', async () => {
+  const message = await buildTelegramOrderStatusMessage({
+    locale: 'en',
+    order: {
+      id: 'ord_123',
+      orderCode: 'ORD-123',
+      kind: 'NEW',
+      status: 'AWAITING_PAYMENT_PROOF',
+      planName: 'Premium / 1 Month / 200 GB',
+      planCode: 'premium_1m_200gb',
+      durationMonths: 1,
+      durationDays: null,
+      requestedName: 'Onn',
+      requestedEmail: 'onn@example.com',
+      selectedServerName: 'SG-2',
+      selectedServerCountryCode: 'SG',
+      paymentMethodLabel: 'KBZPay',
+      createdAt: new Date('2026-04-20T08:00:00.000Z'),
+      paymentSubmittedAt: null,
+      reviewedAt: null,
+      fulfilledAt: null,
+      rejectedAt: null,
+      refundRequestStatus: null,
+      refundRequestedAt: null,
+      refundRequestReviewedAt: null,
+      refundReviewReasonCode: null,
+      customerMessage: 'Please review quickly.',
+      refundRequestCustomerMessage: null,
+      referralCode: 'REF123',
+      orderMode: 'SELF',
+      giftRecipientLabel: null,
+      approvedAccessKeyId: null,
+      targetAccessKeyId: null,
+      approvedDynamicKeyId: null,
+      targetDynamicKeyId: null,
+      financeStatus: 'PAID',
+    } as any,
+    ensureAccessKeySubscriptionToken: async () => 'sub-token',
+    getDynamicKeyMessagingUrls: () => ({
+      sharePageUrl: null,
+      subscriptionUrl: null,
+      outlineClientUrl: null,
+    }),
+  });
+  assert.ok(message);
+
+  assert.match(message, /Current status/);
+  assert.match(message, /Payment & review/);
+  assert.doesNotMatch(message, /What you can do now/i);
+  assert.doesNotMatch(message, /Order timeline/i);
+  assert.doesNotMatch(message, /https?:\/\//);
+  assert.ok(message.split('\n').length <= 24);
 });
