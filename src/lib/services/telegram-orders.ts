@@ -5,6 +5,13 @@ import { evaluateTelegramOrderRefundEligibility } from '@/lib/services/telegram-
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
 import { buildTelegramCommerceViewCallbackData } from '@/lib/services/telegram-callbacks';
 import {
+  getTelegramSalesSettings,
+  resolveTelegramSalesPlan,
+  resolveTelegramSalesPlanLabel,
+  type TelegramSalesSettings,
+  type TelegramSalesPlanCode,
+} from '@/lib/services/telegram-sales';
+import {
   buildTelegramCommerceCard,
   buildTelegramCommerceMessage,
   buildTelegramCommercePagerRow,
@@ -48,7 +55,7 @@ function buildTelegramOrdersCountsLine(input: {
 function buildTelegramCompactOrderStateLine(order: TelegramUserOrder, ui: ReturnType<typeof getTelegramUi>) {
   const stateLine = formatTelegramOrderStateLine({
     orderCode: order.orderCode,
-    planName: order.planName,
+    planName: (order as TelegramUserOrder & { displayPlanLabel?: string | null }).displayPlanLabel || order.planName,
     planCode: order.planCode,
     durationMonths: order.durationMonths,
     durationDays: order.durationDays,
@@ -60,6 +67,35 @@ function buildTelegramCompactOrderStateLine(order: TelegramUserOrder, ui: Return
     : stateLine;
 
   return trimmedStateLine.trim() || formatTelegramOrderKindLabel(order.kind, ui);
+}
+
+function resolveTelegramOrderDisplayPlanLabel(
+  order: {
+    planCode?: string | null;
+    planName?: string | null;
+  },
+  locale: SupportedLocale,
+  settings: TelegramSalesSettings,
+) {
+  if (order.planCode) {
+    const plan = resolveTelegramSalesPlan(settings, order.planCode as TelegramSalesPlanCode);
+    if (plan) {
+      return resolveTelegramSalesPlanLabel(plan, locale);
+    }
+  }
+
+  return order.planName || order.planCode || null;
+}
+
+function normalizeTelegramOrderPlanLabels<T extends { planCode?: string | null; planName?: string | null }>(
+  orders: T[],
+  locale: SupportedLocale,
+  settings: TelegramSalesSettings,
+) {
+  return orders.map((order) => ({
+    ...order,
+    displayPlanLabel: resolveTelegramOrderDisplayPlanLabel(order, locale, settings),
+  }));
 }
 
 function parseTelegramOrdersFilter(argsText?: string | null): TelegramOrdersFilter {
@@ -383,16 +419,21 @@ export async function buildTelegramOrderStatusMessage(input: {
   const locale = input.locale;
   const ui = getTelegramUi(locale);
   const isMyanmar = locale === 'my';
+  const settings = await getTelegramSalesSettings();
+  const displayPlanLabel = resolveTelegramOrderDisplayPlanLabel(order, locale, settings);
   const statusIcon = formatTelegramOrderStatusIcon(order.status);
   const nextStep = buildTelegramOrderNextStepText(order, ui);
-  const stateLine = buildTelegramCompactOrderStateLine(order, ui);
+  const stateLine = buildTelegramCompactOrderStateLine(
+    { ...order, displayPlanLabel } as TelegramUserOrder & { displayPlanLabel?: string | null },
+    ui,
+  );
   const progressSummary = buildTelegramOrderProgressSummary({ order, locale });
   const detailLines: string[] = [];
   const paymentLines: string[] = [];
   const footerLines: string[] = [];
 
-  if (order.planName || order.planCode) {
-    detailLines.push(`${ui.planLabel}: <b>${escapeHtml(order.planName || order.planCode || '')}</b>`);
+  if (displayPlanLabel) {
+    detailLines.push(`${ui.planLabel}: <b>${escapeHtml(displayPlanLabel)}</b>`);
   }
 
   const durationLabel = order.durationMonths
@@ -716,20 +757,28 @@ export async function handleOrdersCommand(input: {
         : filter === 'COMPLETED'
           ? completedOrders
           : orders;
+  const salesSettings = await getTelegramSalesSettings();
+  const [normalizedAttentionOrders, normalizedReviewOrders, normalizedCompletedOrders, normalizedFilteredOrders] =
+    [
+      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(completedOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale, salesSettings),
+    ];
   const summaryMessage = buildTelegramOrdersSummaryMessage({
     locale: input.locale,
     filter,
-    attentionOrders,
-    reviewOrders,
-    completedOrders,
-    filteredOrders,
+    attentionOrders: normalizedAttentionOrders as TelegramUserOrder[],
+    reviewOrders: normalizedReviewOrders as TelegramUserOrder[],
+    completedOrders: normalizedCompletedOrders as TelegramUserOrder[],
+    filteredOrders: normalizedFilteredOrders as TelegramUserOrder[],
     page: 1,
   });
   const sentSummary = await input.sendTelegramMessage(input.botToken, input.chatId, summaryMessage, {
     replyMarkup: buildTelegramOrdersCommerceKeyboard({
       locale: input.locale,
       filter,
-      orders: filteredOrders,
+      orders: normalizedFilteredOrders as TelegramUserOrder[],
       page: 1,
     }),
   });
@@ -802,6 +851,14 @@ export async function handleTelegramOrdersCommerceView(input: {
         : filter === 'COMPLETED'
           ? completedOrders
           : orders;
+  const salesSettings = await getTelegramSalesSettings();
+  const [normalizedAttentionOrders, normalizedReviewOrders, normalizedCompletedOrders, normalizedFilteredOrders] =
+    [
+      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(completedOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale, salesSettings),
+    ];
 
   if (input.action === 'detail') {
     const order = orders.find((candidate) => candidate.id === input.primary);
@@ -820,17 +877,17 @@ export async function handleTelegramOrdersCommerceView(input: {
   const message = buildTelegramOrdersSummaryMessage({
     locale: input.locale,
     filter,
-    attentionOrders,
-    reviewOrders,
-    completedOrders,
-    filteredOrders,
+    attentionOrders: normalizedAttentionOrders as TelegramUserOrder[],
+    reviewOrders: normalizedReviewOrders as TelegramUserOrder[],
+    completedOrders: normalizedCompletedOrders as TelegramUserOrder[],
+    filteredOrders: normalizedFilteredOrders as TelegramUserOrder[],
     page,
   });
   const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
     replyMarkup: buildTelegramOrdersCommerceKeyboard({
       locale: input.locale,
       filter,
-      orders: filteredOrders,
+      orders: normalizedFilteredOrders as TelegramUserOrder[],
       page,
     }),
   });

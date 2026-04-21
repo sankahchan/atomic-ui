@@ -245,3 +245,9 @@ test('telegram support intake messages stay compact and HTML-safe', () => {
   assert.doesNotMatch(submitted, /support queue/i);
   assert.doesNotMatch(submitted, /as soon as it is available/i);
 });
+
+test('support hub copy avoids awkward legacy wording', () => {
+  const line = 'Choose the category you need and start a new support thread.';
+  assert.deepEqual(validateTelegramHtmlMessage(line), { valid: true, invalidTags: [] });
+  assert.doesNotMatch(line, /real support thread/i);
+});
