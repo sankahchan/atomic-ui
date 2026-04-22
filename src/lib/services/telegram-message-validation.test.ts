@@ -7,9 +7,16 @@ import {
 } from '@/lib/services/telegram-reminders';
 import {
   buildTelegramSupportReplySubmittedMessage,
+  buildTelegramSupportStatusSummaryMessage,
   buildTelegramSupportThreadStartMessage,
   resolveTelegramSupportIssuePrompt,
 } from '@/lib/services/telegram-support-cards';
+import {
+  buildTelegramInboxEmptyMessage,
+  buildTelegramInboxTip,
+  buildTelegramInboxTitle,
+} from '@/lib/services/telegram-inbox-ui';
+import { buildTelegramReviewQueueSummaryKeyboard } from '@/lib/services/telegram-review-queue';
 import {
   findUnsupportedTelegramHtmlTags,
   normalizeTelegramUtf8Text,
@@ -250,4 +257,60 @@ test('support hub copy avoids awkward legacy wording', () => {
   const line = 'Choose the category you need and start a new support thread.';
   assert.deepEqual(validateTelegramHtmlMessage(line), { valid: true, invalidTags: [] });
   assert.doesNotMatch(line, /real support thread/i);
+});
+
+test('myanmar help copy stays localized and html-safe', () => {
+  const help = buildTelegramHelpMessage({ isAdmin: true, locale: 'my' });
+
+  assert.deepEqual(validateTelegramHtmlMessage(help), { valid: true, invalidTags: [] });
+  assert.match(help, /အမြန် command guide/);
+  assert.match(help, /Admin command များ/);
+  assert.doesNotMatch(help, /Quick command guide/);
+});
+
+test('myanmar inbox copy avoids english fallback text', () => {
+  const title = buildTelegramInboxTitle('SUPPORT', 'my');
+  const empty = buildTelegramInboxEmptyMessage('SUPPORT', 'my');
+  const tip = buildTelegramInboxTip('ALL', 'my');
+
+  for (const sample of [title, empty, tip]) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+  }
+
+  assert.match(title, /အကူအညီ inbox/);
+  assert.match(empty, /support update မရှိသေးပါ/);
+  assert.match(tip, /button များဖြင့် category/);
+  assert.doesNotMatch(empty, /No recent support updates yet/);
+});
+
+test('myanmar support summary and admin queue labels stay localized', () => {
+  const summary = buildTelegramSupportStatusSummaryMessage({
+    locale: 'my',
+    threads: [
+      {
+        id: 'thr_1',
+        threadCode: 'SUP-123',
+        issueCategory: 'ORDER',
+        status: 'OPEN',
+        waitingOn: 'ADMIN',
+        createdAt: new Date('2026-04-20T00:00:00Z'),
+        updatedAt: new Date('2026-04-20T02:00:00Z'),
+      },
+    ],
+    premiumRequests: [],
+  });
+  const keyboard = buildTelegramReviewQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+
+  assert.deepEqual(validateTelegramHtmlMessage(summary), { valid: true, invalidTags: [] });
+  assert.match(summary, /သင့် support center/);
+  assert.match(summary, /Admin အဖြေ စောင့်နေ/);
+  assert.doesNotMatch(summary, /Your support center/);
+
+  const firstRow = keyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  assert.match(firstRow, /အားလုံး/);
+  assert.match(firstRow, /ကိုယ်ပိုင်/);
+  assert.match(firstRow, /မယူရသေး/);
 });

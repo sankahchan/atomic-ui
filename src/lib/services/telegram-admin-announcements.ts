@@ -121,15 +121,17 @@ function formatTelegramAnnouncementTargetSummary(input: {
   serverName?: string | null;
   countryCode?: string | null;
   directUserLabel?: string | null;
+  locale?: SupportedLocale;
 }) {
+  const isMyanmar = input.locale === 'my';
   const parts = [
-    input.directUserLabel ? `user=${input.directUserLabel}` : null,
+    input.directUserLabel ? `${isMyanmar ? 'user' : 'user'}=${input.directUserLabel}` : null,
     input.tag ? `tag=${input.tag}` : null,
-    input.segment ? `segment=${input.segment}` : null,
-    input.serverName ? `server=${input.serverName}` : null,
-    input.countryCode ? `region=${input.countryCode}` : null,
+    input.segment ? `${isMyanmar ? 'segment' : 'segment'}=${input.segment}` : null,
+    input.serverName ? `${isMyanmar ? 'server' : 'server'}=${input.serverName}` : null,
+    input.countryCode ? `${isMyanmar ? 'region' : 'region'}=${input.countryCode}` : null,
   ].filter(Boolean);
-  return parts.length ? parts.join(' • ') : 'all matching users';
+  return parts.length ? parts.join(' • ') : isMyanmar ? 'ကိုက်ညီသော user အားလုံး' : 'all matching users';
 }
 
 async function resolveSingleTelegramAnnouncementRecipient(query: string) {
@@ -368,7 +370,7 @@ export async function handleAnnouncementsCommand(locale: SupportedLocale) {
   }
 
   const lines = [
-    locale === 'my' ? '📣 <b>မကြာသေးမီက Announcement များ</b>' : '📣 <b>Recent announcements</b>',
+    locale === 'my' ? '📣 <b>မကြာသေးမီက announcement များ</b>' : '📣 <b>Recent announcements</b>',
     '',
   ];
 
@@ -382,6 +384,7 @@ export async function handleAnnouncementsCommand(locale: SupportedLocale) {
         segment: announcement.targetSegment,
         serverName: announcement.targetServerName,
         countryCode: announcement.targetCountryCode,
+        locale,
       })}`,
       `  ${formatTelegramDateTime(announcement.scheduledFor || announcement.sentAt || announcement.createdAt, locale)}`,
       '',
@@ -547,7 +550,7 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
   });
 
   return locale === 'my'
-    ? `📣 Announcement ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။${result.failedCount > 0 ? ` failed: ${result.failedCount}` : ''}`
+    ? `📣 Announcement ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။${result.failedCount > 0 ? ` • failed ${result.failedCount}` : ''}`
     : `📣 Sent the announcement to ${result.sentCount} user(s).${result.failedCount > 0 ? ` Failed: ${result.failedCount}.` : ''}`;
 }
 
