@@ -41,7 +41,7 @@ HEALTH_CHECK_ENABLED=true
 Before the first production build, validate the generated `.env`:
 
 ```bash
-npm install
+npm ci --include=dev
 npm run env:check -- --env-file=.env
 ```
 
@@ -109,7 +109,7 @@ If the new host must restore a production backup and become a replacement server
 git clone https://github.com/sankahchan/atomic-ui.git
 cd atomic-ui
 cp .env.example .env
-npm install
+npm ci --include=dev
 npm run db:generate
 npm run db:push
 npm run setup
@@ -158,6 +158,7 @@ On small VPS instances, do not rebuild while the panel is still running if memor
 ```bash
 cd /opt/atomic-ui
 git pull --ff-only origin main
+npm ci --include=dev
 systemctl stop atomic-ui.service
 NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl start atomic-ui.service

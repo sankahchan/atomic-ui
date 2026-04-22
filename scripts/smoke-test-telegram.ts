@@ -224,9 +224,13 @@ async function main() {
 
   const commands: SmokeCommand[] = [
     { text: '/help', label: 'user /help' },
+    { text: '/buy', label: 'user /buy' },
     { text: '/mykeys', label: 'user /mykeys' },
+    { text: '/renew', label: 'user /renew' },
     { text: '/premium', label: 'user /premium' },
+    { text: '/premiumregion', label: 'user /premiumregion' },
     { text: '/support', label: 'user /support' },
+    { text: '/supportstatus', label: 'user /supportstatus' },
     { text: '/orders', label: 'user /orders' },
     { text: '/inbox', label: 'user /inbox' },
     { text: '/admin', label: 'admin /admin', admin: true },

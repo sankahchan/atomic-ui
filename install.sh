@@ -534,12 +534,12 @@ set_env_var "DATABASE_URL" "${DATABASE_URL_VALUE}"
 # Install npm dependencies only after .env exists so postinstall Prisma commands
 # can resolve the runtime database engine correctly.
 echo -e "${BLUE}[*]${NC} Installing npm dependencies..."
-rm -rf node_modules .next package-lock.json 2>/dev/null || true
+rm -rf node_modules .next 2>/dev/null || true
 export NODE_OPTIONS="--max-old-space-size=1024"
-if ! npm install --production=false --silent 2>&1; then
-    echo -e "${YELLOW}[!]${NC} npm install failed, trying with --legacy-peer-deps..."
-    if ! npm install --production=false --legacy-peer-deps --silent 2>&1; then
-        echo -e "${RED}[✗]${NC} npm install failed"
+if ! npm ci --include=dev --silent 2>&1; then
+    echo -e "${YELLOW}[!]${NC} npm ci failed, trying npm install with --legacy-peer-deps..."
+    if ! npm install --include=dev --legacy-peer-deps --silent 2>&1; then
+        echo -e "${RED}[✗]${NC} npm dependency installation failed"
         echo -e "${YELLOW}[!]${NC} Please check your Node.js version and try again"
         exit 1
     fi
@@ -547,7 +547,7 @@ fi
 unset NODE_OPTIONS
 
 if [ ! -d "$INSTALL_DIR/node_modules" ]; then
-    echo -e "${RED}[✗]${NC} node_modules directory not found after npm install"
+    echo -e "${RED}[✗]${NC} node_modules directory not found after dependency installation"
     exit 1
 fi
 echo -e "${GREEN}[✓]${NC} Dependencies installed"

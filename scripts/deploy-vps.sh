@@ -52,6 +52,7 @@ if ! command -v pg_restore >/dev/null 2>&1 || ! command -v pg_dump >/dev/null 2>
   apt-get install -y -qq openssl postgresql-client >/dev/null
 fi
 git pull --ff-only origin "${BRANCH}"
+npm ci --include=dev
 
 ensure_env_secret() {
   local key="$1"
