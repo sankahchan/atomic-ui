@@ -132,6 +132,7 @@ npm run smoke:telegram
 - Postgres backup creation, verification, and restore require the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) on the host. On Debian/Ubuntu installs, use `apt-get install -y postgresql-client`.
 - Runtime types must match the backup: SQLite backups restore onto SQLite runtimes, and Postgres `.postgres.zip`, `.dump`, or `.sql` backups restore onto servers configured with a PostgreSQL `DATABASE_URL`.
 - Telegram webhook set/reset in the dashboard registers a secret token with Telegram. Incoming webhook calls without a matching `x-telegram-bot-api-secret-token` header are rejected with `401`. Set `TELEGRAM_WEBHOOK_SECRET` only if you need to override the derived default.
+- `Tools -> Monitoring` is the operator surface for backup verification health, Telegram webhook health, and admin queue aging. Threshold meanings and response steps are in [docs/monitoring-operations.md](docs/monitoring-operations.md).
 - Restoring a production backup onto a test server copies the Telegram bot settings, but Telegram keeps sending updates to the currently registered live webhook until you explicitly switch it. Do not reset the webhook on a test restore host.
 - Subscription branding no longer supports custom CSS. Legacy `subscriptionCustomCss` values are ignored and cleared on save.
 
@@ -230,6 +231,7 @@ npm run db:studio
 - [DEPLOY.md](DEPLOY.md): Docker and direct VPS deployment
 - [docs/postgres-cutover.md](docs/postgres-cutover.md): SQLite to Postgres cutover runbook
 - [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md): first-time VPS bootstrap
+- [docs/monitoring-operations.md](docs/monitoring-operations.md): monitoring page thresholds and operator response flow
 - [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md): recovery server from a production backup
 - [docs/worker-setup.md](docs/worker-setup.md): usage snapshot worker setup
 
