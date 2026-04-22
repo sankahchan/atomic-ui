@@ -32,6 +32,11 @@ import { runTelegramDigestCycle } from '@/lib/services/telegram-digest';
 import { runTelegramFinanceDigestCycle } from '@/lib/services/telegram-finance';
 import { runTelegramAnnouncementCycle } from '@/lib/services/telegram-announcements';
 import { runTelegramSalesOrderCycle } from '@/lib/services/telegram-bot';
+import {
+    runAdminQueueHealthAlertCycle,
+    runBackupVerificationFailureAlertCycle,
+    runTelegramWebhookHealthAlertCycle,
+} from '@/lib/services/monitoring-alerts';
 import { runTelegramPremiumRegionAlertCycle } from '@/lib/services/telegram-premium';
 import { runTelegramSupportSlaAlertCycle } from '@/lib/services/telegram-support';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
@@ -349,6 +354,40 @@ export function initScheduler() {
             if (result.length > 0) {
                 const failed = result.filter((item) => item.status === 'FAILED').length;
                 logger.info(`Backup verification: ${result.length - failed} passed, ${failed} failed`);
+                if (failed > 0) {
+                    const alertResult = await runBackupVerificationFailureAlertCycle({ results: result });
+                    if (alertResult.alerted > 0 || alertResult.errors.length > 0) {
+                        logger.warn(
+                            `Backup verification alerts: ${alertResult.failedCount} failed, ${alertResult.alerted} alerted, ${alertResult.suppressed} suppressed, ${alertResult.errors.length} errors`,
+                        );
+                    }
+                }
+            }
+    });
+
+    // 9b. Telegram webhook health monitoring (Every 15 minutes)
+    scheduleManagedJob('*/15 * * * *', SCHEDULER_JOB_DEFINITIONS.telegramWebhookHealth, 'Telegram webhook health check failed', async () => {
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramWebhookHealth,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramWebhookHealthAlertCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : result.healthy
+                                ? 'Webhook healthy'
+                                : `${result.alerted} alerted, ${result.suppressed} suppressed, ${result.errors.length} errors`,
+                        resultPreview: result,
+                    };
+                },
+            );
+            if (!result.skipped && (!result.healthy || result.errors.length > 0)) {
+                logger.warn(
+                    `Telegram webhook health: ${result.alerted} alerted, ${result.suppressed} suppressed, ${result.pendingUpdateCount} pending, ${result.errors.length} errors`,
+                );
             }
     });
 
@@ -443,6 +482,30 @@ export function initScheduler() {
             );
             if (!result.skipped && (result.alerted > 0 || result.errors.length > 0)) {
                 logger.warn(`Support SLA alerts: ${result.alerted} alerted, ${result.errors.length} errors`);
+            }
+    });
+
+    // 12c. Admin queue aging monitor (Every 30 minutes)
+    scheduleManagedJob('*/30 * * * *', SCHEDULER_JOB_DEFINITIONS.adminQueueHealth, 'Admin queue health cycle failed', async () => {
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.adminQueueHealth,
+                'SCHEDULED',
+                async () => {
+                    const result = await runAdminQueueHealthAlertCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.supportOverdueCount} support overdue, ${result.pendingReviewCount} review pending`,
+                        resultPreview: result,
+                    };
+                },
+            );
+            if (!result.skipped && (!result.healthy || result.errors.length > 0)) {
+                logger.warn(
+                    `Admin queue health: ${result.supportOverdueCount} support overdue, ${result.pendingReviewCount} review pending, ${result.unclaimedReviewCount ?? 0} unclaimed, ${result.alerted} alerted, ${result.suppressed} suppressed, ${result.errors.length} errors`,
+                );
             }
     });
 
