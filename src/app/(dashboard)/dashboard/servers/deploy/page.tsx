@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SurfaceSkeleton } from '@/components/ui/surface-skeleton';
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
@@ -27,6 +28,7 @@ import {
   ShieldCheck,
   Cpu,
   TerminalSquare,
+  RefreshCw,
 } from 'lucide-react';
 
 type DeployStep = 1 | 2 | 3 | 4;
@@ -43,6 +45,73 @@ type SizeOption = {
   priceMonthly: number;
   description: string;
 };
+type ProvisioningRun = {
+  id: string;
+  name: string;
+  region: string;
+  size: string;
+  status: 'creating_droplet' | 'waiting_for_ip' | 'ready_for_outline' | 'failed' | 'completed';
+  currentStep: 'provider_token' | 'droplet_config' | 'create_droplet' | 'wait_for_ip' | 'outline_install';
+  summary: string;
+  attemptCount: number;
+  failedStep: string | null;
+  lastError: string | null;
+  dropletId: number | null;
+  dropletStatus: string | null;
+  dropletIp: string | null;
+  updatedAt: string;
+  createdAt: string;
+};
+
+function getProvisioningStatusLabel(status: ProvisioningRun['status']) {
+  switch (status) {
+    case 'creating_droplet':
+      return 'Creating';
+    case 'waiting_for_ip':
+      return 'Waiting for IP';
+    case 'ready_for_outline':
+      return 'Install ready';
+    case 'failed':
+      return 'Failed';
+    case 'completed':
+      return 'Completed';
+    default:
+      return status;
+  }
+}
+
+function getProvisioningStatusClass(status: ProvisioningRun['status']) {
+  switch (status) {
+    case 'completed':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300';
+    case 'ready_for_outline':
+      return 'border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200';
+    case 'creating_droplet':
+    case 'waiting_for_ip':
+      return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200';
+    case 'failed':
+      return 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-300';
+    default:
+      return 'border-border/70 bg-background/70 text-muted-foreground';
+  }
+}
+
+function getProvisioningStepLabel(step: ProvisioningRun['currentStep']) {
+  switch (step) {
+    case 'provider_token':
+      return 'Provider token';
+    case 'droplet_config':
+      return 'Droplet config';
+    case 'create_droplet':
+      return 'Create droplet';
+    case 'wait_for_ip':
+      return 'Wait for IP';
+    case 'outline_install':
+      return 'Outline handoff';
+    default:
+      return step;
+  }
+}
 
 export default function DeployServerPage() {
   const { toast } = useToast();
@@ -53,13 +122,26 @@ export default function DeployServerPage() {
   const [region, setRegion] = useState('');
   const [size, setSize] = useState('');
 
-  const [deploying, setDeploying] = useState(false);
-  const [dropletId, setDropletId] = useState<number | null>(null);
-  const [dropletIp, setDropletIp] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [skipAutoResume, setSkipAutoResume] = useState(false);
 
   const configQuery = trpc.provision.checkConfig.useQuery(undefined, {
     retry: false,
   });
+  const runsQuery = trpc.provision.listRuns.useQuery(undefined, {
+    retry: false,
+  });
+  const activeRunQuery = trpc.provision.getRun.useQuery(
+    { id: activeRunId! },
+    {
+      enabled: !!activeRunId,
+      retry: false,
+      refetchInterval: (query) => {
+        const run = query.state.data as ProvisioningRun | undefined;
+        return run && (run.status === 'creating_droplet' || run.status === 'waiting_for_ip') ? 3000 : false;
+      },
+    },
+  );
 
   const regionsQuery = trpc.provision.listRegions.useQuery(undefined, {
     enabled: step === 2,
@@ -69,13 +151,18 @@ export default function DeployServerPage() {
     enabled: step === 2,
   });
 
-  const { data: dropletData } = trpc.provision.getDroplet.useQuery(
-    { id: dropletId! },
-    {
-      enabled: !!dropletId && !dropletIp,
-      refetchInterval: 3000,
-    }
+  const activeRun = useMemo(
+    () => (activeRunQuery.data as ProvisioningRun | undefined)
+      ?? ((runsQuery.data as ProvisioningRun[] | undefined)?.find((run) => run.id === activeRunId) ?? null),
+    [activeRunId, activeRunQuery.data, runsQuery.data],
   );
+  const latestActionableRun = useMemo(
+    () => ((runsQuery.data as ProvisioningRun[] | undefined)?.find((run) => run.status !== 'completed') ?? null),
+    [runsQuery.data],
+  );
+  const dropletId = activeRun?.dropletId ?? null;
+  const dropletIp = activeRun?.dropletIp ?? null;
+  const deploying = activeRun?.status === 'creating_droplet' || activeRun?.status === 'waiting_for_ip';
 
   useEffect(() => {
     if (
@@ -89,12 +176,34 @@ export default function DeployServerPage() {
   }, [configQuery.data, step]);
 
   useEffect(() => {
-    if (dropletData?.ip) {
-      setDropletIp(dropletData.ip);
-      setDeploying(false);
-      setStep(4);
+    if (!skipAutoResume && !activeRunId && latestActionableRun) {
+      setActiveRunId(latestActionableRun.id);
     }
-  }, [dropletData]);
+  }, [activeRunId, latestActionableRun, skipAutoResume]);
+
+  useEffect(() => {
+    if (!configQuery.data?.hasToken || configQuery.data.needsTokenMigration || configQuery.data.tokenError) {
+      setStep(1);
+      return;
+    }
+
+    if (!activeRun) {
+      setStep(2);
+      return;
+    }
+
+    if (activeRun.status === 'ready_for_outline' || activeRun.status === 'completed') {
+      setStep(4);
+      return;
+    }
+
+    if (activeRun.status === 'failed' || activeRun.status === 'creating_droplet' || activeRun.status === 'waiting_for_ip') {
+      setStep(3);
+      return;
+    }
+
+    setStep(2);
+  }, [activeRun, configQuery.data]);
 
   const tokenMutation = trpc.provision.setToken.useMutation({
     onSuccess: () => {
@@ -107,13 +216,49 @@ export default function DeployServerPage() {
   });
 
   const deployMutation = trpc.provision.createDroplet.useMutation({
-    onSuccess: (data) => {
-      setDropletId(data.id);
+    onSuccess: async (data) => {
+      setSkipAutoResume(false);
+      setActiveRunId(data.run.id);
+      await runsQuery.refetch();
+    },
+    onError: async (err) => {
+      toast({ title: 'Deployment failed', description: err.message, variant: 'destructive' });
+      const refreshed = await runsQuery.refetch();
+      const latestRun = (refreshed.data as ProvisioningRun[] | undefined)?.[0];
+      if (latestRun) {
+        setSkipAutoResume(false);
+        setActiveRunId(latestRun.id);
+        setStep(3);
+      } else {
+        setStep(2);
+      }
+    },
+  });
+  const retryRunMutation = trpc.provision.retryRun.useMutation({
+    onSuccess: async (run) => {
+      setActiveRunId(run.id);
+      await runsQuery.refetch();
+      toast({
+        title: 'Provisioning resumed',
+        description: 'The saved server setup flow is running again from the failed step.',
+      });
+    },
+    onError: async (err) => {
+      await Promise.all([runsQuery.refetch(), activeRunQuery.refetch()]);
+      toast({ title: 'Retry failed', description: err.message, variant: 'destructive' });
+    },
+  });
+  const completeRunMutation = trpc.provision.completeRun.useMutation({
+    onSuccess: async (run) => {
+      setActiveRunId(run.id);
+      await runsQuery.refetch();
+      toast({
+        title: 'Provisioning handoff completed',
+        description: 'This run is now recorded as finished.',
+      });
     },
     onError: (err) => {
-      setDeploying(false);
-      toast({ title: 'Deployment failed', description: err.message, variant: 'destructive' });
-      setStep(2);
+      toast({ title: 'Could not complete run', description: err.message, variant: 'destructive' });
     },
   });
 
@@ -147,9 +292,20 @@ export default function DeployServerPage() {
 
   const handleDeploy = () => {
     if (!name || !region || !size) return;
-    setDeploying(true);
+    setSkipAutoResume(false);
     setStep(3);
     deployMutation.mutate({ name, region, size });
+  };
+
+  const handleResumeRun = (run: ProvisioningRun) => {
+    setSkipAutoResume(false);
+    setActiveRunId(run.id);
+  };
+
+  const handleStartNewRun = () => {
+    setSkipAutoResume(true);
+    setActiveRunId(null);
+    setStep(2);
   };
 
   const handleCopy = (text: string) => {
@@ -233,17 +389,54 @@ export default function DeployServerPage() {
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet state</p>
                   <p className="mt-2 text-sm font-medium">
-                    {dropletIp ? 'Ready' : deploying ? 'Provisioning' : step >= 2 ? 'Configuring' : 'Waiting'}
+                    {activeRun ? getProvisioningStatusLabel(activeRun.status) : step >= 2 ? 'Configuring' : 'Waiting'}
                   </p>
                 </div>
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Location</p>
-                  <p className="mt-2 text-sm font-medium">{selectedRegion?.slug ?? 'Unselected'}</p>
+                  <p className="mt-2 text-sm font-medium">{activeRun?.region ?? selectedRegion?.slug ?? 'Unselected'}</p>
                 </div>
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public IP</p>
                   <p className="mt-2 text-sm font-medium">{dropletIp ?? 'Pending'}</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="ops-panel space-y-3">
+              <div className="space-y-1">
+                <p className="ops-section-heading">Recent runs</p>
+                <h2 className="text-xl font-semibold">Resume or inspect</h2>
+              </div>
+
+              <div className="space-y-2">
+                {((runsQuery.data as ProvisioningRun[] | undefined) ?? []).length === 0 ? (
+                  <div className="ops-mini-tile">
+                    <p className="text-sm text-muted-foreground">No provisioning runs recorded yet.</p>
+                  </div>
+                ) : (
+                  ((runsQuery.data as ProvisioningRun[] | undefined) ?? []).slice(0, 4).map((run) => (
+                    <button
+                      key={run.id}
+                      type="button"
+                      onClick={() => handleResumeRun(run)}
+                      className={`w-full rounded-2xl border px-3 py-3 text-left transition hover:border-primary/30 hover:bg-background/75 ${
+                        activeRunId === run.id ? 'border-primary/35 bg-primary/10 dark:border-cyan-400/24 dark:bg-cyan-400/10' : 'border-border/60 bg-background/55'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{run.name}</p>
+                          <p className="text-xs text-muted-foreground">{run.region} · {run.size}</p>
+                        </div>
+                        <Badge variant="outline" className={getProvisioningStatusClass(run.status)}>
+                          {getProvisioningStatusLabel(run.status)}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">{run.summary}</p>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -458,32 +651,80 @@ export default function DeployServerPage() {
 
           {step === 3 ? (
             <div className="ops-detail-card min-h-[280px] space-y-6">
-              <div className="flex justify-center">
-                <span className="relative inline-flex h-20 w-20 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200">
-                  <Loader2 className="h-9 w-9 animate-spin" />
-                  <Rocket className="absolute h-5 w-5" />
-                </span>
-              </div>
-              <div className="space-y-2 text-center">
-                <h3 className="text-2xl font-semibold">Provisioning droplet</h3>
-                <p className="mx-auto max-w-lg text-sm leading-7 text-muted-foreground">
-                  Allocating the server, assigning a public IP, and installing Docker. This usually finishes in 30 to 60 seconds.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="ops-mini-tile text-center">
-                  <MapPin className="mx-auto h-4 w-4 text-primary" />
-                  <p className="mt-2 text-sm font-medium">{selectedRegion?.slug ?? 'Waiting'}</p>
-                </div>
-                <div className="ops-mini-tile text-center">
-                  <Cpu className="mx-auto h-4 w-4 text-primary" />
-                  <p className="mt-2 text-sm font-medium">{selectedSize?.slug ?? 'Waiting'}</p>
-                </div>
-                <div className="ops-mini-tile text-center">
-                  <Server className="mx-auto h-4 w-4 text-primary" />
-                  <p className="mt-2 text-sm font-medium">{dropletId ? `#${dropletId}` : 'Requesting ID'}</p>
-                </div>
-              </div>
+              {activeRun?.status === 'failed' ? (
+                <>
+                  <div className="flex justify-center">
+                    <span className="inline-flex h-20 w-20 items-center justify-center rounded-full border border-rose-500/25 bg-rose-500/10 text-rose-500 dark:text-rose-300">
+                      <AlertTriangle className="h-8 w-8" />
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-center">
+                    <h3 className="text-2xl font-semibold">Provisioning needs attention</h3>
+                    <p className="mx-auto max-w-lg text-sm leading-7 text-muted-foreground">
+                      {activeRun.summary}
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="ops-mini-tile text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Failed step</p>
+                      <p className="mt-2 text-sm font-medium">{getProvisioningStepLabel(activeRun.currentStep)}</p>
+                    </div>
+                    <div className="ops-mini-tile text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Attempts</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun.attemptCount}</p>
+                    </div>
+                    <div className="ops-mini-tile text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun.dropletId ? `#${activeRun.dropletId}` : 'Not created'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-700 dark:text-rose-200">
+                    {activeRun.lastError || 'The provider returned an unknown error.'}
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => retryRunMutation.mutate({ id: activeRun.id })}
+                      disabled={retryRunMutation.isPending}
+                      className="rounded-full"
+                    >
+                      {retryRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                      Retry last failed step
+                    </Button>
+                    <Button variant="outline" onClick={handleStartNewRun} className="rounded-full">
+                      Start new run
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-center">
+                    <span className="relative inline-flex h-20 w-20 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200">
+                      <Loader2 className="h-9 w-9 animate-spin" />
+                      <Rocket className="absolute h-5 w-5" />
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-center">
+                    <h3 className="text-2xl font-semibold">Provisioning droplet</h3>
+                    <p className="mx-auto max-w-lg text-sm leading-7 text-muted-foreground">
+                      {activeRun?.summary || 'Allocating the server, assigning a public IP, and installing Docker. This usually finishes in 30 to 60 seconds.'}
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="ops-mini-tile text-center">
+                      <MapPin className="mx-auto h-4 w-4 text-primary" />
+                      <p className="mt-2 text-sm font-medium">{activeRun?.region ?? selectedRegion?.slug ?? 'Waiting'}</p>
+                    </div>
+                    <div className="ops-mini-tile text-center">
+                      <Cpu className="mx-auto h-4 w-4 text-primary" />
+                      <p className="mt-2 text-sm font-medium">{activeRun?.size ?? selectedSize?.slug ?? 'Waiting'}</p>
+                    </div>
+                    <div className="ops-mini-tile text-center">
+                      <Server className="mx-auto h-4 w-4 text-primary" />
+                      <p className="mt-2 text-sm font-medium">{dropletId ? `#${dropletId}` : 'Requesting ID'}</p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ) : null}
 
@@ -501,6 +742,23 @@ export default function DeployServerPage() {
                     </p>
                   </div>
                 </div>
+
+                {activeRun ? (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="ops-mini-tile">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Run status</p>
+                      <p className="mt-2 text-sm font-medium">{getProvisioningStatusLabel(activeRun.status)}</p>
+                    </div>
+                    <div className="ops-mini-tile">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Attempts</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun.attemptCount}</p>
+                    </div>
+                    <div className="ops-mini-tile">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet ID</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun.dropletId ? `#${activeRun.dropletId}` : 'Pending'}</p>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="ops-detail-card space-y-3 bg-background/55 dark:bg-[rgba(4,11,23,0.78)]">
                   <div className="flex items-start justify-between gap-3">
@@ -526,9 +784,31 @@ export default function DeployServerPage() {
                   <p className="text-sm text-muted-foreground">
                     After installation, copy the generated <code>apiUrl</code> and add it from the servers page.
                   </p>
-                  <Button asChild className="rounded-full">
-                    <Link href="/dashboard/servers">Return to servers</Link>
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={handleStartNewRun}
+                    >
+                      Start another run
+                    </Button>
+                    {activeRun && activeRun.status !== 'completed' ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => completeRunMutation.mutate({ id: activeRun.id })}
+                        disabled={completeRunMutation.isPending}
+                      >
+                        {completeRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                        Mark handoff done
+                      </Button>
+                    ) : null}
+                    <Button asChild className="rounded-full">
+                      <Link href="/dashboard/servers">Return to servers</Link>
+                    </Button>
+                  </div>
                 </div>
               </div>
 
