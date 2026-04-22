@@ -29,6 +29,7 @@ export const adminToolNavItems = [
   { href: '/dashboard/incidents', icon: Flame, labelKey: 'nav.incidents', descriptionKey: 'tools.incidents.desc' },
   { href: '/dashboard/support', icon: MessageSquare, labelKey: 'nav.support', descriptionKey: 'tools.support.desc' },
   { href: '/dashboard/jobs', icon: ActivitySquare, labelKey: 'nav.jobs', descriptionKey: 'tools.jobs.desc' },
+  { href: '/dashboard/monitoring', icon: Bell, labelKey: 'nav.monitoring', descriptionKey: 'tools.monitoring.desc' },
   { href: '/dashboard/reports', icon: FileText, labelKey: 'nav.reports', descriptionKey: 'tools.reports.desc' },
   { href: '/dashboard/audit', icon: ScrollText, labelKey: 'nav.audit', descriptionKey: 'tools.audit.desc' },
   { href: '/dashboard/sessions', icon: Smartphone, labelKey: 'nav.sessions', descriptionKey: 'tools.sessions.desc' },
