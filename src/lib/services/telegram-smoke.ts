@@ -30,6 +30,21 @@ function normalizeBasePath(value: string | null) {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
+export function resolveTelegramSmokeProfileLocale(input: {
+  role: 'user' | 'admin';
+  userLocale?: string | null;
+  adminLocale?: string | null;
+  sameIdentity: boolean;
+}) {
+  const userLocale = normalizeOptionalString(input.userLocale);
+  const adminLocale = normalizeOptionalString(input.adminLocale);
+  if (input.sameIdentity) {
+    return userLocale || adminLocale;
+  }
+
+  return input.role === 'admin' ? adminLocale : userLocale;
+}
+
 export function parseTelegramSmokeStoredConfig(rawValue: unknown): TelegramSmokeStoredConfig {
   if (typeof rawValue !== 'string' || rawValue.trim().length === 0) {
     return {

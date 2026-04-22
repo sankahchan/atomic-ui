@@ -72,30 +72,14 @@ export function buildTelegramReviewQueueSummaryKeyboard(input: {
   };
 }
 
-function buildTelegramOrderReviewAlertMessage(input: {
+export function buildTelegramOrderReviewAlertMessage(input: {
   order: TelegramAdminReviewQueueOrder;
   locale: SupportedLocale;
   mode: 'initial' | 'reminder' | 'updated';
-  panelUrl: string;
 }) {
-  const { order, locale, mode, panelUrl } = input;
+  const { order, locale, mode } = input;
   const ui = getTelegramUi(locale);
   const isMyanmar = locale === 'my';
-  const reviewFocusLines = isMyanmar
-    ? [
-        '<b>စစ်ဆေးရန် checklist</b>',
-        '• screenshot ရှင်းလင်းမှု',
-        '• amount / method / plan ကိုက်ညီမှု',
-        '• duplicate proof warning ရှိ/မရှိ',
-        '• quick reject preset သုံးရန် လို/မလို',
-      ]
-    : [
-        '<b>Review checklist</b>',
-        '• screenshot clarity',
-        '• amount / method / plan match',
-        '• duplicate-proof warning',
-        '• whether a quick reject preset is enough',
-      ];
   const ownershipLabel = order.assignedReviewerEmail
     ? `🧷 ${isMyanmar ? 'ယူထားသူ' : 'Claimed by'}: <b>${escapeHtml(order.assignedReviewerEmail)}</b>`
     : `🧷 ${isMyanmar ? 'တာဝန်ယူသူ' : 'Queue ownership'}: <b>${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}</b>`;
@@ -111,6 +95,29 @@ function buildTelegramOrderReviewAlertMessage(input: {
         : isMyanmar
           ? 'Review item အသစ်'
           : 'New review item';
+  const proofHint = order.paymentMessageId
+    ? isMyanmar
+      ? '📎 မူရင်း screenshot ကို ဤ card အပေါ်တွင် copy လုပ်ပေးထားပါသည်။'
+      : '📎 The original screenshot is copied just above this card.'
+    : isMyanmar
+      ? 'မူရင်း screenshot ကို ဤနေရာတွင် copy မရသဖြင့် panel button ဖြင့် စစ်ဆေးပေးပါ။'
+      : 'The original screenshot was not copied here, so review it from the panel button.';
+  const actionHint = isMyanmar
+    ? 'Buttons အောက်မှ claim, approve, reject, သို့မဟုတ် panel ကို ဖွင့်နိုင်ပါသည်။'
+    : 'Use the buttons below to claim, approve, reject, or open the panel.';
+  const requesterSummary = [
+    `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
+    `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
+  ].join(' • ');
+  const paymentSnapshot = [
+    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
+    `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
+    order.paymentSubmittedAt
+      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' • ');
 
   return [
     mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
@@ -118,41 +125,26 @@ function buildTelegramOrderReviewAlertMessage(input: {
     `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
     `${isMyanmar ? 'Queue' : 'Queue'}: <b>${queueHint}</b>`,
     '',
-    isMyanmar ? '<b>📎 Proof အနှစ်ချုပ်</b>' : '<b>📎 Proof summary</b>',
+    isMyanmar ? '<b>📎 Proof အနှစ်ချုပ်</b>' : '<b>📎 Proof snapshot</b>',
     order.priceLabel ? `💰 ${ui.priceLabel}: <b>${escapeHtml(order.priceLabel)}</b>` : '',
-    `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
-    `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
-    order.paymentSubmittedAt
-      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
-      : '',
-    `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
-    '',
-    isMyanmar ? '<b>🧭 Queue တာဝန်ယူသူ</b>' : '<b>🧭 Queue ownership</b>',
-    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
+    requesterSummary,
+    paymentSnapshot,
     order.selectedServerName ? `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}</b>` : '',
     ownershipLabel,
-    order.paymentMessageId
-      ? isMyanmar
-        ? '📎 မူရင်း screenshot ကို ဤ summary မတိုင်မီ copy လုပ်ပေးထားပါသည်။'
-        : '📎 The original screenshot is copied just above this review summary.'
-      : isMyanmar
-        ? 'မူရင်း screenshot copy မရရှိသဖြင့် panel တွင် proof ကို စစ်ဆေးပေးပါ။'
-        : 'The original screenshot could not be copied here, so review it in the panel.',
     order.duplicateProofOrderCode
       ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
       : '',
     order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
     order.targetAccessKeyId ? `${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>` : '',
     '',
-    ...reviewFocusLines,
-    '',
-    `${ui.orderReviewPanelLabel}: ${panelUrl}`,
+    proofHint,
+    actionHint,
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-function buildTelegramOrderReviewAlertKeyboard(input: {
+export function buildTelegramOrderReviewAlertKeyboard(input: {
   orderId: string;
   locale: SupportedLocale;
   panelUrl: string;
@@ -251,7 +243,6 @@ export async function sendTelegramOrderReviewCardToChat(input: {
       order: input.order,
       locale: input.locale,
       mode: input.mode,
-      panelUrl,
     }),
     {
       replyMarkup: buildTelegramOrderReviewAlertKeyboard({

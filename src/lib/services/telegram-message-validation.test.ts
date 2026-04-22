@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildTelegramHelpMessage } from '@/lib/services/telegram-admin';
+import {
+  buildTelegramAdminHomeKeyboard,
+  buildTelegramHelpMessage,
+} from '@/lib/services/telegram-admin';
 import {
   buildTelegramCouponReminderMessage,
   buildTelegramTrialExpiringReminderMessage,
@@ -18,12 +21,61 @@ import {
 } from '@/lib/services/telegram-inbox-ui';
 import { buildTelegramReviewQueueSummaryKeyboard } from '@/lib/services/telegram-review-queue';
 import {
+  buildTelegramOrderReviewAlertKeyboard,
+  buildTelegramOrderReviewAlertMessage,
+} from '@/lib/services/telegram-review-queue';
+import {
+  buildTelegramPremiumSupportQueueCardMessage,
+  buildTelegramSupportQueueReplyKeyboard,
+  buildTelegramSupportQueueShortcutMessage,
+  buildTelegramSupportQueueSummaryKeyboard,
+} from '@/lib/services/telegram-premium-support-queue';
+import {
+  buildTelegramSupportThreadQueueMessage,
+  buildTelegramSupportThreadQueueReplyKeyboard,
+  buildTelegramSupportThreadsSummaryKeyboard,
+} from '@/lib/services/telegram-support-console';
+import {
   findUnsupportedTelegramHtmlTags,
+  measureTelegramKeyboardLayout,
+  measureTelegramMessageLayout,
   normalizeTelegramUtf8Text,
   sanitizeTelegramHtmlMessage,
   validateTelegramHtmlMessage,
 } from '@/lib/services/telegram-message-validation';
+import { getCommandKeyboard } from '@/lib/services/telegram-callbacks';
 import { getTelegramUi } from '@/lib/services/telegram-ui';
+
+function assertTelegramMessageBudget(
+  message: string,
+  limits: { maxLines: number; maxChars: number },
+) {
+  const layout = measureTelegramMessageLayout(message);
+  assert.ok(
+    layout.nonEmptyLineCount <= limits.maxLines,
+    `Expected <= ${limits.maxLines} non-empty lines, got ${layout.nonEmptyLineCount}:\n${message}`,
+  );
+  assert.ok(
+    layout.visibleCharacterCount <= limits.maxChars,
+    `Expected <= ${limits.maxChars} visible chars, got ${layout.visibleCharacterCount}:\n${message}`,
+  );
+}
+
+function assertTelegramKeyboardBudget(
+  keyboard: { inline_keyboard?: Array<Array<{ text?: string }>>; keyboard?: Array<Array<{ text?: string }>> },
+  limits: { maxRows: number; maxButtonsPerRow: number; maxButtonTextLength: number },
+) {
+  const layout = measureTelegramKeyboardLayout(keyboard);
+  assert.ok(layout.rowCount <= limits.maxRows, `Expected <= ${limits.maxRows} rows, got ${layout.rowCount}`);
+  assert.ok(
+    layout.maxButtonsPerRow <= limits.maxButtonsPerRow,
+    `Expected <= ${limits.maxButtonsPerRow} buttons per row, got ${layout.maxButtonsPerRow}`,
+  );
+  assert.ok(
+    layout.maxButtonTextLength <= limits.maxButtonTextLength,
+    `Expected button text length <= ${limits.maxButtonTextLength}, got ${layout.maxButtonTextLength}`,
+  );
+}
 
 test('telegram HTML validator accepts supported tags', () => {
   const message = '<b>Hello</b>\n<a href="https://example.com">Open</a>\n<code>ABC</code>';
@@ -313,4 +365,188 @@ test('myanmar support summary and admin queue labels stay localized', () => {
   assert.match(firstRow, /အားလုံး/);
   assert.match(firstRow, /ကိုယ်ပိုင်/);
   assert.match(firstRow, /မယူရသေး/);
+});
+
+test('telegram user and admin keyboards stay within mobile row budgets', () => {
+  const userKeyboard = getCommandKeyboard(false, 'en');
+  const adminKeyboard = getCommandKeyboard(true, 'my');
+  const adminHomeKeyboard = buildTelegramAdminHomeKeyboard({
+    locale: 'my',
+    adminActor: {
+      isAdmin: true,
+      userId: 'admin_1',
+      email: 'owner@example.com',
+      scope: 'OWNER',
+    },
+    pendingReview: 4,
+    supportOpen: 7,
+    customerSupportOpen: 5,
+    premiumSupportOpen: 2,
+    pendingRefunds: 3,
+    scheduledAnnouncements: 1,
+    failedDeliveries: 0,
+  });
+  const reviewKeyboard = buildTelegramReviewQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+  const supportConsoleKeyboard = buildTelegramSupportThreadsSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+  const premiumQueueKeyboard = buildTelegramSupportQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+  const reviewActionKeyboard = buildTelegramOrderReviewAlertKeyboard({
+    orderId: 'ord_1',
+    locale: 'en',
+    panelUrl: 'https://panel.example/orders/ord_1',
+    queueMode: 'all',
+  });
+  const supportReplyKeyboard = buildTelegramSupportThreadQueueReplyKeyboard({
+    threadId: 'thr_1',
+    locale: 'en',
+    panelUrl: 'https://panel.example/support/thr_1',
+    mode: 'all',
+    claimedByMe: false,
+    isClaimed: false,
+  });
+  const premiumReplyKeyboard = buildTelegramSupportQueueReplyKeyboard({
+    requestId: 'req_1',
+    locale: 'my',
+    panelUrl: 'https://panel.example/premium/req_1',
+    mode: 'all',
+  });
+
+  for (const keyboard of [userKeyboard, adminKeyboard]) {
+    assertTelegramKeyboardBudget(keyboard, {
+      maxRows: 14,
+      maxButtonsPerRow: 2,
+      maxButtonTextLength: 20,
+    });
+  }
+
+  for (const keyboard of [
+    adminHomeKeyboard,
+    reviewKeyboard,
+    supportConsoleKeyboard,
+    premiumQueueKeyboard,
+    reviewActionKeyboard,
+    supportReplyKeyboard,
+    premiumReplyKeyboard,
+  ]) {
+    assertTelegramKeyboardBudget(keyboard, {
+      maxRows: 8,
+      maxButtonsPerRow: 3,
+      maxButtonTextLength: 32,
+    });
+  }
+});
+
+test('admin queue cards stay compact and button-first', () => {
+  const reviewCard = buildTelegramOrderReviewAlertMessage({
+    locale: 'en',
+    mode: 'initial',
+    order: {
+      id: 'ord_1',
+      orderCode: 'ORD-123',
+      planName: 'Premium / 1 Month / 200 GB',
+      planCode: 'premium_1m_200gb',
+      assignedReviewerEmail: null,
+      priceLabel: '6,000 Kyat',
+      telegramUsername: 'sankahchan',
+      telegramUserId: '7989641645',
+      paymentSubmittedAt: new Date('2026-04-22T00:00:00Z'),
+      paymentProofType: 'photo',
+      paymentMethodLabel: 'KBZPay',
+      selectedServerName: 'SG-2',
+      paymentMessageId: 123,
+      duplicateProofOrderCode: null,
+      requestedName: 'Onn',
+      targetAccessKeyId: 'key_123',
+    } as any,
+  });
+  const supportThreadCard = buildTelegramSupportThreadQueueMessage({
+    locale: 'my',
+    thread: {
+      id: 'thr_1',
+      threadCode: 'SUP-123',
+      issueCategory: 'ORDER',
+      status: 'OPEN',
+      waitingOn: 'ADMIN',
+      firstAdminReplyAt: null,
+      firstResponseDueAt: new Date('2026-04-22T06:00:00Z'),
+      assignedAdminName: null,
+      telegramUsername: 'customer_one',
+      telegramUserId: '123456',
+      createdAt: new Date('2026-04-22T00:00:00Z'),
+      updatedAt: new Date('2026-04-22T01:30:00Z'),
+      replies: [
+        {
+          id: 'rep_1',
+          senderType: 'USER',
+          message: 'Payment proof is attached. The transfer id is visible in the screenshot.',
+          createdAt: new Date('2026-04-22T01:00:00Z'),
+          mediaUrl: null,
+        },
+      ],
+    } as any,
+  });
+  const premiumQueueCard = buildTelegramPremiumSupportQueueCardMessage({
+    locale: 'my',
+    request: {
+      id: 'req_1',
+      requestCode: 'PRM-123',
+      requestType: 'REGION_CHANGE',
+      followUpPending: true,
+      dynamicAccessKey: {
+        id: 'dak_1',
+        name: 'Onn',
+      },
+      createdAt: new Date('2026-04-22T00:00:00Z'),
+      updatedAt: new Date('2026-04-22T01:00:00Z'),
+      replies: [
+        {
+          id: 'rep_1',
+          senderType: 'USER',
+          message: 'Please switch this key to SG first. JP is unstable for my current route.',
+          createdAt: new Date('2026-04-22T00:30:00Z'),
+        },
+      ],
+    } as any,
+  });
+
+  for (const message of [reviewCard, supportThreadCard, premiumQueueCard]) {
+    assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+    assert.doesNotMatch(message, /https?:\/\//);
+  }
+
+  assertTelegramMessageBudget(reviewCard, { maxLines: 14, maxChars: 520 });
+  assertTelegramMessageBudget(supportThreadCard, { maxLines: 11, maxChars: 420 });
+  assertTelegramMessageBudget(premiumQueueCard, { maxLines: 10, maxChars: 380 });
+});
+
+test('myanmar premium queue helpers stay localized and compact', () => {
+  const queueKeyboard = buildTelegramSupportQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'admin',
+  });
+  const workingMessage = buildTelegramSupportQueueShortcutMessage('wk', 'my');
+  const detailMessage = buildTelegramSupportQueueShortcutMessage('nd', 'my');
+  const handledMessage = buildTelegramSupportQueueShortcutMessage('hd', 'my');
+
+  const firstRow = queueKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  assert.match(firstRow, /အားလုံး/);
+  assert.match(firstRow, /Admin စောင့်နေ/);
+  assert.match(firstRow, /User စောင့်နေ/);
+
+  for (const message of [workingMessage, detailMessage, handledMessage]) {
+    assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+    assertTelegramMessageBudget(message, { maxLines: 2, maxChars: 100 });
+  }
+
+  assert.doesNotMatch(workingMessage, /We are checking this now/);
+  assert.doesNotMatch(detailMessage, /Please send a little more detail/);
+  assert.doesNotMatch(handledMessage, /This issue has been handled/);
 });

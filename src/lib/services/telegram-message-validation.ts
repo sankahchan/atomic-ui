@@ -15,6 +15,18 @@ const TELEGRAM_ALLOWED_HTML_TAGS = new Set([
 ]);
 
 const TELEGRAM_TAG_PATTERN = /<\/?([A-Za-z][A-Za-z0-9-]*)(\s[^<>]*?)?>/g;
+const TELEGRAM_HTML_ENTITY_PATTERN = /&(lt|gt|amp|quot|#39);/g;
+const TELEGRAM_HTML_ENTITY_MAP: Record<string, string> = {
+  '&lt;': '<',
+  '&gt;': '>',
+  '&amp;': '&',
+  '&quot;': '"',
+  '&#39;': "'",
+};
+
+function decodeTelegramHtmlEntities(input: string) {
+  return input.replace(TELEGRAM_HTML_ENTITY_PATTERN, (entity) => TELEGRAM_HTML_ENTITY_MAP[entity] || entity);
+}
 
 export function normalizeTelegramUtf8Text(input: string) {
   let output = '';
@@ -92,5 +104,54 @@ export function validateTelegramHtmlMessage(input: string) {
   return {
     valid: invalidTags.length === 0,
     invalidTags,
+  };
+}
+
+export function measureTelegramMessageLayout(input: string) {
+  const normalized = normalizeTelegramUtf8Text(input).text;
+  const visibleText = decodeTelegramHtmlEntities(normalized.replace(TELEGRAM_TAG_PATTERN, ''));
+  const lines = visibleText.split('\n');
+  const nonEmptyLines = lines.filter((line) => line.trim().length > 0);
+
+  return {
+    lineCount: lines.length,
+    nonEmptyLineCount: nonEmptyLines.length,
+    visibleCharacterCount: visibleText.replace(/\s+/g, ' ').trim().length,
+  };
+}
+
+type TelegramKeyboardRowButton =
+  | { text?: string | null }
+  | string
+  | null
+  | undefined;
+
+type TelegramKeyboardLike = {
+  inline_keyboard?: TelegramKeyboardRowButton[][];
+  keyboard?: TelegramKeyboardRowButton[][];
+};
+
+export function measureTelegramKeyboardLayout(input: TelegramKeyboardLike | null | undefined) {
+  const rows = input?.inline_keyboard || input?.keyboard || [];
+  const buttonCount = rows.reduce((total, row) => total + row.length, 0);
+  const maxButtonsPerRow = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  const maxButtonTextLength = rows.reduce((max, row) => {
+    const rowMax = row.reduce((buttonMax, button) => {
+      const text =
+        typeof button === 'string'
+          ? button
+          : typeof button?.text === 'string'
+            ? button.text
+            : '';
+      return Math.max(buttonMax, text.trim().length);
+    }, 0);
+    return Math.max(max, rowMax);
+  }, 0);
+
+  return {
+    rowCount: rows.length,
+    buttonCount,
+    maxButtonsPerRow,
+    maxButtonTextLength,
   };
 }

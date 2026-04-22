@@ -50,20 +50,20 @@ function getTelegramPremiumSupportQueueState(input: {
   if (input.request.followUpPending) {
     return {
       code: 'admin' as const,
-      label: isMyanmar ? 'Waiting for admin' : 'Waiting for admin',
+      label: isMyanmar ? 'Admin အဖြေ စောင့်နေ' : 'Waiting for admin',
     };
   }
 
   if (latestReply?.senderType === 'ADMIN') {
     return {
       code: 'user' as const,
-      label: isMyanmar ? 'Waiting for user' : 'Waiting for user',
+      label: isMyanmar ? 'User အဖြေ စောင့်နေ' : 'Waiting for user',
     };
   }
 
   return {
     code: 'admin' as const,
-    label: isMyanmar ? 'Pending review' : 'Pending review',
+    label: isMyanmar ? 'စစ်ဆေးရန် စောင့်နေ' : 'Pending review',
   };
 }
 
@@ -137,13 +137,13 @@ export function buildTelegramSupportQueueSummaryKeyboard(input: {
   return {
     inline_keyboard: [
       [
-        option('all', isMyanmar ? 'All' : 'All'),
-        option('admin', isMyanmar ? 'Need admin' : 'Need admin'),
-        option('user', isMyanmar ? 'Need user' : 'Need user'),
+        option('all', isMyanmar ? 'အားလုံး' : 'All'),
+        option('admin', isMyanmar ? 'Admin စောင့်နေ' : 'Need admin'),
+        option('user', isMyanmar ? 'User စောင့်နေ' : 'Need user'),
       ],
       [
         {
-          text: isMyanmar ? '⚡ Next needing action' : '⚡ Next needing action',
+          text: isMyanmar ? '⚡ နောက်ထပ်စစ်ရန်' : '⚡ Next needing action',
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue_unclaimed'),
         },
         {
@@ -151,13 +151,13 @@ export function buildTelegramSupportQueueSummaryKeyboard(input: {
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
         },
         {
-          text: isMyanmar ? '💸 Refunds' : '💸 Refunds',
+          text: isMyanmar ? '💸 Refund များ' : '💸 Refunds',
           callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
         },
       ],
       [
         {
-          text: isMyanmar ? '🧭 Admin home' : '🧭 Admin home',
+          text: isMyanmar ? '🧭 Admin စင်တာ' : '🧭 Admin home',
           callback_data: buildTelegramMenuCallbackData('admin', 'home'),
         },
       ],
@@ -165,7 +165,66 @@ export function buildTelegramSupportQueueSummaryKeyboard(input: {
   };
 }
 
-function buildTelegramSupportQueueReplyKeyboard(input: {
+export function buildTelegramPremiumSupportQueueCardMessage(input: {
+  locale: SupportedLocale;
+  request: TelegramPremiumSupportQueueRequest;
+}) {
+  const latestReply = input.request.replies?.[input.request.replies.length - 1] || null;
+  const state = getTelegramPremiumSupportQueueState({
+    request: input.request,
+    locale: input.locale,
+  });
+  const age = formatTelegramRelativeAge(
+    input.request.updatedAt || input.request.createdAt,
+    input.locale,
+  );
+  const overdue =
+    state.code === 'admin'
+    && Date.now() - (input.request.updatedAt || input.request.createdAt).getTime() > 6 * 60 * 60 * 1000;
+  const replyStateLabel =
+    latestReply?.senderType === 'ADMIN'
+      ? input.locale === 'my'
+        ? '🟡 User စောင့်နေ'
+        : '🟡 Waiting for user'
+      : input.request.followUpPending
+        ? input.locale === 'my'
+          ? '🕒 Admin စောင့်နေ'
+          : '🕒 Waiting for admin'
+        : input.locale === 'my'
+          ? '✅ Update ပြီး'
+          : '✅ Up to date';
+  const latestReplyPreview = buildTelegramLatestReplyPreviewLines({
+    reply: latestReply,
+    locale: input.locale,
+    maxLength: 100,
+  }).map((line) => escapeHtml(line));
+  const statusSnapshot = [
+    `${input.locale === 'my' ? 'အခြေအနေ' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`,
+    `${input.locale === 'my' ? 'တုံ့ပြန်မှု' : 'Reply'}: <b>${escapeHtml(replyStateLabel)}</b>`,
+    `${input.locale === 'my' ? 'ကြာချိန်' : 'Age'}: <b>${escapeHtml(age)}</b>`,
+  ].join(' • ');
+  const actionHint = input.locale === 'my'
+    ? 'Buttons အောက်မှ update, handled, next, သို့မဟုတ် panel ကို ဖွင့်နိုင်ပါသည်။'
+    : 'Use the buttons below to update, mark handled, move next, or open the panel.';
+
+  return [
+    input.locale === 'my'
+      ? '💎 <b>Premium support thread</b>'
+      : '💎 <b>Premium support thread</b>',
+    '',
+    `${input.locale === 'my' ? 'Code' : 'Code'}: <b>${escapeHtml(input.request.requestCode)}</b>`,
+    `${input.locale === 'my' ? 'Key' : 'Key'}: <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b>`,
+    `${input.locale === 'my' ? 'Type' : 'Type'}: <b>${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}</b>`,
+    statusSnapshot,
+    ...latestReplyPreview,
+    '',
+    actionHint,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function buildTelegramSupportQueueReplyKeyboard(input: {
   requestId: string;
   locale: SupportedLocale;
   panelUrl: string;
@@ -218,54 +277,15 @@ export async function sendTelegramSupportQueueCardToChat(input: {
   mode: TelegramSupportQueueMode;
 }) {
   const latestReply = input.request.replies?.[input.request.replies.length - 1] || null;
-  const state = getTelegramPremiumSupportQueueState({
-    request: input.request,
-    locale: input.locale,
-  });
-  const age = formatTelegramRelativeAge(
-    input.request.updatedAt || input.request.createdAt,
-    input.locale,
-  );
-  const overdue =
-    state.code === 'admin'
-    && Date.now() - (input.request.updatedAt || input.request.createdAt).getTime() > 6 * 60 * 60 * 1000;
   const panelUrl = await buildTelegramPremiumSupportPanelUrl(input.request.id);
-  const replyStateLabel =
-    latestReply?.senderType === 'ADMIN'
-      ? input.locale === 'my'
-        ? '🟡 Waiting for user'
-        : '🟡 Waiting for user'
-      : input.request.followUpPending
-        ? input.locale === 'my'
-          ? '🕒 Waiting for admin'
-          : '🕒 Waiting for admin'
-        : input.locale === 'my'
-          ? '✅ Up to date'
-          : '✅ Up to date';
 
   await sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my'
-        ? '💎 <b>Premium support thread</b>'
-        : '💎 <b>Premium support thread</b>',
-      '',
-      `${input.locale === 'my' ? 'Code' : 'Code'}: <b>${escapeHtml(input.request.requestCode)}</b>`,
-      `${input.locale === 'my' ? 'Key' : 'Key'}: <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b>`,
-      `${input.locale === 'my' ? 'Type' : 'Type'}: <b>${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}</b>`,
-      `${input.locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'Overdue' : 'Overdue'}</b>` : ''}`,
-      `${input.locale === 'my' ? 'Reply state' : 'Reply state'}: <b>${escapeHtml(replyStateLabel)}</b>`,
-      `${input.locale === 'my' ? 'Age' : 'Age'}: <b>${escapeHtml(age)}</b>`,
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
-        locale: input.locale,
-        maxLength: 120,
-      }).map((line) => escapeHtml(line)),
-      `${input.locale === 'my' ? 'Panel' : 'Panel'}: ${panelUrl}`,
-    ]
-      .filter(Boolean)
-      .join('\n'),
+    buildTelegramPremiumSupportQueueCardMessage({
+      locale: input.locale,
+      request: input.request,
+    }),
     {
       replyMarkup: buildTelegramSupportQueueReplyKeyboard({
         requestId: input.request.id,
@@ -310,14 +330,14 @@ export async function handleTelegramSupportQueueCommand(input: {
   const modeLabel =
     resolvedMode === 'admin'
       ? input.locale === 'my'
-        ? 'Need admin reply'
+        ? 'Admin အဖြေ စောင့်နေသော thread များ'
         : 'Need admin reply'
       : resolvedMode === 'user'
         ? input.locale === 'my'
-          ? 'Waiting for user'
+          ? 'User အဖြေ စောင့်နေသော thread များ'
           : 'Waiting for user'
         : input.locale === 'my'
-          ? 'All open threads'
+          ? 'ဖွင့်ထားသော thread အားလုံး'
           : 'All open threads';
 
   await sendTelegramMessage(
@@ -328,7 +348,7 @@ export async function handleTelegramSupportQueueCommand(input: {
       '',
       modeLabel,
       input.locale === 'my'
-        ? `${snapshot.totalOpen} open • ${snapshot.waitingAdmin} need admin • ${snapshot.waitingUser} waiting for user`
+        ? `${snapshot.totalOpen} ခု ဖွင့်ထား • ${snapshot.waitingAdmin} ခု admin စောင့်နေ • ${snapshot.waitingUser} ခု user စောင့်နေ`
         : `${snapshot.totalOpen} open • ${snapshot.waitingAdmin} need admin • ${snapshot.waitingUser} waiting for user`,
     ].join('\n'),
     {
@@ -399,15 +419,15 @@ export function buildTelegramSupportQueueShortcutMessage(
   switch (action) {
     case 'wk':
       return isMyanmar
-        ? 'We are checking this now and will update you again shortly.'
+        ? 'ယခု စစ်ဆေးနေပါသည်။ မကြာမီ update ပြန်ပို့ပေးပါမည်။'
         : 'We are checking this now and will update you again shortly.';
     case 'nd':
       return isMyanmar
-        ? 'Please send a little more detail or a clearer screenshot so we can continue.'
+        ? 'ဆက်လုပ်ရန် detail နည်းနည်းပိုပို့ပါ သို့မဟုတ် ပိုရှင်းသော screenshot ကို ပြန်ပို့ပေးပါ။'
         : 'Please send a little more detail or a clearer screenshot so we can continue.';
     case 'hd':
       return isMyanmar
-        ? 'This issue has been handled. Please try again and reply here if you still need help.'
+        ? 'ဤ issue ကို ဖြေရှင်းပြီးပါပြီ။ ထပ်မံစမ်းပြီး အကူအညီလိုသေးပါက ဤနေရာတွင် reply ပြန်ပို့ပါ။'
         : 'This issue has been handled. Please try again and reply here if you still need help.';
     default:
       return '';
