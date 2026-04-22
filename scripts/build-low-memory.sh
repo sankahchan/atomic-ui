@@ -6,7 +6,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 NODE_HEAP_MB="${NODE_HEAP_MB:-640}"
-PUBLISH_STANDALONE="${PUBLISH_STANDALONE:-false}"
+# Standalone is the production runtime used by the installer and systemd unit.
+# Publish its static assets by default so a plain `npm run build:low-memory`
+# cannot leave the service serving HTML without CSS/JS.
+PUBLISH_STANDALONE="${PUBLISH_STANDALONE:-true}"
 NEXT_PUBLIC_APP_VERSION="${NEXT_PUBLIC_APP_VERSION:-$(git rev-parse --short=12 HEAD 2>/dev/null || date +%s)}"
 
 echo "[build-low-memory] root=${ROOT_DIR}"
