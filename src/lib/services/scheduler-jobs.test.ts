@@ -30,6 +30,8 @@ test('computeNextSchedulerJobRun handles daily fixed time cadence', () => {
 test('manual scheduler support is only enabled for safe job keys', () => {
   assert.equal(isSchedulerJobManualRunSupported('health_check'), true);
   assert.equal(isSchedulerJobManualRunSupported('notification_queue'), true);
+  assert.equal(isSchedulerJobManualRunSupported('telegram_webhook_health'), true);
+  assert.equal(isSchedulerJobManualRunSupported('admin_queue_health'), true);
   assert.equal(isSchedulerJobManualRunSupported('telegram_digest'), false);
   assert.equal(isSchedulerJobManualRunSupported('telegram_sales_orders'), false);
   assert.equal(isSchedulerJobManualRunSupported('missing_job'), false);
