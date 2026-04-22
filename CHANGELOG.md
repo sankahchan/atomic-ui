@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.1 - 2026-04-23
+
+### Fixed
+
+- Fixed standalone VPS deployments so `npm run build:low-memory` publishes the matching `.next/static` assets into `.next/standalone` by default.
+- Fixed systemd service sync to fail fast when the standalone server or static asset bundle is missing, preventing production from serving unstyled HTML after deploys.
+
 ## v1.2.0 - 2026-04-22
 
 ### Added
