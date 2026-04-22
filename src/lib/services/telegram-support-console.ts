@@ -69,7 +69,7 @@ async function buildTelegramSupportThreadPanelUrl(thread: {
   return withAbsoluteBasePath(`/dashboard/support/threads/${encodeURIComponent(thread.id)}`);
 }
 
-function buildTelegramSupportThreadsSummaryKeyboard(input: {
+export function buildTelegramSupportThreadsSummaryKeyboard(input: {
   locale: SupportedLocale;
   mode: TelegramSupportQueueMode;
 }) {
@@ -109,7 +109,65 @@ function buildTelegramSupportThreadsSummaryKeyboard(input: {
   };
 }
 
-function buildTelegramSupportThreadQueueReplyKeyboard(input: {
+export function buildTelegramSupportThreadQueueMessage(input: {
+  locale: SupportedLocale;
+  thread: TelegramSupportThreadQueueRecord;
+}) {
+  const latestReply = input.thread.replies?.[input.thread.replies.length - 1] || null;
+  const state = getTelegramSupportThreadState({
+    status: input.thread.status,
+    waitingOn: input.thread.waitingOn,
+    locale: input.locale,
+  });
+  const age = formatTelegramRelativeAge(
+    input.thread.updatedAt || input.thread.createdAt,
+    input.locale,
+  );
+  const overdue =
+    !input.thread.firstAdminReplyAt
+    && Boolean(input.thread.firstResponseDueAt)
+    && (input.thread.firstResponseDueAt?.getTime() || 0) <= Date.now();
+  const latestReplyPreview = buildTelegramLatestReplyPreviewLines({
+    reply: latestReply,
+    locale: input.locale,
+    maxLength: 100,
+  }).map((line) => escapeHtml(line));
+  const statusSnapshot = [
+    `${input.locale === 'my' ? 'အခြေအနေ' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`,
+    `${input.locale === 'my' ? 'ကြာချိန်' : 'Age'}: <b>${escapeHtml(age)}</b>`,
+    input.thread.assignedAdminName
+      ? `${input.locale === 'my' ? 'ယူထားသူ' : 'Claimed by'}: <b>${escapeHtml(input.thread.assignedAdminName)}</b>`
+      : `${input.locale === 'my' ? 'ယူထားသူ' : 'Claimed by'}: <b>${input.locale === 'my' ? 'မရှိသေး' : 'Unclaimed'}</b>`,
+  ].join(' • ');
+  const followUpHint = latestReply?.mediaUrl
+    ? input.locale === 'my'
+      ? 'Attachment ကို button ဖြင့် ဖွင့်နိုင်ပါသည်။'
+      : 'Open the attachment from the button below.'
+    : input.locale === 'my'
+      ? 'Buttons အောက်မှ reply, claim, escalate, သို့မဟုတ် handled ကို သုံးနိုင်ပါသည်။'
+      : 'Use the buttons below to reply, claim, escalate, or mark handled.';
+
+  return [
+    input.locale === 'my'
+      ? '🧵 <b>Customer support thread</b>'
+      : '🧵 <b>Customer support thread</b>',
+    '',
+    `${input.locale === 'my' ? 'Code' : 'Code'}: <b>${escapeHtml(input.thread.threadCode)}</b>`,
+    `${input.locale === 'my' ? 'အမျိုးအစား' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}</b>`,
+    `${input.locale === 'my' ? 'User' : 'User'}: <b>${escapeHtml(input.thread.telegramUsername || input.thread.telegramUserId)}</b>`,
+    statusSnapshot,
+    !input.thread.firstAdminReplyAt && input.thread.firstResponseDueAt
+      ? `${input.locale === 'my' ? 'နောက်ဆုံးအချိန်' : 'Due'}: <b>${escapeHtml(formatTelegramDateTime(input.thread.firstResponseDueAt, input.locale))}</b>`
+      : '',
+    ...latestReplyPreview,
+    '',
+    followUpHint,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
   threadId: string;
   locale: SupportedLocale;
   panelUrl: string;
@@ -194,58 +252,15 @@ async function sendTelegramSupportThreadQueueCardToChat(input: {
   adminActor: TelegramAdminActor;
 }) {
   const latestReply = input.thread.replies?.[input.thread.replies.length - 1] || null;
-  const state = getTelegramSupportThreadState({
-    status: input.thread.status,
-    waitingOn: input.thread.waitingOn,
-    locale: input.locale,
-  });
-  const age = formatTelegramRelativeAge(
-    input.thread.updatedAt || input.thread.createdAt,
-    input.locale,
-  );
-  const overdue =
-    !input.thread.firstAdminReplyAt
-    && Boolean(input.thread.firstResponseDueAt)
-    && (input.thread.firstResponseDueAt?.getTime() || 0) <= Date.now();
   const panelUrl = await buildTelegramSupportThreadPanelUrl(input.thread);
 
   await sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my'
-        ? '🧵 <b>Customer support thread</b>'
-        : '🧵 <b>Customer support thread</b>',
-      '',
-      `${input.locale === 'my' ? 'Code' : 'Code'}: <b>${escapeHtml(input.thread.threadCode)}</b>`,
-      `${input.locale === 'my' ? 'အမျိုးအစား' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}</b>`,
-      `${input.locale === 'my' ? 'အခြေအနေ' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`,
-      `${input.locale === 'my' ? 'ကြာချိန်' : 'Age'}: <b>${escapeHtml(age)}</b>`,
-      `${input.locale === 'my' ? 'SLA' : 'SLA'}: <b>${escapeHtml(
-        input.thread.firstAdminReplyAt
-          ? (input.locale === 'my' ? 'အဖြေပြန်ပြီး' : 'Responded')
-          : input.thread.firstResponseDueAt
-            ? `${input.locale === 'my' ? 'Deadline' : 'Due'} ${formatTelegramDateTime(input.thread.firstResponseDueAt, input.locale)}`
-            : input.locale === 'my'
-              ? 'ဖွင့်ထား'
-              : 'Open',
-      )}</b>`,
-      input.thread.assignedAdminName
-        ? `${input.locale === 'my' ? 'ယူထားသူ' : 'Claimed by'}: <b>${escapeHtml(input.thread.assignedAdminName)}</b>`
-        : `${input.locale === 'my' ? 'ယူထားသူ' : 'Claimed by'}: <b>${input.locale === 'my' ? 'မရှိသေး' : 'Unclaimed'}</b>`,
-      `${input.locale === 'my' ? 'User' : 'User'}: <b>${escapeHtml(input.thread.telegramUsername || input.thread.telegramUserId)}</b>`,
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
-        locale: input.locale,
-        maxLength: 140,
-      }).map((line) => escapeHtml(line)),
-      latestReply?.mediaUrl
-        ? (input.locale === 'my' ? 'Attachment ကို အောက်တွင် ဖွင့်နိုင်ပါသည်။' : 'Attachment ready below.')
-        : '',
-      `${input.locale === 'my' ? 'Panel' : 'Panel'}: ${panelUrl}`,
-    ]
-      .filter(Boolean)
-      .join('\n'),
+    buildTelegramSupportThreadQueueMessage({
+      locale: input.locale,
+      thread: input.thread,
+    }),
     {
       replyMarkup: buildTelegramSupportThreadQueueReplyKeyboard({
         threadId: input.thread.id,

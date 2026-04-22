@@ -532,7 +532,7 @@ export async function handleServerRecoveredCommand(argsText: string, locale: Sup
     : `✅ Sent a recovery update for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
 }
 
-function buildTelegramAdminHomeKeyboard(input: {
+export function buildTelegramAdminHomeKeyboard(input: {
   locale: SupportedLocale;
   adminActor: TelegramAdminActor;
   pendingReview: number;
