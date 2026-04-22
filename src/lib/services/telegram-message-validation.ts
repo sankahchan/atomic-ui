@@ -15,14 +15,17 @@ const TELEGRAM_ALLOWED_HTML_TAGS = new Set([
 ]);
 
 const TELEGRAM_TAG_PATTERN = /<\/?([A-Za-z][A-Za-z0-9-]*)(\s[^<>]*?)?>/g;
+const TELEGRAM_HTML_ENTITY_PATTERN = /&(lt|gt|amp|quot|#39);/g;
+const TELEGRAM_HTML_ENTITY_MAP: Record<string, string> = {
+  '&lt;': '<',
+  '&gt;': '>',
+  '&amp;': '&',
+  '&quot;': '"',
+  '&#39;': "'",
+};
 
 function decodeTelegramHtmlEntities(input: string) {
-  return input
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+  return input.replace(TELEGRAM_HTML_ENTITY_PATTERN, (entity) => TELEGRAM_HTML_ENTITY_MAP[entity] || entity);
 }
 
 export function normalizeTelegramUtf8Text(input: string) {
