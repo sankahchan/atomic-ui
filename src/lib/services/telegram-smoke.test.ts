@@ -4,6 +4,7 @@ import { serializeTelegramBotSettingsValue } from '@/lib/telegram-bot-settings';
 import { deriveLegacyTelegramWebhookSecret } from '@/lib/telegram-webhook-secret';
 import {
   parseTelegramSmokeStoredConfig,
+  resolveTelegramSmokeProfileLocale,
   resolveTelegramSmokeWebhookSecret,
   resolveTelegramSmokeWebhookUrl,
 } from './telegram-smoke';
@@ -87,6 +88,48 @@ test('resolveTelegramSmokeWebhookSecret derives the legacy secret when only bot 
       botToken: '123:abc',
     }),
     expectedSecret,
+  );
+});
+
+test('resolveTelegramSmokeProfileLocale applies the admin override when smoke roles share one account', () => {
+  assert.equal(
+    resolveTelegramSmokeProfileLocale({
+      role: 'user',
+      userLocale: null,
+      adminLocale: 'my',
+      sameIdentity: true,
+    }),
+    'my',
+  );
+  assert.equal(
+    resolveTelegramSmokeProfileLocale({
+      role: 'admin',
+      userLocale: 'en',
+      adminLocale: null,
+      sameIdentity: true,
+    }),
+    'en',
+  );
+});
+
+test('resolveTelegramSmokeProfileLocale keeps separate user/admin overrides when identities differ', () => {
+  assert.equal(
+    resolveTelegramSmokeProfileLocale({
+      role: 'user',
+      userLocale: 'en',
+      adminLocale: 'my',
+      sameIdentity: false,
+    }),
+    'en',
+  );
+  assert.equal(
+    resolveTelegramSmokeProfileLocale({
+      role: 'admin',
+      userLocale: 'en',
+      adminLocale: 'my',
+      sameIdentity: false,
+    }),
+    'my',
   );
 });
 

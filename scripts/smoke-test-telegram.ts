@@ -3,6 +3,7 @@ import path from 'node:path';
 import { applyEnvFileToProcessEnv } from '@/lib/services/production-validation';
 import {
   parseTelegramSmokeStoredConfig,
+  resolveTelegramSmokeProfileLocale,
   resolveTelegramSmokeWebhookSecret,
   resolveTelegramSmokeWebhookUrl,
 } from '@/lib/services/telegram-smoke';
@@ -241,7 +242,12 @@ async function main() {
     telegramUserId: userId,
     telegramChatId: chatId,
     username,
-    locale: userLocale,
+    locale: resolveTelegramSmokeProfileLocale({
+      role: 'user',
+      userLocale,
+      adminLocale,
+      sameIdentity: adminUserId === userId && adminChatId === chatId,
+    }),
   });
   const restoreAdminLocale =
     adminUserId === userId && adminChatId === chatId
@@ -250,7 +256,12 @@ async function main() {
           telegramUserId: adminUserId,
           telegramChatId: adminChatId,
           username: adminUsername,
-          locale: adminLocale,
+          locale: resolveTelegramSmokeProfileLocale({
+            role: 'admin',
+            userLocale,
+            adminLocale,
+            sameIdentity: false,
+          }),
         });
 
   try {
