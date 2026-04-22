@@ -431,14 +431,14 @@ setup_environment() {
 install_npm_deps() {
     print_step "Installing npm dependencies (clean install)..."
     cd "$INSTALL_DIR" || return 1
-    rm -rf node_modules .next package-lock.json
+    rm -rf node_modules .next
 
-    print_step "Running npm install (this may take a few minutes)..."
-    if ! npm install --production=false 2>&1; then
-        print_error "npm install failed"
-        print_info "Trying with --legacy-peer-deps..."
-        if ! npm install --production=false --legacy-peer-deps 2>&1; then
-            print_error "npm install failed even with --legacy-peer-deps"
+    print_step "Running npm ci (this may take a few minutes)..."
+    if ! npm ci --include=dev 2>&1; then
+        print_error "npm ci failed"
+        print_info "Trying npm install with --legacy-peer-deps..."
+        if ! npm install --include=dev --legacy-peer-deps 2>&1; then
+            print_error "Dependency installation failed even with --legacy-peer-deps"
             print_info "Please check your Node.js version and try again"
             return 1
         fi
@@ -446,7 +446,7 @@ install_npm_deps() {
 
     # Verify node_modules was created
     if [ ! -d "$INSTALL_DIR/node_modules" ]; then
-        print_error "node_modules directory not found after npm install"
+        print_error "node_modules directory not found after dependency installation"
         return 1
     fi
 
@@ -1517,8 +1517,15 @@ update_service() {
     fi
     
     print_step "Installing dependencies..."
-    rm -rf node_modules .next package-lock.json
-    npm install --production=false
+    rm -rf node_modules .next
+    if ! npm ci --include=dev 2>&1; then
+        print_error "npm ci failed"
+        print_info "Trying npm install with --legacy-peer-deps..."
+        if ! npm install --include=dev --legacy-peer-deps 2>&1; then
+            print_error "Dependency installation failed even with --legacy-peer-deps"
+            exit 1
+        fi
+    fi
     
     print_step "Updating database..."
     sh scripts/prisma-command.sh generate
