@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.2.0 - 2026-04-22
+
+### Added
+
+- Added Postgres-first fresh VPS bootstrap and portable `.postgres.zip` backup bundles with dashboard upload, verification, and restore support.
+- Added cross-server recovery runbooks, fixed panel-path install support, and IPv4-friendly raw-IP access handling for new servers.
+- Added a summary-first Telegram UX refresh across buy, renew, keys, premium, inbox, support, orders, refunds, and the main admin queue surfaces in both English and Myanmar.
+
+### Changed
+
+- Changed backup restore handling so portable Postgres bundles carry the secret metadata needed for cross-server recovery.
+- Changed database-backed provider, webhook, and Telegram secrets to dedicated at-rest encryption with `SETTINGS_ENCRYPTION_KEY`.
+- Changed Telegram regression coverage to enforce message-size and keyboard-layout budgets during smoke and unit validation.
+
+### Fixed
+
+- Fixed fresh VPS bootstrap ordering, Prisma prompt hangs, raw-IP panel URL selection, and the benign Next compiler `SIGTERM` build noise.
+- Fixed cross-server restore verification noise, duplicate backup verification failures, and restore readiness reporting on Postgres targets.
+- Fixed Telegram smoke/runtime secret handling so encrypted settings, webhook secret enforcement, and live support/order flows continue to work after deploys and restores.
+
 ## v1.1.0 - 2026-04-15
 
 ### Added
