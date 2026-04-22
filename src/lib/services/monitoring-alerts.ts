@@ -4,19 +4,17 @@ import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { getConfiguredPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
-import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
 import { type BackupVerificationSummary } from '@/lib/services/backup-verification';
+import { getMonitoringSettings, type MonitoringSettings } from '@/lib/services/monitoring-config';
 import { escapeHtml, formatTelegramDateTime } from '@/lib/services/telegram-ui';
 import {
   getTelegramConfig,
   sendTelegramMessageDetailed,
 } from '@/lib/services/telegram-runtime';
 
-const BACKUP_VERIFICATION_ALERT_COOLDOWN_MS = 20 * 60 * 60 * 1000;
-const TELEGRAM_WEBHOOK_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
-const ADMIN_QUEUE_ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
-const TELEGRAM_WEBHOOK_BACKLOG_THRESHOLD = 20;
-const MIN_REVIEW_QUEUE_ALERT_HOURS = 6;
+export const MONITOR_BACKUP_VERIFICATION_FAILED_EVENT_PREFIX = 'MONITOR_BACKUP_VERIFICATION_FAILED';
+export const MONITOR_TELEGRAM_WEBHOOK_HEALTH_EVENT_PREFIX = 'MONITOR_TELEGRAM_WEBHOOK_HEALTH';
+export const MONITOR_ADMIN_QUEUE_HEALTH_EVENT_PREFIX = 'MONITOR_ADMIN_QUEUE_HEALTH';
 
 type MonitoringAlertDispatchResult = {
   skipped: boolean;
@@ -44,6 +42,28 @@ export type TelegramWebhookMonitorIssue = {
   pendingUpdateCount: number;
   lastErrorMessage: string | null;
   lastErrorAt: Date | null;
+};
+
+export type TelegramWebhookMonitorSnapshot = {
+  configured: boolean;
+  alertsConfigured: boolean;
+  adminChatCount: number;
+  locale: SupportedLocale;
+  expectedWebhookUrl: string | null;
+  backlogThreshold: number;
+  issue: TelegramWebhookMonitorIssue | null;
+};
+
+export type AdminQueueHealthSnapshot = {
+  healthy: boolean;
+  supportOverdueCount: number;
+  oldestSupportOverdueMinutes: number | null;
+  supportThreadCodes: string[];
+  pendingReviewCount: number;
+  unclaimedReviewCount: number;
+  oldestReviewAgeMinutes: number | null;
+  reviewOrderCodes: string[];
+  reviewThresholdHours: number;
 };
 
 function formatDurationMinutes(totalMinutes: number, locale: SupportedLocale) {
@@ -151,6 +171,7 @@ async function dispatchMonitoringAdminAlert(input: {
 export function resolveTelegramWebhookMonitorIssue(input: {
   webhookSecretConfigured: boolean;
   expectedWebhookUrl: string | null;
+  backlogThreshold?: number;
   webhookInfo: {
     url?: string | null;
     pending_update_count?: number | null;
@@ -198,7 +219,7 @@ export function resolveTelegramWebhookMonitorIssue(input: {
     summaries.push('Telegram reported delivery errors');
   }
 
-  if (pendingUpdateCount >= TELEGRAM_WEBHOOK_BACKLOG_THRESHOLD) {
+  if (pendingUpdateCount >= (input.backlogThreshold ?? 20)) {
     issueCodes.push('pending_backlog');
     summaries.push(`pending backlog (${pendingUpdateCount})`);
   }
@@ -396,77 +417,38 @@ function buildAdminQueueHealthKeyboard(locale: SupportedLocale): MonitoringAlert
   };
 }
 
-export async function runBackupVerificationFailureAlertCycle(input: {
-  results: Array<BackupVerificationSummary & { id?: string; verifiedAt?: Date }>;
-}) {
-  const config = await getTelegramConfig();
-  const locale = config?.defaultLanguage || 'en';
-  const failures = input.results.filter((item) => item.status === 'FAILED');
-
-  if (failures.length === 0) {
-    return {
-      skipped: true,
-      reason: 'healthy',
-      failedCount: 0,
-      alerted: 0,
-      suppressed: 0,
-      errors: [] as string[],
-    };
-  }
-
-  const event = buildMonitoringEventKey(
-    'MONITOR_BACKUP_VERIFICATION_FAILED',
-    failures
-      .map((item) => [item.filename, item.fileHashSha256, item.error].join('|'))
-      .sort()
-      .join('||'),
-  );
-
-  const dispatch = await dispatchMonitoringAdminAlert({
-    event,
-    message: buildBackupVerificationFailureAlertMessage({
-      failures: failures.map((item) => ({
-        filename: item.filename,
-        error: item.error,
-        verifiedAt: item.verifiedAt,
-        restoreReady: item.restoreReady,
-      })),
-      locale,
-    }),
-    cooldownMs: BACKUP_VERIFICATION_ALERT_COOLDOWN_MS,
-  });
-
-  return {
-    skipped: false,
-    failedCount: failures.length,
-    alerted: dispatch.delivered > 0 ? 1 : 0,
-    suppressed: dispatch.skipped ? 1 : 0,
-    errors: dispatch.errors,
-  };
+function hoursToCooldownMs(hours: number) {
+  return Math.max(0, Math.trunc(hours)) * 60 * 60 * 1000;
 }
 
-export async function runTelegramWebhookHealthAlertCycle(input?: {
+function minutesToCooldownMs(minutes: number) {
+  return Math.max(0, Math.trunc(minutes)) * 60 * 1000;
+}
+
+export async function collectTelegramWebhookMonitorSnapshot(input?: {
   fetchImpl?: typeof fetch;
-}) {
+  settings?: MonitoringSettings;
+}): Promise<TelegramWebhookMonitorSnapshot> {
+  const settings = input?.settings ?? await getMonitoringSettings();
   const config = await getTelegramConfig();
-  if (!config?.botToken || config.adminChatIds.length === 0) {
+  const locale = config?.defaultLanguage || 'en';
+  const expectedOrigin = getConfiguredPublicAppOrigin();
+  const expectedWebhookUrl = expectedOrigin ? `${expectedOrigin}${getPublicBasePath()}/api/telegram/webhook` : null;
+
+  if (!config?.botToken) {
     return {
-      skipped: true,
-      reason: 'not_configured',
-      healthy: true,
-      alerted: 0,
-      suppressed: 0,
-      errors: [] as string[],
-      pendingUpdateCount: 0,
+      configured: false,
+      alertsConfigured: false,
+      adminChatCount: 0,
+      locale,
+      expectedWebhookUrl,
+      backlogThreshold: settings.telegramWebhookPendingUpdateThreshold,
+      issue: null,
     };
   }
 
   const fetchImpl = input?.fetchImpl || fetch;
-  const expectedOrigin = getConfiguredPublicAppOrigin();
-  const expectedWebhookUrl = expectedOrigin ? `${expectedOrigin}${getPublicBasePath()}/api/telegram/webhook` : null;
-  const locale = config.defaultLanguage || 'en';
 
-  let issue: TelegramWebhookMonitorIssue;
   try {
     const response = await fetchImpl(`https://api.telegram.org/bot${config.botToken}/getWebhookInfo`);
     const payload = (await response.json()) as {
@@ -480,93 +462,65 @@ export async function runTelegramWebhookHealthAlertCycle(input?: {
       } | null;
     };
 
-    if (!response.ok || payload.ok !== true || !payload.result) {
-      issue = {
+    const issue =
+      !response.ok || payload.ok !== true || !payload.result
+        ? {
+            healthy: false,
+            issueCode: 'telegram_api_error',
+            fingerprint: ['telegram_api_error', String(response.status), payload.description || 'unknown'].join('|'),
+            summary: payload.description || `Telegram API returned ${response.status}`,
+            currentWebhookUrl: null,
+            expectedWebhookUrl,
+            pendingUpdateCount: 0,
+            lastErrorMessage: payload.description || null,
+            lastErrorAt: null,
+          }
+        : resolveTelegramWebhookMonitorIssue({
+            webhookSecretConfigured: Boolean(config.webhookSecretToken),
+            expectedWebhookUrl,
+            backlogThreshold: settings.telegramWebhookPendingUpdateThreshold,
+            webhookInfo: payload.result,
+          });
+
+    return {
+      configured: true,
+      alertsConfigured: config.adminChatIds.length > 0,
+      adminChatCount: config.adminChatIds.length,
+      locale,
+      expectedWebhookUrl,
+      backlogThreshold: settings.telegramWebhookPendingUpdateThreshold,
+      issue,
+    };
+  } catch (error) {
+    return {
+      configured: true,
+      alertsConfigured: config.adminChatIds.length > 0,
+      adminChatCount: config.adminChatIds.length,
+      locale,
+      expectedWebhookUrl,
+      backlogThreshold: settings.telegramWebhookPendingUpdateThreshold,
+      issue: {
         healthy: false,
-        issueCode: 'telegram_api_error',
-        fingerprint: ['telegram_api_error', String(response.status), payload.description || 'unknown'].join('|'),
-        summary: payload.description || `Telegram API returned ${response.status}`,
+        issueCode: 'request_failed',
+        fingerprint: ['request_failed', error instanceof Error ? error.message : 'unknown'].join('|'),
+        summary: error instanceof Error ? error.message : 'Failed to query Telegram webhook info',
         currentWebhookUrl: null,
         expectedWebhookUrl,
         pendingUpdateCount: 0,
-        lastErrorMessage: payload.description || null,
+        lastErrorMessage: error instanceof Error ? error.message : 'Failed to query Telegram webhook info',
         lastErrorAt: null,
-      };
-    } else {
-      issue = resolveTelegramWebhookMonitorIssue({
-        webhookSecretConfigured: Boolean(config.webhookSecretToken),
-        expectedWebhookUrl,
-        webhookInfo: payload.result,
-      });
-    }
-  } catch (error) {
-    issue = {
-      healthy: false,
-      issueCode: 'request_failed',
-      fingerprint: ['request_failed', error instanceof Error ? error.message : 'unknown'].join('|'),
-      summary: error instanceof Error ? error.message : 'Failed to query Telegram webhook info',
-      currentWebhookUrl: null,
-      expectedWebhookUrl,
-      pendingUpdateCount: 0,
-      lastErrorMessage: error instanceof Error ? error.message : 'Failed to query Telegram webhook info',
-      lastErrorAt: null,
+      },
     };
   }
-
-  if (issue.healthy || !issue.fingerprint) {
-    return {
-      skipped: true,
-      reason: 'healthy',
-      healthy: true,
-      alerted: 0,
-      suppressed: 0,
-      errors: [] as string[],
-      pendingUpdateCount: issue.pendingUpdateCount,
-    };
-  }
-
-  const dispatch = await dispatchMonitoringAdminAlert({
-    event: buildMonitoringEventKey('MONITOR_TELEGRAM_WEBHOOK_HEALTH', issue.fingerprint),
-    message: buildTelegramWebhookHealthAlertMessage({
-      issue,
-      locale,
-    }),
-    cooldownMs: TELEGRAM_WEBHOOK_ALERT_COOLDOWN_MS,
-  });
-
-  return {
-    skipped: false,
-    healthy: false,
-    issueCode: issue.issueCode,
-    alerted: dispatch.delivered > 0 ? 1 : 0,
-    suppressed: dispatch.skipped ? 1 : 0,
-    errors: dispatch.errors,
-    pendingUpdateCount: issue.pendingUpdateCount,
-  };
 }
 
-export async function runAdminQueueHealthAlertCycle(input?: {
+export async function collectAdminQueueHealthSnapshot(input?: {
   now?: Date;
-}) {
-  const config = await getTelegramConfig();
-  if (!config?.botToken || config.adminChatIds.length === 0) {
-    return {
-      skipped: true,
-      reason: 'not_configured',
-      healthy: true,
-      alerted: 0,
-      suppressed: 0,
-      supportOverdueCount: 0,
-      pendingReviewCount: 0,
-      errors: [] as string[],
-    };
-  }
-
+  settings?: MonitoringSettings;
+}): Promise<AdminQueueHealthSnapshot> {
+  const settings = input?.settings ?? await getMonitoringSettings();
   const now = input?.now || new Date();
-  const locale = config.defaultLanguage || 'en';
-  const salesSettings = await getTelegramSalesSettings();
-  const reviewThresholdHours = Math.max(MIN_REVIEW_QUEUE_ALERT_HOURS, salesSettings.pendingReviewReminderHours * 2);
-  const reviewThresholdMs = reviewThresholdHours * 60 * 60 * 1000;
+  const reviewThresholdMs = settings.reviewQueueAlertHours * 60 * 60 * 1000;
 
   const [
     supportOverdueCount,
@@ -641,42 +595,183 @@ export async function runAdminQueueHealthAlertCycle(input?: {
     ? now.getTime() - oldestReviewBaseline.getTime() >= reviewThresholdMs
     : false;
 
-  if (supportOverdueCount === 0 && !reviewBreached) {
+  return {
+    healthy: supportOverdueCount === 0 && !reviewBreached,
+    supportOverdueCount,
+    oldestSupportOverdueMinutes,
+    supportThreadCodes: oldestSupportThreads.map((thread) => thread.threadCode),
+    pendingReviewCount,
+    unclaimedReviewCount,
+    oldestReviewAgeMinutes,
+    reviewOrderCodes: oldestReviewOrders.map((order) => order.orderCode),
+    reviewThresholdHours: settings.reviewQueueAlertHours,
+  };
+}
+
+export async function runBackupVerificationFailureAlertCycle(input: {
+  results: Array<BackupVerificationSummary & { id?: string; verifiedAt?: Date }>;
+}) {
+  const config = await getTelegramConfig();
+  const settings = await getMonitoringSettings();
+  const locale = config?.defaultLanguage || 'en';
+  const failures = input.results.filter((item) => item.status === 'FAILED');
+
+  if (failures.length === 0) {
+    return {
+      skipped: true,
+      reason: 'healthy',
+      failedCount: 0,
+      alerted: 0,
+      suppressed: 0,
+      errors: [] as string[],
+    };
+  }
+
+  const event = buildMonitoringEventKey(
+    MONITOR_BACKUP_VERIFICATION_FAILED_EVENT_PREFIX,
+    failures
+      .map((item) => [item.filename, item.fileHashSha256, item.error].join('|'))
+      .sort()
+      .join('||'),
+  );
+
+  const dispatch = await dispatchMonitoringAdminAlert({
+    event,
+    message: buildBackupVerificationFailureAlertMessage({
+      failures: failures.map((item) => ({
+        filename: item.filename,
+        error: item.error,
+        verifiedAt: item.verifiedAt,
+        restoreReady: item.restoreReady,
+      })),
+      locale,
+    }),
+    cooldownMs: hoursToCooldownMs(settings.backupVerificationAlertCooldownHours),
+  });
+
+  return {
+    skipped: false,
+    failedCount: failures.length,
+    alerted: dispatch.delivered > 0 ? 1 : 0,
+    suppressed: dispatch.skipped ? 1 : 0,
+    errors: dispatch.errors,
+  };
+}
+
+export async function runTelegramWebhookHealthAlertCycle(input?: {
+  fetchImpl?: typeof fetch;
+}) {
+  const settings = await getMonitoringSettings();
+  const snapshot = await collectTelegramWebhookMonitorSnapshot({
+    fetchImpl: input?.fetchImpl,
+    settings,
+  });
+
+  if (!snapshot.configured || !snapshot.alertsConfigured) {
+    return {
+      skipped: true,
+      reason: 'not_configured',
+      healthy: true,
+      alerted: 0,
+      suppressed: 0,
+      errors: [] as string[],
+      pendingUpdateCount: snapshot.issue?.pendingUpdateCount || 0,
+    };
+  }
+
+  if (!snapshot.issue || snapshot.issue.healthy || !snapshot.issue.fingerprint) {
     return {
       skipped: true,
       reason: 'healthy',
       healthy: true,
       alerted: 0,
       suppressed: 0,
-      supportOverdueCount,
-      pendingReviewCount,
+      errors: [] as string[],
+      pendingUpdateCount: snapshot.issue?.pendingUpdateCount || 0,
+    };
+  }
+
+  const dispatch = await dispatchMonitoringAdminAlert({
+    event: buildMonitoringEventKey(MONITOR_TELEGRAM_WEBHOOK_HEALTH_EVENT_PREFIX, snapshot.issue.fingerprint),
+    message: buildTelegramWebhookHealthAlertMessage({
+      issue: snapshot.issue,
+      locale: snapshot.locale,
+    }),
+    cooldownMs: minutesToCooldownMs(settings.telegramWebhookAlertCooldownMinutes),
+  });
+
+  return {
+    skipped: false,
+    healthy: false,
+    issueCode: snapshot.issue.issueCode,
+    alerted: dispatch.delivered > 0 ? 1 : 0,
+    suppressed: dispatch.skipped ? 1 : 0,
+    errors: dispatch.errors,
+    pendingUpdateCount: snapshot.issue.pendingUpdateCount,
+  };
+}
+
+export async function runAdminQueueHealthAlertCycle(input?: {
+  now?: Date;
+}) {
+  const config = await getTelegramConfig();
+  const settings = await getMonitoringSettings();
+  const locale = config?.defaultLanguage || 'en';
+
+  if (!config?.botToken || config.adminChatIds.length === 0) {
+    return {
+      skipped: true,
+      reason: 'not_configured',
+      healthy: true,
+      alerted: 0,
+      suppressed: 0,
+      supportOverdueCount: 0,
+      pendingReviewCount: 0,
+      errors: [] as string[],
+    };
+  }
+
+  const snapshot = await collectAdminQueueHealthSnapshot({
+    now: input?.now,
+    settings,
+  });
+
+  if (snapshot.healthy) {
+    return {
+      skipped: true,
+      reason: 'healthy',
+      healthy: true,
+      alerted: 0,
+      suppressed: 0,
+      supportOverdueCount: snapshot.supportOverdueCount,
+      pendingReviewCount: snapshot.pendingReviewCount,
       errors: [] as string[],
     };
   }
 
   const fingerprint = [
-    supportOverdueCount,
-    oldestSupportThreads.map((thread) => thread.id).join(','),
-    pendingReviewCount,
-    unclaimedReviewCount,
-    oldestReviewOrders.map((order) => order.id).join(','),
-    oldestReviewAgeMinutes ? Math.floor(oldestReviewAgeMinutes / 60) : 'none',
+    snapshot.supportOverdueCount,
+    snapshot.supportThreadCodes.join(','),
+    snapshot.pendingReviewCount,
+    snapshot.unclaimedReviewCount,
+    snapshot.reviewOrderCodes.join(','),
+    snapshot.oldestReviewAgeMinutes ? Math.floor(snapshot.oldestReviewAgeMinutes / 60) : 'none',
   ].join('|');
 
   const dispatch = await dispatchMonitoringAdminAlert({
-    event: buildMonitoringEventKey('MONITOR_ADMIN_QUEUE_HEALTH', fingerprint),
+    event: buildMonitoringEventKey(MONITOR_ADMIN_QUEUE_HEALTH_EVENT_PREFIX, fingerprint),
     message: buildAdminQueueHealthAlertMessage({
       locale,
-      supportOverdueCount,
-      oldestSupportOverdueMinutes,
-      supportThreadCodes: oldestSupportThreads.map((thread) => thread.threadCode),
-      pendingReviewCount,
-      unclaimedReviewCount,
-      oldestReviewAgeMinutes,
-      reviewOrderCodes: oldestReviewOrders.map((order) => order.orderCode),
-      reviewThresholdHours,
+      supportOverdueCount: snapshot.supportOverdueCount,
+      oldestSupportOverdueMinutes: snapshot.oldestSupportOverdueMinutes,
+      supportThreadCodes: snapshot.supportThreadCodes,
+      pendingReviewCount: snapshot.pendingReviewCount,
+      unclaimedReviewCount: snapshot.unclaimedReviewCount,
+      oldestReviewAgeMinutes: snapshot.oldestReviewAgeMinutes,
+      reviewOrderCodes: snapshot.reviewOrderCodes,
+      reviewThresholdHours: snapshot.reviewThresholdHours,
     }),
-    cooldownMs: ADMIN_QUEUE_ALERT_COOLDOWN_MS,
+    cooldownMs: hoursToCooldownMs(settings.adminQueueAlertCooldownHours),
     replyMarkup: buildAdminQueueHealthKeyboard(locale),
   });
 
@@ -685,11 +780,11 @@ export async function runAdminQueueHealthAlertCycle(input?: {
     healthy: false,
     alerted: dispatch.delivered > 0 ? 1 : 0,
     suppressed: dispatch.skipped ? 1 : 0,
-    supportOverdueCount,
-    pendingReviewCount,
-    unclaimedReviewCount,
-    oldestSupportOverdueMinutes,
-    oldestReviewAgeMinutes,
+    supportOverdueCount: snapshot.supportOverdueCount,
+    pendingReviewCount: snapshot.pendingReviewCount,
+    unclaimedReviewCount: snapshot.unclaimedReviewCount,
+    oldestSupportOverdueMinutes: snapshot.oldestSupportOverdueMinutes,
+    oldestReviewAgeMinutes: snapshot.oldestReviewAgeMinutes,
     errors: dispatch.errors,
   };
 }

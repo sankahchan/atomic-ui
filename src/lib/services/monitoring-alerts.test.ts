@@ -29,6 +29,7 @@ test('resolveTelegramWebhookMonitorIssue detects mismatch, delivery errors, and 
   const result = resolveTelegramWebhookMonitorIssue({
     webhookSecretConfigured: true,
     expectedWebhookUrl: 'https://example.com/panel/api/telegram/webhook',
+    backlogThreshold: 20,
     webhookInfo: {
       url: 'https://wrong.example.com/api/telegram/webhook',
       pending_update_count: 42,
@@ -43,6 +44,23 @@ test('resolveTelegramWebhookMonitorIssue detects mismatch, delivery errors, and 
   assert.match(result.issueCode ?? '', /pending_backlog/);
   assert.match(result.summary ?? '', /URL mismatch/);
   assert.equal(result.pendingUpdateCount, 42);
+});
+
+test('resolveTelegramWebhookMonitorIssue respects the configured backlog threshold', () => {
+  const result = resolveTelegramWebhookMonitorIssue({
+    webhookSecretConfigured: true,
+    expectedWebhookUrl: 'https://example.com/panel/api/telegram/webhook',
+    backlogThreshold: 50,
+    webhookInfo: {
+      url: 'https://example.com/panel/api/telegram/webhook',
+      pending_update_count: 42,
+      last_error_date: null,
+      last_error_message: null,
+    },
+  });
+
+  assert.equal(result.healthy, true);
+  assert.equal(result.issueCode, null);
 });
 
 test('buildBackupVerificationFailureAlertMessage lists failed backups succinctly', () => {
