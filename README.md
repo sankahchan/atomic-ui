@@ -151,6 +151,7 @@ This repository now uses semver-style Git tags:
 - `v1.0.0` first stable release
 - `v1.1.0` feature release
 - `v1.1.1` bug-fix release
+- `v1.2.0` restore + Telegram stabilization release
 - `v2.0.0` breaking release
 
 ### Recommended release flow
