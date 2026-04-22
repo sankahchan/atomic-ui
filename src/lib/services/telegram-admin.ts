@@ -550,7 +550,7 @@ function buildTelegramAdminHomeKeyboard(input: {
   if (hasKeyManageScope(input.adminActor.scope)) {
     rows.push([
       {
-        text: isMyanmar ? '➕ Normal key' : '➕ Normal key',
+        text: isMyanmar ? '➕ ပုံမှန် key' : '➕ Normal key',
         callback_data: buildTelegramMenuCallbackData('admin', 'createkey'),
       },
       {
@@ -560,11 +560,11 @@ function buildTelegramAdminHomeKeyboard(input: {
     ]);
     rows.push([
       {
-        text: isMyanmar ? '🛠 Manage key' : '🛠 Manage key',
+        text: isMyanmar ? '🛠 Key စီမံရန်' : '🛠 Manage key',
         callback_data: buildTelegramMenuCallbackData('admin', 'managekey'),
       },
       {
-        text: isMyanmar ? '🧭 Manage dynamic' : '🧭 Manage dynamic',
+        text: isMyanmar ? '🧭 Dynamic စီမံရန်' : '🧭 Manage dynamic',
         callback_data: buildTelegramMenuCallbackData('admin', 'managedynamic'),
       },
     ]);
@@ -583,7 +583,7 @@ function buildTelegramAdminHomeKeyboard(input: {
     ]);
     rows.push([
       {
-        text: withCount(isMyanmar ? '🧵 Customer threads' : '🧵 Customer threads', input.customerSupportOpen),
+        text: withCount(isMyanmar ? '🧵 Customer thread များ' : '🧵 Customer threads', input.customerSupportOpen),
         callback_data: buildTelegramMenuCallbackData('admin', 'supportthreads'),
       },
       {
@@ -623,7 +623,7 @@ function buildTelegramAdminHomeKeyboard(input: {
   const lastRow: Array<{ text: string; callback_data: string }> = [];
   if (hasOutageManageScope(input.adminActor.scope)) {
     lastRow.push({
-      text: isMyanmar ? '🚨 Server notices' : '🚨 Server notices',
+      text: isMyanmar ? '🚨 Server notice များ' : '🚨 Server notices',
       callback_data: buildTelegramMenuCallbackData('admin', 'servernotices'),
     });
   }
@@ -755,53 +755,68 @@ export async function handleAdminHomeCommand(input: {
 
   const quickActionLines = [
     ...(hasKeyManageScope(input.adminActor.scope)
-      ? ['• /createkey', '• /createdynamic', '• /managekey', '• /managedynamic']
+      ? [
+          isMyanmar ? '• /createkey - ပုံမှန် key ဖန်တီးရန်' : '• /createkey - create a normal key',
+          isMyanmar ? '• /createdynamic - dynamic key ဖန်တီးရန်' : '• /createdynamic - create a dynamic key',
+          isMyanmar ? '• /managekey - key ရှာဖွေ/စီမံရန်' : '• /managekey - manage normal keys',
+          isMyanmar ? '• /managedynamic - dynamic key စီမံရန်' : '• /managedynamic - manage dynamic keys',
+        ]
       : []),
     ...(hasTelegramReviewManageScope(input.adminActor.scope)
-      ? ['• /reviewqueue', '• /supportqueue']
+      ? [
+          isMyanmar ? '• /reviewqueue - pending order များ စစ်ရန်' : '• /reviewqueue - review pending orders',
+          isMyanmar ? '• /supportqueue - support queue ကို ဖွင့်ရန်' : '• /supportqueue - open support queues',
+        ]
       : []),
-    ...(hasFinanceManageScope(input.adminActor.scope) ? ['• /refunds', '• /finance'] : []),
-    ...(hasTelegramAnnouncementManageScope(input.adminActor.scope) ? ['• /announcements'] : []),
-    '• /status',
+    ...(hasFinanceManageScope(input.adminActor.scope)
+      ? [
+          isMyanmar ? '• /refunds - refund စောင့်ဆိုင်းချက်များ' : '• /refunds - pending refunds',
+          isMyanmar ? '• /finance - ငွေကြေးအနှစ်ချုပ်' : '• /finance - finance summary',
+        ]
+      : []),
+    ...(hasTelegramAnnouncementManageScope(input.adminActor.scope)
+      ? [isMyanmar ? '• /announcements - announcement history' : '• /announcements - broadcast history']
+      : []),
+    isMyanmar ? '• /status - server အခြေအနေ' : '• /status - server status',
   ];
 
   const message = [
-    isMyanmar ? '🧭 <b>Admin home</b>' : '🧭 <b>Admin home</b>',
+    isMyanmar ? '🧭 <b>Admin စင်တာ</b>' : '🧭 <b>Admin home</b>',
     '',
     input.adminActor.email
       ? isMyanmar
-        ? `Signed in as <b>${escapeHtml(input.adminActor.email)}</b>`
+        ? `<b>${escapeHtml(input.adminActor.email)}</b> ဖြင့် ဝင်ထားသည်`
         : `Signed in as <b>${escapeHtml(input.adminActor.email)}</b>`
       : isMyanmar
-        ? 'Signed in with admin chat access'
+        ? 'Admin chat access ဖြင့် ဝင်ထားသည်'
         : 'Signed in with admin chat access',
     '',
-    isMyanmar ? '<b>Queues</b>' : '<b>Queues</b>',
+    isMyanmar ? '<b>Queue အနှစ်ချုပ်</b>' : '<b>Queues</b>',
     isMyanmar
-      ? `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`
+      ? `• Review: ${pendingReview} ခု pending • ${unclaimedReview} ခု မယူရသေး`
       : `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`,
     isMyanmar
-      ? `• Support: ${supportOpen} total • ${customerSupportOpen} customer • ${premiumSupportOpen} premium`
+      ? `• Support: ${supportOpen} ခု စုစုပေါင်း • customer ${customerSupportOpen} ခု • premium ${premiumSupportOpen} ခု`
       : `• Support: ${supportOpen} total • ${customerSupportOpen} customer • ${premiumSupportOpen} premium`,
     isMyanmar
-      ? `• Need admin: ${customerSupportWaitingAdmin} customer • ${premiumSupportWaitingAdmin} premium`
+      ? `• Admin စောင့်နေ: customer ${customerSupportWaitingAdmin} ခု • premium ${premiumSupportWaitingAdmin} ခု`
       : `• Need admin: ${customerSupportWaitingAdmin} customer • ${premiumSupportWaitingAdmin} premium`,
     isMyanmar
-      ? `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`
+      ? `• Refunds: ${pendingRefunds} ခု pending${input.adminActor.userId ? ` • ${myRefunds} ခု ကိုယ်ပိုင်` : ''}`
       : `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`,
     isMyanmar
-      ? `• Broadcasts: ${scheduledAnnouncements} scheduled • ${failedDeliveries} failed deliveries`
+      ? `• Broadcasts: ${scheduledAnnouncements} ခု schedule လုပ်ထား • ${failedDeliveries} ခု မအောင်မြင်`
       : `• Broadcasts: ${scheduledAnnouncements} scheduled • ${failedDeliveries} failed deliveries`,
     '',
-    isMyanmar ? '<b>Finance snapshot</b>' : '<b>Finance snapshot</b>',
+    isMyanmar ? '<b>ငွေကြေး snapshot</b>' : '<b>Finance snapshot</b>',
     isMyanmar
-      ? `• Today fulfilled: ${todayFulfilledCount}`
+      ? `• ယနေ့ပြီးစီး: ${todayFulfilledCount}`
       : `• Today fulfilled: ${todayFulfilledCount}`,
     isMyanmar
-      ? `• Today revenue: ${todayRevenue.toLocaleString('en-US')} Kyat`
+      ? `• ယနေ့ဝင်ငွေ: ${todayRevenue.toLocaleString('en-US')} Kyat`
       : `• Today revenue: ${todayRevenue.toLocaleString('en-US')} Kyat`,
     '',
-    isMyanmar ? '<b>Quick next actions</b>' : '<b>Quick next actions</b>',
+    isMyanmar ? '<b>အမြန် next action များ</b>' : '<b>Quick next actions</b>',
     ...quickActionLines,
   ].join('\n');
 
@@ -833,19 +848,19 @@ export function buildTelegramHelpMessage(input: {
   let message = isMyanmar
     ? `📚 <b>အမြန် command guide</b>
 
-<b>Start here</b>
+<b>စတင်ရန်</b>
 /buy - order အသစ် စတင်မည်
 /mykeys - key နှင့် renew ကို စစ်မည်
 /orders - မကြာသေးသော order များကို ကြည့်မည်
-/support - help center ကို ဖွင့်မည်
+/support - အကူအညီ စင်တာကို ဖွင့်မည်
 
-<b>Updates</b>
+<b>Update များ</b>
 /inbox - notice, refund, reply များကို ကြည့်မည်
 /notifications - alert preference များကို ပြောင်းမည်
-/premium - premium center ကို ဖွင့်မည်
+/premium - premium စင်တာကို ဖွင့်မည်
 /supportstatus - support thread summary ကို ကြည့်မည်
 
-<b>More tools</b>
+<b>နောက်ထပ် tool များ</b>
 /renew - renew ကို တိုက်ရိုက် စတင်မည်
 <code>/order ORDER-CODE</code> - order တစ်ခုကို အသေးစိတ်ကြည့်မည်
 /usage - usage နှင့် setup info ရယူမည်
@@ -890,15 +905,15 @@ Tip: <code>/inbox orders|support|refunds|announcements|premium</code> narrows th
 
   if (input.isAdmin) {
     message += isMyanmar
-      ? `\n\n<b>Admin commands</b>
+      ? `\n\n<b>Admin command များ</b>
 /admin - admin hub
 /reviewqueue - pending review queue
-/createkey, /createdynamic - key creation
-/managekey, /managedynamic - key management
-/announcements, /announce, /announceuser - broadcast tools
-/supportqueue, /supportthreads - support queues
-/finance, /refunds, /claimrefund, /reassignrefund - finance and refunds
-/status, /expiring, /find, /sysinfo, /backup - ops shortcuts`
+/createkey, /createdynamic - key ဖန်တီးရန်
+/managekey, /managedynamic - key စီမံရန်
+/announcements, /announce, /announceuser - announcement tools
+/supportqueue, /supportthreads - support queue များ
+/finance, /refunds, /claimrefund, /reassignrefund - finance နှင့် refund
+/status, /expiring, /find, /sysinfo, /backup - ops shortcut များ`
       : `\n\n<b>Admin commands</b>
 /admin - Admin hub
 /reviewqueue - Pending review queue

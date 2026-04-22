@@ -33,7 +33,7 @@ export function buildTelegramInboxTitle(mode: TelegramInboxMode, locale: Support
     case 'ORDERS':
       return isMyanmar ? '🧾 <b>Order inbox</b>' : '🧾 <b>Your order inbox</b>';
     case 'SUPPORT':
-      return isMyanmar ? '🛟 <b>Support inbox</b>' : '🛟 <b>Your support inbox</b>';
+      return isMyanmar ? '🛟 <b>အကူအညီ inbox</b>' : '🛟 <b>Your support inbox</b>';
     case 'REFUNDS':
       return isMyanmar ? '💸 <b>Refund inbox</b>' : '💸 <b>Your refund inbox</b>';
     case 'ANNOUNCEMENTS':
@@ -49,22 +49,22 @@ export function buildTelegramInboxEmptyMessage(mode: TelegramInboxMode, locale: 
   const isMyanmar = locale === 'my';
   switch (mode) {
     case 'UNREAD':
-      return isMyanmar ? '📭 No unread updates right now.' : '📭 No unread updates right now.';
+      return isMyanmar ? '📭 မဖတ်ရသေးသော update မရှိသေးပါ။' : '📭 No unread updates right now.';
     case 'PINNED':
-      return isMyanmar ? '📭 No pinned updates right now.' : '📭 No pinned updates right now.';
+      return isMyanmar ? '📭 Pin လုပ်ထားသော update မရှိသေးပါ။' : '📭 No pinned updates right now.';
     case 'ORDERS':
-      return isMyanmar ? '📭 No recent order updates yet.' : '📭 No recent order updates yet.';
+      return isMyanmar ? '📭 မကြာသေးသော order update မရှိသေးပါ။' : '📭 No recent order updates yet.';
     case 'SUPPORT':
-      return isMyanmar ? '📭 No recent support updates yet.' : '📭 No recent support updates yet.';
+      return isMyanmar ? '📭 မကြာသေးသော support update မရှိသေးပါ။' : '📭 No recent support updates yet.';
     case 'REFUNDS':
-      return isMyanmar ? '📭 No recent refund updates yet.' : '📭 No recent refund updates yet.';
+      return isMyanmar ? '📭 မကြာသေးသော refund update မရှိသေးပါ။' : '📭 No recent refund updates yet.';
     case 'ANNOUNCEMENTS':
-      return isMyanmar ? '📭 No recent announcements yet.' : '📭 No recent announcements yet.';
+      return isMyanmar ? '📭 မကြာသေးသော announcement မရှိသေးပါ။' : '📭 No recent announcements yet.';
     case 'PREMIUM':
-      return isMyanmar ? '📭 No recent premium updates yet.' : '📭 No recent premium updates yet.';
+      return isMyanmar ? '📭 မကြာသေးသော premium update မရှိသေးပါ။' : '📭 No recent premium updates yet.';
     default:
       return isMyanmar
-        ? '📭 No recent notices or announcements yet.'
+        ? '📭 မကြာသေးသော notice သို့မဟုတ် announcement မရှိသေးပါ။'
         : '📭 No recent notices or announcements yet.';
   }
 }
@@ -73,12 +73,12 @@ export function buildTelegramInboxTip(mode: TelegramInboxMode, locale: Supported
   const isMyanmar = locale === 'my';
   if (mode === 'ALL') {
     return isMyanmar
-      ? 'Tip: use the buttons below for a narrower inbox.'
+      ? 'အောက်က button များဖြင့် category တစ်ခုချင်းစီ ကြည့်နိုင်ပါသည်။'
       : 'Tip: use the buttons below for a narrower inbox.';
   }
 
   return isMyanmar
-    ? 'Tip: switch back to All to see every update in one place.'
+    ? 'Update အားလုံးကို တစ်နေရာတည်းမှာ ကြည့်ရန် All သို့ ပြန်ပြောင်းပါ။'
     : 'Tip: switch back to All to see every update in one place.';
 }
 
