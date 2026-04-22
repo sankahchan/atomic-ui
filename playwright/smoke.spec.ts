@@ -48,7 +48,7 @@ test('admin smoke journeys stay functional', async ({ page }) => {
     await page.getByTestId('support-claim').click();
     await page.locator('#support-reply').fill(replyText);
     await page.getByTestId('support-send-reply').click();
-    await expect(page.getByText(replyText)).toBeVisible();
+    await expect(page.locator('p.whitespace-pre-wrap', { hasText: replyText }).last()).toBeVisible();
   });
 
   await test.step('telegram review queue claim and reject macro works', async () => {
