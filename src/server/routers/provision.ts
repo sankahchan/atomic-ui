@@ -26,9 +26,75 @@ import {
     getProvisioningRuns,
     updateProvisioningRun,
 } from '@/lib/services/provisioning-runs';
-import digitalocean from 'digitalocean';
 
 const DIGITALOCEAN_TOKEN_SETTING_KEY = 'digitalOceanToken';
+const DIGITALOCEAN_API_BASE_URL = 'https://api.digitalocean.com/v2';
+const DIGITALOCEAN_API_ORIGIN = new URL(DIGITALOCEAN_API_BASE_URL).origin;
+
+interface DigitalOceanNetworkAddress {
+    type: 'public' | 'private';
+    ip_address: string;
+}
+
+interface DigitalOceanDroplet {
+    id: number;
+    status: string;
+    networks?: {
+        v4?: DigitalOceanNetworkAddress[];
+    };
+}
+
+interface DigitalOceanRegion {
+    slug: string;
+    name: string;
+    sizes: string[];
+    available: boolean;
+}
+
+interface DigitalOceanSize {
+    slug: string;
+    memory: number;
+    vcpus: number;
+    disk: number;
+    price_monthly: number;
+    description: string;
+    available: boolean;
+}
+
+interface DigitalOceanErrorResponse {
+    message?: string;
+    id?: string;
+}
+
+type DigitalOceanListResponse<T, K extends string> = Record<K, T[]> & {
+    links?: {
+        pages?: {
+            next?: string;
+        };
+    };
+};
+
+interface DigitalOceanDropletCreateInput {
+    name: string;
+    region: string;
+    size: string;
+    image: string;
+    user_data: string;
+    tags: string[];
+}
+
+interface DigitalOceanClient {
+    droplets: {
+        get(id: number): Promise<DigitalOceanDroplet>;
+        create(input: DigitalOceanDropletCreateInput): Promise<DigitalOceanDroplet>;
+    };
+    regions: {
+        list(): Promise<DigitalOceanRegion[]>;
+    };
+    sizes: {
+        list(): Promise<DigitalOceanSize[]>;
+    };
+}
 
 export interface ProvisionTokenInspection {
     hasToken: boolean;
@@ -113,8 +179,93 @@ function getEnvDigitalOceanToken() {
     );
 }
 
-function getDropletPublicIp(droplet: any) {
-    return droplet.networks?.v4?.find((ip: any) => ip.type === 'public')?.ip_address ?? null;
+function getDropletPublicIp(droplet: DigitalOceanDroplet) {
+    return droplet.networks?.v4?.find((ip) => ip.type === 'public')?.ip_address ?? null;
+}
+
+function normalizeDigitalOceanApiPath(pathOrUrl: string) {
+    if (pathOrUrl.startsWith('/')) {
+        return pathOrUrl;
+    }
+
+    const parsed = new URL(pathOrUrl);
+    if (parsed.origin !== DIGITALOCEAN_API_ORIGIN || !parsed.pathname.startsWith('/v2/')) {
+        throw new Error('DigitalOcean returned an unexpected pagination URL.');
+    }
+
+    return `${parsed.pathname.slice('/v2'.length)}${parsed.search}`;
+}
+
+async function requestDigitalOcean<T>(
+    token: string,
+    pathOrUrl: string,
+    init: RequestInit = {},
+): Promise<T> {
+    const path = normalizeDigitalOceanApiPath(pathOrUrl);
+    const response = await fetch(`${DIGITALOCEAN_API_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+            authorization: `Bearer ${token}`,
+            accept: 'application/json',
+            ...(init.body ? { 'content-type': 'application/json' } : {}),
+            ...init.headers,
+        },
+    });
+
+    if (!response.ok) {
+        let errorMessage = response.statusText;
+        try {
+            const payload = (await response.json()) as DigitalOceanErrorResponse;
+            errorMessage = payload.message || payload.id || errorMessage;
+        } catch {
+            // Keep the status text when DigitalOcean returns a non-JSON error.
+        }
+
+        throw new Error(`DigitalOcean API ${response.status}: ${errorMessage}`);
+    }
+
+    return (await response.json()) as T;
+}
+
+async function listDigitalOceanPages<T, K extends string>(token: string, path: string, key: K): Promise<T[]> {
+    const results: T[] = [];
+    let nextPath: string | null = path;
+
+    while (nextPath) {
+        const page: DigitalOceanListResponse<T, K> = await requestDigitalOcean<DigitalOceanListResponse<T, K>>(token, nextPath);
+        const items = page[key];
+        results.push(...items);
+
+        nextPath = page.links?.pages?.next
+            ? normalizeDigitalOceanApiPath(page.links.pages.next)
+            : null;
+    }
+
+    return results;
+}
+
+function createDigitalOceanClient(token: string): DigitalOceanClient {
+    return {
+        droplets: {
+            async get(id) {
+                const payload = await requestDigitalOcean<{ droplet: DigitalOceanDroplet }>(token, `/droplets/${id}`);
+                return payload.droplet;
+            },
+            async create(input) {
+                const payload = await requestDigitalOcean<{ droplet: DigitalOceanDroplet }>(token, '/droplets', {
+                    method: 'POST',
+                    body: JSON.stringify(input),
+                });
+                return payload.droplet;
+            },
+        },
+        regions: {
+            list: () => listDigitalOceanPages<DigitalOceanRegion, 'regions'>(token, '/regions', 'regions'),
+        },
+        sizes: {
+            list: () => listDigitalOceanPages<DigitalOceanSize, 'sizes'>(token, '/sizes', 'sizes'),
+        },
+    };
 }
 
 // Helper to get DO client
@@ -144,7 +295,7 @@ async function getDOClient() {
         });
     }
 
-    return digitalocean.client(token);
+    return createDigitalOceanClient(token);
 }
 
 export const provisionRouter = router({
@@ -255,8 +406,8 @@ export const provisionRouter = router({
         try {
             const regions = await client.regions.list();
             return regions
-                .filter((r: any) => r.available && r.sizes.length > 0)
-                .map((r: any) => ({
+                .filter((r) => r.available && r.sizes.length > 0)
+                .map((r) => ({
                     slug: r.slug,
                     name: r.name,
                     sizes: r.sizes,
@@ -277,8 +428,8 @@ export const provisionRouter = router({
         try {
             const sizes = await client.sizes.list();
             return sizes
-                .filter((s: any) => s.available)
-                .map((s: any) => ({
+                .filter((s) => s.available)
+                .map((s) => ({
                     slug: s.slug,
                     memory: s.memory,
                     vcpus: s.vcpus,

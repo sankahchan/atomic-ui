@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-NODE_HEAP_MB="${NODE_HEAP_MB:-640}"
+NODE_HEAP_MB="${NODE_HEAP_MB:-1024}"
 # Standalone is the production runtime used by the installer and systemd unit.
 # Publish its static assets by default so a plain `npm run build:low-memory`
 # cannot leave the service serving HTML without CSS/JS.

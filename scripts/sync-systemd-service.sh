@@ -51,13 +51,13 @@ fi
 if [[ "${EXEC_START}" == *"${APP_DIR}/.next/standalone/server.js"* ]]; then
   if [[ ! -f "${APP_DIR}/.next/standalone/server.js" ]]; then
     echo "[sync-systemd-service] missing standalone server: ${APP_DIR}/.next/standalone/server.js" >&2
-    echo "[sync-systemd-service] run: NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh" >&2
+    echo "[sync-systemd-service] run: NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh" >&2
     exit 1
   fi
 
   if [[ ! -d "${APP_DIR}/.next/standalone/.next/static" ]]; then
     echo "[sync-systemd-service] missing standalone static assets: ${APP_DIR}/.next/standalone/.next/static" >&2
-    echo "[sync-systemd-service] run: NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh" >&2
+    echo "[sync-systemd-service] run: NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh" >&2
     exit 1
   fi
 fi

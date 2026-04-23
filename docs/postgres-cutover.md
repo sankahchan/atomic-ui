@@ -100,7 +100,7 @@ The command exits non-zero if any model count differs from the exported manifest
 ### 7. Build and start the app
 
 ```bash
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl restart atomic-ui.service
 ```
 
