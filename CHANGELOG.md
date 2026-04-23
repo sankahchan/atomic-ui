@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.2 - 2026-04-23
+
+### Changed
+
+- Expanded live Telegram smoke coverage for the summary-first commerce commands: `/buy`, `/renew`, `/premiumregion`, and `/supportstatus`.
+- Changed VPS install, update, and deploy paths to prefer `npm ci --include=dev` so the committed lockfile is preserved during normal operations.
+
+### Fixed
+
+- Fixed recurring package-lock drift caused by installer and deploy scripts deleting `package-lock.json` and running plain `npm install`.
+
 ## v1.2.1 - 2026-04-23
 
 ### Fixed
