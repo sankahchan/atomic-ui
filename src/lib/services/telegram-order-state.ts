@@ -303,14 +303,14 @@ function buildTelegramBuyPlanSummaryCard(input: {
 }) {
   const label = resolveTelegramSalesPlanLabel(input.plan, input.locale);
   const price = resolveTelegramSalesPriceLabel(input.plan, input.locale);
+  const typeSummary = buildTelegramPlanTypeSummary(input.plan, input.locale);
+  const capacitySummary =
+    buildTelegramPlanCapacitySummary(input.plan, input.locale)
+    || (input.locale === 'my' ? 'Choose the duration in chat' : 'Choose the duration in chat');
   return buildTelegramCommerceCard(
     `${input.index}. ${input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑'} <b>${escapeHtml(label)}</b>${price ? ` • ${escapeHtml(price)}` : ''}`,
     [
-      escapeHtml(buildTelegramPlanTypeSummary(input.plan, input.locale)),
-      escapeHtml(
-        buildTelegramPlanCapacitySummary(input.plan, input.locale)
-          || (input.locale === 'my' ? 'Choose the duration in chat' : 'Choose the duration in chat'),
-      ),
+      escapeHtml([typeSummary, capacitySummary].filter(Boolean).join(' • ')),
       escapeHtml(
         input.plan.deliveryType === 'DYNAMIC_KEY'
           ? getTelegramPremiumPlanHighlight(input.plan, input.locale)
@@ -358,17 +358,17 @@ export function buildTelegramBuySummaryMessage(input: {
       ? `🔗 ${input.locale === 'my' ? 'Referral' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
       : null,
     input.locale === 'my'
-      ? 'Plan ကို နှိပ်ပါ။ Compare ဖြင့် Standard / Premium အကျဉ်းချုပ်ကို ကြည့်နိုင်ပြီး Button မရပါက plan နံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
-      : 'Tap a plan button. Use Compare for a quick Standard vs Premium summary, or reply with the plan number if buttons do not work.',
+      ? 'Plan ကို နှိပ်ပါ။ Button မရပါက plan နံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
+      : 'Tap a plan button, or reply with the plan number if buttons do not work.',
   ];
 
   return buildTelegramCommerceMessage({
     title: ui.orderPlanPrompt(input.order.orderCode),
-    statsLine: `${input.plans.length} plan(s) • ${standardCount} standard • ${premiumCount} premium${trialCount > 0 ? ` • ${trialCount} trial` : ''}`,
+    statsLine: `${input.plans.length} ${input.plans.length === 1 ? 'plan' : 'plans'} • ${standardCount} standard • ${premiumCount} premium${trialCount > 0 ? ` • ${trialCount} trial` : ''}`,
     intro:
       input.locale === 'my'
-        ? 'Buy flow ကို အတိုချုံးထားသည်: plan ရွေးရန်၊ payment step ဆက်ရန်၊ screenshot ပို့ရန်။'
-        : 'This flow is now simple: choose a plan, continue to payment, then send your screenshot.',
+        ? 'Plan တစ်ခုကို ရွေးပြီး payment step သို့ ဆက်ပါ။'
+        : 'Choose a plan, then continue to payment.',
     cards,
     footerLines,
   });
@@ -478,8 +478,7 @@ export function buildTelegramBuyPlanDetailMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: input.locale === 'my' ? `ℹ️ <b>Plan detail ${input.index}/${input.totalPlans}</b>` : `ℹ️ <b>Plan detail ${input.index}/${input.totalPlans}</b>`,
-    statsLine: `<b>${escapeHtml(label)}</b>`,
-    intro: input.locale === 'my' ? `Order ${escapeHtml(input.orderCode)} အတွက် detail` : `Detail for order ${escapeHtml(input.orderCode)}`,
+    statsLine: input.locale === 'my' ? `Order <b>${escapeHtml(input.orderCode)}</b>` : `Order <b>${escapeHtml(input.orderCode)}</b>`,
     cards: [
       buildTelegramCommerceCard(
         `${input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑'} <b>${escapeHtml(label)}</b>`,
