@@ -38,6 +38,14 @@ export function getPublicAppOrigin(fallbackOrigin?: string | null) {
   return trimTrailingSlash(configuredOrigin);
 }
 
+export function getConfiguredPublicAppOrigin() {
+  return (
+    normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL) ||
+    normalizeOrigin(process.env.APP_URL) ||
+    null
+  );
+}
+
 export function getPublicShareOrigin(fallbackOrigin?: string | null) {
   const configuredOrigin =
     normalizeOrigin(process.env.NEXT_PUBLIC_PUBLIC_SHARE_URL) ||

@@ -24,6 +24,37 @@ GITHUB_REPO="sankahchan/atomic-ui"
 SCRIPT_VERSION="1.4.1"
 DEFAULT_PORT=2053
 
+detect_public_ip() {
+    curl -s -4 ifconfig.me 2>/dev/null ||
+        curl -s -4 icanhazip.com 2>/dev/null ||
+        curl -s -4 ipinfo.io/ip 2>/dev/null ||
+        curl -s ifconfig.me 2>/dev/null ||
+        curl -s icanhazip.com 2>/dev/null ||
+        echo "localhost"
+}
+
+format_host_for_url() {
+    local host="${1}"
+    case "${host}" in
+        \[*\]) echo "${host}" ;;
+        *:*) echo "[${host}]" ;;
+        *) echo "${host}" ;;
+    esac
+}
+
+build_origin() {
+    local scheme="$1"
+    local host="$2"
+    local port="${3:-}"
+    local formatted_host
+    formatted_host=$(format_host_for_url "${host}")
+    if [ -n "${port}" ]; then
+        echo "${scheme}://${formatted_host}:${port}"
+    else
+        echo "${scheme}://${formatted_host}"
+    fi
+}
+
 # Get current port from saved file or default
 get_current_port() {
     if [ -f "$INSTALL_DIR/.panel_port" ]; then
@@ -70,8 +101,8 @@ get_public_origin() {
     local fallback_port
     fallback_port=$(get_current_port)
     local fallback_ip
-    fallback_ip=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
-    echo "http://${fallback_ip}:${fallback_port}"
+    fallback_ip=$(detect_public_ip)
+    build_origin "http" "${fallback_ip}" "${fallback_port}"
 }
 
 get_public_share_origin() {
@@ -340,32 +371,6 @@ setup_repository() {
     cd "$INSTALL_DIR" || return 1
 }
 
-# Install npm dependencies
-install_npm_deps() {
-    print_step "Installing npm dependencies (clean install)..."
-    cd "$INSTALL_DIR" || return 1
-    rm -rf node_modules .next package-lock.json
-
-    print_step "Running npm install (this may take a few minutes)..."
-    if ! npm install --production=false 2>&1; then
-        print_error "npm install failed"
-        print_info "Trying with --legacy-peer-deps..."
-        if ! npm install --production=false --legacy-peer-deps 2>&1; then
-            print_error "npm install failed even with --legacy-peer-deps"
-            print_info "Please check your Node.js version and try again"
-            return 1
-        fi
-    fi
-
-    # Verify node_modules was created
-    if [ ! -d "$INSTALL_DIR/node_modules" ]; then
-        print_error "node_modules directory not found after npm install"
-        return 1
-    fi
-
-    print_success "npm dependencies installed"
-}
-
 # Setup environment
 setup_environment() {
     local NEW_PORT=$1
@@ -384,8 +389,9 @@ setup_environment() {
         sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
     fi
     
-    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+    SERVER_IP=$(detect_public_ip)
     DB_PATH="${INSTALL_DIR}/prisma/data/atomic-ui.db"
+    SERVER_ORIGIN=$(build_origin "http" "${SERVER_IP}" "${NEW_PORT}")
     
     # Update port in .env
     if grep -q "^PORT=" .env; then
@@ -394,20 +400,57 @@ setup_environment() {
         echo "PORT=${NEW_PORT}" >> .env
     fi
     
-    # Update APP_URL with new port
-    sed -i "s|http://localhost:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
-    sed -i "s|http://${SERVER_IP}:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
+    # Update public app URL to the preferred IPv4 origin when no custom domain is set.
+    if grep -q "^APP_URL=" .env; then
+        sed -i "s|^APP_URL=.*|APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
+    if grep -q "^NEXT_PUBLIC_APP_URL=" .env; then
+        sed -i "s|^NEXT_PUBLIC_APP_URL=.*|NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
 
     # Save port to file
     echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
 
-    if grep -q "^DATABASE_URL=" .env; then
+    CURRENT_DATABASE_URL=$(grep "^DATABASE_URL=" .env | cut -d'=' -f2- | tr -d '"' || true)
+    if [ -z "${CURRENT_DATABASE_URL}" ]; then
+        echo "DATABASE_URL=file:${DB_PATH}" >> .env
+    elif [[ "${CURRENT_DATABASE_URL}" == file:* ]]; then
         sed -i "s|^DATABASE_URL=.*|DATABASE_URL=file:${DB_PATH}|g" .env
     else
-        echo "DATABASE_URL=file:${DB_PATH}" >> .env
+        print_info "Preserving existing non-SQLite DATABASE_URL"
     fi
 
     print_success "Environment configured with port ${NEW_PORT}"
+}
+
+# Install npm dependencies
+install_npm_deps() {
+    print_step "Installing npm dependencies (clean install)..."
+    cd "$INSTALL_DIR" || return 1
+    rm -rf node_modules .next
+
+    print_step "Running npm ci (this may take a few minutes)..."
+    if ! npm ci --include=dev 2>&1; then
+        print_error "npm ci failed"
+        print_info "Trying npm install with --legacy-peer-deps..."
+        if ! npm install --include=dev --legacy-peer-deps 2>&1; then
+            print_error "Dependency installation failed even with --legacy-peer-deps"
+            print_info "Please check your Node.js version and try again"
+            return 1
+        fi
+    fi
+
+    # Verify node_modules was created
+    if [ ! -d "$INSTALL_DIR/node_modules" ]; then
+        print_error "node_modules directory not found after dependency installation"
+        return 1
+    fi
+
+    print_success "npm dependencies installed"
 }
 
 # Setup database
@@ -423,7 +466,7 @@ setup_database() {
     fi
 
     print_step "Pushing database schema..."
-    if ! sh scripts/prisma-command.sh db push 2>&1; then
+    if ! node scripts/prisma-safe-db-push.js 2>&1; then
         print_error "Prisma db push failed"
         return 1
     fi
@@ -452,7 +495,7 @@ build_app() {
     cd "$INSTALL_DIR" || return 1
     rm -rf .next
     
-    if ! NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
+    if ! NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
         print_error "Build failed"
         print_info "Please check the build output above for errors"
         return 1
@@ -491,35 +534,13 @@ create_service() {
         WORKING_DIR="${INSTALL_DIR}"
     fi
 
-    cat > /etc/systemd/system/${SERVICE_NAME}.service << EOF
-[Unit]
-Description=Atomic-UI - Outline VPN Management Panel
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${WORKING_DIR}
-ExecStart=${EXEC_START}
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${SERVICE_NAME}
-Environment=NODE_ENV=production
-Environment=PORT=${PORT}
-Environment=HOSTNAME=0.0.0.0
-Environment=NODE_OPTIONS=--max-old-space-size=512
-EnvironmentFile=-${INSTALL_DIR}/.env
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    if ! systemctl daemon-reload; then
-        print_error "Failed to reload systemd daemon"
-        return 1
-    fi
+    APP_DIR="${INSTALL_DIR}" \
+    SERVICE_NAME="${SERVICE_NAME}.service" \
+    PORT_FALLBACK="${PORT}" \
+    NODE_OPTIONS_VALUE="--max-old-space-size=512" \
+    EXEC_START="${EXEC_START}" \
+    WORKING_DIR="${WORKING_DIR}" \
+        bash "${INSTALL_DIR}/scripts/sync-systemd-service.sh"
 
     if ! systemctl enable ${SERVICE_NAME} 2>&1; then
         print_error "Failed to enable service"
@@ -575,7 +596,8 @@ setup_firewall() {
 # Print completion message
 print_completion() {
     local PORT=$1
-    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "YOUR_SERVER_IP")
+    SERVER_IP=$(detect_public_ip)
+    PANEL_ORIGIN=$(build_origin "http" "${SERVER_IP}" "${PORT}")
 
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
@@ -584,7 +606,7 @@ print_completion() {
     echo ""
     echo -e "${CYAN}┌──────────────────────────────────────────────────────────────┐${NC}"
     echo -e "${CYAN}│${NC}  ${YELLOW}Access your panel:${NC}"
-    echo -e "${CYAN}│${NC}  URL: ${GREEN}http://${SERVER_IP}:${PORT}${NC}"
+    echo -e "${CYAN}│${NC}  URL: ${GREEN}${PANEL_ORIGIN}${NC}"
     echo -e "${CYAN}│${NC}"
     echo -e "${CYAN}│${NC}  ${YELLOW}Your panel port:${NC} ${GREEN}${PORT}${NC}"
     echo -e "${CYAN}│${NC}"
@@ -1228,7 +1250,7 @@ EOF
         print_success "APP_URL and NEXT_PUBLIC_APP_URL updated"
 
         print_step "Rebuilding application with new URL..."
-        NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+        NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
         systemctl restart ${SERVICE_NAME}
         print_success "Application restarted with new domain"
     fi
@@ -1278,8 +1300,8 @@ remove_custom_domain() {
     fi
 
     rm -f "$INSTALL_DIR/.panel_domain"
-    SERVER_IP=$(curl -s ifconfig.me || echo "YOUR_SERVER_IP")
-    echo "http://${SERVER_IP}" > "$INSTALL_DIR/.public_origin"
+    SERVER_IP=$(detect_public_ip)
+    echo "$(build_origin "http" "${SERVER_IP}")" > "$INSTALL_DIR/.public_origin"
 
     CURRENT_PORT=$(get_current_port)
     CURRENT_PATH=$(get_current_path)
@@ -1390,15 +1412,26 @@ change_port() {
     fi
     
     # Update APP_URL
-    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
-    sed -i "s|http://${SERVER_IP}:[0-9]*|http://${SERVER_IP}:${NEW_PORT}|g" .env
+    SERVER_IP=$(detect_public_ip)
+    SERVER_ORIGIN=$(build_origin "http" "${SERVER_IP}" "${NEW_PORT}")
+    if grep -q "^APP_URL=" .env; then
+        sed -i "s|^APP_URL=.*|APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
+    if grep -q "^NEXT_PUBLIC_APP_URL=" .env; then
+        sed -i "s|^NEXT_PUBLIC_APP_URL=.*|NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"|g" .env
+    else
+        echo "NEXT_PUBLIC_APP_URL=\"${SERVER_ORIGIN}\"" >> .env
+    fi
     
     # Save new port
     echo "${NEW_PORT}" > "$INSTALL_DIR/.panel_port"
-    
-    # Update systemd service
-    sed -i "s|Environment=PORT=.*|Environment=PORT=${NEW_PORT}|g" /etc/systemd/system/${SERVICE_NAME}.service
-    systemctl daemon-reload
+
+    if ! create_service "${NEW_PORT}"; then
+        print_error "Failed to refresh systemd service"
+        return 1
+    fi
     
     # Add new firewall rule
     setup_firewall "${NEW_PORT}"
@@ -1484,15 +1517,27 @@ update_service() {
     fi
     
     print_step "Installing dependencies..."
-    rm -rf node_modules .next package-lock.json
-    npm install --production=false
+    rm -rf node_modules .next
+    if ! npm ci --include=dev 2>&1; then
+        print_error "npm ci failed"
+        print_info "Trying npm install with --legacy-peer-deps..."
+        if ! npm install --include=dev --legacy-peer-deps 2>&1; then
+            print_error "Dependency installation failed even with --legacy-peer-deps"
+            exit 1
+        fi
+    fi
     
     print_step "Updating database..."
     sh scripts/prisma-command.sh generate
-    sh scripts/prisma-command.sh db push
+    node scripts/prisma-safe-db-push.js
     
     print_step "Building application..."
-    NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+    NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+
+    if ! create_service "${CURRENT_PORT}"; then
+        print_error "Failed to refresh systemd service"
+        exit 1
+    fi
     
     # Update management script
     cp "$INSTALL_DIR/atomic-ui.sh" /usr/local/bin/atomic-ui.tmp
@@ -1647,14 +1692,14 @@ install_full() {
         return 1
     fi
     
-    if ! install_npm_deps; then
-        print_error "Failed to install npm dependencies"
+    if ! setup_environment "$NEW_PORT"; then
+        print_error "Failed to setup environment"
         cleanup_failed_install
         return 1
     fi
-    
-    if ! setup_environment "$NEW_PORT"; then
-        print_error "Failed to setup environment"
+
+    if ! install_npm_deps; then
+        print_error "Failed to install npm dependencies"
         cleanup_failed_install
         return 1
     fi

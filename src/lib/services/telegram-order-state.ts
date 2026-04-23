@@ -19,6 +19,19 @@ import {
 } from '@/lib/services/telegram-referrals';
 import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import {
+  buildTelegramCommerceViewCallbackData,
+  buildTelegramOrderActionCallbackData,
+} from '@/lib/services/telegram-callbacks';
+import {
+  TELEGRAM_COMMERCE_PAGE_SIZE,
+  buildTelegramCommerceCard,
+  buildTelegramCommerceMessage,
+  buildTelegramCommercePagerRow,
+  paginateTelegramCommerce,
+  truncateTelegramCommerceButtonLabel,
+  type TelegramInlineButton,
+} from '@/lib/services/telegram-commerce-ui';
+import {
   escapeHtml,
   formatExpirationSummary,
   formatTelegramServerChoiceLabel,
@@ -233,6 +246,668 @@ function buildTelegramPremiumPlanCard(input: {
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+type TelegramSalesPlanOption = Awaited<ReturnType<typeof getTelegramSalesSettings>>['plans'][number];
+
+type TelegramBuySummaryOrder = {
+  id: string;
+  orderCode: string;
+  couponCode?: string | null;
+  couponDiscountAmount?: number | null;
+  couponDiscountLabel?: string | null;
+  referralCode?: string | null;
+  orderMode?: string | null;
+  giftRecipientLabel?: string | null;
+};
+
+type TelegramRenewableKeySummary = {
+  id: string;
+  name: string;
+  kind: 'access' | 'dynamic';
+  status: string;
+  expirationSummary: string;
+  serverLabel: string | null;
+};
+
+function isTelegramTrialPlan(plan: TelegramSalesPlanOption) {
+  return plan.code === 'trial_1d_3gb';
+}
+
+function buildTelegramPlanTypeSummary(plan: TelegramSalesPlanOption, locale: SupportedLocale) {
+  if (plan.deliveryType === 'DYNAMIC_KEY') {
+    return locale === 'my' ? 'Premium dynamic key' : 'Premium dynamic key';
+  }
+
+  if (isTelegramTrialPlan(plan)) {
+    return locale === 'my' ? 'Free trial access key' : 'Free trial access key';
+  }
+
+  return locale === 'my' ? 'Standard access key' : 'Standard access key';
+}
+
+function buildTelegramPlanCapacitySummary(plan: TelegramSalesPlanOption, locale: SupportedLocale) {
+  const quota = plan.unlimitedQuota
+    ? (locale === 'my' ? 'Unlimited quota' : 'Unlimited quota')
+    : typeof plan.dataLimitGB === 'number' && Number.isFinite(plan.dataLimitGB)
+      ? `${plan.dataLimitGB} GB`
+      : null;
+  const duration = formatTelegramPlanDurationLabel(plan, locale);
+  return [quota, duration].filter(Boolean).join(' • ');
+}
+
+function buildTelegramBuyPlanSummaryCard(input: {
+  locale: SupportedLocale;
+  plan: TelegramSalesPlanOption;
+  index: number;
+}) {
+  const label = resolveTelegramSalesPlanLabel(input.plan, input.locale);
+  const price = resolveTelegramSalesPriceLabel(input.plan, input.locale);
+  return buildTelegramCommerceCard(
+    `${input.index}. ${input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑'} <b>${escapeHtml(label)}</b>${price ? ` • ${escapeHtml(price)}` : ''}`,
+    [
+      escapeHtml(buildTelegramPlanTypeSummary(input.plan, input.locale)),
+      escapeHtml(
+        buildTelegramPlanCapacitySummary(input.plan, input.locale)
+          || (input.locale === 'my' ? 'Choose the duration in chat' : 'Choose the duration in chat'),
+      ),
+      escapeHtml(
+        input.plan.deliveryType === 'DYNAMIC_KEY'
+          ? getTelegramPremiumPlanHighlight(input.plan, input.locale)
+          : isTelegramTrialPlan(input.plan)
+            ? (input.locale === 'my' ? 'Try before you buy' : 'Try before you buy')
+            : (input.locale === 'my' ? 'Normal daily use' : 'Normal daily use'),
+      ),
+    ],
+  );
+}
+
+export function buildTelegramBuySummaryMessage(input: {
+  locale: SupportedLocale;
+  order: TelegramBuySummaryOrder;
+  plans: TelegramSalesPlanOption[];
+  page: number;
+  activeOfferCount: number;
+  couponHintLines?: string[];
+}) {
+  const ui = getTelegramUi(input.locale);
+  const pagination = paginateTelegramCommerce(input.plans, input.page);
+  const standardCount = input.plans.filter(
+    (plan) => plan.deliveryType === 'ACCESS_KEY' && !isTelegramTrialPlan(plan),
+  ).length;
+  const premiumCount = input.plans.filter((plan) => plan.deliveryType === 'DYNAMIC_KEY').length;
+  const trialCount = input.plans.filter((plan) => isTelegramTrialPlan(plan)).length;
+  const cards = pagination.pageItems.map((plan, index) =>
+    buildTelegramBuyPlanSummaryCard({
+      locale: input.locale,
+      plan,
+      index: pagination.startIndex + index + 1,
+    }),
+  );
+  const footerLines = [
+    input.activeOfferCount > 0
+      ? input.locale === 'my'
+        ? `🎟 Active offers: ${input.activeOfferCount} • /offers ဖြင့် ကြည့်နိုင်သည်။`
+        : `🎟 Active offers: ${input.activeOfferCount} • use /offers any time.`
+      : null,
+    ...(input.couponHintLines || []),
+    input.order.orderMode === 'GIFT' && input.order.giftRecipientLabel
+      ? `🎁 ${input.locale === 'my' ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
+      : null,
+    input.order.referralCode
+      ? `🔗 ${input.locale === 'my' ? 'Referral' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
+      : null,
+    input.locale === 'my'
+      ? 'Plan ကို နှိပ်ပါ။ Compare ဖြင့် Standard / Premium အကျဉ်းချုပ်ကို ကြည့်နိုင်ပြီး Button မရပါက plan နံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
+      : 'Tap a plan button. Use Compare for a quick Standard vs Premium summary, or reply with the plan number if buttons do not work.',
+  ];
+
+  return buildTelegramCommerceMessage({
+    title: ui.orderPlanPrompt(input.order.orderCode),
+    statsLine: `${input.plans.length} plan(s) • ${standardCount} standard • ${premiumCount} premium${trialCount > 0 ? ` • ${trialCount} trial` : ''}`,
+    intro:
+      input.locale === 'my'
+        ? 'Buy flow ကို အတိုချုံးထားသည်: plan ရွေးရန်၊ payment step ဆက်ရန်၊ screenshot ပို့ရန်။'
+        : 'This flow is now simple: choose a plan, continue to payment, then send your screenshot.',
+    cards,
+    footerLines,
+  });
+}
+
+export function buildTelegramBuyCompareMessage(input: {
+  locale: SupportedLocale;
+  orderCode: string;
+  plans: TelegramSalesPlanOption[];
+}) {
+  const standardPlans = input.plans.filter(
+    (plan) => plan.deliveryType === 'ACCESS_KEY' && !isTelegramTrialPlan(plan),
+  );
+  const premiumPlans = input.plans.filter((plan) => plan.deliveryType === 'DYNAMIC_KEY');
+  const trialPlans = input.plans.filter((plan) => isTelegramTrialPlan(plan));
+
+  return buildTelegramCommerceMessage({
+    title: input.locale === 'my' ? `🧭 <b>Plan compare · ${escapeHtml(input.orderCode)}</b>` : `🧭 <b>Plan compare · ${escapeHtml(input.orderCode)}</b>`,
+    intro:
+      input.locale === 'my'
+        ? 'Standard သည် ပုံမှန်အသုံးပြုမှုအတွက်ဖြစ်ပြီး Premium သည် stable route နှင့် region-aware support အတွက်ဖြစ်သည်။'
+        : 'Standard is for everyday access, while Premium focuses on stable routing and region-aware support.',
+    cards: [
+      buildTelegramCommerceCard(
+        '🔑 <b>Standard key</b>',
+        [
+          escapeHtml(
+            input.locale === 'my'
+              ? `Normal daily use • ${standardPlans.length} package(s)`
+              : `Normal daily use • ${standardPlans.length} package(s)`,
+          ),
+          escapeHtml(
+            input.locale === 'my'
+              ? 'Server ကို သင်ရွေးသည့်အတိုင်း အများအားဖြင့် တစ်နေရာတည်းတွင် နေမည်။'
+              : 'Usually stays on the server you choose.',
+          ),
+        ],
+      ),
+      buildTelegramCommerceCard(
+        '💎 <b>Premium key</b>',
+        [
+          escapeHtml(
+            input.locale === 'my'
+              ? `Stable premium route • ${premiumPlans.length} package(s)`
+              : `Stable premium route • ${premiumPlans.length} package(s)`,
+          ),
+          escapeHtml(
+            input.locale === 'my'
+              ? 'Dynamic routing, region-aware support, and better fallback visibility.'
+              : 'Dynamic routing, region-aware support, and better fallback visibility.',
+          ),
+        ],
+      ),
+      trialPlans.length > 0
+        ? buildTelegramCommerceCard(
+            '🎁 <b>Trial</b>',
+            [
+              escapeHtml(
+                input.locale === 'my'
+                  ? `Free try-before-you-buy option • ${trialPlans.length} package(s)`
+                  : `Free try-before-you-buy option • ${trialPlans.length} package(s)`,
+              ),
+            ],
+          )
+        : null,
+    ],
+    footerLines: [
+      input.locale === 'my'
+        ? 'Back to plans ကိုနှိပ်ပြီး package ရွေးချယ်မှုသို့ ပြန်နိုင်ပါသည်။'
+        : 'Use Back to plans to return to the package list.',
+    ],
+  });
+}
+
+export function buildTelegramBuyPlanDetailMessage(input: {
+  locale: SupportedLocale;
+  orderCode: string;
+  plan: TelegramSalesPlanOption;
+  index: number;
+  totalPlans: number;
+}) {
+  const label = resolveTelegramSalesPlanLabel(input.plan, input.locale);
+  const price = resolveTelegramSalesPriceLabel(input.plan, input.locale);
+  const summaryLines = [
+    price ? `${input.locale === 'my' ? 'Price' : 'Price'}: <b>${escapeHtml(price)}</b>` : null,
+    buildTelegramPlanCapacitySummary(input.plan, input.locale)
+      ? escapeHtml(buildTelegramPlanCapacitySummary(input.plan, input.locale))
+      : null,
+    `${input.locale === 'my' ? 'Type' : 'Type'}: <b>${escapeHtml(buildTelegramPlanTypeSummary(input.plan, input.locale))}</b>`,
+    input.plan.deliveryType === 'DYNAMIC_KEY'
+      ? `${input.locale === 'my' ? 'Best for' : 'Best for'}: ${escapeHtml(getTelegramPremiumPlanBestFor(input.plan, input.locale))}`
+      : isTelegramTrialPlan(input.plan)
+        ? escapeHtml(
+            input.locale === 'my'
+              ? 'Best for first-time testing before a paid purchase.'
+              : 'Best for first-time testing before a paid purchase.',
+          )
+        : escapeHtml(
+            input.locale === 'my'
+              ? 'Best for normal daily use on one selected server.'
+              : 'Best for normal daily use on one selected server.',
+          ),
+    input.plan.deliveryType === 'DYNAMIC_KEY'
+      ? `${input.locale === 'my' ? 'Highlight' : 'Highlight'}: ${escapeHtml(getTelegramPremiumPlanHighlight(input.plan, input.locale))}`
+      : null,
+  ];
+
+  return buildTelegramCommerceMessage({
+    title: input.locale === 'my' ? `ℹ️ <b>Plan detail ${input.index}/${input.totalPlans}</b>` : `ℹ️ <b>Plan detail ${input.index}/${input.totalPlans}</b>`,
+    statsLine: `<b>${escapeHtml(label)}</b>`,
+    intro: input.locale === 'my' ? `Order ${escapeHtml(input.orderCode)} အတွက် detail` : `Detail for order ${escapeHtml(input.orderCode)}`,
+    cards: [
+      buildTelegramCommerceCard(
+        `${input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑'} <b>${escapeHtml(label)}</b>`,
+        summaryLines,
+      ),
+    ],
+    footerLines: [
+      input.locale === 'my'
+        ? 'Select plan ကိုနှိပ်ပြီး တိုက်ရိုက်ရွေးနိုင်ပါသည်။'
+        : 'Tap Select plan to choose it directly.',
+    ],
+  });
+}
+
+function buildTelegramBuySummaryKeyboard(input: {
+  locale: SupportedLocale;
+  orderId: string;
+  plans: TelegramSalesPlanOption[];
+  page: number;
+  hasCouponApplied?: boolean;
+}) {
+  const pagination = paginateTelegramCommerce(input.plans, input.page);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = pagination.pageItems.map((plan, index) => {
+    const globalIndex = pagination.startIndex + index + 1;
+    const label = resolveTelegramSalesPlanLabel(plan, input.locale);
+    const price = resolveTelegramSalesPriceLabel(plan, input.locale);
+    return [{
+      text: truncateTelegramCommerceButtonLabel(
+        `${globalIndex}. ${label}${price ? ` • ${price}` : ''}`,
+        42,
+      ),
+      callback_data: buildTelegramOrderActionCallbackData('pl', input.orderId, plan.code),
+    }];
+  });
+
+  const detailButtons = pagination.pageItems.map((plan, index) => ({
+    text: `ℹ️ ${pagination.startIndex + index + 1}`,
+    callback_data: buildTelegramCommerceViewCallbackData(
+      'buy',
+      'detail',
+      plan.code,
+      String(pagination.page),
+    ),
+  }));
+  if (detailButtons.length > 0) {
+    rows.push(detailButtons);
+  }
+
+  rows.push([{
+    text: input.locale === 'my' ? '🧭 Compare' : '🧭 Compare',
+    callback_data: buildTelegramCommerceViewCallbackData('buy', 'compare', String(pagination.page)),
+  }]);
+
+  if (input.hasCouponApplied) {
+    rows.push([{
+      text: input.locale === 'my' ? '🏷 Coupon ဖယ်ရှားရန်' : '🏷 Remove coupon',
+      callback_data: buildTelegramOrderActionCallbackData('cp', input.orderId),
+    }]);
+  }
+
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'buy',
+    page: pagination.page,
+    totalItems: input.plans.length,
+  });
+  if (pager) {
+    rows.push(pager);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+function buildTelegramBuyCompareKeyboard(input: {
+  locale: SupportedLocale;
+  page: number;
+}) {
+  return {
+    inline_keyboard: [[{
+      text: input.locale === 'my' ? '← Back to plans' : '← Back to plans',
+      callback_data: buildTelegramCommerceViewCallbackData('buy', 'home', String(input.page)),
+    }]],
+  };
+}
+
+function buildTelegramBuyPlanDetailKeyboard(input: {
+  locale: SupportedLocale;
+  orderId: string;
+  plan: TelegramSalesPlanOption;
+  page: number;
+}) {
+  return {
+    inline_keyboard: [
+      [{
+        text: input.locale === 'my' ? '✅ Select plan' : '✅ Select plan',
+        callback_data: buildTelegramOrderActionCallbackData('pl', input.orderId, input.plan.code),
+      }],
+      [{
+        text: input.locale === 'my' ? '← Back to plans' : '← Back to plans',
+        callback_data: buildTelegramCommerceViewCallbackData('buy', 'home', String(input.page)),
+      }],
+    ],
+  };
+}
+
+async function isEligibleForTelegramFreeTrialCommerce(chatId: number, telegramUserId: number) {
+  const [linkedKeyCount, fulfilledOrders, fulfilledTrialOrder] = await Promise.all([
+    db.accessKey.count({
+      where: {
+        OR: [{ telegramId: String(telegramUserId) }, { user: { telegramChatId: String(chatId) } }],
+        status: { not: 'ARCHIVED' },
+      },
+    }),
+    db.telegramOrder.count({
+      where: {
+        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
+        kind: 'NEW',
+        status: 'FULFILLED',
+      },
+    }),
+    db.telegramOrder.count({
+      where: {
+        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
+        kind: 'NEW',
+        planCode: 'trial_1d_3gb',
+        status: 'FULFILLED',
+      },
+    }),
+  ]);
+
+  return linkedKeyCount === 0 && fulfilledOrders === 0 && fulfilledTrialOrder === 0;
+}
+
+async function listTelegramPlansForConversationOrder(input: {
+  kind: 'NEW' | 'RENEW';
+  chatId: number;
+  telegramUserId: number;
+  settings: Awaited<ReturnType<typeof getTelegramSalesSettings>>;
+  deliveryType?: 'ACCESS_KEY' | 'DYNAMIC_KEY' | null;
+}) {
+  const freeTrialEligible =
+    input.kind === 'NEW'
+      ? await isEligibleForTelegramFreeTrialCommerce(input.chatId, input.telegramUserId)
+      : false;
+
+  return input.settings.plans.filter((plan) => {
+    if (!plan.enabled) {
+      return false;
+    }
+
+    if (input.kind === 'RENEW' && isTelegramTrialPlan(plan)) {
+      return false;
+    }
+
+    if (isTelegramTrialPlan(plan) && !freeTrialEligible) {
+      return false;
+    }
+
+    if (input.deliveryType && plan.deliveryType !== input.deliveryType) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+export function buildTelegramRenewSummaryMessage(input: {
+  locale: SupportedLocale;
+  orderCode: string;
+  keys: TelegramRenewableKeySummary[];
+  page: number;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const pagination = paginateTelegramCommerce(input.keys, input.page);
+  const accessCount = input.keys.filter((key) => key.kind === 'access').length;
+  const premiumCount = input.keys.filter((key) => key.kind === 'dynamic').length;
+  const cards = pagination.pageItems.map((key, index) =>
+    buildTelegramCommerceCard(
+      `${pagination.startIndex + index + 1}. ${key.kind === 'dynamic' ? '💎' : '🔑'} <b>${escapeHtml(key.name)}</b>`,
+      [
+        `${ui.statusLineLabel}: <b>${escapeHtml(key.status)}</b>`,
+        escapeHtml(
+          key.serverLabel
+            ? `${key.expirationSummary} • ${key.serverLabel}`
+            : key.expirationSummary,
+        ),
+      ],
+    ),
+  );
+
+  return buildTelegramCommerceMessage({
+    title: ui.renewTargetPrompt(input.orderCode),
+    statsLine: `${input.keys.length} key(s) • ${accessCount} standard • ${premiumCount} premium`,
+    intro:
+      input.locale === 'my'
+        ? 'သက်တမ်းတိုးလိုသော key ကို အောက်တွင် ရွေးပါ။'
+        : 'Choose the key you want to renew.',
+    cards,
+    footerLines: [
+      input.locale === 'my'
+        ? 'Button ကိုနှိပ်ပါ သို့မဟုတ် key နံပါတ်ကို reply လုပ်နိုင်ပါသည်။ ရွေးပြီးနောက် plan များကို ဆက်ပြပါမည်။'
+        : 'Tap a key button or reply with its number. Plans appear after you choose one.',
+    ],
+  });
+}
+
+function buildTelegramRenewSummaryKeyboard(input: {
+  orderId: string;
+  locale: SupportedLocale;
+  keys: TelegramRenewableKeySummary[];
+  page: number;
+}) {
+  const pagination = paginateTelegramCommerce(input.keys, input.page);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = pagination.pageItems.map((key, index) => [{
+    text: truncateTelegramCommerceButtonLabel(
+      `${pagination.startIndex + index + 1}. ${key.kind === 'dynamic' ? '💎' : '🔑'} ${key.name}`,
+      38,
+    ),
+    callback_data: buildTelegramOrderActionCallbackData(
+      'ky',
+      key.id,
+      key.kind === 'dynamic' ? 'dynamic' : undefined,
+    ),
+  }]);
+
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'renew',
+    page: pagination.page,
+    totalItems: input.keys.length,
+  });
+  if (pager) {
+    rows.push(pager);
+  }
+
+  rows.push([{
+    text: getTelegramUi(input.locale).orderActionCancel,
+    callback_data: buildTelegramOrderActionCallbackData('ca', input.orderId),
+  }]);
+
+  return { inline_keyboard: rows };
+}
+
+export async function handleTelegramBuyCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page' | 'detail' | 'compare';
+  primary?: string | null;
+  secondary?: string | null;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const activeOrder = await getActiveTelegramOrder(input.chatId, input.telegramUserId);
+  if (!activeOrder || activeOrder.kind !== 'NEW' || activeOrder.status !== 'AWAITING_PLAN') {
+    return ui.orderActionStatusMissing;
+  }
+
+  const settings = await getTelegramSalesSettings();
+  const enabledPlans = await listTelegramPlansForConversationOrder({
+    kind: 'NEW',
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+    settings,
+  });
+  if (enabledPlans.length === 0) {
+    return ui.invalidPlanChoice;
+  }
+
+  const activeOfferCount = await db.telegramCouponRedemption.count({
+    where: {
+      AND: [
+        {
+          OR: [
+            { telegramChatId: String(input.chatId) },
+            { telegramUserId: String(input.telegramUserId) },
+          ],
+        },
+        { status: 'ISSUED' },
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: new Date() } },
+          ],
+        },
+      ],
+    },
+  });
+
+  const page = Number.parseInt(
+    input.action === 'detail' ? input.secondary || '1' : input.primary || '1',
+    10,
+  ) || 1;
+
+  if (input.action === 'compare') {
+    const message = buildTelegramBuyCompareMessage({
+      locale: input.locale,
+      orderCode: activeOrder.orderCode,
+      plans: enabledPlans,
+    });
+    const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramBuyCompareKeyboard({
+        locale: input.locale,
+        page,
+      }),
+    });
+    return sent ? null : message;
+  }
+
+  if (input.action === 'detail') {
+    const plan = enabledPlans.find((candidate) => candidate.code === input.primary);
+    if (!plan) {
+      return ui.invalidPlanChoice;
+    }
+    const index = enabledPlans.findIndex((candidate) => candidate.code === plan.code) + 1;
+    const message = buildTelegramBuyPlanDetailMessage({
+      locale: input.locale,
+      orderCode: activeOrder.orderCode,
+      plan,
+      index,
+      totalPlans: enabledPlans.length,
+    });
+    const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramBuyPlanDetailKeyboard({
+        locale: input.locale,
+        orderId: activeOrder.id,
+        plan,
+        page,
+      }),
+    });
+    return sent ? null : message;
+  }
+
+  const message = buildTelegramBuySummaryMessage({
+    locale: input.locale,
+    order: {
+      id: activeOrder.id,
+      orderCode: activeOrder.orderCode,
+      couponCode: activeOrder.couponCode,
+      couponDiscountAmount: activeOrder.couponDiscountAmount,
+      couponDiscountLabel: activeOrder.couponDiscountLabel,
+      referralCode: activeOrder.referralCode,
+      orderMode: activeOrder.orderMode,
+      giftRecipientLabel: activeOrder.giftRecipientLabel,
+    },
+    plans: enabledPlans,
+    page,
+    activeOfferCount,
+    couponHintLines: activeOrder.couponCode
+      ? [
+          input.locale === 'my'
+            ? `🏷 Coupon: <b>${escapeHtml(activeOrder.couponCode)}</b>`
+            : `🏷 Coupon: <b>${escapeHtml(activeOrder.couponCode)}</b>`,
+        ]
+      : [],
+  });
+  const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramBuySummaryKeyboard({
+      orderId: activeOrder.id,
+      plans: enabledPlans,
+      locale: input.locale,
+      page,
+      hasCouponApplied: Boolean(activeOrder.couponCode),
+    }),
+  });
+  return sent ? null : message;
+}
+
+export async function handleTelegramRenewCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page';
+  primary?: string | null;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const activeOrder = await getActiveTelegramOrder(input.chatId, input.telegramUserId);
+  if (!activeOrder || activeOrder.kind !== 'RENEW' || activeOrder.status !== 'AWAITING_KEY_SELECTION') {
+    return ui.orderActionStatusMissing;
+  }
+
+  const [accessKeys, dynamicKeys] = await Promise.all([
+    findLinkedAccessKeys(input.chatId, input.telegramUserId, true),
+    findLinkedDynamicAccessKeys(input.chatId, input.telegramUserId, true),
+  ]);
+  const renewableKeys: TelegramRenewableKeySummary[] = [
+    ...accessKeys.map((key) => ({
+      id: key.id,
+      name: key.name,
+      kind: 'access' as const,
+      status: key.status,
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: key.server
+        ? `${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
+        : null,
+    })),
+    ...dynamicKeys.map((key) => ({
+      id: key.id,
+      name: key.name,
+      kind: 'dynamic' as const,
+      status: key.status,
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: null,
+    })),
+  ];
+
+  if (renewableKeys.length === 0) {
+    return ui.myKeysEmpty;
+  }
+
+  const page = Number.parseInt(input.primary || '1', 10) || 1;
+  const message = buildTelegramRenewSummaryMessage({
+    locale: input.locale,
+    orderCode: activeOrder.orderCode,
+    keys: renewableKeys,
+    page,
+  });
+  const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramRenewSummaryKeyboard({
+      orderId: activeOrder.id,
+      locale: input.locale,
+      keys: renewableKeys,
+      page,
+    }),
+  });
+
+  return sent ? null : message;
 }
 
 function parseTelegramBuyArgs(argsText?: string | null) {
@@ -712,145 +1387,42 @@ export async function handleBuyCommand(input: {
     telegramUserId: input.telegramUserId,
     settings,
   });
-  const trialPlanLines = enabledPlans
-    .filter((plan: any) => plan.code === 'trial_1d_3gb')
-    .map((plan: any) => {
-      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
-      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return price ? `• <b>${label}</b> — ${price}` : `• <b>${label}</b>`;
-    });
-  const standardPlanLines = enabledPlans
-    .filter((plan: any) => plan.deliveryType === 'ACCESS_KEY' && plan.code !== 'trial_1d_3gb')
-    .map((plan: any) => {
-      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
-      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return price ? `• <b>${label}</b> — ${price}` : `• <b>${label}</b>`;
-    });
-  const premiumPlanLines = enabledPlans
-    .filter((plan: any) => plan.deliveryType === 'DYNAMIC_KEY')
-    .map((plan: any) => buildTelegramPremiumPlanCard({ plan, locale: input.locale }));
-
-  if (premiumPlanLines.length > 0) {
-    await sendTelegramPhotoUrl(
-      input.botToken,
-      input.chatId,
-      getTelegramBrandMediaUrl('premiumShowcase'),
-      [
-        ui.premiumHubTitle,
-        '',
-        ui.buyPremiumSummary,
-        ui.buyPremiumUpsell,
-        ui.buyPremiumBestFor,
-        ui.buyPremiumRegionExplain,
-      ].join('\n'),
-    );
-
-    const premiumPlans = enabledPlans.filter((plan: any) => plan.deliveryType === 'DYNAMIC_KEY');
-    if (premiumPlans.length > 0) {
-      await sendTelegramMessage(
-        input.botToken,
-        input.chatId,
-        [
-          input.locale === 'my' ? '<b>Premium plan cards</b>' : '<b>Premium plan cards</b>',
-          '',
-          ...premiumPlans.map((plan: any) => buildTelegramPremiumPlanCard({ plan, locale: input.locale })),
-        ].join('\n\n'),
-      );
-    }
-  }
-
-  const lines = [
-    ui.orderPlanPrompt(preparedOrder.orderCode),
-    '',
-    ui.buyPlanChooseHint,
-    activeOfferCount > 0
-      ? input.locale === 'my'
-        ? `🎟 You already have ${activeOfferCount} active offer${activeOfferCount === 1 ? '' : 's'} • use /offers to compare them any time.`
-        : `🎟 You already have ${activeOfferCount} active offer${activeOfferCount === 1 ? '' : 's'} • use /offers to compare them any time.`
-      : '',
-    '',
-    input.locale === 'my'
-      ? '<b>How buying works</b>\n• Plan ရွေးရန်\n• Server / payment ရွေးရန်\n• Screenshot ပို့ရန်\n• Admin approval စောင့်ရန်'
-      : '<b>How buying works</b>\n• Choose a plan\n• Choose server / payment\n• Send your screenshot\n• Wait for admin approval',
-    ...(input.deps.buildTelegramCouponReadyLines
-      ? input.deps.buildTelegramCouponReadyLines({
-          locale: input.locale,
-          couponCode: preparedOrder.couponCode,
-          couponDiscountAmount: preparedOrder.couponDiscountAmount,
-          couponDiscountLabel: preparedOrder.couponDiscountLabel,
-          priceCurrency: preparedOrder.priceCurrency,
-          unavailableReason: couponResolution?.unavailableReason || null,
-          requestedCouponCode: couponResolution?.requestedCouponCode || null,
-        })
-      : []),
-    parsedArgs.giftRecipientTelegramUsername
-      ? input.locale === 'my'
-        ? `🎁 Gift for: <b>${escapeHtml(giftRecipient?.label || `@${parsedArgs.giftRecipientTelegramUsername}`)}</b>`
-        : `🎁 Gift for: <b>${escapeHtml(giftRecipient?.label || `@${parsedArgs.giftRecipientTelegramUsername}`)}</b>`
-      : '',
-    parsedArgs.giftRecipientTelegramUsername
-      ? giftRecipient?.chatId
-        ? input.locale === 'my'
-          ? 'Recipient က bot ကို စတင်ထားပြီးဖြစ်သောကြောင့် access details ကို recipient chat ထဲသို့လည်း ပို့ရန် ကြိုးစားပါမည်။'
-          : 'The recipient has already started the bot, so we will also try to deliver the access details in the recipient chat.'
-        : input.locale === 'my'
-          ? 'Recipient သည် bot ကို မစတင်ရသေးလျှင် buyer chat ထဲသို့ အရင်ပို့ပြီး admin မှ handoff လုပ်နိုင်ပါသည်။'
-          : 'If the recipient has not started the bot yet, delivery will land in your chat first and the admin can hand it off manually.'
-      : '',
-    referralCode
-      ? input.locale === 'my'
-        ? `🔗 Referral: <b>${escapeHtml(referralCode)}</b>`
-        : `🔗 Referral: <b>${escapeHtml(referralCode)}</b>`
-      : '',
-    '',
-    input.locale === 'my' ? '<b>Compare your options</b>' : '<b>Compare your options</b>',
-    '',
-    ui.buyStandardSummary,
-    ui.buyStandardBestFor,
-    ...(standardPlanLines.length ? ['', `${ui.buyStandardPlansTitle}:`, ...standardPlanLines] : []),
-    '',
-    ui.buyPremiumSummary,
-    ui.buyPremiumUpsell,
-    ui.buyPremiumBestFor,
-    ui.buyPremiumRegionExplain,
-    input.locale === 'my'
-      ? '• Better routing quality\n• Premium support queue\n• Region fallback awareness'
-      : '• Better routing quality\n• Premium support queue\n• Region fallback awareness',
-    ...(premiumPlanLines.length ? ['', `${ui.buyPremiumPlansTitle}:`, ...premiumPlanLines] : []),
-    ...(trialPlanLines.length
-      ? [
-          '',
-          input.locale === 'my' ? '🎁 <b>Trial option</b>' : '🎁 <b>Trial option</b>',
-          input.locale === 'my'
-            ? 'အရင် စမ်းသုံးလိုသူများအတွက် free trial option ပါရှိနိုင်ပါသည်။'
-            : 'A free trial option may be available if you want to try the service first.',
-          ...trialPlanLines,
-        ]
-      : []),
-    '',
-    input.locale === 'my'
-      ? '<b>ရွေးချယ်ရန် အသင့်ဖြစ်ပါပြီ</b>'
-      : '<b>Ready to choose?</b>',
-    input.locale === 'my'
-      ? 'Gift flow ကို စတင်ရန် /gift @recipient_username ကို သုံးနိုင်ပါသည်။ Referral code လိုအပ်ပါက /referral ကို သုံးပါ။'
-      : 'Use /gift @recipient_username to buy for a friend. Use /referral when you want your invite code.',
-    ui.buyPlanCardChooseHint,
-    input.locale === 'my'
-      ? 'Button မသုံးနိုင်ပါက အောက်ပါနံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
-      : 'If the buttons do not work, reply with the matching number below.',
-    '',
-    ...enabledPlans.map((plan: any, index: number) => {
-      const label = resolveTelegramSalesPlanLabel(plan, input.locale);
-      const price = resolveTelegramSalesPriceLabel(plan, input.locale);
-      return `${index + 1}. ${label}${price ? ` - ${price}` : ''}`;
-    }),
-  ].filter(Boolean);
-  const message = input.deps.buildTelegramSalesPlanPromptText(input.locale, lines);
+  const couponHintLines = input.deps.buildTelegramCouponReadyLines
+    ? input.deps.buildTelegramCouponReadyLines({
+        locale: input.locale,
+        couponCode: preparedOrder.couponCode,
+        couponDiscountAmount: preparedOrder.couponDiscountAmount,
+        couponDiscountLabel: preparedOrder.couponDiscountLabel,
+        priceCurrency: preparedOrder.priceCurrency,
+        unavailableReason: couponResolution?.unavailableReason || null,
+        requestedCouponCode: couponResolution?.requestedCouponCode || null,
+      })
+    : [];
+  const message = buildTelegramBuySummaryMessage({
+    locale: input.locale,
+    order: {
+      id: preparedOrder.id,
+      orderCode: preparedOrder.orderCode,
+      couponCode: preparedOrder.couponCode,
+      couponDiscountAmount: preparedOrder.couponDiscountAmount,
+      couponDiscountLabel: preparedOrder.couponDiscountLabel,
+      referralCode,
+      orderMode: preparedOrder.orderMode,
+      giftRecipientLabel:
+        giftRecipient?.label
+        || (parsedArgs.giftRecipientTelegramUsername ? `@${parsedArgs.giftRecipientTelegramUsername}` : null),
+    },
+    plans: enabledPlans,
+    page: 1,
+    activeOfferCount,
+    couponHintLines,
+  });
   const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
-    replyMarkup: input.deps.buildTelegramPlanSelectionKeyboard({
+    replyMarkup: buildTelegramBuySummaryKeyboard({
       orderId: preparedOrder.id,
       plans: enabledPlans,
       locale: input.locale,
+      page: 1,
       hasCouponApplied: Boolean(preparedOrder.couponCode),
     }),
   });
@@ -889,9 +1461,9 @@ export async function handleRenewOrderCommand(input: {
       name: key.name,
       kind: 'access' as const,
       status: key.status,
-      detailLine: `${ui.myKeysTypeStandard} • ${formatExpirationSummary(key, input.locale)}`,
-      extraLine: key.server
-        ? `${ui.preferredServerLabel}: ${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: key.server
+        ? `${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
         : null,
     })),
     ...dynamicKeys.map((key) => ({
@@ -899,8 +1471,8 @@ export async function handleRenewOrderCommand(input: {
       name: key.name,
       kind: 'dynamic' as const,
       status: key.status,
-      detailLine: `${ui.myKeysTypePremium} • ${formatExpirationSummary(key, input.locale)}`,
-      extraLine: null,
+      expirationSummary: formatExpirationSummary(key, input.locale),
+      serverLabel: null,
     })),
   ];
 
@@ -940,42 +1512,20 @@ export async function handleRenewOrderCommand(input: {
   }
 
   const lines = [
-    ui.renewTargetPrompt(order.orderCode),
-    '',
-    `<b>${input.locale === 'my' ? 'Choose the key to renew' : 'Choose the key to renew'}</b>`,
-    input.locale === 'my'
-      ? 'Button ကို နှိပ်နိုင်သလို နံပါတ်ဖြင့် reply လည်း လုပ်နိုင်ပါသည်။'
-      : 'Tap a button or reply with the number.',
-    '',
-    `<b>${input.locale === 'my' ? 'What stays the same' : 'What stays the same'}</b>`,
-    input.locale === 'my'
-      ? '• share page\n• Telegram linkage\n• support history'
-      : '• share page\n• Telegram linkage\n• support history',
-    '',
-    ...renewableKeys.map((key, index) => {
-      const icon = key.kind === 'dynamic' ? '💎' : '🔑';
-      return [
-        `${index + 1}. ${icon} <b>${escapeHtml(key.name)}</b>`,
-        `   ${escapeHtml(key.detailLine)}`,
-        `   ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
-        key.extraLine ? `   ${escapeHtml(key.extraLine)}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n');
+    buildTelegramRenewSummaryMessage({
+      locale: input.locale,
+      orderCode: order.orderCode,
+      keys: renewableKeys,
+      page: 1,
     }),
-    '',
-    escapeHtml(
-      input.locale === 'my'
-        ? 'Key ကို ရွေးပြီးနောက် renewal package များကို ဒီ chat ထဲမှာ ဆက်ပြပေးပါမည်။'
-        : 'After you choose a key, the renewal packages will appear here in this chat.',
-    ),
   ];
-  const message = input.deps.buildTelegramSalesPlanPromptText(input.locale, lines);
+  const message = lines.join('\n');
   const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
-    replyMarkup: input.deps.buildTelegramRenewKeySelectionKeyboard({
+    replyMarkup: buildTelegramRenewSummaryKeyboard({
       orderId: order.id,
       keys: renewableKeys,
       locale: input.locale,
+      page: 1,
     }),
   });
 

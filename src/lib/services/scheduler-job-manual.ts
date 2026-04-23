@@ -11,6 +11,10 @@ import { runScheduledRebalanceCycle } from '@/lib/services/load-balancer';
 import { processNotificationQueue } from '@/lib/services/notification-queue';
 import { runScheduledReportsCycle } from '@/lib/services/scheduled-reports';
 import {
+  runAdminQueueHealthAlertCycle,
+  runTelegramWebhookHealthAlertCycle,
+} from '@/lib/services/monitoring-alerts';
+import {
   getSchedulerJobDefinitionByKey,
   isSchedulerJobManualRunSupported,
   runObservedSchedulerJob,
@@ -159,6 +163,36 @@ async function runBackupVerification(definition: SchedulerJobDefinition) {
   });
 }
 
+async function runTelegramWebhookHealth(definition: SchedulerJobDefinition) {
+  return runObservedSchedulerJob(definition, 'MANUAL', async () => {
+    const result = await runTelegramWebhookHealthAlertCycle();
+    return {
+      value: result,
+      status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+      summary: result.skipped
+        ? getSkippedSummary(result)
+        : result.healthy
+          ? 'Webhook healthy'
+          : `${result.alerted} alerted, ${result.suppressed} suppressed, ${result.errors.length} errors`,
+      resultPreview: result,
+    };
+  });
+}
+
+async function runAdminQueueHealth(definition: SchedulerJobDefinition) {
+  return runObservedSchedulerJob(definition, 'MANUAL', async () => {
+    const result = await runAdminQueueHealthAlertCycle();
+    return {
+      value: result,
+      status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+      summary: result.skipped
+        ? getSkippedSummary(result)
+        : `${result.supportOverdueCount} support overdue, ${result.pendingReviewCount} review pending`,
+      resultPreview: result,
+    };
+  });
+}
+
 async function runRebalancePlanner(definition: SchedulerJobDefinition) {
   return runObservedSchedulerJob(definition, 'MANUAL', async () => {
     const result = await runScheduledRebalanceCycle();
@@ -236,6 +270,10 @@ export async function runManualSchedulerJob(jobKey: string) {
       return runNotificationQueue(definition);
     case 'backup_verification':
       return runBackupVerification(definition);
+    case 'telegram_webhook_health':
+      return runTelegramWebhookHealth(definition);
+    case 'admin_queue_health':
+      return runAdminQueueHealth(definition);
     case 'rebalance_planner':
       return runRebalancePlanner(definition);
     case 'scheduled_reports':

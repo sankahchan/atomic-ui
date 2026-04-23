@@ -27,6 +27,14 @@ GITHUB_REPO="sankahchan/atomic-ui"
 DEFAULT_PORT=2053  # Fixed port like 3x-ui
 CLEANUP_ON_FAILURE=true
 INSTALL_HTTPS_MODE="${INSTALL_HTTPS:-auto}"
+INSTALL_DATABASE_ENGINE_INPUT="${INSTALL_DATABASE_ENGINE:-${DATABASE_ENGINE:-postgres}}"
+INSTALL_DATABASE_URL_INPUT="${INSTALL_DATABASE_URL:-}"
+INSTALL_PANEL_PATH_INPUT="${INSTALL_PANEL_PATH:-${PANEL_PATH:-}}"
+INSTALL_POSTGRES_HOST_INPUT="${INSTALL_POSTGRES_HOST:-127.0.0.1}"
+INSTALL_POSTGRES_PORT_INPUT="${INSTALL_POSTGRES_PORT:-5432}"
+INSTALL_POSTGRES_DB_INPUT="${INSTALL_POSTGRES_DB:-atomic_ui}"
+INSTALL_POSTGRES_USER_INPUT="${INSTALL_POSTGRES_USER:-atomic_ui_app}"
+INSTALL_POSTGRES_PASSWORD_INPUT="${INSTALL_POSTGRES_PASSWORD:-}"
 ACME_CONTACT_EMAIL="${ACME_EMAIL:-}"
 PANEL_DOMAIN_INPUT="${PANEL_DOMAIN:-}"
 PUBLIC_SHARE_DOMAIN_INPUT="${PUBLIC_SHARE_DOMAIN:-}"
@@ -47,6 +55,70 @@ normalize_host() {
     value="${value#https://}"
     value="${value%%/*}"
     echo "${value,,}"
+}
+
+normalize_panel_path() {
+    local value="${1#/}"
+    value="${value%/}"
+    echo "${value}"
+}
+
+detect_public_ip() {
+    curl -s -4 ifconfig.me 2>/dev/null ||
+        curl -s -4 icanhazip.com 2>/dev/null ||
+        curl -s -4 ipinfo.io/ip 2>/dev/null ||
+        curl -s ifconfig.me 2>/dev/null ||
+        curl -s icanhazip.com 2>/dev/null ||
+        echo "localhost"
+}
+
+format_host_for_url() {
+    local host="${1}"
+    case "${host}" in
+        \[*\]) echo "${host}" ;;
+        *:*) echo "[${host}]" ;;
+        *) echo "${host}" ;;
+    esac
+}
+
+build_origin() {
+    local scheme="${1}"
+    local host="${2}"
+    echo "${scheme}://$(format_host_for_url "${host}")"
+}
+
+normalize_database_engine() {
+    case "${1,,}" in
+        postgres|postgresql) echo "postgres" ;;
+        ""|sqlite) echo "sqlite" ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+is_local_postgres_host() {
+    case "${1,,}" in
+        127.0.0.1|localhost|::1|'[::1]') return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+require_simple_postgres_identifier() {
+    local label="$1"
+    local value="$2"
+    if [[ ! "${value}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        echo -e "${RED}[✗]${NC} ${label} must match ^[A-Za-z_][A-Za-z0-9_]*$ for installer-managed Postgres"
+        exit 1
+    fi
+}
+
+require_valid_panel_path() {
+    local value="$1"
+    if [[ ! "${value}" =~ ^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$ ]]; then
+        echo -e "${RED}[✗]${NC} INSTALL_PANEL_PATH must contain only letters, numbers, hyphens, underscores, and optional slash-separated segments"
+        exit 1
+    fi
 }
 
 set_env_var() {
@@ -109,11 +181,40 @@ fi
 
 PANEL_DOMAIN="$(normalize_host "${PANEL_DOMAIN_INPUT}")"
 PUBLIC_SHARE_DOMAIN="$(normalize_host "${PUBLIC_SHARE_DOMAIN_INPUT}")"
+INSTALL_PANEL_PATH="$(normalize_panel_path "${INSTALL_PANEL_PATH_INPUT}")"
 ALLOW_IP_FALLBACK="$(normalize_bool "${ALLOW_IP_FALLBACK_INPUT}")"
+INSTALL_DATABASE_ENGINE="$(normalize_database_engine "${INSTALL_DATABASE_ENGINE_INPUT}")"
+
+if [ -z "${INSTALL_DATABASE_ENGINE}" ]; then
+    echo -e "${RED}[✗]${NC} INSTALL_DATABASE_ENGINE must be sqlite or postgres"
+    exit 1
+fi
+
+if [ -n "${INSTALL_DATABASE_URL_INPUT}" ] && [[ ! "${INSTALL_DATABASE_URL_INPUT}" =~ ^postgres(ql)?:// ]]; then
+    echo -e "${RED}[✗]${NC} INSTALL_DATABASE_URL must be a Postgres connection string"
+    exit 1
+fi
+
+if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ] && [ -z "${INSTALL_DATABASE_URL_INPUT}" ]; then
+    require_simple_postgres_identifier "INSTALL_POSTGRES_DB" "${INSTALL_POSTGRES_DB_INPUT}"
+    require_simple_postgres_identifier "INSTALL_POSTGRES_USER" "${INSTALL_POSTGRES_USER_INPUT}"
+    if [[ ! "${INSTALL_POSTGRES_PORT_INPUT}" =~ ^[0-9]+$ ]]; then
+        echo -e "${RED}[✗]${NC} INSTALL_POSTGRES_PORT must be numeric"
+        exit 1
+    fi
+    if ! is_local_postgres_host "${INSTALL_POSTGRES_HOST_INPUT}"; then
+        echo -e "${RED}[✗]${NC} INSTALL_POSTGRES_HOST must be local when installer manages Postgres; use INSTALL_DATABASE_URL for remote Postgres"
+        exit 1
+    fi
+fi
 
 if [ -n "${PANEL_DOMAIN}" ] && [ "${PUBLIC_SHARE_DOMAIN}" = "${PANEL_DOMAIN}" ]; then
     echo -e "${RED}[✗]${NC} PUBLIC_SHARE_DOMAIN must be different from PANEL_DOMAIN"
     exit 1
+fi
+
+if [ -n "${INSTALL_PANEL_PATH}" ]; then
+    require_valid_panel_path "${INSTALL_PANEL_PATH}"
 fi
 
 # Check system
@@ -129,10 +230,16 @@ fi
 PANEL_PORT=${DEFAULT_PORT}
 echo -e "${GREEN}[✓]${NC} Panel port: ${CYAN}${PANEL_PORT}${NC} (fixed)"
 
-# Generate random path for security
-echo -e "${BLUE}[*]${NC} Generating secure random path..."
-PANEL_PATH=$(generate_random_path)
-echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC}"
+# Resolve panel path
+if [ -n "${INSTALL_PANEL_PATH}" ]; then
+    echo -e "${BLUE}[*]${NC} Using custom panel path..."
+    PANEL_PATH="${INSTALL_PANEL_PATH}"
+    echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC} ${YELLOW}(custom)${NC}"
+else
+    echo -e "${BLUE}[*]${NC} Generating secure random path..."
+    PANEL_PATH=$(generate_random_path)
+    echo -e "${GREEN}[✓]${NC} Panel path: ${CYAN}/${PANEL_PATH}/${NC}"
+fi
 
 # Check for port conflicts
 echo -e "${BLUE}[*]${NC} Checking for port conflicts..."
@@ -145,7 +252,11 @@ fi
 # Install dependencies
 echo -e "${BLUE}[*]${NC} Installing system dependencies..."
 apt-get update -qq
-apt-get install -y -qq git curl wget unzip openssl lsof > /dev/null
+SYSTEM_PACKAGES=(git curl wget unzip openssl lsof postgresql-client)
+if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ]; then
+    SYSTEM_PACKAGES+=(postgresql)
+fi
+apt-get install -y -qq "${SYSTEM_PACKAGES[@]}" > /dev/null
 
 # Ensure swap exists for low-memory VPS (1GB RAM)
 echo -e "${BLUE}[*]${NC} Checking memory and swap..."
@@ -203,26 +314,6 @@ echo -e "${GREEN}[✓]${NC} Downloaded to $INSTALL_DIR"
 
 cd "$INSTALL_DIR"
 
-# Clean install npm dependencies (memory-limited for low-RAM VPS)
-echo -e "${BLUE}[*]${NC} Installing npm dependencies..."
-rm -rf node_modules .next package-lock.json 2>/dev/null || true
-export NODE_OPTIONS="--max-old-space-size=1024"
-if ! npm install --production=false --silent 2>&1; then
-    echo -e "${YELLOW}[!]${NC} npm install failed, trying with --legacy-peer-deps..."
-    if ! npm install --production=false --legacy-peer-deps --silent 2>&1; then
-        echo -e "${RED}[✗]${NC} npm install failed"
-        echo -e "${YELLOW}[!]${NC} Please check your Node.js version and try again"
-        exit 1
-    fi
-fi
-unset NODE_OPTIONS
-
-if [ ! -d "$INSTALL_DIR/node_modules" ]; then
-    echo -e "${RED}[✗]${NC} node_modules directory not found after npm install"
-    exit 1
-fi
-echo -e "${GREEN}[✓]${NC} Dependencies installed"
-
 # Setup environment with random port
 echo -e "${BLUE}[*]${NC} Configuring environment..."
 
@@ -237,12 +328,19 @@ cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
 sed -i "s|your-super-secret-jwt-key-change-this-in-production|${JWT_SECRET}|g" .env
 TOTP_ENCRYPTION_KEY=$(openssl rand -hex 32)
+SETTINGS_ENCRYPTION_KEY=$(openssl rand -hex 32)
 CRON_SECRET=$(openssl rand -hex 24)
 
 if grep -q "^TOTP_ENCRYPTION_KEY=" .env; then
     sed -i "s|^TOTP_ENCRYPTION_KEY=.*|TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}|g" .env
 else
     echo "TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}" >> .env
+fi
+
+if grep -q "^SETTINGS_ENCRYPTION_KEY=" .env; then
+    sed -i "s|^SETTINGS_ENCRYPTION_KEY=.*|SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}|g" .env
+else
+    echo "SETTINGS_ENCRYPTION_KEY=${SETTINGS_ENCRYPTION_KEY}" >> .env
 fi
 
 if grep -q "^CRON_SECRET=" .env; then
@@ -263,13 +361,13 @@ if [ -n "${TELEGRAM_BOT_TOKEN_INPUT}" ]; then
     set_env_var "TELEGRAM_BOT_TOKEN" "${TELEGRAM_BOT_TOKEN_INPUT}"
 fi
 
-# Get server IP
-SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || echo "localhost")
+# Get server IP, preferring IPv4 for raw-IP installs.
+SERVER_IP=$(detect_public_ip)
 PUBLIC_HOST="${SERVER_IP}"
 if [ -n "${PANEL_DOMAIN}" ]; then
     PUBLIC_HOST="${PANEL_DOMAIN}"
 fi
-PUBLIC_ORIGIN="http://${PUBLIC_HOST}"
+PUBLIC_ORIGIN="$(build_origin "http" "${PUBLIC_HOST}")"
 PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
 PUBLIC_SHARE_ORIGIN=""
 PUBLIC_SHARE_URL=""
@@ -278,11 +376,11 @@ HTTPS_NOTE="HTTP reverse proxy enabled on port 80."
 IP_FALLBACK_URL=""
 
 if [ -n "${PANEL_DOMAIN}" ] && [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
-    IP_FALLBACK_URL="http://${SERVER_IP}/${PANEL_PATH}/"
+    IP_FALLBACK_URL="$(build_origin "http" "${SERVER_IP}")/${PANEL_PATH}/"
 fi
 
 if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
-    PUBLIC_SHARE_ORIGIN="http://${PUBLIC_SHARE_DOMAIN}"
+    PUBLIC_SHARE_ORIGIN="$(build_origin "http" "${PUBLIC_SHARE_DOMAIN}")"
     PUBLIC_SHARE_URL="${PUBLIC_SHARE_ORIGIN}/${PANEL_PATH}/"
 fi
 
@@ -344,21 +442,21 @@ if [ "${INSTALL_HTTPS_MODE}" != "false" ]; then
     if APP_PORT="${PANEL_PORT}" PANEL_PATH="/${PANEL_PATH}" PANEL_DOMAIN="${PANEL_DOMAIN}" PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN}" ALLOW_IP_FALLBACK="${ALLOW_IP_FALLBACK}" ENABLE_FAIL2BAN=true ACME_EMAIL="${ACME_CONTACT_EMAIL}" bash "$INSTALL_DIR/scripts/setup-nginx-https.sh" "${PANEL_PORT}" "${ACME_CONTACT_EMAIL}"; then
         HTTPS_ENABLED=true
         if [ -n "${PANEL_DOMAIN}" ]; then
-            PUBLIC_ORIGIN="https://${PANEL_DOMAIN}"
+            PUBLIC_ORIGIN="$(build_origin "https" "${PANEL_DOMAIN}")"
             if [ "${ALLOW_IP_FALLBACK}" = "true" ]; then
-                IP_FALLBACK_URL="https://${SERVER_IP}/${PANEL_PATH}/"
+                IP_FALLBACK_URL="$(build_origin "https" "${SERVER_IP}")/${PANEL_PATH}/"
                 HTTPS_NOTE="HTTPS enabled for ${PANEL_DOMAIN}. The original IP remains available over HTTPS as a fallback."
             else
                 IP_FALLBACK_URL=""
                 HTTPS_NOTE="HTTPS enabled for ${PANEL_DOMAIN}. Raw IP traffic redirects to the domain."
             fi
         else
-            PUBLIC_ORIGIN="https://${SERVER_IP}"
+            PUBLIC_ORIGIN="$(build_origin "https" "${SERVER_IP}")"
             HTTPS_NOTE="HTTPS enabled with a short-lived Let's Encrypt IP certificate. Renewal timer is installed automatically."
         fi
         PUBLIC_PANEL_URL="${PUBLIC_ORIGIN}/${PANEL_PATH}/"
         if [ -n "${PUBLIC_SHARE_DOMAIN}" ]; then
-            PUBLIC_SHARE_ORIGIN="https://${PUBLIC_SHARE_DOMAIN}"
+            PUBLIC_SHARE_ORIGIN="$(build_origin "https" "${PUBLIC_SHARE_DOMAIN}")"
             PUBLIC_SHARE_URL="${PUBLIC_SHARE_ORIGIN}/${PANEL_PATH}/"
         fi
         set_env_var "APP_URL" "${PUBLIC_ORIGIN}"
@@ -385,7 +483,74 @@ fi
 echo -e "${BLUE}[*]${NC} Setting up database..."
 mkdir -p prisma/data
 DB_PATH="${INSTALL_DIR}/prisma/data/atomic-ui.db"
-set_env_var "DATABASE_URL" "file:${DB_PATH}"
+DATABASE_URL_VALUE="file:${DB_PATH}"
+INSTALL_DATABASE_MODE_NOTE="SQLite"
+INSTALL_DATABASE_SUMMARY_LABEL="SQLite file"
+INSTALL_DATABASE_SUMMARY_VALUE="${DB_PATH}"
+
+if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ]; then
+    echo -e "${BLUE}[*]${NC} Preparing Postgres runtime..."
+    if [ -n "${INSTALL_DATABASE_URL_INPUT}" ]; then
+        DATABASE_URL_VALUE="${INSTALL_DATABASE_URL_INPUT}"
+        INSTALL_DATABASE_MODE_NOTE="Postgres (custom DATABASE_URL)"
+        INSTALL_DATABASE_SUMMARY_LABEL="Postgres URL source"
+        INSTALL_DATABASE_SUMMARY_VALUE="Provided by INSTALL_DATABASE_URL"
+    else
+        POSTGRES_PASSWORD="${INSTALL_POSTGRES_PASSWORD_INPUT}"
+        if [ -z "${POSTGRES_PASSWORD}" ]; then
+            POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+        fi
+        POSTGRES_USER="${INSTALL_POSTGRES_USER_INPUT}"
+        POSTGRES_DB="${INSTALL_POSTGRES_DB_INPUT}"
+        POSTGRES_HOST="${INSTALL_POSTGRES_HOST_INPUT}"
+        POSTGRES_PORT="${INSTALL_POSTGRES_PORT_INPUT}"
+
+        systemctl enable --now postgresql > /dev/null 2>&1
+
+        su postgres -c "psql -v ON_ERROR_STOP=1" <<SQL
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${POSTGRES_USER}') THEN
+    CREATE ROLE "${POSTGRES_USER}" LOGIN PASSWORD '${POSTGRES_PASSWORD}';
+  ELSE
+    ALTER ROLE "${POSTGRES_USER}" WITH LOGIN PASSWORD '${POSTGRES_PASSWORD}';
+  END IF;
+END
+\$\$;
+SELECT 'CREATE DATABASE "${POSTGRES_DB}" OWNER "${POSTGRES_USER}"'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${POSTGRES_DB}')\gexec
+ALTER DATABASE "${POSTGRES_DB}" OWNER TO "${POSTGRES_USER}";
+SQL
+
+        DATABASE_URL_VALUE="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+        INSTALL_DATABASE_MODE_NOTE="Postgres (local managed database)"
+        INSTALL_DATABASE_SUMMARY_LABEL="Postgres database"
+        INSTALL_DATABASE_SUMMARY_VALUE="${POSTGRES_DB} (${POSTGRES_USER}@${POSTGRES_HOST}:${POSTGRES_PORT})"
+    fi
+fi
+
+set_env_var "DATABASE_URL" "${DATABASE_URL_VALUE}"
+
+# Install npm dependencies only after .env exists so postinstall Prisma commands
+# can resolve the runtime database engine correctly.
+echo -e "${BLUE}[*]${NC} Installing npm dependencies..."
+rm -rf node_modules .next 2>/dev/null || true
+export NODE_OPTIONS="--max-old-space-size=1024"
+if ! npm ci --include=dev --silent 2>&1; then
+    echo -e "${YELLOW}[!]${NC} npm ci failed, trying npm install with --legacy-peer-deps..."
+    if ! npm install --include=dev --legacy-peer-deps --silent 2>&1; then
+        echo -e "${RED}[✗]${NC} npm dependency installation failed"
+        echo -e "${YELLOW}[!]${NC} Please check your Node.js version and try again"
+        exit 1
+    fi
+fi
+unset NODE_OPTIONS
+
+if [ ! -d "$INSTALL_DIR/node_modules" ]; then
+    echo -e "${RED}[✗]${NC} node_modules directory not found after dependency installation"
+    exit 1
+fi
+echo -e "${GREEN}[✓]${NC} Dependencies installed"
 
 echo -e "${BLUE}[*]${NC} Generating Prisma client..."
 if ! sh scripts/prisma-command.sh generate 2>&1; then
@@ -394,7 +559,7 @@ if ! sh scripts/prisma-command.sh generate 2>&1; then
 fi
 
 echo -e "${BLUE}[*]${NC} Pushing database schema..."
-if ! sh scripts/prisma-command.sh db push 2>&1; then
+if ! node scripts/prisma-safe-db-push.js 2>&1; then
     echo -e "${RED}[✗]${NC} Prisma db push failed"
     exit 1
 fi
@@ -414,7 +579,7 @@ fi
 
 # Build
 echo -e "${BLUE}[*]${NC} Building application..."
-if ! NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
+if ! NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
     echo -e "${RED}[✗]${NC} Build failed"
     echo -e "${YELLOW}[!]${NC} Please check the build output above for errors"
     exit 1
@@ -428,30 +593,13 @@ echo -e "${GREEN}[✓]${NC} Build complete"
 
 # Create service with random port (using standalone for low memory)
 echo -e "${BLUE}[*]${NC} Creating systemd service..."
-cat > /etc/systemd/system/atomic-ui.service << EOF
-[Unit]
-Description=Atomic-UI - Outline VPN Management Panel
-After=network.target
+APP_DIR="${INSTALL_DIR}" \
+SERVICE_NAME="atomic-ui.service" \
+PORT_FALLBACK="${PANEL_PORT}" \
+NODE_OPTIONS_VALUE="--max-old-space-size=384" \
+EXEC_START="/usr/bin/node ${INSTALL_DIR}/.next/standalone/server.js" \
+    bash "${INSTALL_DIR}/scripts/sync-systemd-service.sh"
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/node ${INSTALL_DIR}/.next/standalone/server.js
-Restart=always
-RestartSec=10
-Environment=NODE_ENV=production
-Environment=PORT=${PANEL_PORT}
-Environment=PANEL_PATH=/${PANEL_PATH}
-Environment=NODE_OPTIONS=--max-old-space-size=384
-EnvironmentFile=-${INSTALL_DIR}/.env
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable atomic-ui > /dev/null 2>&1
 systemctl start atomic-ui
 
 # Service startup verification with retry
@@ -570,6 +718,8 @@ echo -e "${CYAN}│${NC}  ${YELLOW}Share host:${NC} ${GREEN}${PUBLIC_SHARE_DOMAI
 fi
 echo -e "${CYAN}│${NC}  ${YELLOW}Internal app port:${NC} ${GREEN}${PANEL_PORT}${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Your panel path:${NC} ${GREEN}/${PANEL_PATH}/${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}Database engine:${NC} ${GREEN}${INSTALL_DATABASE_MODE_NOTE}${NC}"
+echo -e "${CYAN}│${NC}  ${YELLOW}${INSTALL_DATABASE_SUMMARY_LABEL}:${NC} ${GREEN}${INSTALL_DATABASE_SUMMARY_VALUE}${NC}"
 echo -e "${CYAN}│${NC}"
 echo -e "${CYAN}│${NC}  ${YELLOW}Initial login credentials:${NC}"
 echo -e "${CYAN}│${NC}  Username: ${GREEN}${DEFAULT_ADMIN_USERNAME_INPUT}${NC}"

@@ -69,7 +69,7 @@ async function buildTelegramSupportThreadPanelUrl(thread: {
   return withAbsoluteBasePath(`/dashboard/support/threads/${encodeURIComponent(thread.id)}`);
 }
 
-function buildTelegramSupportThreadsSummaryKeyboard(input: {
+export function buildTelegramSupportThreadsSummaryKeyboard(input: {
   locale: SupportedLocale;
   mode: TelegramSupportQueueMode;
 }) {
@@ -85,9 +85,9 @@ function buildTelegramSupportThreadsSummaryKeyboard(input: {
   return {
     inline_keyboard: [
       [
-        option('all', isMyanmar ? 'All threads' : 'All threads'),
-        option('admin', isMyanmar ? 'Need admin' : 'Need admin'),
-        option('user', isMyanmar ? 'Need user' : 'Need user'),
+        option('all', isMyanmar ? 'Thread အားလုံး' : 'All threads'),
+        option('admin', isMyanmar ? 'Admin စောင့်နေ' : 'Need admin'),
+        option('user', isMyanmar ? 'User စောင့်နေ' : 'Need user'),
       ],
       [
         {
@@ -101,7 +101,7 @@ function buildTelegramSupportThreadsSummaryKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '🧭 Admin home' : '🧭 Admin home',
+          text: isMyanmar ? '🧭 Admin စင်တာ' : '🧭 Admin home',
           callback_data: buildTelegramMenuCallbackData('admin', 'home'),
         },
       ],
@@ -109,89 +109,9 @@ function buildTelegramSupportThreadsSummaryKeyboard(input: {
   };
 }
 
-function buildTelegramSupportThreadQueueReplyKeyboard(input: {
-  threadId: string;
-  locale: SupportedLocale;
-  panelUrl: string;
-  mode: TelegramSupportQueueMode;
-  claimedByMe: boolean;
-  isClaimed: boolean;
-  attachmentUrl?: string | null;
-}) {
-  const isMyanmar = input.locale === 'my';
-  return {
-    inline_keyboard: [
-      [
-        {
-          text:
-            input.claimedByMe
-              ? (isMyanmar ? '↩️ Unclaim' : '↩️ Unclaim')
-              : input.isClaimed
-                ? (isMyanmar ? '🔒 Claimed' : '🔒 Claimed')
-                : (isMyanmar ? '🙋 Claim' : '🙋 Claim'),
-          callback_data: buildTelegramSupportQueueCallbackData(
-            input.claimedByMe ? 'uc' : 'cl',
-            `thr_${input.threadId}`,
-            input.mode,
-          ),
-        },
-        {
-          text: isMyanmar ? '✍️ Reply' : '✍️ Reply',
-          callback_data: buildTelegramSupportQueueCallbackData('rp', `thr_${input.threadId}`, input.mode),
-        },
-      ],
-      [
-        {
-          text: isMyanmar ? '👀 Working on it' : '👀 Working on it',
-          callback_data: buildTelegramSupportQueueCallbackData('wk', `thr_${input.threadId}`, input.mode),
-        },
-        {
-          text: isMyanmar ? '❓ Need details' : '❓ Need details',
-          callback_data: buildTelegramSupportQueueCallbackData('nd', `thr_${input.threadId}`, input.mode),
-        },
-      ],
-      [
-        {
-          text: isMyanmar ? '📌 Escalate' : '📌 Escalate',
-          callback_data: buildTelegramSupportQueueCallbackData('es', `thr_${input.threadId}`, input.mode),
-        },
-        {
-          text: isMyanmar ? '⬅️ Threads' : '⬅️ Threads',
-          callback_data: buildTelegramMenuCallbackData(
-            'admin',
-            input.mode === 'admin'
-              ? 'supportthreads_admin'
-              : input.mode === 'user'
-                ? 'supportthreads_user'
-                : 'supportthreads',
-          ),
-        },
-        {
-          text: isMyanmar ? '✅ Handled' : '✅ Handled',
-          callback_data: buildTelegramSupportQueueCallbackData('hd', `thr_${input.threadId}`, input.mode),
-        },
-      ],
-      [
-        {
-          text: isMyanmar ? '➡️ Next' : '➡️ Next',
-          callback_data: buildTelegramSupportQueueCallbackData('nx', `thr_${input.threadId}`, input.mode),
-        },
-      ],
-      ...(input.attachmentUrl?.trim()
-        ? [[{ text: isMyanmar ? '🖼 Open attachment' : '🖼 Open attachment', url: input.attachmentUrl.trim() }]]
-        : []),
-      [{ text: isMyanmar ? 'Open panel' : 'Open panel', url: input.panelUrl }],
-    ],
-  };
-}
-
-async function sendTelegramSupportThreadQueueCardToChat(input: {
-  botToken: string;
-  chatId: string | number;
+export function buildTelegramSupportThreadQueueMessage(input: {
   locale: SupportedLocale;
   thread: TelegramSupportThreadQueueRecord;
-  mode: TelegramSupportQueueMode;
-  adminActor: TelegramAdminActor;
 }) {
   const latestReply = input.thread.replies?.[input.thread.replies.length - 1] || null;
   const state = getTelegramSupportThreadState({
@@ -207,45 +127,140 @@ async function sendTelegramSupportThreadQueueCardToChat(input: {
     !input.thread.firstAdminReplyAt
     && Boolean(input.thread.firstResponseDueAt)
     && (input.thread.firstResponseDueAt?.getTime() || 0) <= Date.now();
+  const latestReplyPreview = buildTelegramLatestReplyPreviewLines({
+    reply: latestReply,
+    locale: input.locale,
+    maxLength: 100,
+  }).map((line) => escapeHtml(line));
+  const statusSnapshot = [
+    `${input.locale === 'my' ? 'အခြေအနေ' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`,
+    `${input.locale === 'my' ? 'ကြာချိန်' : 'Age'}: <b>${escapeHtml(age)}</b>`,
+    input.thread.assignedAdminName
+      ? `${input.locale === 'my' ? 'ယူထားသူ' : 'Claimed by'}: <b>${escapeHtml(input.thread.assignedAdminName)}</b>`
+      : `${input.locale === 'my' ? 'ယူထားသူ' : 'Claimed by'}: <b>${input.locale === 'my' ? 'မရှိသေး' : 'Unclaimed'}</b>`,
+  ].join(' • ');
+  const followUpHint = latestReply?.mediaUrl
+    ? input.locale === 'my'
+      ? 'Attachment ကို button ဖြင့် ဖွင့်နိုင်ပါသည်။'
+      : 'Open the attachment from the button below.'
+    : input.locale === 'my'
+      ? 'Buttons အောက်မှ reply, claim, escalate, သို့မဟုတ် handled ကို သုံးနိုင်ပါသည်။'
+      : 'Use the buttons below to reply, claim, escalate, or mark handled.';
+
+  return [
+    input.locale === 'my'
+      ? '🧵 <b>Customer support thread</b>'
+      : '🧵 <b>Customer support thread</b>',
+    '',
+    `${input.locale === 'my' ? 'Code' : 'Code'}: <b>${escapeHtml(input.thread.threadCode)}</b>`,
+    `${input.locale === 'my' ? 'အမျိုးအစား' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}</b>`,
+    `${input.locale === 'my' ? 'User' : 'User'}: <b>${escapeHtml(input.thread.telegramUsername || input.thread.telegramUserId)}</b>`,
+    statusSnapshot,
+    !input.thread.firstAdminReplyAt && input.thread.firstResponseDueAt
+      ? `${input.locale === 'my' ? 'နောက်ဆုံးအချိန်' : 'Due'}: <b>${escapeHtml(formatTelegramDateTime(input.thread.firstResponseDueAt, input.locale))}</b>`
+      : '',
+    ...latestReplyPreview,
+    '',
+    followUpHint,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
+  threadId: string;
+  locale: SupportedLocale;
+  panelUrl: string;
+  mode: TelegramSupportQueueMode;
+  claimedByMe: boolean;
+  isClaimed: boolean;
+  attachmentUrl?: string | null;
+}) {
+  const isMyanmar = input.locale === 'my';
+  return {
+    inline_keyboard: [
+      [
+        {
+          text:
+            input.claimedByMe
+              ? (isMyanmar ? '↩️ လွှတ်မည်' : '↩️ Unclaim')
+              : input.isClaimed
+                ? (isMyanmar ? '🔒 ယူထားပြီး' : '🔒 Claimed')
+                : (isMyanmar ? '🙋 ယူမည်' : '🙋 Claim'),
+          callback_data: buildTelegramSupportQueueCallbackData(
+            input.claimedByMe ? 'uc' : 'cl',
+            `thr_${input.threadId}`,
+            input.mode,
+          ),
+        },
+        {
+          text: isMyanmar ? '✍️ အကြောင်းပြန်မည်' : '✍️ Reply',
+          callback_data: buildTelegramSupportQueueCallbackData('rp', `thr_${input.threadId}`, input.mode),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '👀 စစ်နေသည်' : '👀 Working on it',
+          callback_data: buildTelegramSupportQueueCallbackData('wk', `thr_${input.threadId}`, input.mode),
+        },
+        {
+          text: isMyanmar ? '❓ အသေးစိတ်လို' : '❓ Need details',
+          callback_data: buildTelegramSupportQueueCallbackData('nd', `thr_${input.threadId}`, input.mode),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '📌 Panel သို့ တင်မည်' : '📌 Escalate',
+          callback_data: buildTelegramSupportQueueCallbackData('es', `thr_${input.threadId}`, input.mode),
+        },
+        {
+          text: isMyanmar ? '⬅️ Thread များ' : '⬅️ Threads',
+          callback_data: buildTelegramMenuCallbackData(
+            'admin',
+            input.mode === 'admin'
+              ? 'supportthreads_admin'
+              : input.mode === 'user'
+                ? 'supportthreads_user'
+                : 'supportthreads',
+          ),
+        },
+        {
+          text: isMyanmar ? '✅ ဖြေရှင်းပြီး' : '✅ Handled',
+          callback_data: buildTelegramSupportQueueCallbackData('hd', `thr_${input.threadId}`, input.mode),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '➡️ နောက်တစ်ခု' : '➡️ Next',
+          callback_data: buildTelegramSupportQueueCallbackData('nx', `thr_${input.threadId}`, input.mode),
+        },
+      ],
+      ...(input.attachmentUrl?.trim()
+        ? [[{ text: isMyanmar ? '🖼 Attachment ဖွင့်ရန်' : '🖼 Open attachment', url: input.attachmentUrl.trim() }]]
+        : []),
+      [{ text: isMyanmar ? '📂 Panel ဖွင့်ရန်' : 'Open panel', url: input.panelUrl }],
+    ],
+  };
+}
+
+async function sendTelegramSupportThreadQueueCardToChat(input: {
+  botToken: string;
+  chatId: string | number;
+  locale: SupportedLocale;
+  thread: TelegramSupportThreadQueueRecord;
+  mode: TelegramSupportQueueMode;
+  adminActor: TelegramAdminActor;
+}) {
+  const latestReply = input.thread.replies?.[input.thread.replies.length - 1] || null;
   const panelUrl = await buildTelegramSupportThreadPanelUrl(input.thread);
 
   await sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my'
-        ? '🧵 <b>Customer support thread</b>'
-        : '🧵 <b>Customer support thread</b>',
-      '',
-      `${input.locale === 'my' ? 'Code' : 'Code'}: <b>${escapeHtml(input.thread.threadCode)}</b>`,
-      `${input.locale === 'my' ? 'Category' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}</b>`,
-      `${input.locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>${overdue ? ` • <b>${input.locale === 'my' ? 'Overdue' : 'Overdue'}</b>` : ''}`,
-      `${input.locale === 'my' ? 'Age' : 'Age'}: <b>${escapeHtml(age)}</b>`,
-      `${input.locale === 'my' ? 'SLA' : 'SLA'}: <b>${escapeHtml(
-        input.thread.firstAdminReplyAt
-          ? (input.locale === 'my' ? 'Responded' : 'Responded')
-          : input.thread.firstResponseDueAt
-            ? `${input.locale === 'my' ? 'Due' : 'Due'} ${formatTelegramDateTime(input.thread.firstResponseDueAt, input.locale)}`
-            : input.locale === 'my'
-              ? 'Open'
-              : 'Open',
-      )}</b>`,
-      input.thread.assignedAdminName
-        ? `${input.locale === 'my' ? 'Claimed by' : 'Claimed by'}: <b>${escapeHtml(input.thread.assignedAdminName)}</b>`
-        : `${input.locale === 'my' ? 'Claimed by' : 'Claimed by'}: <b>${input.locale === 'my' ? 'Unclaimed' : 'Unclaimed'}</b>`,
-      `${input.locale === 'my' ? 'User' : 'User'}: <b>${escapeHtml(input.thread.telegramUsername || input.thread.telegramUserId)}</b>`,
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
-        locale: input.locale,
-        maxLength: 140,
-      }).map((line) => escapeHtml(line)),
-      latestReply?.mediaUrl
-        ? (input.locale === 'my' ? 'Attachment ready below.' : 'Attachment ready below.')
-        : '',
-      `${input.locale === 'my' ? 'Panel' : 'Panel'}: ${panelUrl}`,
-    ]
-      .filter(Boolean)
-      .join('\n'),
+    buildTelegramSupportThreadQueueMessage({
+      locale: input.locale,
+      thread: input.thread,
+    }),
     {
       replyMarkup: buildTelegramSupportThreadQueueReplyKeyboard({
         threadId: input.thread.id,
@@ -297,14 +312,14 @@ export async function handleTelegramSupportThreadsQueueCommand(input: {
   const modeLabel =
     mode === 'admin'
       ? input.locale === 'my'
-        ? 'Need admin reply'
+        ? 'Admin အဖြေ စောင့်နေသော thread များ'
         : 'Need admin reply'
       : mode === 'user'
         ? input.locale === 'my'
-          ? 'Waiting for user'
+          ? 'User အဖြေ စောင့်နေသော thread များ'
           : 'Waiting for user'
         : input.locale === 'my'
-          ? 'All customer threads'
+          ? 'Customer thread အားလုံး'
           : 'All customer threads';
 
   await sendTelegramMessage(
@@ -312,12 +327,12 @@ export async function handleTelegramSupportThreadsQueueCommand(input: {
     input.chatId,
     [
       input.locale === 'my'
-        ? '🧵 <b>Customer support threads</b>'
+        ? '🧵 <b>Customer support thread များ</b>'
         : '🧵 <b>Customer support threads</b>',
       '',
       modeLabel,
       input.locale === 'my'
-        ? `${snapshot.totalOpen} open • ${snapshot.waitingAdmin} need admin • ${snapshot.waitingUser} waiting for user • ${snapshot.overdue} overdue`
+        ? `${snapshot.totalOpen} ခု ဖွင့်ထား • ${snapshot.waitingAdmin} ခု admin စောင့်နေ • ${snapshot.waitingUser} ခု user စောင့်နေ • ${snapshot.overdue} ခု နောက်ကျ`
         : `${snapshot.totalOpen} open • ${snapshot.waitingAdmin} need admin • ${snapshot.waitingUser} waiting for user • ${snapshot.overdue} overdue`,
     ].join('\n'),
     {
@@ -413,21 +428,21 @@ export async function handleTelegramSupportConsoleCommand(input: {
         : '🛟 <b>Support console</b>',
       '',
       input.locale === 'my'
-        ? '<b>Customer threads</b>'
+        ? '<b>Customer thread များ</b>'
         : '<b>Customer threads</b>',
       input.locale === 'my'
-        ? `${customerSnapshot.totalOpen} open • ${customerSnapshot.waitingAdmin} need admin • ${customerSnapshot.waitingUser} waiting for user • ${customerSnapshot.overdue} overdue`
+        ? `${customerSnapshot.totalOpen} ခု ဖွင့်ထား • ${customerSnapshot.waitingAdmin} ခု admin စောင့်နေ • ${customerSnapshot.waitingUser} ခု user စောင့်နေ • ${customerSnapshot.overdue} ခု နောက်ကျ`
         : `${customerSnapshot.totalOpen} open • ${customerSnapshot.waitingAdmin} need admin • ${customerSnapshot.waitingUser} waiting for user • ${customerSnapshot.overdue} overdue`,
       '',
       input.locale === 'my'
         ? '<b>Premium support</b>'
         : '<b>Premium support</b>',
       input.locale === 'my'
-        ? `${premiumSnapshot.totalOpen} open • ${premiumSnapshot.waitingAdmin} need admin • ${premiumSnapshot.waitingUser} waiting for user`
+        ? `${premiumSnapshot.totalOpen} ခု ဖွင့်ထား • ${premiumSnapshot.waitingAdmin} ခု admin စောင့်နေ • ${premiumSnapshot.waitingUser} ခု user စောင့်နေ`
         : `${premiumSnapshot.totalOpen} open • ${premiumSnapshot.waitingAdmin} need admin • ${premiumSnapshot.waitingUser} waiting for user`,
       '',
       input.locale === 'my'
-        ? 'Use the buttons below to open the queue you want.'
+        ? 'ကြည့်လိုသော queue ကို အောက်က button များဖြင့် ဖွင့်နိုင်ပါသည်။'
         : 'Use the buttons below to open the queue you want.',
     ].join('\n'),
     {
@@ -445,21 +460,21 @@ export async function handleTelegramSupportConsoleCommand(input: {
           ],
           [
             {
-              text: input.locale === 'my' ? '⏱ Need admin' : '⏱ Need admin',
+              text: input.locale === 'my' ? '⏱ Admin စောင့်နေ' : '⏱ Need admin',
               callback_data: buildTelegramMenuCallbackData('admin', 'supportthreads_admin'),
             },
             {
-              text: input.locale === 'my' ? '💬 Need user' : '💬 Need user',
+              text: input.locale === 'my' ? '💬 User စောင့်နေ' : '💬 Need user',
               callback_data: buildTelegramMenuCallbackData('admin', 'supportthreads_user'),
             },
           ],
           [
             {
-              text: input.locale === 'my' ? '💎 Premium need admin' : '💎 Premium need admin',
+              text: input.locale === 'my' ? '💎 Premium admin စောင့်နေ' : '💎 Premium need admin',
               callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue_admin'),
             },
             {
-              text: input.locale === 'my' ? '💎 Premium need user' : '💎 Premium need user',
+              text: input.locale === 'my' ? '💎 Premium user စောင့်နေ' : '💎 Premium need user',
               callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue_user'),
             },
           ],

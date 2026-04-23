@@ -107,6 +107,11 @@ const RESERVED_WEBHOOK_HEADERS = new Set([
   'x-atomic-timestamp',
   'x-atomic-signature',
 ]);
+const MASKED_SECRET_PLACEHOLDER = '********';
+
+function isMaskedSecretInput(value: string | undefined) {
+  return value?.trim() === MASKED_SECRET_PLACEHOLDER;
+}
 
 /**
  * Channel type configuration with icons and descriptions
@@ -1652,9 +1657,14 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   };
   const utils = trpc.useUtils();
   const currentUserQuery = trpc.auth.me.useQuery();
-  const settingsQuery = trpc.telegramBot.getSettings.useQuery();
+  const canManageAnnouncements = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
+  const settingsQuery = trpc.telegramBot.getSettings.useQuery(undefined, {
+    enabled: canManageAnnouncements,
+    refetchOnWindowFocus: false,
+  });
   const webhookInfoQuery = trpc.telegramBot.getWebhookInfo.useQuery(undefined, {
-    refetchInterval: 30_000,
+    enabled: canManageAnnouncements,
+    refetchInterval: canManageAnnouncements ? 30_000 : false,
   });
   const [form, setForm] = useState<TelegramSettings>(DEFAULT_TELEGRAM_SETTINGS);
   const [adminChatIdsInput, setAdminChatIdsInput] = useState('');
@@ -1921,7 +1931,6 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       enabled: isAnalyticsTabActive,
     },
   );
-  const canManageAnnouncements = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
   const sendAnnouncementMutation = trpc.telegramBot.sendAnnouncement.useMutation({
     onSuccess: async (result) => {
       await Promise.all([
@@ -2135,6 +2144,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
 
   const isSaving = saveSettingsMutation.isPending;
   const hasToken = form.botToken.trim().length > 0;
+  const hasTestableToken = hasToken && !isMaskedSecretInput(form.botToken);
   const announcementFilters = {
     tag: announcementTargetTag === 'ALL' ? null : announcementTargetTag,
     segment:
@@ -2470,7 +2480,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                     variant="outline"
                     className="shrink-0"
                     onClick={() => testConnectionMutation.mutate({ botToken: form.botToken.trim() })}
-                    disabled={!hasToken || testConnectionMutation.isPending}
+                    disabled={!hasTestableToken || testConnectionMutation.isPending}
                   >
                     {testConnectionMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube className="mr-2 h-4 w-4" />}
                     {t('settings.telegram.test')}
@@ -3222,11 +3232,13 @@ function ChannelDialog({
   onOpenChange,
   editChannel,
   onSuccess,
+  canLoadTelegramAdminChats,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editChannel?: Channel | null;
   onSuccess: () => void;
+  canLoadTelegramAdminChats: boolean;
 }) {
   const { toast } = useToast();
   const { t } = useLocale();
@@ -3268,7 +3280,7 @@ function ChannelDialog({
     events: editChannel?.events || [],
   });
   const telegramSettingsQuery = trpc.telegramBot.getSettings.useQuery(undefined, {
-    enabled: open && formData.type === 'TELEGRAM',
+    enabled: canLoadTelegramAdminChats && open && formData.type === 'TELEGRAM',
     refetchOnWindowFocus: false,
   });
 
@@ -8928,13 +8940,13 @@ function KeyAlertsCard() {
       hasAlerts ? 'border-orange-500/25 bg-orange-500/[0.06]' : 'border-border/60'
     )}>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex min-w-0 items-center gap-2 text-xl leading-tight sm:text-2xl">
             <AlertTriangle className={cn(
-              'w-5 h-5',
+              'h-5 w-5 shrink-0',
               hasAlerts ? 'text-orange-500' : 'text-muted-foreground'
             )} />
-            {t('notifications.key_alerts.title')}
+            <span className="min-w-0 break-words">{t('notifications.key_alerts.title')}</span>
           </CardTitle>
           <Button variant="ghost" size="icon" className="rounded-2xl" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4" />
@@ -9678,6 +9690,7 @@ export default function NotificationsPage() {
   const { t, locale } = useLocale();
   const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
+  const currentUserQuery = trpc.auth.me.useQuery();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -9705,6 +9718,7 @@ export default function NotificationsPage() {
     params.set('workspace', workspace);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
+  const canManageAnnouncementSettings = hasTelegramAnnouncementManageScope(currentUserQuery.data?.adminScope);
 
   const { data: channels = [], isLoading: isChannelsLoading } = trpc.notifications.listChannels.useQuery(
     undefined,
@@ -9822,7 +9836,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6 dark:[&_.ops-section-heading]:text-slate-300/90 dark:[&_.text-muted-foreground]:text-slate-300/82">
       <section className="ops-showcase">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+        <div className="grid gap-5">
           <div className="space-y-5">
             <BackButton href="/dashboard" label={t('nav.dashboard')} />
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
@@ -9860,7 +9874,7 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 xl:hidden">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={handleOpenCreate} className="h-11 rounded-full px-5">
                 <Plus className="w-4 h-4 mr-2" />
                 {t('notifications.add_channel')}
@@ -9868,15 +9882,18 @@ export default function NotificationsPage() {
             </div>
           </div>
 
-          <div className="hidden xl:block">
+          <div>
             <div className="ops-hero-aside space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
                   <p className="ops-section-heading">Command rail</p>
                   <h2 className="text-xl font-semibold">{t('notifications.add_channel')}</h2>
                   <p className="text-sm text-muted-foreground">{t('notifications.subtitle')}</p>
                 </div>
-                <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                <Badge
+                  variant="outline"
+                  className="h-auto w-fit max-w-full self-start whitespace-normal break-words rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 leading-tight dark:text-cyan-200 sm:self-auto"
+                >
                   {workspaces.length} workspaces
                 </Badge>
               </div>
@@ -9917,7 +9934,7 @@ export default function NotificationsPage() {
                       updateWorkspaceUrlState(workspace.id);
                     }}
                     className={cn(
-                      'ops-pill transition-colors',
+                      'ops-pill max-w-full justify-start text-left whitespace-normal break-words transition-colors',
                       activeWorkspace === workspace.id
                         ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200'
                         : 'text-muted-foreground'
@@ -9948,16 +9965,16 @@ export default function NotificationsPage() {
               <TabsTrigger
                 key={workspace.id}
                 value={workspace.id}
-                className="min-h-[94px] w-full flex-col items-start justify-start gap-2 rounded-[1.25rem] border border-transparent px-4 py-4 text-left text-sm font-medium text-foreground/90 dark:text-slate-200 dark:[&_.workspace-caption]:text-slate-400 dark:[&_.workspace-meta]:text-slate-500 data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:[&_.workspace-caption]:text-primary-foreground/80 data-[state=active]:[&_.workspace-meta]:text-primary-foreground/70 dark:data-[state=active]:border-cyan-300/20 dark:data-[state=active]:bg-[linear-gradient(135deg,rgba(8,33,49,0.98),rgba(7,75,104,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:[&_.workspace-caption]:text-cyan-100/90 dark:data-[state=active]:[&_.workspace-meta]:text-cyan-200/85 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_18px_34px_rgba(6,182,212,0.18)]"
+                className="min-h-[94px] w-full min-w-0 flex-col items-start justify-start gap-2 overflow-hidden whitespace-normal rounded-[1.25rem] border border-transparent px-4 py-4 text-left text-sm font-medium text-foreground/90 dark:text-slate-200 dark:[&_.workspace-caption]:text-slate-400 dark:[&_.workspace-meta]:text-slate-500 data-[state=active]:border-primary/20 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:[&_.workspace-caption]:text-primary-foreground/80 data-[state=active]:[&_.workspace-meta]:text-primary-foreground/70 dark:data-[state=active]:border-cyan-300/20 dark:data-[state=active]:bg-[linear-gradient(135deg,rgba(8,33,49,0.98),rgba(7,75,104,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:[&_.workspace-caption]:text-cyan-100/90 dark:data-[state=active]:[&_.workspace-meta]:text-cyan-200/85 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_18px_34px_rgba(6,182,212,0.18)]"
               >
-                <span className="flex items-center gap-2 text-sm font-semibold">
-                  <Icon className="h-4 w-4" />
-                  {workspace.title}
+                <span className="flex min-w-0 flex-wrap items-center gap-2 whitespace-normal text-sm font-semibold">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 break-words">{workspace.title}</span>
                 </span>
-                <span className="workspace-caption text-xs leading-5 text-muted-foreground">
+                <span className="workspace-caption min-w-0 whitespace-normal break-words text-xs leading-5 text-muted-foreground">
                   {workspace.description}
                 </span>
-                <span className="workspace-meta text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <span className="workspace-meta min-w-0 whitespace-normal break-words text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   {workspace.meta}
                 </span>
               </TabsTrigger>
@@ -10190,6 +10207,7 @@ export default function NotificationsPage() {
         onSuccess={() => {
           setEditChannel(null);
         }}
+        canLoadTelegramAdminChats={canManageAnnouncementSettings}
       />
     </div>
   );

@@ -39,7 +39,19 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DetailHero,
   DetailHeroAside,
@@ -262,219 +274,250 @@ function EditKeyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(760px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>Edit Access Key</DialogTitle>
           <DialogDescription>
             Update the key configuration. Name changes will sync to Outline.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="editName">Name</Label>
-            <Input
-              id="editName"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
+        <form onSubmit={handleSubmit}>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Identity</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Update the visible key details used across the admin panel, CRM, and share flows.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="editName">Name</Label>
+                  <Input
+                    id="editName"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editEmail">Email</Label>
-            <Input
-              id="editEmail"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editEmail">Email</Label>
+                  <Input
+                    id="editEmail"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editTelegram">Telegram ID</Label>
-            <Input
-              id="editTelegram"
-              value={formData.telegramId}
-              onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editDataLimit">Data Limit (GB)</Label>
-            <Input
-              id="editDataLimit"
-              type="number"
-              placeholder="Leave empty for unlimited"
-              value={formData.dataLimitGB}
-              onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
-              min="0"
-              step="0.5"
-            />
-          </div>
-
-          {formData.dataLimitGB && (
-            <>
-              <div className="space-y-2">
-                <Label>Reset Strategy</Label>
-                <Select
-                  value={formData.dataLimitResetStrategy}
-                  onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
-                    setFormData({ ...formData, dataLimitResetStrategy: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NEVER">Never Reset</SelectItem>
-                    <SelectItem value="DAILY">Daily (Every 24h)</SelectItem>
-                    <SelectItem value="WEEKLY">Weekly (Every 7 days)</SelectItem>
-                    <SelectItem value="MONTHLY">Monthly (Every 30 days)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label htmlFor="editTelegram">Telegram ID</Label>
+                  <Input
+                    id="editTelegram"
+                    value={formData.telegramId}
+                    onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
+                  />
+                </div>
               </div>
+            </DialogSection>
 
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="space-y-0.5">
-                  <Label htmlFor="autoDisable" className="text-sm font-medium">Auto-disable on limit</Label>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Quota and lifecycle</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Set usage limits, expiration rules, and device controls without leaving the detail page.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="editDataLimit">Data limit (GB)</Label>
+                  <Input
+                    id="editDataLimit"
+                    type="number"
+                    placeholder="Leave empty for unlimited"
+                    value={formData.dataLimitGB}
+                    onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
+                    min="0"
+                    step="0.5"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+                  <Input
+                    id="editMaxDevices"
+                    type="number"
+                    min="1"
+                    max="20"
+                    placeholder="Leave empty for no device limit"
+                    value={formData.maxDevices}
+                    onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+                  />
                   <p className="text-xs text-muted-foreground">
-                    Automatically disable the key when its quota is fully consumed. Threshold alerts are now sent manually by an admin.
+                    Uses recent IP and user-agent activity as an estimate. The key warns first and only disables if the over-limit state continues.
                   </p>
                 </div>
-                <Switch
-                  id="autoDisable"
-                  checked={formData.autoDisableOnLimit}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, autoDisableOnLimit: checked })
-                  }
-                />
+
+                {formData.dataLimitGB && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Reset strategy</Label>
+                      <Select
+                        value={formData.dataLimitResetStrategy}
+                        onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
+                          setFormData({ ...formData, dataLimitResetStrategy: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NEVER">Never reset</SelectItem>
+                          <SelectItem value="DAILY">Daily (every 24h)</SelectItem>
+                          <SelectItem value="WEEKLY">Weekly (every 7 days)</SelectItem>
+                          <SelectItem value="MONTHLY">Monthly (every 30 days)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="editQuotaThresholds">Quota alert thresholds (%)</Label>
+                      <Input
+                        id="editQuotaThresholds"
+                        placeholder="80,90"
+                        value={formData.quotaAlertThresholds}
+                        onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="autoDisable" className="text-sm font-medium">Auto-disable on limit</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Automatically disable the key when its quota is fully consumed. Threshold alerts stay manual.
+                        </p>
+                      </div>
+                      <Switch
+                        id="autoDisable"
+                        checked={formData.autoDisableOnLimit}
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, autoDisableOnLimit: checked })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="editDuration">Duration (days)</Label>
+                  <Input
+                    id="editDuration"
+                    type="number"
+                    placeholder="e.g., 30, 45, 60"
+                    value={formData.durationDays}
+                    onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+                    min="1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Recalculates the expiration date from the duration you set here.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editExpiration">Expiration date</Label>
+                  <Input
+                    id="editExpiration"
+                    type="date"
+                    value={formData.expiresAt}
+                    onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Or set a fixed date directly if the key does not use a simple duration.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="autoDisableOnExpire" className="text-sm font-medium">Auto-disable on expiry</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Remove the key from Outline automatically after it expires.
+                    </p>
+                  </div>
+                  <Switch
+                    id="autoDisableOnExpire"
+                    checked={formData.autoDisableOnExpire}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, autoDisableOnExpire: checked })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="autoArchiveAfterDays">Auto-archive after (days)</Label>
+                  <Input
+                    id="autoArchiveAfterDays"
+                    type="number"
+                    min="0"
+                    value={formData.autoArchiveAfterDays}
+                    onChange={(e) => setFormData({ ...formData, autoArchiveAfterDays: e.target.value })}
+                  />
+                </div>
               </div>
+            </DialogSection>
 
-              <div className="space-y-2">
-                <Label htmlFor="editQuotaThresholds">Quota alert thresholds (%)</Label>
-                <Input
-                  id="editQuotaThresholds"
-                  placeholder="80,90"
-                  value={formData.quotaAlertThresholds}
-                  onChange={(e) => setFormData({ ...formData, quotaAlertThresholds: e.target.value })}
-                />
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Renewal and notes</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Control whether this key can auto-extend and keep an internal note for support or operations.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Auto-renew policy</Label>
+                  <Select
+                    value={formData.autoRenewPolicy}
+                    onValueChange={(value: 'NONE' | 'EXTEND_DURATION') =>
+                      setFormData({ ...formData, autoRenewPolicy: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">Do not auto-renew</SelectItem>
+                      <SelectItem value="EXTEND_DURATION">Extend by fixed duration</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.autoRenewPolicy === 'EXTEND_DURATION' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="autoRenewDurationDays">Auto-renew duration (days)</Label>
+                    <Input
+                      id="autoRenewDurationDays"
+                      type="number"
+                      min="1"
+                      value={formData.autoRenewDurationDays}
+                      onChange={(e) => setFormData({ ...formData, autoRenewDurationDays: e.target.value })}
+                    />
+                  </div>
+                ) : null}
+
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="editNotes">Notes</Label>
+                  <Input
+                    id="editNotes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  />
+                </div>
               </div>
+            </DialogSection>
+          </DialogBody>
 
-            </>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
-            <Input
-              id="editMaxDevices"
-              type="number"
-              min="1"
-              max="20"
-              placeholder="Leave empty for no device limit"
-              value={formData.maxDevices}
-              onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Uses recent IP and user-agent activity as an estimate. The key will warn first and only disable if the over-limit state continues.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editDuration">Duration (Days)</Label>
-            <Input
-              id="editDuration"
-              type="number"
-              placeholder="e.g., 30, 45, 60"
-              value={formData.durationDays}
-              onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
-              min="1"
-            />
-            <p className="text-xs text-muted-foreground">
-              Set the validity period in days. This will recalculate the expiration date.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editExpiration">Expiration Date</Label>
-            <Input
-              id="editExpiration"
-              type="date"
-              value={formData.expiresAt}
-              onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Or set a specific expiration date directly.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="autoDisableOnExpire" className="text-sm font-medium">Auto-disable on expiry</Label>
-              <p className="text-xs text-muted-foreground">
-                Remove the key from Outline after it expires.
-              </p>
-            </div>
-            <Switch
-              id="autoDisableOnExpire"
-              checked={formData.autoDisableOnExpire}
-              onCheckedChange={(checked) =>
-                setFormData({ ...formData, autoDisableOnExpire: checked })
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="autoArchiveAfterDays">Auto-archive after (days)</Label>
-            <Input
-              id="autoArchiveAfterDays"
-              type="number"
-              min="0"
-              value={formData.autoArchiveAfterDays}
-              onChange={(e) => setFormData({ ...formData, autoArchiveAfterDays: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Auto-renew policy</Label>
-            <Select
-              value={formData.autoRenewPolicy}
-              onValueChange={(value: 'NONE' | 'EXTEND_DURATION') =>
-                setFormData({ ...formData, autoRenewPolicy: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">Do not auto-renew</SelectItem>
-                <SelectItem value="EXTEND_DURATION">Extend by fixed duration</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {formData.autoRenewPolicy === 'EXTEND_DURATION' ? (
-            <div className="space-y-2">
-              <Label htmlFor="autoRenewDurationDays">Auto-renew duration (days)</Label>
-              <Input
-                id="autoRenewDurationDays"
-                type="number"
-                min="1"
-                value={formData.autoRenewDurationDays}
-                onChange={(e) => setFormData({ ...formData, autoRenewDurationDays: e.target.value })}
-              />
-            </div>
-          ) : null}
-
-          <div className="space-y-2">
-            <Label htmlFor="editNotes">Notes</Label>
-            <Input
-              id="editNotes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            />
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -511,8 +554,8 @@ function DeleteKeyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-md">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>Delete Access Key</DialogTitle>
           <DialogDescription>
             Are you sure you want to delete &quot;{keyName}&quot;?
@@ -520,7 +563,14 @@ function DeleteKeyDialog({
             This action cannot be undone. The key will be permanently removed from the server.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter>
+        <DialogBody>
+          <DialogSection>
+            <div className="ops-modal-note-danger">
+              This permanently removes the key from Atomic-UI and Outline. Existing clients will stop connecting immediately.
+            </div>
+          </DialogSection>
+        </DialogBody>
+        <DialogFooter className="ops-modal-sticky-footer">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -2315,35 +2365,47 @@ function SupportWorkflowCard({
       </Card>
 
       <Dialog open={supportDialogOpen} onOpenChange={setSupportDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle>{supportUi.supportDialogTitle}</DialogTitle>
             <DialogDescription>{supportUi.supportDialogDesc}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-sm font-medium">{supportUi.supportMacrosTitle}</p>
-            <p className="text-xs text-muted-foreground">{supportUi.supportMacrosDesc}</p>
-            <div className="flex flex-wrap gap-2">
-              {supportReplyMacros.map((macro) => (
-                <Button
-                  key={macro.code}
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setSupportMessage(macro.message)}
-                >
-                  {macro.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <Textarea
-            value={supportMessage}
-            onChange={(event) => setSupportMessage(event.target.value)}
-            placeholder={supportUi.supportPlaceholder}
-            className="min-h-[140px]"
-          />
-          <DialogFooter>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>{supportUi.supportMacrosTitle}</DialogSectionTitle>
+                <DialogSectionDescription>{supportUi.supportMacrosDesc}</DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="flex flex-wrap gap-2">
+                {supportReplyMacros.map((macro) => (
+                  <Button
+                    key={macro.code}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSupportMessage(macro.message)}
+                  >
+                    {macro.label}
+                  </Button>
+                ))}
+              </div>
+            </DialogSection>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Message</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Send a support update or request help from the admin queue for this key.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <Textarea
+                value={supportMessage}
+                onChange={(event) => setSupportMessage(event.target.value)}
+                placeholder={supportUi.supportPlaceholder}
+                className="min-h-[160px]"
+              />
+            </DialogSection>
+          </DialogBody>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button variant="outline" onClick={() => setSupportDialogOpen(false)}>
               {supportUi.cancel}
             </Button>
@@ -2363,36 +2425,46 @@ function SupportWorkflowCard({
       </Dialog>
 
       <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle>{supportUi.reportDialogTitle}</DialogTitle>
             <DialogDescription>{supportUi.reportDialogDesc}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>{supportUi.severity}</Label>
-              <Select
-                value={problemSeverity}
-                onValueChange={(value) => setProblemSeverity(value as 'critical' | 'warning' | 'info')}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="info">{supportUi.severityInfo}</SelectItem>
-                  <SelectItem value="warning">{supportUi.severityWarning}</SelectItem>
-                  <SelectItem value="critical">{supportUi.severityCritical}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Textarea
-              value={problemSummary}
-              onChange={(event) => setProblemSummary(event.target.value)}
-              placeholder={supportUi.reportPlaceholder}
-              className="min-h-[140px]"
-            />
-          </div>
-          <DialogFooter>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Incident details</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Capture the severity and a short summary so the incident queue can triage it quickly.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{supportUi.severity}</Label>
+                  <Select
+                    value={problemSeverity}
+                    onValueChange={(value) => setProblemSeverity(value as 'critical' | 'warning' | 'info')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="info">{supportUi.severityInfo}</SelectItem>
+                      <SelectItem value="warning">{supportUi.severityWarning}</SelectItem>
+                      <SelectItem value="critical">{supportUi.severityCritical}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Textarea
+                  value={problemSummary}
+                  onChange={(event) => setProblemSummary(event.target.value)}
+                  placeholder={supportUi.reportPlaceholder}
+                  className="min-h-[160px]"
+                />
+              </div>
+            </DialogSection>
+          </DialogBody>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button variant="outline" onClick={() => setReportDialogOpen(false)}>
               {supportUi.cancel}
             </Button>

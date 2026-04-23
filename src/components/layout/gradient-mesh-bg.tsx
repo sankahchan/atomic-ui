@@ -8,7 +8,7 @@ export function GradientMeshBackground() {
   return (
     <div className="bg-mesh" aria-hidden="true">
       <div
-        className="absolute left-[6%] top-[8%] h-[24rem] w-[24rem] rounded-full opacity-90"
+        className="absolute left-[6%] top-[8%] hidden h-[24rem] w-[24rem] rounded-full opacity-90 md:block"
         style={{
           background: 'var(--mesh-color-1)',
           filter: 'blur(92px)',
@@ -17,7 +17,7 @@ export function GradientMeshBackground() {
         }}
       />
       <div
-        className="absolute bottom-[10%] right-[8%] h-[22rem] w-[22rem] rounded-full opacity-80"
+        className="absolute bottom-[10%] right-[8%] hidden h-[22rem] w-[22rem] rounded-full opacity-80 md:block"
         style={{
           background: 'var(--mesh-color-2)',
           filter: 'blur(96px)',
@@ -26,7 +26,7 @@ export function GradientMeshBackground() {
         }}
       />
       <div
-        className="absolute left-1/2 top-[18%] h-[18rem] w-[18rem] -translate-x-1/2 rounded-full opacity-75"
+        className="absolute left-1/2 top-[18%] hidden h-[18rem] w-[18rem] -translate-x-1/2 rounded-full opacity-75 md:block"
         style={{
           background: 'var(--mesh-color-3)',
           filter: 'blur(88px)',

@@ -29,7 +29,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -309,258 +321,289 @@ function EditDAKDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(820px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>Edit Dynamic Key</DialogTitle>
           <DialogDescription>
             Update the dynamic key configuration.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="editName">Name</Label>
-            <Input
-              id="editName"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editEmail">Email</Label>
-            <Input
-              id="editEmail"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editTelegram">Telegram ID</Label>
-            <Input
-              id="editTelegram"
-              value={formData.telegramId}
-              onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editDataLimit">Data Limit (GB)</Label>
-            <Input
-              id="editDataLimit"
-              type="number"
-              placeholder="Leave empty for unlimited"
-              value={formData.dataLimitGB}
-              onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
-              min="0"
-              step="0.5"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editDuration">Duration (Days)</Label>
-            <Input
-              id="editDuration"
-              type="number"
-              placeholder="e.g., 30, 45, 60"
-              value={formData.durationDays}
-              onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
-              min="1"
-            />
-            <p className="text-xs text-muted-foreground">
-              Set the validity period in days. This will recalculate the expiration date.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="editExpiration">Expiration Date</Label>
-            <Input
-              id="editExpiration"
-              type="date"
-              value={formData.expiresAt}
-              onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Or set a specific expiration date directly.
-            </p>
-          </div>
-
-          {/* Load Balancer Algorithm */}
-          <div className="space-y-2">
-            <Label>Load Balancer Algorithm</Label>
-            <Select
-              value={formData.loadBalancerAlgorithm}
-              onValueChange={(value) => setFormData({ ...formData, loadBalancerAlgorithm: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select algorithm" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="IP_HASH">IP Hash (Consistent)</SelectItem>
-                <SelectItem value="RANDOM">Random</SelectItem>
-                <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
-                <SelectItem value="LEAST_LOAD">Least Load (Smart)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {formData.loadBalancerAlgorithm === 'LEAST_LOAD'
-                ? 'Routes to the server with lowest load based on key count and bandwidth.'
-                : formData.loadBalancerAlgorithm === 'IP_HASH'
-                ? 'Same client IP always connects to the same server.'
-                : formData.loadBalancerAlgorithm === 'ROUND_ROBIN'
-                ? 'Cycles through servers sequentially.'
-                : 'Randomly selects a server.'}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Preferred Routing Order</Label>
-            <DynamicRoutingPreferencesEditor
-              preferredRegionMode={formData.preferredRegionMode}
-              serverTagIds={formData.serverTagIds}
-              preferredServerIds={formData.preferredServerIds}
-              preferredCountryCodes={formData.preferredCountryCodes}
-              preferredServerWeights={formData.preferredServerWeights}
-              preferredCountryWeights={formData.preferredCountryWeights}
-              sessionStickinessMode={formData.sessionStickinessMode}
-              drainGraceMinutes={formData.drainGraceMinutes}
-              compact
-              onChange={(next) =>
-                setFormData((current) => ({
-                  ...current,
-                  preferredRegionMode: next.preferredRegionMode,
-                  serverTagIds: next.serverTagIds,
-                  preferredServerIds: next.preferredServerIds,
-                  preferredCountryCodes: next.preferredCountryCodes,
-                  preferredServerWeights: next.preferredServerWeights,
-                  preferredCountryWeights: next.preferredCountryWeights,
-                  sessionStickinessMode: next.sessionStickinessMode,
-                  drainGraceMinutes: next.drainGraceMinutes,
-                }))
-              }
-            />
-          </div>
-
-          <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Rotation Trigger Policy</p>
-              <p className="text-xs text-muted-foreground">
-                Fine-tune when this dynamic key should rotate to a new backend.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Trigger Mode</Label>
-                <Select
-                  value={formData.rotationTriggerMode}
-                  onValueChange={(value: typeof formData.rotationTriggerMode) =>
-                    setFormData((current) => ({ ...current, rotationTriggerMode: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SCHEDULED">Schedule only</SelectItem>
-                    <SelectItem value="USAGE">Quota threshold</SelectItem>
-                    <SelectItem value="HEALTH">Health issue</SelectItem>
-                    <SelectItem value="COMBINED">Schedule + quota + health</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {(formData.rotationTriggerMode === 'USAGE' || formData.rotationTriggerMode === 'COMBINED') && (
-                <div className="space-y-2">
-                  <Label>Usage Threshold (%)</Label>
+        <form onSubmit={handleSubmit}>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Identity and access window</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Keep the customer-facing details, quota, and expiry settings aligned for this routing profile.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="editName">Name</Label>
                   <Input
+                    id="editName"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editEmail">Email</Label>
+                  <Input
+                    id="editEmail"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editTelegram">Telegram ID</Label>
+                  <Input
+                    id="editTelegram"
+                    value={formData.telegramId}
+                    onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editDataLimit">Data limit (GB)</Label>
+                  <Input
+                    id="editDataLimit"
                     type="number"
-                    min="50"
-                    max="100"
-                    value={formData.rotationUsageThresholdPercent}
-                    onChange={(event) =>
+                    placeholder="Leave empty for unlimited"
+                    value={formData.dataLimitGB}
+                    onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
+                    min="0"
+                    step="0.5"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editDuration">Duration (days)</Label>
+                  <Input
+                    id="editDuration"
+                    type="number"
+                    placeholder="e.g., 30, 45, 60"
+                    value={formData.durationDays}
+                    onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+                    min="1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Recalculates the expiration date from the duration you set here.
+                  </p>
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="editExpiration">Expiration date</Label>
+                  <Input
+                    id="editExpiration"
+                    type="date"
+                    value={formData.expiresAt}
+                    onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+                  />
+                </div>
+              </div>
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Routing strategy</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Choose how traffic is distributed and which regions or servers should be preferred first.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Load balancer algorithm</Label>
+                  <Select
+                    value={formData.loadBalancerAlgorithm}
+                    onValueChange={(value) => setFormData({ ...formData, loadBalancerAlgorithm: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select algorithm" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IP_HASH">IP Hash (consistent)</SelectItem>
+                      <SelectItem value="RANDOM">Random</SelectItem>
+                      <SelectItem value="ROUND_ROBIN">Round robin</SelectItem>
+                      <SelectItem value="LEAST_LOAD">Least load (smart)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.loadBalancerAlgorithm === 'LEAST_LOAD'
+                      ? 'Routes to the server with the lowest current load.'
+                      : formData.loadBalancerAlgorithm === 'IP_HASH'
+                        ? 'Keeps the same client IP on the same backend when possible.'
+                        : formData.loadBalancerAlgorithm === 'ROUND_ROBIN'
+                          ? 'Cycles through backends in sequence.'
+                          : 'Chooses a backend randomly.'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Preferred routing order</Label>
+                  <DynamicRoutingPreferencesEditor
+                    preferredRegionMode={formData.preferredRegionMode}
+                    serverTagIds={formData.serverTagIds}
+                    preferredServerIds={formData.preferredServerIds}
+                    preferredCountryCodes={formData.preferredCountryCodes}
+                    preferredServerWeights={formData.preferredServerWeights}
+                    preferredCountryWeights={formData.preferredCountryWeights}
+                    sessionStickinessMode={formData.sessionStickinessMode}
+                    drainGraceMinutes={formData.drainGraceMinutes}
+                    compact
+                    onChange={(next) =>
                       setFormData((current) => ({
                         ...current,
-                        rotationUsageThresholdPercent: Math.max(50, Math.min(100, Number(event.target.value) || 85)),
+                        preferredRegionMode: next.preferredRegionMode,
+                        serverTagIds: next.serverTagIds,
+                        preferredServerIds: next.preferredServerIds,
+                        preferredCountryCodes: next.preferredCountryCodes,
+                        preferredServerWeights: next.preferredServerWeights,
+                        preferredCountryWeights: next.preferredCountryWeights,
+                        sessionStickinessMode: next.sessionStickinessMode,
+                        drainGraceMinutes: next.drainGraceMinutes,
                       }))
                     }
                   />
                 </div>
-              )}
-            </div>
+              </div>
+            </DialogSection>
 
-            {(formData.rotationTriggerMode === 'HEALTH' || formData.rotationTriggerMode === 'COMBINED') && (
-              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-3">
-                <div>
-                  <p className="text-sm font-medium">Rotate on health failure</p>
-                  <p className="text-xs text-muted-foreground">
-                    Force a fresh backend when a serving server is degraded or down.
-                  </p>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Rotation and auto recovery</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Control when the profile should rotate away from a backend and how aggressively it should recover.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Trigger mode</Label>
+                      <Select
+                        value={formData.rotationTriggerMode}
+                        onValueChange={(value: typeof formData.rotationTriggerMode) =>
+                          setFormData((current) => ({ ...current, rotationTriggerMode: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SCHEDULED">Schedule only</SelectItem>
+                          <SelectItem value="USAGE">Quota threshold</SelectItem>
+                          <SelectItem value="HEALTH">Health issue</SelectItem>
+                          <SelectItem value="COMBINED">Schedule + quota + health</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {(formData.rotationTriggerMode === 'USAGE' || formData.rotationTriggerMode === 'COMBINED') && (
+                      <div className="space-y-2">
+                        <Label>Usage threshold (%)</Label>
+                        <Input
+                          type="number"
+                          min="50"
+                          max="100"
+                          value={formData.rotationUsageThresholdPercent}
+                          onChange={(event) =>
+                            setFormData((current) => ({
+                              ...current,
+                              rotationUsageThresholdPercent: Math.max(50, Math.min(100, Number(event.target.value) || 85)),
+                            }))
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {(formData.rotationTriggerMode === 'HEALTH' || formData.rotationTriggerMode === 'COMBINED') && (
+                    <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-3">
+                      <div>
+                        <p className="text-sm font-medium">Rotate on health failure</p>
+                        <p className="text-xs text-muted-foreground">
+                          Force a fresh backend when a serving server is degraded or down.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formData.rotateOnHealthFailure}
+                        onCheckedChange={(checked) =>
+                          setFormData((current) => ({ ...current, rotateOnHealthFailure: checked === true }))
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
-                <Switch
-                  checked={formData.rotateOnHealthFailure}
-                  onCheckedChange={(checked) =>
-                    setFormData((current) => ({ ...current, rotateOnHealthFailure: checked === true }))
-                  }
+
+                <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                  <h4 className="text-sm font-semibold">{t('dynamic_keys.routing.auto_recovery.title')}</h4>
+                  <div className="flex items-center justify-between space-x-2">
+                    <div className="space-y-0.5">
+                      <Label>{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins_desc')}</p>
+                    </div>
+                    <Switch
+                      checked={formData.autoClearStalePins}
+                      onCheckedChange={(checked) => setFormData({ ...formData, autoClearStalePins: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between space-x-2">
+                    <div className="space-y-0.5">
+                      <Label>{t('dynamic_keys.routing.auto_recovery.relax_only')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only_desc')}</p>
+                    </div>
+                    <Switch
+                      checked={formData.autoFallbackToPrefer}
+                      onCheckedChange={(checked) => setFormData({ ...formData, autoFallbackToPrefer: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between space-x-2">
+                    <div className="space-y-0.5">
+                      <Label>{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</Label>
+                      <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy_desc')}</p>
+                    </div>
+                    <Switch
+                      checked={formData.autoSkipUnhealthy}
+                      onCheckedChange={(checked) => setFormData({ ...formData, autoSkipUnhealthy: checked })}
+                    />
+                  </div>
+                </div>
+
+                <DynamicRoutingAlertRulesEditor
+                  value={formData.routingAlertRules}
+                  onChange={(nextValue) => setFormData((current) => ({ ...current, routingAlertRules: nextValue }))}
+                  compact
                 />
               </div>
-            )}
-          </div>
+            </DialogSection>
 
-          <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-            <h4 className="text-sm font-semibold">{t('dynamic_keys.routing.auto_recovery.title')}</h4>
-            <div className="flex items-center justify-between space-x-2">
-              <div className="space-y-0.5">
-                <Label>{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</Label>
-                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins_desc')}</p>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Notes</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Keep an internal note for support, migration, or routing decisions.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="space-y-2">
+                <Label htmlFor="editNotes">Notes</Label>
+                <Input
+                  id="editNotes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                />
               </div>
-              <Switch
-                checked={formData.autoClearStalePins}
-                onCheckedChange={(checked) => setFormData({ ...formData, autoClearStalePins: checked })}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between space-x-2">
-              <div className="space-y-0.5">
-                <Label>{t('dynamic_keys.routing.auto_recovery.relax_only')}</Label>
-                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only_desc')}</p>
-              </div>
-              <Switch
-                checked={formData.autoFallbackToPrefer}
-                onCheckedChange={(checked) => setFormData({ ...formData, autoFallbackToPrefer: checked })}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between space-x-2">
-              <div className="space-y-0.5">
-                <Label>{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</Label>
-                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy_desc')}</p>
-              </div>
-              <Switch
-                checked={formData.autoSkipUnhealthy}
-                onCheckedChange={(checked) => setFormData({ ...formData, autoSkipUnhealthy: checked })}
-              />
-            </div>
-          </div>
+            </DialogSection>
+          </DialogBody>
 
-          <DynamicRoutingAlertRulesEditor
-            value={formData.routingAlertRules}
-            onChange={(nextValue) => setFormData((current) => ({ ...current, routingAlertRules: nextValue }))}
-            compact
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor="editNotes">Notes</Label>
-            <Input
-              id="editNotes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            />
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('dynamic_keys.dialog.cancel')}
             </Button>
@@ -4194,8 +4237,8 @@ export default function DynamicKeyDetailPage() {
 
       {/* Attach Key Dialog */}
       <Dialog open={attachDialogOpen} onOpenChange={setAttachDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-primary" />
               Attach Access Key
@@ -4205,45 +4248,53 @@ export default function DynamicKeyDetailPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Select Access Key</Label>
-              <Select
-                value={selectedKeyId}
-                onValueChange={setSelectedKeyId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a key to attach..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableKeys?.items && availableKeys.items.length > 0 ? (
-                    availableKeys.items.map((key) => (
-                      <SelectItem key={key.id} value={key.id}>
-                        <div className="flex items-center gap-2">
-                          <Key className="w-4 h-4" />
-                          <span>{key.name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            ({key.server?.name || 'Unknown Server'})
-                          </span>
-                        </div>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Choose an access key</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Only active keys that are not already attached to another dynamic key can be selected here.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="space-y-2">
+                <Label>Select access key</Label>
+                <Select
+                  value={selectedKeyId}
+                  onValueChange={setSelectedKeyId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a key to attach..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableKeys?.items && availableKeys.items.length > 0 ? (
+                      availableKeys.items.map((key) => (
+                        <SelectItem key={key.id} value={key.id}>
+                          <div className="flex items-center gap-2">
+                            <Key className="w-4 h-4" />
+                            <span>{key.name}</span>
+                            <span className="text-muted-foreground text-xs">
+                              ({key.server?.name || 'Unknown Server'})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No available keys
                       </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>
-                      No available keys
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-              {(!availableKeys?.items || availableKeys.items.length === 0) && (
-                <p className="text-sm text-muted-foreground">
-                  No unattached access keys available. Create a new key first or detach one from another dynamic key.
-                </p>
-              )}
-            </div>
-          </div>
+                    )}
+                  </SelectContent>
+                </Select>
+                {(!availableKeys?.items || availableKeys.items.length === 0) && (
+                  <div className="ops-modal-note">
+                    No unattached access keys are available. Create one first or detach a key from another dynamic profile.
+                  </div>
+                )}
+              </div>
+            </DialogSection>
+          </DialogBody>
 
-          <DialogFooter>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button
               variant="outline"
               onClick={() => {

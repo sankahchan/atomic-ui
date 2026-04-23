@@ -5,8 +5,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-NODE_HEAP_MB="${NODE_HEAP_MB:-640}"
-PUBLISH_STANDALONE="${PUBLISH_STANDALONE:-false}"
+NODE_HEAP_MB="${NODE_HEAP_MB:-1024}"
+# Standalone is the production runtime used by the installer and systemd unit.
+# Publish its static assets by default so a plain `npm run build:low-memory`
+# cannot leave the service serving HTML without CSS/JS.
+PUBLISH_STANDALONE="${PUBLISH_STANDALONE:-true}"
 NEXT_PUBLIC_APP_VERSION="${NEXT_PUBLIC_APP_VERSION:-$(git rev-parse --short=12 HEAD 2>/dev/null || date +%s)}"
 
 echo "[build-low-memory] root=${ROOT_DIR}"
@@ -17,7 +20,14 @@ export NEXT_PUBLIC_APP_VERSION
 
 sh scripts/prisma-command.sh generate >/dev/null
 rm -rf .next/standalone
-npx next build
+# Next occasionally prints a benign compiler worker SIGTERM notice near the end
+# of successful low-memory builds. Filter only that noise and keep all real
+# build output and failures intact.
+npx next build 2>&1 | awk '
+  $0 == "Compiler server unexpectedly exited with code: null and signal: SIGTERM" { next }
+  $0 == "Compiler client unexpectedly exited with code: null and signal: SIGTERM" { next }
+  { print }
+'
 
 if [[ "${PUBLISH_STANDALONE}" == "true" ]]; then
   echo "[build-low-memory] publishing standalone server bundle"

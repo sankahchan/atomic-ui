@@ -100,7 +100,7 @@ The command exits non-zero if any model count differs from the exported manifest
 ### 7. Build and start the app
 
 ```bash
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl restart atomic-ui.service
 ```
 
@@ -114,6 +114,7 @@ npm run smoke -- --base-url=http://127.0.0.1:2053/your-panel-path --email=admin 
 
 ## Notes
 
-- Dashboard backup and restore APIs remain SQLite-file oriented. For Postgres operations, use the cutover scripts and database-native backups such as `pg_dump`.
+- Dashboard backup creation emits portable Postgres `.postgres.zip` bundles from the settings workspace. Each bundle contains `backup.dump` plus restore encryption metadata so a fresh VPS can decrypt database-backed Telegram/provider secrets after restore. Raw `.dump` and `.sql` restore remain supported for older backups.
+- The target Atomic-UI instance must also be running on Postgres, and the host needs PostgreSQL client tools installed (`pg_dump`, `pg_restore`, `psql`). On Debian/Ubuntu, install them with `apt-get install -y postgresql-client`.
 - Keep the SQLite safety backup until you have completed smoke tests and at least one clean production backup on Postgres.
 - Run the export and import from the same Git commit so the manifest model order and Prisma schema stay aligned.

@@ -9,8 +9,16 @@ import {
   resolveDynamicPinState,
 } from '@/lib/services/dynamic-subscription-routing';
 import {
+  buildTelegramCommerceViewCallbackData,
   buildTelegramDynamicSupportActionCallbackData,
 } from '@/lib/services/telegram-callbacks';
+import {
+  buildTelegramCommerceCard,
+  buildTelegramCommerceMessage,
+  buildTelegramCommercePagerRow,
+  paginateTelegramCommerce,
+  truncateTelegramCommerceButtonLabel,
+} from '@/lib/services/telegram-commerce-ui';
 import {
   buildPremiumIncidentKey,
   getPremiumHealthyPreferredRegions,
@@ -34,7 +42,6 @@ import {
 } from '@/lib/services/telegram-runtime';
 import { getTelegramBrandMediaUrl } from '@/lib/services/telegram-branding';
 import {
-  buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
@@ -48,15 +55,6 @@ import {
   normalizeTelegramPremiumSupportLookupCodes,
 } from '@/lib/services/telegram-ui';
 import { generateRandomString } from '@/lib/utils';
-
-function truncateTelegramButtonLabel(value: string, maxLength = 28) {
-  const trimmed = value.trim();
-  if (trimmed.length <= maxLength) {
-    return trimmed;
-  }
-
-  return `${trimmed.slice(0, maxLength - 1)}…`;
-}
 
 export function buildTelegramDynamicPremiumSupportKeyboard(
   dynamicAccessKeyId: string,
@@ -157,7 +155,7 @@ export function buildTelegramDynamicPremiumRegionKeyboard(input: {
     .slice(0, 8)
     .map((countryCode) => [
       {
-        text: truncateTelegramButtonLabel(`${getFlagEmoji(countryCode)} ${countryCode}`, 38),
+        text: truncateTelegramCommerceButtonLabel(`${getFlagEmoji(countryCode)} ${countryCode}`, 38),
         callback_data: buildTelegramDynamicSupportActionCallbackData(
           'rv',
           input.dynamicAccessKeyId,
@@ -530,48 +528,32 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
     followUpPending: request.followUpPending,
     locale: input.locale,
   });
-  const lines = [
-    ui.premiumStatusTitle,
-    '',
-    `${request.requestCode} • ${formatTelegramPremiumSupportStatusLabel(request.status, ui)}`,
-    '',
-    `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(request.requestCode)}</b>`,
-    `${ui.keyLabel}: <b>${escapeHtml(request.dynamicAccessKey.name)}</b>`,
+  const routeSnapshotLines = [
+    `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
+    request.requestedRegionCode || request.currentResolvedServerName || request.currentResolvedServerCountryCode
+      ? [
+          request.requestedRegionCode
+            ? `${ui.premiumRequestedRegionLabel}: <b>${escapeHtml(request.requestedRegionCode)}</b>`
+            : null,
+          request.currentResolvedServerName || request.currentResolvedServerCountryCode
+            ? `${ui.premiumResolvedServer}: <b>${escapeHtml(
+                request.currentResolvedServerName ||
+                  request.currentResolvedServerCountryCode ||
+                  ui.premiumNoRequestedRegion,
+              )}</b>`
+            : null,
+        ].filter(Boolean).join(' • ')
+      : null,
+  ].filter(Boolean) as string[];
+
+  const threadMetaLines = [
     `${ui.premiumRequestType}: <b>${escapeHtml(
       formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
-    )}</b>`,
-    `${ui.statusLineLabel}: <b>${escapeHtml(
+    )}</b> • ${ui.statusLineLabel}: <b>${escapeHtml(
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
-    `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b>`,
-    `${escapeHtml(followUpIndicator)}`,
-    `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`,
-    `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
+    `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b> • ${escapeHtml(followUpIndicator)}`,
   ];
-
-  if (request.requestedRegionCode) {
-    lines.push(`${ui.premiumRequestedRegionLabel}: <b>${escapeHtml(request.requestedRegionCode)}</b>`);
-  }
-
-  if (request.currentResolvedServerName || request.currentResolvedServerCountryCode) {
-    lines.push(
-      `${ui.premiumResolvedServer}: <b>${escapeHtml(
-        request.currentResolvedServerName ||
-          request.currentResolvedServerCountryCode ||
-          ui.premiumNoRequestedRegion,
-      )}</b>`,
-    );
-  }
-
-  const updatedAt =
-    request.dismissedAt || request.handledAt || request.reviewedAt || request.updatedAt || null;
-  if (updatedAt) {
-    lines.push(
-      `${ui.premiumStatusUpdatedLabel}: ${escapeHtml(
-        formatTelegramDateTime(updatedAt, input.locale),
-      )}`,
-    );
-  }
 
   if (request.appliedPinServerName) {
     const pinSummary = request.appliedPinExpiresAt
@@ -580,101 +562,437 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
           input.locale,
         )})`
       : request.appliedPinServerName;
-    lines.push(`${ui.premiumCurrentPin}: <b>${escapeHtml(pinSummary)}</b>`);
+    routeSnapshotLines.push(`${ui.premiumCurrentPin}: <b>${escapeHtml(pinSummary)}</b>`);
   }
 
+  const cards = [
+    buildTelegramCommerceCard(
+      '🧾 <b>Request snapshot</b>',
+      threadMetaLines,
+    ),
+    buildTelegramCommerceCard(
+      '🌍 <b>Route snapshot</b>',
+      routeSnapshotLines,
+    ),
+  ];
+
   if (request.customerMessage?.trim()) {
-    lines.push('', `${ui.customerMessage}:`, escapeHtml(request.customerMessage.trim()));
+    cards.push(
+      buildTelegramCommerceCard(
+        '✍️ <b>Your note</b>',
+        [escapeHtml(request.customerMessage.trim())],
+      ),
+    );
   }
 
   if (latestReply) {
-    lines.push('', '<b>💬 Latest reply</b>');
-    lines.push(
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
-        locale: input.locale,
-        maxLength: 280,
-      }).map((line) => escapeHtml(line)),
+    const replySenderLabel =
+      latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
+    const replyMessage = latestReply.message.trim();
+    const replyPreview = replyMessage.length > 120 ? `${replyMessage.slice(0, 117)}...` : replyMessage;
+    cards.push(
+      buildTelegramCommerceCard(
+        '💬 <b>Latest reply</b>',
+        [
+          `${escapeHtml(replySenderLabel)} • ${escapeHtml(
+            formatTelegramDateTime(latestReply.createdAt, input.locale),
+          )}`,
+          escapeHtml(replyPreview),
+        ],
+      ),
     );
   }
 
-  lines.push(
-    '',
-    `<b>${input.locale === 'my' ? 'What happens next' : 'What happens next'}</b>`,
-    escapeHtml(
-      request.status === 'PENDING_REVIEW'
+  const nextStepText =
+    request.status === 'PENDING_REVIEW'
+      ? input.locale === 'my'
+        ? 'Admin review ကို စောင့်ပါ။ လိုအပ်ပါက extra detail တောင်းနိုင်ပါသည်။'
+        : 'Wait for admin review. The admin may ask for extra detail if needed.'
+      : currentState === ui.premiumAwaitingYourReply
         ? input.locale === 'my'
-          ? 'Admin review စောင့်ပါ။ လိုအပ်ပါက screenshot သို့မဟုတ် extra detail တောင်းနိုင်ပါသည်။'
-          : 'Wait for admin review. If needed, the admin may ask for more detail.'
-        : currentState === ui.premiumAwaitingYourReply
+          ? 'Admin reply ပို့ထားပါသည်။ Reply to request ဖြင့် thread ကို ဆက်လုပ်နိုင်ပါသည်။'
+          : 'The admin replied. Use Reply to request to continue the same thread.'
+        : currentState === ui.premiumAwaitingAdminReply
           ? input.locale === 'my'
-            ? 'Admin က reply ပို့ထားပါသည်။ Reply to request ဖြင့် ဆက်ပြောနိုင်ပါသည်။'
-            : 'The admin replied. Use Reply to request if you want to continue the same thread.'
-          : currentState === ui.premiumAwaitingAdminReply
-            ? input.locale === 'my'
-              ? 'သင့်နောက်ဆုံး message ကို admin စစ်နေပါသည်။'
-              : 'The admin is reviewing your latest message.'
-            : input.locale === 'my'
-              ? 'လက်ရှိ request ကို status နှင့် history အဖြစ် အောက်တွင် ဆက်လက်ကြည့်နိုင်ပါသည်။'
-              : 'You can continue to track the current request status and history below.',
+            ? 'သင့်နောက်ဆုံး message ကို admin စစ်နေပါသည်။'
+            : 'The admin is reviewing your latest message.'
+          : ui.premiumStatusReplyHint;
+
+  return buildTelegramCommerceMessage({
+    title: ui.premiumStatusTitle,
+    statsLine: `<b>${escapeHtml(request.requestCode)}</b> • <b>${escapeHtml(request.dynamicAccessKey.name)}</b>`,
+    cards,
+    footerLines: [`${ui.orderNextStepLabel}: ${escapeHtml(nextStepText)}`],
+  });
+}
+
+type TelegramPremiumHubItem = {
+  id: string;
+  name: string;
+  sharePageUrl: string | null;
+  poolSummary: string;
+  currentRouteLabel: string;
+  preferredRegions: string[];
+  summaryLine: string;
+  latestRequestId: string | null;
+  latestRequestCode: string | null;
+  latestRequestState: string | null;
+};
+
+type TelegramPremiumSupportListItem = {
+  id: string;
+  requestCode: string;
+  keyName: string;
+  requestTypeLabel: string;
+  statusLabel: string;
+  threadStateLabel: string;
+  replyStateLabel: string;
+  createdAtLabel: string;
+};
+
+export function buildTelegramPremiumHubMessage(input: {
+  locale: SupportedLocale;
+  items: TelegramPremiumHubItem[];
+  requestCount: number;
+  page: number;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const pagination = paginateTelegramCommerce(input.items, input.page);
+  const cards = pagination.pageItems.map((item) =>
+    buildTelegramCommerceCard(
+      `💎 <b>${escapeHtml(item.name)}</b>`,
+      [
+        escapeHtml(item.summaryLine),
+        `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(item.currentRouteLabel)}`,
+        `${ui.premiumCurrentPoolLabel}: ${escapeHtml(item.poolSummary)}`,
+        item.latestRequestCode && item.latestRequestState
+          ? `${ui.premiumThreadStatusLabel}: ${escapeHtml(`${item.latestRequestCode} • ${item.latestRequestState}`)}`
+          : null,
+      ],
     ),
   );
 
-  lines.push('', `${ui.orderTimelineTitle}:`);
-  lines.push(
-    `• ${ui.premiumHistorySubmitted} · ${escapeHtml(
-      formatTelegramDateTime(request.createdAt, input.locale),
-    )}`,
+  return buildTelegramCommerceMessage({
+    title: ui.premiumHubTitle,
+    statsLine: `${input.items.length} key(s) • ${input.requestCount} recent request(s)`,
+    intro:
+      input.locale === 'my'
+        ? 'Premium hub ကို အတိုချုံးပြထားသည်။ Region, issue, status, and More ကို အသုံးပြုနိုင်သည်။'
+        : 'This premium hub stays short. Use Region, Issue, Status, or More for the next step.',
+    cards,
+  });
+}
+
+export function buildTelegramPremiumDetailMessage(input: {
+  locale: SupportedLocale;
+  item: TelegramPremiumHubItem;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const detailLines = [
+    `${ui.statusLineLabel}: ${escapeHtml(input.item.summaryLine)}`,
+    `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(input.item.currentRouteLabel)}`,
+    `${ui.premiumCurrentPoolLabel}: ${escapeHtml(input.item.poolSummary)}`,
+    input.item.preferredRegions.length > 0
+      ? `${ui.premiumRequestedRegionLabel}: ${escapeHtml(input.item.preferredRegions.join(', '))}`
+      : null,
+    input.item.latestRequestCode && input.item.latestRequestState
+      ? `${ui.premiumThreadStatusLabel}: ${escapeHtml(`${input.item.latestRequestCode} • ${input.item.latestRequestState}`)}`
+      : null,
+  ].filter(Boolean) as string[];
+
+  return buildTelegramCommerceMessage({
+    title: '💎 <b>Premium key detail</b>',
+    statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
+    intro:
+      input.locale === 'my'
+        ? 'Open, region, issue, and status actions stay in the buttons below.'
+        : 'Open, region, issue, and status actions stay in the buttons below.',
+    cards: [
+      buildTelegramCommerceCard(
+        '💎 <b>Premium summary</b>',
+        detailLines,
+      ),
+    ],
+  });
+}
+
+export function buildTelegramPremiumSupportListMessage(input: {
+  locale: SupportedLocale;
+  items: TelegramPremiumSupportListItem[];
+  page: number;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const pagination = paginateTelegramCommerce(input.items, input.page);
+  const cards = pagination.pageItems.map((item) =>
+    buildTelegramCommerceCard(
+      `🧾 <b>${escapeHtml(item.requestCode)}</b>`,
+      [
+        `${escapeHtml(item.keyName)} • ${escapeHtml(item.requestTypeLabel)}`,
+        `${ui.statusLineLabel}: ${escapeHtml(item.statusLabel)} • ${escapeHtml(item.threadStateLabel)}`,
+        `${escapeHtml(item.replyStateLabel)} • ${ui.createdAtLabel}: ${escapeHtml(item.createdAtLabel)}`,
+      ],
+    ),
   );
-  if (request.reviewedAt) {
-    lines.push(
-      `• ${ui.premiumHistoryReviewed} · ${escapeHtml(
-        formatTelegramDateTime(request.reviewedAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.status === 'APPROVED' && request.reviewedAt) {
-    lines.push(
-      `• ${ui.premiumHistoryApproved} · ${escapeHtml(
-        formatTelegramDateTime(request.reviewedAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.handledAt) {
-    lines.push(
-      `• ${ui.premiumHistoryHandled} · ${escapeHtml(
-        formatTelegramDateTime(request.handledAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.dismissedAt) {
-    lines.push(
-      `• ${ui.premiumHistoryDismissed} · ${escapeHtml(
-        formatTelegramDateTime(request.dismissedAt, input.locale),
-      )}`,
-    );
-  }
-  if (request.appliedPinServerName) {
-    lines.push(`• ${ui.premiumHistoryPinApplied} · ${escapeHtml(request.appliedPinServerName)}`);
+
+  return buildTelegramCommerceMessage({
+    title: ui.premiumStatusTitle,
+    statsLine: `${input.items.length} request(s)`,
+    intro:
+      input.locale === 'my'
+        ? 'Open thread ကို နှိပ်ပြီး request detail ကို ဖွင့်နိုင်သည်။'
+        : 'Use Open thread to view the request detail card.',
+    cards,
+  });
+}
+
+export function buildTelegramPremiumRegionDetailMessage(input: {
+  locale: SupportedLocale;
+  key: PremiumMessagingKey & { status: string };
+  analysis: PremiumRegionAnalysis;
+  latestRoutingEvent: Awaited<ReturnType<typeof getLatestPremiumRoutingEventsByKeyIds>> extends Map<string, infer TValue>
+    ? TValue | null
+    : unknown;
+  index: number;
+  total: number;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const currentFallback = getPremiumCurrentFallbackRegion(input.analysis);
+  const currentRouteLabel = input.analysis.currentServer
+    ? `${input.analysis.currentServer.name}${input.analysis.currentServer.countryCode ? ` ${getFlagEmoji(input.analysis.currentServer.countryCode)}` : ''}`
+    : ui.premiumRegionUnknownStatus;
+  const preferredRegionsLabel = input.analysis.preferredRegions.join(', ') || ui.premiumRegionNoAttached;
+  const regionLines =
+    input.analysis.regionSummaries.length === 0
+      ? [ui.premiumRegionNoAttached]
+      : input.analysis.regionSummaries.slice(0, 3).map((summary) => {
+          const markers: string[] = [];
+          if (summary.isCurrent) {
+            markers.push(ui.premiumRegionCurrentRouteLabel);
+          }
+          if (summary.serverCount > 0) {
+            markers.push(`${summary.serverCount} server${summary.serverCount === 1 ? '' : 's'}`);
+          }
+          return [formatPremiumRegionSummaryLine(summary, ui), markers.join(' • ')].filter(Boolean).join(' • ');
+        });
+
+  return buildTelegramCommerceMessage({
+    title: `🌍 <b>Region status ${input.index}/${input.total}</b>`,
+    statsLine: `<b>${escapeHtml(input.key.name)}</b> • ${escapeHtml(formatPremiumOverallStatusLine(input.analysis, input.locale))}`,
+    cards: [
+      buildTelegramCommerceCard(
+        '🌍 <b>Routing snapshot</b>',
+        [
+          `${ui.premiumRegionPreferredLabel}: ${escapeHtml(preferredRegionsLabel)}`,
+          `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}${currentFallback ? ` • ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}` : ''}`,
+          `Last event: ${escapeHtml(formatTelegramPremiumRoutingEventSummary(input.latestRoutingEvent, input.locale))}`,
+        ],
+      ),
+      buildTelegramCommerceCard(
+        '🩺 <b>Health snapshot</b>',
+        regionLines.map((line) => escapeHtml(line)),
+      ),
+    ],
+    footerLines: [
+      escapeHtml(buildPremiumRecommendedNextStepText(input.analysis, input.locale)),
+    ],
+  });
+}
+
+function buildTelegramPremiumHubKeyboard(input: {
+  locale: SupportedLocale;
+  items: TelegramPremiumHubItem[];
+  page: number;
+  supportLink?: string | null;
+}) {
+  const pagination = paginateTelegramCommerce(input.items, input.page);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+
+  for (const item of pagination.pageItems) {
+    rows.push([
+      {
+        text: getTelegramUi(input.locale).premiumChangeRegion,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', item.id),
+      },
+      {
+        text: getTelegramUi(input.locale).premiumReportRouteIssue,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('is', item.id),
+      },
+    ]);
+    rows.push([
+      {
+        text: getTelegramUi(input.locale).myKeysPremiumStatus,
+        callback_data: item.latestRequestId
+          ? buildTelegramDynamicSupportActionCallbackData('st', item.latestRequestId)
+          : buildTelegramDynamicSupportActionCallbackData('is', item.id),
+      },
+      {
+        text: input.locale === 'my' ? 'More' : 'More',
+        callback_data: buildTelegramCommerceViewCallbackData(
+          'premium',
+          'detail',
+          item.id,
+          String(pagination.page),
+        ),
+      },
+    ]);
   }
 
-  if (request.replies?.length) {
-    lines.push('', `${ui.premiumFollowUpHistoryTitle}:`);
-    for (const reply of request.replies.slice(-3)) {
-      const senderLabel =
-        reply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
-      lines.push(
-        `• <b>${escapeHtml(senderLabel)}</b> · ${escapeHtml(
-          formatTelegramDateTime(reply.createdAt, input.locale),
-        )}`,
-        `  ${escapeHtml(reply.message)}`,
-      );
-    }
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'premium',
+    page: pagination.page,
+    totalItems: input.items.length,
+  });
+  if (pager) {
+    rows.push(pager);
   }
 
-  lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(ui.premiumStatusReplyHint)}`);
+  if (input.supportLink) {
+    rows.push([{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }]);
+  }
 
-  return lines.join('\n');
+  return { inline_keyboard: rows };
+}
+
+function buildTelegramPremiumDetailKeyboard(input: {
+  locale: SupportedLocale;
+  item: TelegramPremiumHubItem;
+  page: number;
+  supportLink?: string | null;
+}) {
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+
+  if (input.item.sharePageUrl) {
+    rows.push([{ text: getTelegramUi(input.locale).openSharePage, url: input.item.sharePageUrl }]);
+  }
+  rows.push([
+    {
+      text: getTelegramUi(input.locale).premiumChangeRegion,
+      callback_data: buildTelegramDynamicSupportActionCallbackData('rg', input.item.id),
+    },
+    {
+      text: getTelegramUi(input.locale).premiumReportRouteIssue,
+      callback_data: buildTelegramDynamicSupportActionCallbackData('is', input.item.id),
+    },
+  ]);
+  rows.push([
+    {
+      text: getTelegramUi(input.locale).myKeysPremiumStatus,
+      callback_data: input.item.latestRequestId
+        ? buildTelegramDynamicSupportActionCallbackData('st', input.item.latestRequestId)
+        : buildTelegramDynamicSupportActionCallbackData('is', input.item.id),
+    },
+    ...(input.supportLink ? [{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }] : []),
+  ]);
+  rows.push([{
+    text: input.locale === 'my' ? '← Back to premium' : '← Back to premium',
+    callback_data: buildTelegramCommerceViewCallbackData('premium', 'home', String(input.page)),
+  }]);
+
+  return { inline_keyboard: rows };
+}
+
+function buildTelegramPremiumSupportListKeyboard(input: {
+  locale: SupportedLocale;
+  items: TelegramPremiumSupportListItem[];
+  page: number;
+  supportLink?: string | null;
+}) {
+  const pagination = paginateTelegramCommerce(input.items, input.page);
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = pagination.pageItems.map((item) => [{
+    text: truncateTelegramCommerceButtonLabel(
+      `${getTelegramUi(input.locale).orderActionCheckStatus}: ${item.requestCode}`,
+      36,
+    ),
+    callback_data: buildTelegramCommerceViewCallbackData(
+      'supportstatus',
+      'detail',
+      item.id,
+      String(pagination.page),
+    ),
+  }]);
+
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'supportstatus',
+    page: pagination.page,
+    totalItems: input.items.length,
+  });
+  if (pager) {
+    rows.push(pager);
+  }
+
+  if (input.supportLink) {
+    rows.push([{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }]);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+function buildTelegramPremiumStatusDetailKeyboard(input: {
+  locale: SupportedLocale;
+  request: TelegramPremiumSupportRequestForUser;
+  supportLink?: string | null;
+  page: number;
+}) {
+  const requestKeyboard =
+    input.request.status === 'PENDING_REVIEW'
+      ? buildTelegramDynamicPremiumPendingKeyboard({
+          dynamicAccessKeyId: input.request.dynamicAccessKeyId,
+          requestId: input.request.id,
+          locale: input.locale,
+          supportLink: input.supportLink,
+        }).inline_keyboard
+      : buildTelegramDynamicPremiumSupportKeyboard(
+          input.request.dynamicAccessKeyId,
+          input.locale,
+          input.supportLink,
+          input.request.id,
+        ).inline_keyboard;
+
+  requestKeyboard.push([{
+    text: input.locale === 'my' ? '← Back to requests' : '← Back to requests',
+    callback_data: buildTelegramCommerceViewCallbackData('supportstatus', 'home', String(input.page)),
+  }]);
+
+  return { inline_keyboard: requestKeyboard };
+}
+
+function buildTelegramPremiumRegionKeyboard(input: {
+  locale: SupportedLocale;
+  keyId: string;
+  page: number;
+  totalItems: number;
+  supportLink?: string | null;
+}) {
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      {
+        text: getTelegramUi(input.locale).premiumChangeRegion,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', input.keyId),
+      },
+      {
+        text: getTelegramUi(input.locale).premiumReportRouteIssue,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('is', input.keyId),
+      },
+    ],
+  ];
+
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'premiumregion',
+    page: input.page,
+    totalItems: input.totalItems,
+  });
+  if (pager) {
+    rows.push(pager);
+  }
+
+  if (input.supportLink) {
+    rows.push([{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }]);
+  }
+
+  return { inline_keyboard: rows };
 }
 
 export async function handlePremiumCommand(input: {
@@ -764,131 +1082,28 @@ export async function handlePremiumCommand(input: {
     input.telegramUserId,
     3,
   );
-  const lines = [
-    ui.premiumHubTitle,
-    '',
-    `${dynamicKeys.length} key(s) • ${recentRequests.length} recent request(s)`,
-    '',
-    ui.premiumHubHint,
-    '',
-  ];
-  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
-
-  for (const key of dynamicKeys.slice(0, 4)) {
+  const items: TelegramPremiumHubItem[] = dynamicKeys.map((key) => {
     const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
     const { sharePageUrl } = input.getDynamicKeyMessagingUrls(key, 'telegram_premium', input.locale);
     const latestRequest = recentRequests.find((request) => request.dynamicAccessKeyId === key.id) || null;
-    const latestReply = latestRequest?.replies?.[latestRequest.replies.length - 1] || null;
     const analysis = summarizePremiumRegions(key, healthByServerId);
-    const latestRoutingEvent = latestRoutingEvents.get(key.id) || null;
-    const currentFallback = getPremiumCurrentFallbackRegion(analysis);
     const currentRouteLabel = analysis.currentServer
       ? `${analysis.currentServer.name}${analysis.currentServer.countryCode ? ` ${getFlagEmoji(analysis.currentServer.countryCode)}` : ''}`
       : ui.premiumRegionUnknownStatus;
-    const nextStepSummary = latestRequest
-      ? latestReply?.senderType === 'ADMIN'
-        ? ui.premiumReplyToRequest
-        : latestRequest.followUpPending
-          ? (input.locale === 'my' ? 'Wait for admin reply' : 'Wait for admin reply')
-          : ui.orderActionCheckStatus
-      : buildPremiumRecommendedNextStepText(analysis, input.locale);
-    lines.push(
-      `💎 <b>${escapeHtml(key.name)}</b>`,
-      `  ${escapeHtml(formatPremiumOverallStatusLine(analysis, input.locale))}`,
-      `  ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
-      `  ${ui.premiumRegionPreferredLabel}: ${escapeHtml(
-        analysis.preferredRegions.length ? analysis.preferredRegions.join(', ') : ui.premiumRegionNoAttached,
-      )}`,
-      `  ${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}`,
-      currentFallback
-        ? `  ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}`
-        : '',
-      `  ${ui.premiumCurrentPoolLabel}: ${escapeHtml(poolSummary)}`,
-      latestRequest
-        ? `  ${ui.premiumThreadStatusLabel}: ${escapeHtml(
-            `${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`,
-          )}`
-        : '',
-      latestReply
-        ? `  ${ui.premiumLatestReplyLabel}: ${escapeHtml(
-            `${latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou} • ${formatTelegramDateTime(latestReply.createdAt, input.locale)}`,
-          )}`
-        : '',
-      latestReply
-        ? `  ${escapeHtml(latestReply.message.slice(0, 100))}${latestReply.message.length > 100 ? '…' : ''}`
-        : '',
-      `  ${input.locale === 'my' ? 'Last routing event' : 'Last routing event'}: ${escapeHtml(
-        formatTelegramPremiumRoutingEventSummary(latestRoutingEvent, input.locale),
-      )}`,
-      `  ${ui.orderNextStepLabel}: ${escapeHtml(nextStepSummary)}`,
-      `  ${escapeHtml(
-        input.locale === 'my'
-          ? 'Quick actions: region • route issue • status'
-          : 'Quick actions: region • route issue • status',
-      )}`,
-      sharePageUrl ? `  ${ui.sharePageLabel}: ${sharePageUrl}` : '',
-      '',
-    );
 
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(`${ui.premiumChangeRegion}: ${key.name}`, 36),
-        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', key.id),
-      },
-      {
-        text: truncateTelegramButtonLabel(`${ui.premiumReportRouteIssue}: ${key.name}`, 36),
-        callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
-      },
-    ]);
-
-    if (latestRequest) {
-      inlineKeyboard.push([
-        {
-          text: truncateTelegramButtonLabel(
-            `${ui.orderActionCheckStatus}: ${latestRequest.requestCode}`,
-            36,
-          ),
-          callback_data: buildTelegramDynamicSupportActionCallbackData('st', latestRequest.id),
-        },
-        {
-          text: truncateTelegramButtonLabel(ui.premiumReplyToRequest, 30),
-          callback_data: buildTelegramDynamicSupportActionCallbackData('rp', latestRequest.id),
-        },
-      ]);
-    }
-  }
-
-  if (recentRequests.length > 0) {
-    lines.push(ui.premiumStatusTitle, '');
-    for (const request of recentRequests) {
-      lines.push(
-        `• 🧾 <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
-          formatTelegramPremiumSupportStatusLabel(request.status, ui),
-        )}`,
-        `  ${escapeHtml(request.dynamicAccessKey.name)} · ${escapeHtml(
-          formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
-        )}`,
-        '',
-      );
-    }
-  }
-
-  if (recentRequests[0]) {
-    inlineKeyboard.push([
-      {
-        text: ui.orderActionCheckStatus,
-        callback_data: buildTelegramDynamicSupportActionCallbackData('st', recentRequests[0].id),
-      },
-      {
-        text: ui.premiumReplyToRequest,
-        callback_data: buildTelegramDynamicSupportActionCallbackData('rp', recentRequests[0].id),
-      },
-    ]);
-  }
-
-  if (supportLink) {
-    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
-  }
+    return {
+      id: key.id,
+      name: key.name,
+      sharePageUrl,
+      poolSummary,
+      currentRouteLabel,
+      preferredRegions: analysis.preferredRegions,
+      summaryLine: formatPremiumOverallStatusLine(analysis, input.locale),
+      latestRequestId: latestRequest?.id || null,
+      latestRequestCode: latestRequest?.requestCode || null,
+      latestRequestState: latestRequest ? formatTelegramPremiumFollowUpState(latestRequest, ui) : null,
+    };
+  });
 
   await sendTelegramPhotoUrl(
     input.botToken,
@@ -908,9 +1123,19 @@ export async function handlePremiumCommand(input: {
     ].join('\n'),
   );
 
-  const message = lines.join('\n');
+  const message = buildTelegramPremiumHubMessage({
+    locale: input.locale,
+    items,
+    requestCount: recentRequests.length,
+    page: 1,
+  });
   const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
-    replyMarkup: { inline_keyboard: inlineKeyboard.slice(0, 10) },
+    replyMarkup: buildTelegramPremiumHubKeyboard({
+      locale: input.locale,
+      items,
+      page: 1,
+      supportLink,
+    }),
   });
 
   return sent ? null : message;
@@ -996,126 +1221,41 @@ export async function handlePremiumSupportStatusCommand(input: {
   const requests = await listTelegramPremiumSupportRequestsForUser(
     input.chatId,
     input.telegramUserId,
-    5,
+    12,
   );
   if (requests.length === 0) {
     return ui.premiumStatusEmpty;
   }
-
-  if (requests.length === 1) {
-    const request = requests[0];
-    const message = buildTelegramPremiumSupportStatusMessage({
-      locale: input.locale,
-      request,
-    });
-    const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
-      replyMarkup:
-        request.status === 'PENDING_REVIEW'
-          ? buildTelegramDynamicPremiumPendingKeyboard({
-              dynamicAccessKeyId: request.dynamicAccessKeyId,
-              requestId: request.id,
-              locale: input.locale,
-              supportLink,
-            })
-          : buildTelegramDynamicPremiumSupportKeyboard(
-              request.dynamicAccessKeyId,
-              input.locale,
-              supportLink,
-              request.id,
-            ),
-    });
-
-    return sent ? null : message;
-  }
-
-  const waitingForAdmin = requests.filter((request) => request.followUpPending).length;
-  const replyNeeded = requests.filter((request) => {
+  const summaryItems: TelegramPremiumSupportListItem[] = requests.map((request) => {
     const latestReply = request.replies?.[request.replies.length - 1] || null;
-    return latestReply?.senderType === 'ADMIN';
-  }).length;
-  const lines = [
-    ui.premiumStatusTitle,
-    '',
-    `${requests.length} request(s) • ${waitingForAdmin} waiting for admin • ${replyNeeded} reply needed`,
-    '',
-  ];
-  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
-  const latestRequest = requests[0] || null;
-
-  for (const request of requests) {
-    const latestReply = request.replies?.[request.replies.length - 1] || null;
-    const replyStateLabel = formatTelegramReplyStateLabel({
-      latestReplySenderType: latestReply?.senderType || null,
-      followUpPending: request.followUpPending,
-      locale: input.locale,
-    });
-    lines.push(
-      `• 🧾 <b>${escapeHtml(request.requestCode)}</b> · ${escapeHtml(
-        formatTelegramPremiumSupportStatusLabel(request.status, ui),
-      )}`,
-      `  ${escapeHtml(request.dynamicAccessKey.name)} · ${escapeHtml(
-        formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
-      )}`,
-      `  ${ui.premiumThreadStatusLabel}: ${escapeHtml(
-        formatTelegramPremiumFollowUpState(request, ui),
-      )}`,
-      `  ${escapeHtml(replyStateLabel)}`,
-      `  ${ui.createdAtLabel}: ${escapeHtml(
-        formatTelegramDateTime(request.createdAt, input.locale),
-      )}`,
-      ...buildTelegramLatestReplyPreviewLines({
-        reply: latestReply,
+    return {
+      id: request.id,
+      requestCode: request.requestCode,
+      keyName: request.dynamicAccessKey.name,
+      requestTypeLabel: formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
+      statusLabel: formatTelegramPremiumSupportStatusLabel(request.status, ui),
+      threadStateLabel: formatTelegramPremiumFollowUpState(request, ui),
+      replyStateLabel: formatTelegramReplyStateLabel({
+        latestReplySenderType: latestReply?.senderType || null,
+        followUpPending: request.followUpPending,
         locale: input.locale,
-        maxLength: 100,
-      }).map((line) => `  ${escapeHtml(line)}`),
-      '',
-    );
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(
-          `${ui.orderActionCheckStatus}: ${request.requestCode}`,
-          36,
-        ),
-        callback_data: buildTelegramDynamicSupportActionCallbackData('st', request.id),
-      },
-    ]);
-  }
-
-  if (supportLink) {
-    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
-  }
-
-  const message = lines.join('\n');
-  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
-    replyMarkup: { inline_keyboard: inlineKeyboard.slice(0, 8) },
-  });
-
-  if (sent && latestRequest) {
-    await input.sendTelegramMessage(
-      input.botToken,
-      input.chatId,
-      buildTelegramPremiumSupportStatusMessage({
-        locale: input.locale,
-        request: latestRequest,
       }),
-      {
-        replyMarkup:
-          latestRequest.status === 'PENDING_REVIEW'
-            ? buildTelegramDynamicPremiumPendingKeyboard({
-                dynamicAccessKeyId: latestRequest.dynamicAccessKeyId,
-                requestId: latestRequest.id,
-                locale: input.locale,
-                supportLink,
-              })
-            : buildTelegramDynamicPremiumSupportKeyboard(
-                latestRequest.dynamicAccessKeyId,
-                input.locale,
-                supportLink,
-                latestRequest.id,
-              ),
-      },
-    );
-  }
+      createdAtLabel: formatTelegramDateTime(request.createdAt, input.locale),
+    };
+  });
+  const message = buildTelegramPremiumSupportListMessage({
+    locale: input.locale,
+    items: summaryItems,
+    page: 1,
+  });
+  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramPremiumSupportListKeyboard({
+      locale: input.locale,
+      items: summaryItems,
+      page: 1,
+      supportLink,
+    }),
+  });
 
   return sent ? null : message;
 }
@@ -1204,139 +1344,327 @@ export async function handlePremiumRegionStatusCommand(input: {
     : [];
   const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
   const latestRoutingEvents = await getLatestPremiumRoutingEventsByKeyIds(dynamicKeys.map((key) => key.id));
+  const selectedKey = dynamicKeys[0];
+  const selectedAnalysis = summarizePremiumRegions(selectedKey, healthByServerId);
+  const latestRoutingEvent = latestRoutingEvents.get(selectedKey.id) || null;
+  const message = buildTelegramPremiumRegionDetailMessage({
+    locale: input.locale,
+    key: selectedKey,
+    analysis: selectedAnalysis,
+    latestRoutingEvent,
+    index: 1,
+    total: dynamicKeys.length,
+  });
+  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramPremiumRegionKeyboard({
+      locale: input.locale,
+      keyId: selectedKey.id,
+      page: 1,
+      totalItems: dynamicKeys.length,
+      supportLink,
+    }),
+  });
 
-  const lines = [
-    ui.premiumRegionStatusTitle,
-    '',
-    `${dynamicKeys.length} premium key(s)`,
-    '',
-    ui.premiumRegionStatusHint,
-    '',
-  ];
-  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+  return sent ? null : message;
+}
 
-  for (const key of dynamicKeys.slice(0, 4)) {
+export async function handleTelegramPremiumCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page' | 'detail';
+  primary?: string | null;
+  secondary?: string | null;
+  getTelegramSupportLink: () => Promise<string | null>;
+  findLinkedDynamicAccessKeys: (
+    chatId: number,
+    telegramUserId: number,
+    includeDisabled?: boolean,
+  ) => Promise<Array<PremiumMessagingKey & { status: string }>>;
+  getDynamicKeyMessagingUrls: (
+    dynamicKey: PremiumMessagingKey,
+    source: string,
+    locale: SupportedLocale,
+  ) => {
+    sharePageUrl: string | null;
+    subscriptionUrl: string | null;
+    outlineClientUrl: string | null;
+  };
+  sendTelegramMessage: (
+    botToken: string,
+    chatId: number | string,
+    text: string,
+    options?: {
+      parseMode?: 'HTML' | 'Markdown';
+      replyMarkup?: Record<string, unknown>;
+      disableWebPagePreview?: boolean;
+    },
+  ) => Promise<boolean>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await input.getTelegramSupportLink();
+  const dynamicKeys = (await input.findLinkedDynamicAccessKeys(
+    input.chatId,
+    input.telegramUserId,
+    true,
+  )).filter((key) => ['ACTIVE', 'PENDING', 'DISABLED'].includes(key.status));
+  if (dynamicKeys.length === 0) {
+    return ui.premiumHubEmpty;
+  }
+
+  const allServerIds = Array.from(
+    new Set(
+      dynamicKeys.flatMap((key) =>
+        key.accessKeys
+          .map((accessKey) => accessKey.server?.id || null)
+          .filter((serverId): serverId is string => Boolean(serverId)),
+      ),
+    ),
+  );
+  const healthChecks = allServerIds.length
+    ? await db.healthCheck.findMany({
+        where: { serverId: { in: allServerIds } },
+        select: {
+          serverId: true,
+          lastStatus: true,
+          lastLatencyMs: true,
+          lastCheckedAt: true,
+          latencyThresholdMs: true,
+          server: { select: { id: true, name: true, countryCode: true } },
+        },
+      })
+    : [];
+  const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+  const requests = await listTelegramPremiumSupportRequestsForUser(
+    input.chatId,
+    input.telegramUserId,
+    12,
+  );
+  const items: TelegramPremiumHubItem[] = dynamicKeys.map((key) => {
     const analysis = summarizePremiumRegions(key, healthByServerId);
-    const latestRoutingEvent = latestRoutingEvents.get(key.id) || null;
-    const currentFallback = getPremiumCurrentFallbackRegion(analysis);
+    const latestRequest = requests.find((request) => request.dynamicAccessKeyId === key.id) || null;
     const currentRouteLabel = analysis.currentServer
       ? `${analysis.currentServer.name}${analysis.currentServer.countryCode ? ` ${getFlagEmoji(analysis.currentServer.countryCode)}` : ''}`
       : ui.premiumRegionUnknownStatus;
-    const suggestedFallback = analysis.suggestedFallbacks[0] || null;
+    return {
+      id: key.id,
+      name: key.name,
+      sharePageUrl: input.getDynamicKeyMessagingUrls(key, 'telegram_premium', input.locale).sharePageUrl,
+      poolSummary: formatTelegramDynamicPoolSummary(key, ui),
+      currentRouteLabel,
+      preferredRegions: analysis.preferredRegions,
+      summaryLine: formatPremiumOverallStatusLine(analysis, input.locale),
+      latestRequestId: latestRequest?.id || null,
+      latestRequestCode: latestRequest?.requestCode || null,
+      latestRequestState: latestRequest ? formatTelegramPremiumFollowUpState(latestRequest, ui) : null,
+    };
+  });
 
-    lines.push(`• 💎 <b>${escapeHtml(key.name)}</b>`);
-    lines.push(
-      `  ${escapeHtml(formatPremiumOverallStatusLine(analysis, input.locale))}`,
-    );
-    lines.push(
-      `  ${ui.premiumRegionPreferredLabel}: ${
-        analysis.preferredRegions.length
-          ? escapeHtml(analysis.preferredRegions.join(', '))
-          : escapeHtml(ui.premiumRegionNoAttached)
-      }`,
-    );
-    lines.push(
-      `  ${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}`,
-    );
-    if (currentFallback) {
-      lines.push(`  ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}`);
+  if (input.action === 'detail') {
+    const item = items.find((candidate) => candidate.id === input.primary);
+    if (!item) {
+      return ui.premiumHubEmpty;
     }
-    if (suggestedFallback) {
-      lines.push(
-        `  ${ui.premiumRegionAlertSuggestedLabel}: ${escapeHtml(
-          `${suggestedFallback.regionCode}${suggestedFallback.latencyMs ? ` • ${suggestedFallback.latencyMs}ms` : ''}`,
-        )}`,
-      );
-    }
-    lines.push(
-      `  ${input.locale === 'my' ? 'Last routing event' : 'Last routing event'}: ${escapeHtml(
-        formatTelegramPremiumRoutingEventSummary(latestRoutingEvent, input.locale),
-      )}`,
-    );
-    lines.push(`  ${ui.orderNextStepLabel}: ${escapeHtml(buildPremiumRecommendedNextStepText(analysis, input.locale))}`);
-    lines.push(`  ${ui.premiumRegionAttachedLabel}: ${analysis.attachedServers.length}`);
-    lines.push(`  <b>${input.locale === 'my' ? 'Region health' : 'Region health'}</b>`);
-
-    if (analysis.preferredRegions.length === 0) {
-      lines.push(`  ${escapeHtml(ui.premiumRegionNoAttached)}`, '');
-      inlineKeyboard.push([
-        {
-          text: truncateTelegramButtonLabel(`${ui.premiumReportRouteIssue}: ${key.name}`, 36),
-          callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
-        },
-      ]);
-      continue;
-    }
-
-    for (const regionSummary of analysis.regionSummaries.slice(0, 6)) {
-      const markers: string[] = [];
-      if (regionSummary.isCurrent) {
-        markers.push(ui.premiumRegionCurrentRouteLabel);
-      }
-      if (regionSummary.serverCount > 0) {
-        markers.push(`${regionSummary.serverCount} server${regionSummary.serverCount === 1 ? '' : 's'}`);
-      }
-
-      lines.push(
-        `  • ${escapeHtml(formatPremiumRegionSummaryLine(regionSummary, ui))}`,
-      );
-      if (markers.length > 0) {
-        lines.push(`    ${escapeHtml(markers.join(' • '))}`);
-      }
-      if (regionSummary.serverName) {
-        lines.push(`    ${escapeHtml(regionSummary.serverName)}`);
-      }
-      if (regionSummary.lastCheckedAt) {
-        lines.push(
-          `    ${escapeHtml(formatTelegramDateTime(regionSummary.lastCheckedAt, input.locale))}`,
-        );
-      }
-    }
-
-    lines.push(
-      `  ${escapeHtml(
-        input.locale === 'my'
-          ? 'Need a change? Use the buttons below to request a region change or report a route issue.'
-          : 'Need a change? Use the buttons below to request a region change or report a route issue.',
-      )}`,
-    );
-
-    lines.push('');
-    inlineKeyboard.push([
-      {
-        text: truncateTelegramButtonLabel(`${ui.premiumChangeRegion}: ${key.name}`, 34),
-        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', key.id),
-      },
-      {
-        text: truncateTelegramButtonLabel(`${ui.premiumReportRouteIssue}: ${key.name}`, 34),
-        callback_data: buildTelegramDynamicSupportActionCallbackData('is', key.id),
-      },
-    ]);
+    const page = Number.parseInt(input.secondary || '1', 10) || 1;
+    const message = buildTelegramPremiumDetailMessage({
+      locale: input.locale,
+      item,
+    });
+    const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramPremiumDetailKeyboard({
+        locale: input.locale,
+        item,
+        page,
+        supportLink,
+      }),
+    });
+    return sent ? null : message;
   }
 
-  lines.push(ui.premiumRegionStatusFootnote);
-
-  if (supportLink) {
-    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
-  }
-
-  await sendTelegramPhotoUrl(
-    input.botToken,
-    input.chatId,
-    getTelegramBrandMediaUrl('premiumShowcase'),
-    [
-      ui.premiumRegionStatusTitle,
-      '',
-      input.locale === 'my'
-        ? `${dynamicKeys.length} key(s) • live route health`
-        : `${dynamicKeys.length} key(s) • live route health`,
-      ui.premiumRegionStatusHint,
-    ].join('\n'),
-  );
-
-  const message = lines.join('\n');
+  const page = Number.parseInt(input.primary || '1', 10) || 1;
+  const message = buildTelegramPremiumHubMessage({
+    locale: input.locale,
+    items,
+    requestCount: requests.length,
+    page,
+  });
   const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
-    replyMarkup: inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined,
+    replyMarkup: buildTelegramPremiumHubKeyboard({
+      locale: input.locale,
+      items,
+      page,
+      supportLink,
+    }),
+  });
+  return sent ? null : message;
+}
+
+export async function handleTelegramPremiumSupportStatusCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page' | 'detail';
+  primary?: string | null;
+  secondary?: string | null;
+  getTelegramSupportLink: () => Promise<string | null>;
+  sendTelegramMessage: (
+    botToken: string,
+    chatId: number | string,
+    text: string,
+    options?: {
+      parseMode?: 'HTML' | 'Markdown';
+      replyMarkup?: Record<string, unknown>;
+      disableWebPagePreview?: boolean;
+    },
+  ) => Promise<boolean>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await input.getTelegramSupportLink();
+  const requests = await listTelegramPremiumSupportRequestsForUser(
+    input.chatId,
+    input.telegramUserId,
+    12,
+  );
+  if (requests.length === 0) {
+    return ui.premiumStatusEmpty;
+  }
+
+  if (input.action === 'detail') {
+    const request = requests.find((candidate) => candidate.id === input.primary);
+    if (!request) {
+      return ui.premiumStatusEmpty;
+    }
+    const page = Number.parseInt(input.secondary || '1', 10) || 1;
+    const message = buildTelegramPremiumSupportStatusMessage({
+      locale: input.locale,
+      request,
+    });
+    const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+      replyMarkup: buildTelegramPremiumStatusDetailKeyboard({
+        locale: input.locale,
+        request,
+        supportLink,
+        page,
+      }),
+    });
+    return sent ? null : message;
+  }
+
+  const items: TelegramPremiumSupportListItem[] = requests.map((request) => {
+    const latestReply = request.replies?.[request.replies.length - 1] || null;
+    return {
+      id: request.id,
+      requestCode: request.requestCode,
+      keyName: request.dynamicAccessKey.name,
+      requestTypeLabel: formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
+      statusLabel: formatTelegramPremiumSupportStatusLabel(request.status, ui),
+      threadStateLabel: formatTelegramPremiumFollowUpState(request, ui),
+      replyStateLabel: formatTelegramReplyStateLabel({
+        latestReplySenderType: latestReply?.senderType || null,
+        followUpPending: request.followUpPending,
+        locale: input.locale,
+      }),
+      createdAtLabel: formatTelegramDateTime(request.createdAt, input.locale),
+    };
+  });
+  const page = Number.parseInt(input.primary || '1', 10) || 1;
+  const message = buildTelegramPremiumSupportListMessage({
+    locale: input.locale,
+    items,
+    page,
+  });
+  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramPremiumSupportListKeyboard({
+      locale: input.locale,
+      items,
+      page,
+      supportLink,
+    }),
+  });
+  return sent ? null : message;
+}
+
+export async function handleTelegramPremiumRegionCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page';
+  primary?: string | null;
+  getTelegramSupportLink: () => Promise<string | null>;
+  findLinkedDynamicAccessKeys: (
+    chatId: number,
+    telegramUserId: number,
+    includeDisabled?: boolean,
+  ) => Promise<Array<PremiumMessagingKey & { status: string }>>;
+  sendTelegramMessage: (
+    botToken: string,
+    chatId: number | string,
+    text: string,
+    options?: {
+      parseMode?: 'HTML' | 'Markdown';
+      replyMarkup?: Record<string, unknown>;
+      disableWebPagePreview?: boolean;
+    },
+  ) => Promise<boolean>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const supportLink = await input.getTelegramSupportLink();
+  const dynamicKeys = (await input.findLinkedDynamicAccessKeys(
+    input.chatId,
+    input.telegramUserId,
+    true,
+  )).filter((key) => ['ACTIVE', 'PENDING', 'DISABLED'].includes(key.status));
+  if (dynamicKeys.length === 0) {
+    return ui.premiumRegionStatusEmpty;
+  }
+
+  const allServerIds = Array.from(
+    new Set(
+      dynamicKeys.flatMap((key) =>
+        key.accessKeys
+          .map((accessKey) => accessKey.server?.id || null)
+          .filter((serverId): serverId is string => Boolean(serverId)),
+      ),
+    ),
+  );
+  const healthChecks = allServerIds.length
+    ? await db.healthCheck.findMany({
+        where: { serverId: { in: allServerIds } },
+        select: {
+          serverId: true,
+          lastStatus: true,
+          lastLatencyMs: true,
+          lastCheckedAt: true,
+          latencyThresholdMs: true,
+          server: { select: { id: true, name: true, countryCode: true } },
+        },
+      })
+    : [];
+  const healthByServerId = new Map(healthChecks.map((entry) => [entry.serverId, entry]));
+  const latestRoutingEvents = await getLatestPremiumRoutingEventsByKeyIds(dynamicKeys.map((key) => key.id));
+  const page = Math.min(Math.max(Number.parseInt(input.primary || '1', 10) || 1, 1), dynamicKeys.length);
+  const key = dynamicKeys[page - 1];
+  const analysis = summarizePremiumRegions(key, healthByServerId);
+  const latestRoutingEvent = latestRoutingEvents.get(key.id) || null;
+  const message = buildTelegramPremiumRegionDetailMessage({
+    locale: input.locale,
+    key,
+    analysis,
+    latestRoutingEvent,
+    index: page,
+    total: dynamicKeys.length,
+  });
+  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramPremiumRegionKeyboard({
+      locale: input.locale,
+      keyId: key.id,
+      page,
+      totalItems: dynamicKeys.length,
+      supportLink,
+    }),
   });
 
   return sent ? null : message;

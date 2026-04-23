@@ -489,8 +489,8 @@ function SecurityAlertsSummaryCard() {
 
   return (
     <div className="ops-panel space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="ops-section-heading">Security alerts</p>
           <h2 className="mt-2 text-xl font-semibold">Admin login protection</h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -500,7 +500,7 @@ function SecurityAlertsSummaryCard() {
         <Badge
           variant="outline"
           className={cn(
-            'rounded-full px-3 py-1 text-xs font-semibold',
+            'h-auto w-fit max-w-full self-start whitespace-normal break-words rounded-full px-3 py-1 text-xs font-semibold leading-tight sm:self-auto',
             activeBans.length > 0
               ? 'border-rose-500/25 bg-rose-500/10 text-rose-500'
               : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'

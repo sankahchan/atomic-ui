@@ -1300,11 +1300,6 @@ export default function SubscriptionPage() {
         <link href={branding.fontUrl} rel="stylesheet" />
       )}
 
-      {/* Custom CSS injection */}
-      {branding.customCss && (
-        <style dangerouslySetInnerHTML={{ __html: branding.customCss }} />
-      )}
-
       {/* Animation styles */}
       <style>{`
         @keyframes gradient-shift {

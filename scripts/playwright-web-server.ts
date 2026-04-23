@@ -3,6 +3,7 @@ import https from 'https';
 import os from 'os';
 import path from 'path';
 import { execFileSync, spawn, type ChildProcess } from 'child_process';
+import { X509Certificate } from 'crypto';
 
 import bcrypt from 'bcryptjs';
 
@@ -12,6 +13,7 @@ const outlinePort = 18443;
 const baseUrl = `http://127.0.0.1:${appPort}`;
 const outlineUrl = `https://127.0.0.1:${outlinePort}`;
 const templateDbPath = path.join(repoRoot, 'prisma', 'data', 'atomic-ui.db');
+const templateSchemaPath = path.join(repoRoot, 'scripts', 'playwright-smoke-schema.sql');
 const smokeDbPath = path.join(repoRoot, 'prisma', 'data', 'playwright-smoke.db');
 const smokeAdminEmail = 'smoke-admin@example.com';
 const smokeAdminPassword = 'Admin123!';
@@ -34,6 +36,12 @@ function setSmokeEnv() {
   process.env.DISABLE_SCHEDULER = '1';
   process.env.NODE_ENV = 'development';
 }
+
+type GeneratedSelfSignedCertificate = {
+  key: Buffer;
+  cert: Buffer;
+  fingerprint256: string;
+};
 
 function generateSelfSignedCertificate() {
   const certDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-playwright-'));
@@ -67,10 +75,15 @@ function generateSelfSignedCertificate() {
     );
   }
 
+  const key = fs.readFileSync(keyPath);
+  const cert = fs.readFileSync(certPath);
+  const fingerprint256 = new X509Certificate(cert).fingerprint256;
+
   return {
-    key: fs.readFileSync(keyPath),
-    cert: fs.readFileSync(certPath),
-  };
+    key,
+    cert,
+    fingerprint256,
+  } satisfies GeneratedSelfSignedCertificate;
 }
 
 function readJsonBody(request: import('http').IncomingMessage): Promise<Record<string, unknown>> {
@@ -110,7 +123,14 @@ function createMockOutlineServer() {
   >();
   let keyCounter = 1;
 
-  return https.createServer(certificate, async (request, response) => {
+  return {
+    fingerprint256: certificate.fingerprint256,
+    server: https.createServer(
+      {
+        key: certificate.key,
+        cert: certificate.cert,
+      },
+      async (request, response) => {
     const requestUrl = new URL(request.url || '/', outlineUrl);
 
     if (request.method === 'GET' && requestUrl.pathname === '/server') {
@@ -205,16 +225,13 @@ function createMockOutlineServer() {
 
     response.writeHead(404, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ error: 'Not found', path: requestUrl.pathname }));
-  });
+      },
+    ),
+  };
 }
 
-async function resetAndSeedDatabase() {
+async function resetAndSeedDatabase(outlineCertSha256: string) {
   fs.mkdirSync(path.dirname(smokeDbPath), { recursive: true });
-  if (!fs.existsSync(templateDbPath)) {
-    throw new Error(
-      `Smoke database template is missing at ${templateDbPath}. Run the normal local setup first.`,
-    );
-  }
   if (fs.existsSync(smokeDbPath)) {
     fs.rmSync(smokeDbPath, { force: true });
   }
@@ -222,10 +239,31 @@ async function resetAndSeedDatabase() {
   if (fs.existsSync(journalPath)) {
     fs.rmSync(journalPath, { force: true });
   }
-  execFileSync('sqlite3', [templateDbPath, `.backup ${smokeDbPath}`], {
-    cwd: repoRoot,
-    stdio: 'ignore',
-  });
+  const walPath = `${smokeDbPath}-wal`;
+  if (fs.existsSync(walPath)) {
+    fs.rmSync(walPath, { force: true });
+  }
+  const shmPath = `${smokeDbPath}-shm`;
+  if (fs.existsSync(shmPath)) {
+    fs.rmSync(shmPath, { force: true });
+  }
+
+  if (fs.existsSync(templateDbPath)) {
+    execFileSync('sqlite3', [templateDbPath, `.backup ${smokeDbPath}`], {
+      cwd: repoRoot,
+      stdio: 'ignore',
+    });
+  } else if (fs.existsSync(templateSchemaPath)) {
+    execFileSync('sqlite3', [smokeDbPath], {
+      cwd: repoRoot,
+      input: fs.readFileSync(templateSchemaPath),
+      stdio: ['pipe', 'ignore', 'inherit'],
+    });
+  } else {
+    throw new Error(
+      `Smoke database bootstrap is missing both ${templateDbPath} and ${templateSchemaPath}.`,
+    );
+  }
 
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
@@ -333,7 +371,7 @@ async function resetAndSeedDatabase() {
         id: 'smoke-server',
         name: 'Playwright SG',
         apiUrl: outlineUrl,
-        apiCertSha256: 'playwright-smoke',
+        apiCertSha256: outlineCertSha256,
         countryCode: 'SG',
         location: 'Singapore',
         isActive: true,
@@ -582,9 +620,9 @@ function startNextServer(): ChildProcess {
 
 async function main() {
   setSmokeEnv();
-  await resetAndSeedDatabase();
+  const { server: outlineServer, fingerprint256 } = createMockOutlineServer();
+  await resetAndSeedDatabase(fingerprint256);
 
-  const outlineServer = createMockOutlineServer();
   await new Promise<void>((resolve) => {
     outlineServer.listen(outlinePort, '127.0.0.1', () => resolve());
   });

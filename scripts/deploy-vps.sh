@@ -8,7 +8,7 @@ DEPLOY_PASSWORD="${DEPLOY_PASSWORD:-}"
 DEPLOY_PATH="${DEPLOY_PATH:-/opt/atomic-ui}"
 DEPLOY_SERVICE="${DEPLOY_SERVICE:-atomic-ui.service}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
-NODE_HEAP_MB="${NODE_HEAP_MB:-640}"
+NODE_HEAP_MB="${NODE_HEAP_MB:-1024}"
 DEPLOY_PORT_FALLBACK="${DEPLOY_PORT_FALLBACK:-2053}"
 DEPLOY_PANEL_PATH_FALLBACK="${DEPLOY_PANEL_PATH_FALLBACK:-}"
 
@@ -22,7 +22,7 @@ Optional environment variables:
   DEPLOY_PATH=/opt/atomic-ui
   DEPLOY_SERVICE=atomic-ui.service
   DEPLOY_BRANCH=main
-  NODE_HEAP_MB=640
+  NODE_HEAP_MB=1024
   DEPLOY_PORT_FALLBACK=2053
   DEPLOY_PANEL_PATH_FALLBACK=/7061c5df
 EOF
@@ -47,7 +47,31 @@ fi
 set -euo pipefail
 
 cd "${APP_DIR}"
+if ! command -v pg_restore >/dev/null 2>&1 || ! command -v pg_dump >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+  apt-get update -qq
+  apt-get install -y -qq openssl postgresql-client >/dev/null
+fi
 git pull --ff-only origin "${BRANCH}"
+npm ci --include=dev
+
+ensure_env_secret() {
+  local key="$1"
+  local value
+
+  if [[ ! -f .env ]]; then
+    return
+  fi
+
+  value="$(grep -E "^${key}=" .env | tail -n 1 | cut -d '=' -f2- | sed -E 's/^["'\'']?|["'\'']?$//g' || true)"
+  if [[ -n "${value}" ]]; then
+    return
+  fi
+
+  printf '%s="%s"\n' "${key}" "$(openssl rand -hex 32)" >> .env
+  echo "Generated missing ${key} in ${APP_DIR}/.env"
+}
+
+ensure_env_secret "SETTINGS_ENCRYPTION_KEY"
 
 restart_service() {
   systemctl start "${SERVICE_NAME}" >/dev/null 2>&1 || true
@@ -56,9 +80,10 @@ restart_service() {
 trap restart_service ERR
 
 systemctl stop "${SERVICE_NAME}"
-sh scripts/prisma-command.sh db push
+node scripts/prisma-safe-db-push.js
 sh scripts/prisma-command.sh generate
 NODE_HEAP_MB="${NODE_HEAP_MB}" PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+APP_DIR="${APP_DIR}" SERVICE_NAME="${SERVICE_NAME}" PORT_FALLBACK="${PANEL_PORT:-${PORT_FALLBACK}}" bash scripts/sync-systemd-service.sh
 trap - ERR
 
 systemctl start "${SERVICE_NAME}"

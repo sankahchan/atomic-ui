@@ -84,6 +84,10 @@ export function hasRestoreManageScope(scope?: string | null) {
   return isOwnerLikeAdmin(scope);
 }
 
+export function hasSubscriptionSettingsManageScope(scope?: string | null) {
+  return isOwnerLikeAdmin(scope);
+}
+
 export function hasKeyExportScope(scope?: string | null) {
   return hasKeyManageScope(scope);
 }

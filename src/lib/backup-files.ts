@@ -1,0 +1,75 @@
+export type BackupFileKind =
+  | 'sqlite'
+  | 'sqlite_archive'
+  | 'postgres_archive'
+  | 'postgres_dump'
+  | 'postgres_sql'
+  | 'unknown';
+
+function normalizeBackupFilename(filename: string) {
+  return filename.trim().toLowerCase();
+}
+
+export function inferBackupFileKind(filename: string, header?: string | null): BackupFileKind {
+  const normalizedFilename = normalizeBackupFilename(filename);
+  const normalizedHeader = (header || '').trim();
+
+  if (normalizedHeader.startsWith('SQLite format 3')) {
+    return 'sqlite';
+  }
+
+  if (normalizedHeader.startsWith('PGDMP')) {
+    return 'postgres_dump';
+  }
+
+  if (
+    normalizedFilename.endsWith('.postgres.zip') ||
+    normalizedFilename.endsWith('.pg.zip')
+  ) {
+    return 'postgres_archive';
+  }
+
+  if (normalizedFilename.endsWith('.zip')) {
+    return 'sqlite_archive';
+  }
+
+  if (
+    normalizedFilename.endsWith('.db') ||
+    normalizedFilename.endsWith('.sqlite') ||
+    normalizedFilename.endsWith('.bak')
+  ) {
+    return 'sqlite';
+  }
+
+  if (normalizedFilename.endsWith('.dump')) {
+    return 'postgres_dump';
+  }
+
+  if (normalizedFilename.endsWith('.sql')) {
+    return 'postgres_sql';
+  }
+
+  return 'unknown';
+}
+
+export function buildOfflineRestoreCommand(filename: string, absolutePath: string) {
+  const fileKind = inferBackupFileKind(filename);
+
+  switch (fileKind) {
+    case 'postgres_dump':
+      return `pg_restore --clean --if-exists --no-owner --no-privileges --dbname "$DATABASE_URL" ${absolutePath}`;
+    case 'postgres_sql':
+      return `psql "$DATABASE_URL" < ${absolutePath}`;
+    case 'postgres_archive':
+      return `Upload ${absolutePath} in the dashboard and use Restore. The bundle contains the Postgres dump plus restore encryption metadata.`;
+    case 'sqlite_archive':
+    case 'sqlite':
+    case 'unknown':
+    default:
+      return `npm run restore:sqlite -- --backup ${absolutePath}`;
+  }
+}
+
+export function isSupportedBackupFileKind(fileKind: BackupFileKind) {
+  return fileKind !== 'unknown';
+}

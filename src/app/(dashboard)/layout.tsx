@@ -53,12 +53,6 @@ const navItems = [
   { href: '/dashboard/tools' },
 ];
 
-const sidebarSections = [
-  { title: 'Core', items: primaryDashboardNavItems },
-  { title: 'Operations', items: adminToolNavItems },
-  { title: 'Workspace', items: settingsShortcutItems },
-] as const;
-
 /**
  * Sidebar Component (Desktop only)
  *
@@ -116,47 +110,41 @@ function Sidebar({
 
       {/* Navigation links */}
       <nav className="custom-scrollbar flex-1 overflow-y-auto px-2 py-5">
-        <div className="space-y-5">
-          {sidebarSections.map((section) => (
-            <div key={section.title} className="space-y-2">
-              {!isCollapsed && (
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80">
-                  {section.title}
-                </p>
-              )}
-              <ul className="space-y-1.5">
-                {section.items.map((item) => {
-                  const isActive = pathname === item.href ||
-                    (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+        {!isCollapsed && (
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80">
+            Core
+          </p>
+        )}
+        <ul className="space-y-1.5">
+          {primaryDashboardNavItems.map((item) => {
+            const isActive = pathname === item.href ||
+              (item.href !== '/dashboard' && pathname?.startsWith(item.href));
 
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          'ops-sidebar-item',
-                          isCollapsed && 'justify-center px-0',
-                          isActive
-                            ? 'border border-white/55 bg-white/70 text-primary shadow-[0_16px_28px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-white/[0.07] dark:text-cyan-100 dark:shadow-[0_18px_34px_rgba(0,3,12,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]'
-                            : 'text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100'
-                        )}
-                        title={isCollapsed ? t(item.labelKey) : undefined}
-                      >
-                        <item.icon className={cn(
-                          'w-5 h-5 flex-shrink-0',
-                          isActive ? 'text-primary dark:text-cyan-200' : 'text-muted-foreground dark:text-slate-500'
-                        )} />
-                        {!isCollapsed && (
-                          <span className="text-sm font-medium">{t(item.labelKey)}</span>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    'ops-sidebar-item',
+                    isCollapsed && 'justify-center px-0',
+                    isActive
+                      ? 'border border-white/55 bg-white/70 text-primary shadow-[0_16px_28px_rgba(148,163,184,0.18),inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-white/[0.07] dark:text-cyan-100 dark:shadow-[0_18px_34px_rgba(0,3,12,0.3),inset_0_1px_0_rgba(255,255,255,0.08)]'
+                      : 'text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100'
+                  )}
+                  title={isCollapsed ? t(item.labelKey) : undefined}
+                >
+                  <item.icon className={cn(
+                    'w-5 h-5 flex-shrink-0',
+                    isActive ? 'text-primary dark:text-cyan-200' : 'text-muted-foreground dark:text-slate-500'
+                  )} />
+                  {!isCollapsed && (
+                    <span className="text-sm font-medium">{t(item.labelKey)}</span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
       {/* Sidebar footer */}
@@ -176,7 +164,9 @@ function Sidebar({
               Release
             </p>
             <p className="mt-2 text-sm font-semibold text-foreground">{APP_RELEASE_LABEL}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Frosted command center for keys, servers, automation, and customer ops.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Core navigation stays here. Everything else lives in the tools menu.
+            </p>
           </>
         )}
       </div>
@@ -188,7 +178,8 @@ function Sidebar({
  * Header Component
  *
  * Glass-styled header with theme toggle, notifications, and user actions.
- * No hamburger menu on mobile — bottom tab bar handles navigation instead.
+ * Core navigation stays in the sidebar/bottom tabs, with a secondary tools menu
+ * for the rest of the dashboard surface.
  */
 function Header({
   user,
@@ -208,16 +199,18 @@ function Header({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 px-4 pt-4 md:px-6 lg:px-8 lg:pt-6">
+    <header className="sticky top-0 z-40 px-3 pt-[calc(var(--safe-area-top)+0.55rem)] sm:px-4 md:px-6 lg:px-8 lg:pt-6">
       <div className="ops-topbar">
         {/* Left side: Logo on mobile */}
-        <div className="flex items-center gap-3 lg:hidden">
-          <Link href="/dashboard" className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-2 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
-            <Atom className="h-5 w-5 text-primary" />
-            <div className="leading-none">
-              <span className="block text-sm font-semibold">Atomic-UI</span>
-              <span className="block pt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Frosted</span>
-            </div>
+        <div className="flex min-w-0 items-center gap-2 lg:hidden">
+          <Link
+            href="/dashboard"
+            className="flex h-9 min-w-0 shrink items-center gap-2 rounded-full border border-border/70 bg-background/70 px-2.5 shadow-sm dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+          >
+            <Atom className="h-4 w-4 shrink-0 text-primary" />
+            <span className="block max-w-[4.9rem] truncate text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+              Atomic-UI
+            </span>
           </Link>
         </div>
 
@@ -227,7 +220,6 @@ function Header({
             <Atom className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">Frosted workspace</p>
             <p className="truncate text-sm font-semibold text-foreground">Operations dashboard</p>
           </div>
         </div>
@@ -236,24 +228,26 @@ function Header({
         <div className="flex items-center gap-1.5 sm:gap-2">
           <Button
             variant="ghost"
-            size="icon"
             onClick={onOpenTools}
             title={t('nav.tools')}
-            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm lg:hidden"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/70 px-0 text-muted-foreground shadow-sm hover:text-foreground sm:h-10 sm:w-auto sm:px-3 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-300 dark:hover:text-cyan-100"
           >
             <LayoutGrid className="h-4 w-4" />
+            <span className="ml-2 hidden text-sm font-medium sm:inline">
+              {t('nav.tools')}
+            </span>
           </Button>
 
           {mounted && (
             <>
-              <LanguageSelector />
+              <LanguageSelector className="h-9 px-2 sm:h-10 sm:px-2.5 md:px-3" />
               <NotificationBell />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-                className="h-10 w-10 rounded-full border border-border/70 bg-background/70 shadow-sm dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                className="h-9 w-9 rounded-full border border-border/70 bg-background/70 shadow-sm sm:h-10 sm:w-10 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
               >
                 {theme === 'dark' ? (
                   <Sun className="h-4 w-4" />
@@ -281,7 +275,7 @@ function Header({
             size="icon"
             onClick={onLogout}
             title="Logout"
-            className="h-10 w-10 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-400 dark:hover:text-cyan-100"
+            className="h-9 w-9 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground sm:h-10 sm:w-10 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-400 dark:hover:text-cyan-100"
           >
             <LogOut className="h-4 w-4" />
           </Button>
@@ -405,7 +399,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background overflow-x-hidden">
+    <div className="ops-mobile-root min-h-screen min-h-[100dvh] overflow-x-hidden bg-background">
       {/* Animated gradient mesh background */}
       <GradientMeshBackground />
 
@@ -431,7 +425,7 @@ export default function DashboardLayout({
         />
 
         {/* Page content — extra bottom padding on mobile for tab bar */}
-        <main className="flex-1 px-4 pb-24 pt-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
+        <main className="flex-1 px-3 pb-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+1.5rem)] pt-3 sm:px-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
           <div className="ops-page">
             {children}
           </div>

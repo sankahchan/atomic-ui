@@ -14,6 +14,12 @@ import {
     syncSchedulerJobCatalog,
 } from '@/lib/services/scheduler-jobs';
 import { runManualSchedulerJob } from '@/lib/services/scheduler-job-manual';
+import {
+    getMonitoringSettings,
+    MONITORING_SETTINGS_LIMITS,
+    saveMonitoringSettings,
+} from '@/lib/services/monitoring-config';
+import { getMonitoringOverview } from '@/lib/services/monitoring-overview';
 import { writeAuditLog } from '@/lib/audit';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -156,6 +162,41 @@ export const systemRouter = router({
             databaseRuntime: getDatabaseRuntimeSummary(),
         };
     }),
+    getMonitoringSettings: adminProcedure.query(async () => {
+        return getMonitoringSettings();
+    }),
+    getMonitoringOverview: adminProcedure.query(async () => {
+        await syncSchedulerJobCatalog();
+        return getMonitoringOverview();
+    }),
+    updateMonitoringSettings: adminProcedure
+        .input(
+            z.object({
+                backupVerificationAlertCooldownHours: z.number().int().min(MONITORING_SETTINGS_LIMITS.backupVerificationAlertCooldownHours.min).max(MONITORING_SETTINGS_LIMITS.backupVerificationAlertCooldownHours.max),
+                telegramWebhookAlertCooldownMinutes: z.number().int().min(MONITORING_SETTINGS_LIMITS.telegramWebhookAlertCooldownMinutes.min).max(MONITORING_SETTINGS_LIMITS.telegramWebhookAlertCooldownMinutes.max),
+                telegramWebhookPendingUpdateThreshold: z.number().int().min(MONITORING_SETTINGS_LIMITS.telegramWebhookPendingUpdateThreshold.min).max(MONITORING_SETTINGS_LIMITS.telegramWebhookPendingUpdateThreshold.max),
+                adminQueueAlertCooldownHours: z.number().int().min(MONITORING_SETTINGS_LIMITS.adminQueueAlertCooldownHours.min).max(MONITORING_SETTINGS_LIMITS.adminQueueAlertCooldownHours.max),
+                reviewQueueAlertHours: z.number().int().min(MONITORING_SETTINGS_LIMITS.reviewQueueAlertHours.min).max(MONITORING_SETTINGS_LIMITS.reviewQueueAlertHours.max),
+            }),
+        )
+        .mutation(async ({ ctx, input }) => {
+            const previous = await getMonitoringSettings();
+            const next = await saveMonitoringSettings(input);
+
+            await writeAuditLog({
+                userId: ctx.user.id,
+                ip: ctx.clientIp,
+                action: 'MONITORING_SETTINGS_UPDATED',
+                entity: 'SETTINGS',
+                entityId: 'ops_monitoring_settings',
+                details: {
+                    previous,
+                    next,
+                },
+            });
+
+            return next;
+        }),
     runSchedulerJob: adminProcedure
         .input(
             z.object({

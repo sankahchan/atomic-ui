@@ -86,7 +86,8 @@
     --neon-violet: rgba(150, 162, 255, 0.18);
 
     /* Bottom tab bar */
-    --bottom-bar-height: 5.35rem;
+    --bottom-bar-height: 4.65rem;
+    --safe-area-top: env(safe-area-inset-top, 0px);
     --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   }
 
@@ -176,6 +177,11 @@
       linear-gradient(180deg, rgba(246, 241, 234, 0.98), rgba(238, 244, 250, 0.96) 52%, rgba(244, 246, 251, 0.98));
     background-attachment: fixed;
     min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
   }
 
   .dark body {
@@ -191,6 +197,8 @@
   /* Smooth scrolling with reduced motion support */
   html {
     scroll-behavior: smooth;
+    min-height: 100%;
+    overflow-x: hidden;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -410,10 +418,11 @@
 
   .ops-page {
     @apply mx-auto w-full max-w-[1680px] space-y-6 md:space-y-8;
+    min-width: 0;
   }
 
   .ops-hero {
-    @apply relative overflow-hidden rounded-[2rem] border px-5 py-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-6 sm:py-6 lg:px-7 lg:py-7;
+    @apply relative overflow-hidden rounded-[2rem] border px-4 py-4 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-5 sm:py-5 lg:px-6 lg:py-6;
     border-color: rgba(255, 255, 255, 0.5);
     background:
       radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%),
@@ -644,7 +653,7 @@
   }
 
   .ops-detail-rail {
-    @apply space-y-4 xl:sticky xl:top-6 xl:self-start;
+    @apply grid gap-4 md:grid-cols-2 min-[1700px]:grid-cols-1 min-[1700px]:sticky min-[1700px]:top-6 min-[1700px]:self-start;
   }
 
   .ops-hero-aside {
@@ -677,7 +686,7 @@
   }
 
   .ops-showcase-grid {
-    @apply grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_340px] xl:items-start;
+    @apply grid gap-4 min-[1700px]:grid-cols-[minmax(0,1.55fr)_320px] min-[1700px]:items-start;
   }
 
   .ops-detail-card {
@@ -1006,6 +1015,117 @@
 
   .dark .ops-modal-divider {
     border-color: rgba(34, 211, 238, 0.1);
+  }
+
+  .ops-modal-body {
+    @apply space-y-5 px-6 pb-6;
+  }
+
+  .ops-modal-section {
+    @apply space-y-4 rounded-[1.45rem] border p-4;
+    border-color: rgba(214, 225, 239, 0.92);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(247, 250, 253, 0.46));
+    box-shadow:
+      0 18px 40px rgba(148, 163, 184, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .ops-modal-section {
+    border-color: rgba(214, 227, 255, 0.12);
+    background:
+      radial-gradient(circle at top right, rgba(110, 175, 255, 0.1), transparent 24%),
+      linear-gradient(180deg, rgba(13, 20, 35, 0.52), rgba(8, 12, 22, 0.34));
+    box-shadow:
+      0 24px 52px rgba(0, 3, 12, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .ops-modal-section-header {
+    @apply space-y-1;
+  }
+
+  .ops-modal-section-title {
+    @apply text-sm font-semibold tracking-tight text-foreground;
+  }
+
+  .ops-modal-section-description {
+    @apply text-xs leading-5 text-muted-foreground;
+  }
+
+  .ops-modal-card-grid {
+    @apply grid gap-3;
+  }
+
+  .ops-modal-card-grid-2 {
+    @apply grid gap-3 sm:grid-cols-2;
+  }
+
+  .ops-modal-stat-card {
+    @apply rounded-[1.1rem] border px-4 py-3;
+    border-color: rgba(214, 225, 239, 0.88);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(246, 249, 252, 0.5));
+    box-shadow:
+      0 18px 34px rgba(148, 163, 184, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .ops-modal-stat-card {
+    border-color: rgba(214, 227, 255, 0.12);
+    background:
+      radial-gradient(circle at top right, rgba(110, 175, 255, 0.1), transparent 24%),
+      linear-gradient(180deg, rgba(14, 21, 35, 0.6), rgba(6, 11, 22, 0.42));
+    box-shadow:
+      0 22px 44px rgba(0, 3, 12, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .ops-modal-note {
+    @apply rounded-[1.15rem] border px-4 py-3 text-sm leading-6 text-muted-foreground;
+    border-color: rgba(148, 163, 184, 0.2);
+    background: rgba(248, 250, 252, 0.72);
+  }
+
+  .dark .ops-modal-note {
+    border-color: rgba(34, 211, 238, 0.12);
+    background: rgba(7, 14, 28, 0.62);
+  }
+
+  .ops-modal-note-danger {
+    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(254, 242, 242, 0.82);
+  }
+
+  .dark .ops-modal-note-danger {
+    border-color: rgba(248, 113, 113, 0.22);
+    background: rgba(45, 10, 15, 0.44);
+  }
+
+  .ops-modal-code-panel {
+    @apply rounded-[1rem] border px-3 py-3 font-mono text-xs leading-6 break-all;
+    border-color: rgba(214, 225, 239, 0.88);
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .ops-modal-code-panel {
+    border-color: rgba(214, 227, 255, 0.12);
+    background: rgba(5, 11, 22, 0.74);
+  }
+
+  .ops-modal-sticky-footer {
+    @apply sticky bottom-0 z-10 mt-2 border-t px-6 py-4;
+    border-color: rgba(148, 163, 184, 0.22);
+    background:
+      linear-gradient(180deg, rgba(248, 250, 252, 0.8), rgba(244, 248, 252, 0.96));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .dark .ops-modal-sticky-footer {
+    border-color: rgba(34, 211, 238, 0.1);
+    background:
+      linear-gradient(180deg, rgba(8, 12, 22, 0.56), rgba(6, 13, 27, 0.92));
   }
 
   .ops-tooltip-shell {
@@ -1385,22 +1505,25 @@
   }
 
   .ops-mobile-dock {
-    border-radius: 2rem;
-    backdrop-filter: blur(calc(var(--glass-blur-xl) + 2px));
-    -webkit-backdrop-filter: blur(calc(var(--glass-blur-xl) + 2px));
+    min-height: calc(var(--bottom-bar-height) + var(--safe-area-bottom));
+    padding: 0.38rem 0.55rem calc(var(--safe-area-bottom) + 0.32rem);
+    border-radius: 999px;
+    backdrop-filter: blur(calc(var(--glass-blur-lg) + 2px));
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur-lg) + 2px));
   }
 
   .ops-mobile-dock-item {
     display: flex;
+    flex: 1 1 0%;
     min-width: 0;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    border-radius: 1.45rem;
-    padding: 0.5rem 0.15rem 0.2rem;
+    justify-content: flex-end;
+    gap: 0.24rem;
+    border-radius: 1.2rem;
+    padding: 0.05rem 0 0;
     color: hsl(var(--muted-foreground));
-    transition: transform 180ms ease, color 180ms ease, opacity 180ms ease;
+    transition: flex 200ms ease, transform 180ms ease, color 180ms ease, opacity 180ms ease;
   }
 
   .ops-mobile-dock-item:hover {
@@ -1408,7 +1531,7 @@
   }
 
   .ops-mobile-dock-item-active {
-    transform: translateY(-3px);
+    transform: translateY(-0.18rem);
     color: rgb(15 23 42 / 0.96);
   }
 
@@ -1420,40 +1543,57 @@
     color: rgb(248 250 252 / 0.98);
   }
 
-  .ops-mobile-dock-icon {
+  .ops-mobile-dock-pill {
     display: flex;
-    height: 2.6rem;
-    min-width: 2.8rem;
+    height: 2.45rem;
+    width: 2.45rem;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
-    transition: all 180ms ease;
+    border-radius: 1.05rem;
+    border: 1px solid transparent;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
+    color: rgb(71 85 105 / 0.92);
+    transition: width 200ms ease, transform 180ms ease, background 180ms ease, color 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
   }
 
-  .ops-mobile-dock-icon-active {
-    min-width: 4.2rem;
+  .dark .ops-mobile-dock-pill {
+    color: rgb(176 190 212 / 0.96);
+  }
+
+  .ops-mobile-dock-pill-active {
+    width: 4.2rem;
     background:
-      linear-gradient(135deg, rgba(115, 198, 255, 0.96), rgba(132, 146, 255, 0.92));
+      radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.38), transparent 42%),
+      linear-gradient(135deg, rgba(136, 190, 255, 0.98), rgba(136, 124, 255, 0.94));
+    border-color: rgba(255, 255, 255, 0.74);
     color: rgb(15 23 42 / 0.98);
     box-shadow:
-      0 18px 36px rgba(122, 161, 255, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+      0 14px 30px rgba(122, 140, 255, 0.26),
+      0 0 26px rgba(146, 152, 255, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.62);
   }
 
-  .dark .ops-mobile-dock-icon-active {
+  .dark .ops-mobile-dock-pill-active {
     color: rgb(248 250 252 / 0.98);
     box-shadow:
-      0 20px 40px rgba(82, 128, 255, 0.32),
-      0 0 24px rgba(120, 180, 255, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      0 18px 36px rgba(90, 108, 255, 0.32),
+      0 0 30px rgba(150, 160, 255, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.26);
   }
 
   .ops-mobile-dock-label {
+    display: -webkit-box;
+    min-height: 1.08rem;
     max-width: 100%;
-    line-height: 1;
-    font-size: 0.65rem;
-    font-weight: 500;
-    opacity: 0.76;
+    overflow: hidden;
+    text-align: center;
+    line-height: 1.05;
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    opacity: 0.72;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .ops-mobile-dock-label-active {
@@ -1707,6 +1847,169 @@
     25% { transform: translate(5%, 5%) scale(1.05); }
     50% { transform: translate(-3%, 8%) scale(0.95); }
     75% { transform: translate(7%, -3%) scale(1.02); }
+  }
+
+  @media (max-width: 767px) {
+    :root {
+      --glass-blur: 10px;
+      --glass-blur-lg: 14px;
+      --glass-blur-xl: 20px;
+      --bottom-bar-height: 4.65rem;
+    }
+
+    body {
+      background-attachment: scroll;
+      overscroll-behavior-y: none;
+    }
+
+    .ops-mobile-root {
+      min-height: 100dvh;
+    }
+
+    .ops-page,
+    .ops-page > *,
+    .ops-page section,
+    .ops-page article,
+    .ops-page aside,
+    .ops-page header,
+    .ops-page nav,
+    .ops-page form,
+    .ops-page div {
+      min-width: 0;
+    }
+
+    .ops-page {
+      max-width: 100%;
+    }
+
+    .ops-page [class~="p-6"] {
+      padding: 1rem;
+    }
+
+    .ops-page [class~="pt-0"] {
+      padding-top: 0;
+    }
+
+    .ops-showcase-grid,
+    .ops-section-grid,
+    .ops-card-grid,
+    .ops-detail-rail,
+    .ops-screen-hero-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ops-detail-rail {
+      gap: 0.85rem;
+    }
+
+    .ops-topbar {
+      height: 3rem;
+      border-radius: 1.25rem;
+      padding-inline: 0.55rem;
+    }
+
+    .bg-mesh::before,
+    .bg-mesh::after {
+      filter: blur(54px);
+      animation: none;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .bg-mesh > div {
+      filter: blur(42px);
+      opacity: 0.45;
+    }
+
+    .ops-topbar {
+      box-shadow:
+        0 12px 28px rgba(15, 23, 42, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.66);
+    }
+
+    .dark .ops-topbar {
+      box-shadow:
+        0 18px 40px rgba(1, 6, 20, 0.34),
+        inset 0 1px 0 rgba(125, 211, 252, 0.05);
+    }
+
+    .glass-bottom-bar {
+      box-shadow:
+        0 16px 34px rgba(148, 163, 184, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.74);
+    }
+
+    .dark .glass-bottom-bar {
+      box-shadow:
+        0 20px 42px rgba(0, 3, 12, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .glass,
+    .glass-medium,
+    .glass-light,
+    .ops-panel,
+    .ops-kpi-tile,
+    .ops-showcase,
+    .ops-support-card,
+    .ops-detail-card,
+    .ops-command-bar,
+    .ops-table-toolbar,
+    .ops-filter-bar,
+    .ops-data-shell,
+    .ops-mobile-card,
+    .ops-chart-shell,
+    .ops-empty-state,
+    .ops-mobile-action-bar,
+    .ops-inline-stat,
+    .ops-row-card,
+    .ops-mini-tile,
+    .ops-action-tile,
+    .ops-stat-pod,
+    .ops-table-meta,
+    .ops-chart-legend-chip,
+    .ops-modal-shell,
+    .ops-mobile-sheet,
+    .ops-screen-hero,
+    .ops-screen-aside,
+    .ops-screen-summary {
+      box-shadow:
+        0 18px 44px rgba(148, 163, 184, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.64);
+    }
+
+    .dark .glass,
+    .dark .glass-medium,
+    .dark .glass-light,
+    .dark .ops-panel,
+    .dark .ops-kpi-tile,
+    .dark .ops-showcase,
+    .dark .ops-support-card,
+    .dark .ops-detail-card,
+    .dark .ops-command-bar,
+    .dark .ops-table-toolbar,
+    .dark .ops-filter-bar,
+    .dark .ops-data-shell,
+    .dark .ops-mobile-card,
+    .dark .ops-chart-shell,
+    .dark .ops-empty-state,
+    .dark .ops-mobile-action-bar,
+    .dark .ops-inline-stat,
+    .dark .ops-row-card,
+    .dark .ops-mini-tile,
+    .dark .ops-action-tile,
+    .dark .ops-stat-pod,
+    .dark .ops-table-meta,
+    .dark .ops-chart-legend-chip,
+    .dark .ops-modal-shell,
+    .dark .ops-mobile-sheet,
+    .dark .ops-screen-hero,
+    .dark .ops-screen-aside,
+    .dark .ops-screen-summary {
+      box-shadow:
+        0 22px 50px rgba(0, 3, 12, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
   }
 
   /* Card with subtle hover effect */

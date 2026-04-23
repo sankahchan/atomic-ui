@@ -22,6 +22,17 @@ test('admin smoke journeys stay functional', async ({ page }) => {
     await expect(healthJob).not.toContainText('PAUSED');
   });
 
+  await test.step('monitoring overview loads with live health cards', async () => {
+    await page.goto('/dashboard/monitoring');
+    await expect(page.getByRole('heading', { name: /Monitoring/i })).toBeVisible();
+    await expect(page.getByText('Current monitor state')).toBeVisible();
+    await expect(page.getByText('Portable restore baseline')).toBeVisible();
+    await expect(page.getByText('Delivery health')).toBeVisible();
+    await expect(page.getByText('Backlog aging')).toBeVisible();
+    await expect(page.getByLabel('Webhook backlog threshold')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save monitoring settings' })).toBeVisible();
+  });
+
   await test.step('access key creation works from the panel', async () => {
     const keyName = 'Playwright Smoke Key';
     await page.goto('/dashboard/keys');
@@ -37,7 +48,7 @@ test('admin smoke journeys stay functional', async ({ page }) => {
     await page.getByTestId('support-claim').click();
     await page.locator('#support-reply').fill(replyText);
     await page.getByTestId('support-send-reply').click();
-    await expect(page.getByText(replyText)).toBeVisible();
+    await expect(page.locator('p.whitespace-pre-wrap', { hasText: replyText }).last()).toBeVisible();
   });
 
   await test.step('telegram review queue claim and reject macro works', async () => {

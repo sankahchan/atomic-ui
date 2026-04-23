@@ -1,21 +1,14 @@
 import { db } from '@/lib/db';
-import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
+import { getTelegramConfig, sendTelegramMessage } from '@/lib/services/telegram-runtime';
 
 const WARNING_THRESHOLD_PERCENT = 80;
 const EXPIRY_WARNING_DAYS = 3;
 
 export async function checkSubscriptions() {
     try {
-        const settings = await db.settings.findUnique({
-            where: { key: 'telegram_bot' },
-        });
-
-        if (!settings) return;
-
-        const botSettings = JSON.parse(settings.value);
-        const { botToken, isEnabled } = botSettings;
-
-        if (!isEnabled || !botToken) return;
+        const botSettings = await getTelegramConfig();
+        if (!botSettings?.botToken) return;
+        const { botToken } = botSettings;
 
         // 1. Check Data Usage (80% Alert)
         // Find active keys that have a limit, are not depleted, and have exceeded threshold

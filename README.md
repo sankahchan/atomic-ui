@@ -71,6 +71,8 @@ docker-compose up -d --build
 wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh | sudo bash
 ```
 
+Fresh VPS installs now default to a local Postgres runtime so production `.postgres.zip` backup bundles can be restored onto replacement servers without an extra database conversion step.
+
 The installer now prefers HTTPS by default. If HTTPS setup fails, it falls back to HTTP and prints the next steps.
 
 Useful install-time overrides:
@@ -80,6 +82,8 @@ sudo env ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubuserconte
 sudo env INSTALL_HTTPS=false bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env INSTALL_HTTPS=require ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 sudo env PANEL_DOMAIN=admin.example.com PUBLIC_SHARE_DOMAIN=share.example.com ACME_EMAIL=you@example.com bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+sudo env INSTALL_PANEL_PATH=control-center bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
+sudo env INSTALL_DATABASE_ENGINE=sqlite bash <(wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh)
 ```
 
 ### Fresh VPS bootstrap from your workstation
@@ -94,6 +98,10 @@ bash scripts/bootstrap-vps.sh
 ```
 
 See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for domain/HTTPS examples and the full checklist.
+
+If the new server needs to become a restored copy of an existing production server, follow [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md) after bootstrap.
+Fresh VPS bootstrap now defaults to Postgres too. If you intentionally want SQLite instead, set `BOOTSTRAP_DATABASE_ENGINE=sqlite`.
+If you want a predictable first-login path instead of a generated random one, set `BOOTSTRAP_PANEL_PATH=control-center` or `INSTALL_PANEL_PATH=control-center`.
 
 ## Production Workflow
 
@@ -113,8 +121,24 @@ npm run build
 
 ```bash
 npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin123
+TELEGRAM_SMOKE_WEBHOOK_URL=https://panel.example.com/panel-path/api/telegram/webhook \
+TELEGRAM_SMOKE_CHAT_ID=123456789 \
+TELEGRAM_SMOKE_USER_ID=123456789 \
 npm run smoke:telegram
 ```
+
+### Operator notes
+
+- For the full fresh-VPS restore runbook, including the short checklist and Telegram cutover rules, see [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md).
+- SQLite restore runs offline only. Stop `atomic-ui.service`, then run `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip`.
+- Dashboard backup creation follows the active runtime: SQLite creates `.db` file-copy backups, and Postgres creates portable `.postgres.zip` bundles containing `backup.dump` plus restore encryption metadata. Raw `.dump` and `.sql` restores remain supported for older backups.
+- Postgres backup creation, verification, and restore require the PostgreSQL client tools (`pg_dump`, `pg_restore`, `psql`) on the host. On Debian/Ubuntu installs, use `apt-get install -y postgresql-client`.
+- Runtime types must match the backup: SQLite backups restore onto SQLite runtimes, and Postgres `.postgres.zip`, `.dump`, or `.sql` backups restore onto servers configured with a PostgreSQL `DATABASE_URL`.
+- Telegram webhook set/reset in the dashboard registers a secret token with Telegram. Incoming webhook calls without a matching `x-telegram-bot-api-secret-token` header are rejected with `401`. Set `TELEGRAM_WEBHOOK_SECRET` only if you need to override the derived default.
+- Telegram commerce commands (`/buy`, `/mykeys`, `/premium`, `/premiumregion`, `/supportstatus`, `/orders`, `/renew`) intentionally use short summary-first screens with details behind buttons or drill-down views.
+- `Tools -> Monitoring` is the operator surface for backup verification health, Telegram webhook health, and admin queue aging. Threshold meanings and response steps are in [docs/monitoring-operations.md](docs/monitoring-operations.md).
+- Restoring a production backup onto a test server copies the Telegram bot settings, but Telegram keeps sending updates to the currently registered live webhook until you explicitly switch it. Do not reset the webhook on a test restore host.
+- Subscription branding no longer supports custom CSS. Legacy `subscriptionCustomCss` values are ignored and cleared on save.
 
 ### Low-memory VPS deploy
 
@@ -132,6 +156,10 @@ This repository now uses semver-style Git tags:
 - `v1.0.0` first stable release
 - `v1.1.0` feature release
 - `v1.1.1` bug-fix release
+- `v1.2.0` restore + Telegram stabilization release
+- `v1.2.1` standalone deployment asset hotfix
+- `v1.2.2` Telegram smoke + VPS install lockfile hardening
+- `v1.2.3` dependency security refresh
 - `v2.0.0` breaking release
 
 ### Recommended release flow
@@ -157,6 +185,8 @@ Set these in `.env` before production use:
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | SQLite DSN such as `file:./data/atomic-ui.db` or a Postgres DSN such as `postgresql://user:pass@host:5432/atomic_ui` |
 | `JWT_SECRET` | Yes | Session signing secret |
+| `TOTP_ENCRYPTION_KEY` | Yes | Encrypts 2FA/TOTP secrets; generate with `openssl rand -hex 32` |
+| `SETTINGS_ENCRYPTION_KEY` | Yes | Encrypts provider tokens, webhook secrets, and other database-backed setting secrets; generate with `openssl rand -hex 32` |
 | `CRON_SECRET` | Strongly recommended | Protects scheduled task endpoints |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Canonical admin/app URL |
 | `APP_URL` | Recommended | Server-side admin/app base URL |
@@ -168,7 +198,7 @@ Set these in `.env` before production use:
 | `SMTP_USER` | Optional | SMTP username |
 | `SMTP_PASS` | Optional | SMTP password |
 | `SMTP_FROM` | Optional | Sender address for email delivery |
-| `DIGITALOCEAN_TOKEN` | Optional | Enables DO provisioning from the UI |
+| `DIGITALOCEAN_ACCESS_TOKEN` | Optional | Enables DO provisioning from the UI when no token is saved in settings |
 | `LOG_LEVEL` | Optional | `debug`, `info`, `warn`, `error` |
 | `LOG_VERBOSE_SCOPES` | Optional | Temporary verbose scopes such as `sync,trpc` |
 
@@ -186,11 +216,12 @@ npm run typecheck
 npm run test
 npm run env:check -- --env-file=.env
 npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password=admin123
-npm run smoke:telegram
+TELEGRAM_SMOKE_WEBHOOK_URL=https://panel.example.com/panel-path/api/telegram/webhook TELEGRAM_SMOKE_CHAT_ID=123456789 TELEGRAM_SMOKE_USER_ID=123456789 npm run smoke:telegram
 npm run deploy:vps
 npm run bootstrap:vps
 npm run db:generate
 npm run db:push
+npm run restore:sqlite -- --backup /absolute/path/to/backup.zip
 npm run db:migrate
 npm run db:cutover:report
 npm run db:cutover:preflight -- TARGET_DATABASE_URL=postgresql://...
@@ -207,6 +238,8 @@ npm run db:studio
 - [DEPLOY.md](DEPLOY.md): Docker and direct VPS deployment
 - [docs/postgres-cutover.md](docs/postgres-cutover.md): SQLite to Postgres cutover runbook
 - [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md): first-time VPS bootstrap
+- [docs/monitoring-operations.md](docs/monitoring-operations.md): monitoring page thresholds and operator response flow
+- [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md): recovery server from a production backup
 - [docs/worker-setup.md](docs/worker-setup.md): usage snapshot worker setup
 
 ## Project Structure

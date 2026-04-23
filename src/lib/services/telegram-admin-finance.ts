@@ -79,18 +79,18 @@ export async function handleFinanceCommand(locale: SupportedLocale) {
   return [
     locale === 'my' ? '💸 <b>Finance အနှစ်ချုပ်</b>' : '💸 <b>Finance summary</b>',
     '',
-    'Window: last 24 hour(s)',
-    `Paid orders: ${fulfilledOrders.length}`,
-    `Revenue: ${formatTelegramAdminMoneyMap(revenueByCurrency)}`,
-    `Renewals: ${renewals}`,
-    `Verified payments: ${verifiedCount}`,
-    `Refunded: ${formatTelegramAdminMoneyMap(refundsByCurrency)}`,
-    `Credited: ${formatTelegramAdminMoneyMap(creditsByCurrency)}`,
-    `Pending refund requests: ${pendingRefundRequests}`,
-    `Trial → paid conversions: ${trialConversions}`,
+    locale === 'my' ? 'Window: လွန်ခဲ့သော 24 နာရီ' : 'Window: last 24 hour(s)',
+    locale === 'my' ? `Paid order: ${fulfilledOrders.length}` : `Paid orders: ${fulfilledOrders.length}`,
+    locale === 'my' ? `ဝင်ငွေ: ${formatTelegramAdminMoneyMap(revenueByCurrency)}` : `Revenue: ${formatTelegramAdminMoneyMap(revenueByCurrency)}`,
+    locale === 'my' ? `Renew: ${renewals}` : `Renewals: ${renewals}`,
+    locale === 'my' ? `စစ်ပြီး payment: ${verifiedCount}` : `Verified payments: ${verifiedCount}`,
+    locale === 'my' ? `Refund: ${formatTelegramAdminMoneyMap(refundsByCurrency)}` : `Refunded: ${formatTelegramAdminMoneyMap(refundsByCurrency)}`,
+    locale === 'my' ? `Credit: ${formatTelegramAdminMoneyMap(creditsByCurrency)}` : `Credited: ${formatTelegramAdminMoneyMap(creditsByCurrency)}`,
+    locale === 'my' ? `Refund စောင့်နေ: ${pendingRefundRequests}` : `Pending refund requests: ${pendingRefundRequests}`,
+    locale === 'my' ? `Trial → paid: ${trialConversions}` : `Trial → paid conversions: ${trialConversions}`,
     '',
     locale === 'my'
-      ? `Daily digest: ${financeControls.dailyFinanceDigestEnabled ? 'ON' : 'OFF'}`
+      ? `Daily digest: ${financeControls.dailyFinanceDigestEnabled ? 'ဖွင့်' : 'ပိတ်'}`
       : `Daily digest: ${financeControls.dailyFinanceDigestEnabled ? 'ON' : 'OFF'}`,
   ].join('\n');
 }
@@ -132,7 +132,7 @@ export async function handleRefundsCommand(locale: SupportedLocale) {
   }
 
   const lines = [
-    locale === 'my' ? '🧾 <b>Pending Refund Requests</b>' : '🧾 <b>Pending refund requests</b>',
+    locale === 'my' ? '🧾 <b>Pending refund request များ</b>' : '🧾 <b>Pending refund requests</b>',
     '',
   ];
 
@@ -140,9 +140,9 @@ export async function handleRefundsCommand(locale: SupportedLocale) {
     lines.push(
       `• <b>${escapeHtml(order.orderCode)}</b>`,
       `  ${order.priceAmount ? `${order.priceAmount.toLocaleString()} ${(order.priceCurrency || 'MMK').toUpperCase()}` : '0'}`,
-      `  ${escapeHtml(order.requestedEmail || 'Unknown customer')}`,
+      `  ${escapeHtml(order.requestedEmail || (locale === 'my' ? 'မသိရသော user' : 'Unknown customer'))}`,
       `  ${formatTelegramDateTime(order.refundRequestedAt || new Date(), locale)}`,
-      `  ${locale === 'my' ? 'Reviewer' : 'Reviewer'}: ${escapeHtml(order.refundAssignedReviewerEmail || 'Unclaimed')}`,
+      `  ${locale === 'my' ? 'Reviewer' : 'Reviewer'}: ${escapeHtml(order.refundAssignedReviewerEmail || (locale === 'my' ? 'မယူရသေး' : 'Unclaimed'))}`,
       '',
     );
   }

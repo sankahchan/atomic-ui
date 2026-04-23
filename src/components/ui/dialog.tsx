@@ -142,6 +142,61 @@ const DialogFooter = ({
 );
 DialogFooter.displayName = 'DialogFooter';
 
+const DialogBody = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn('ops-modal-body', className)}
+    {...props}
+  />
+);
+DialogBody.displayName = 'DialogBody';
+
+const DialogSection = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLElement>) => (
+  <section
+    className={cn('ops-modal-section', className)}
+    {...props}
+  />
+);
+DialogSection.displayName = 'DialogSection';
+
+const DialogSectionHeader = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn('ops-modal-section-header', className)}
+    {...props}
+  />
+);
+DialogSectionHeader.displayName = 'DialogSectionHeader';
+
+const DialogSectionTitle = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLParagraphElement>) => (
+  <p
+    className={cn('ops-modal-section-title', className)}
+    {...props}
+  />
+);
+DialogSectionTitle.displayName = 'DialogSectionTitle';
+
+const DialogSectionDescription = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLParagraphElement>) => (
+  <p
+    className={cn('ops-modal-section-description', className)}
+    {...props}
+  />
+);
+DialogSectionDescription.displayName = 'DialogSectionDescription';
+
 /**
  * DialogTitle Component
  * 
@@ -190,6 +245,11 @@ export {
   DialogContent,
   DialogHeader,
   DialogFooter,
+  DialogBody,
+  DialogSection,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogSectionDescription,
   DialogTitle,
   DialogDescription,
 };

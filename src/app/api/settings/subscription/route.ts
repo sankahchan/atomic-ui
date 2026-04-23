@@ -7,7 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasSubscriptionSettingsManageScope } from '@/lib/admin-scope';
 import { defaultBranding } from '@/lib/subscription-themes';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 
@@ -22,7 +23,6 @@ const brandingKeys = [
   'subscriptionWelcomeMessage',
   'subscriptionLocalizedWelcomeMessages',
   'subscriptionShowWelcome',
-  'subscriptionCustomCss',
   'subscriptionFontFamily',
   'subscriptionFontUrl',
   'subscriptionLayout',
@@ -42,8 +42,34 @@ const brandingKeys = [
   'subscriptionCustomApps',
 ];
 
-export async function GET() {
+type SubscriptionSettingsDeps = {
+  requireAdminRouteScope: typeof requireAdminRouteScope;
+  settings: {
+    findMany: (args: Parameters<typeof db.settings.findMany>[0]) => Promise<Array<{ key: string; value: string }>>;
+    upsert: (args: Parameters<typeof db.settings.upsert>[0]) => Promise<unknown>;
+    deleteMany: (args: Parameters<typeof db.settings.deleteMany>[0]) => Promise<unknown>;
+  };
+  logError: typeof console.error;
+};
+
+const defaultDeps: SubscriptionSettingsDeps = {
+  requireAdminRouteScope,
+  settings: db.settings,
+  logError: console.error,
+};
+
+export async function handleSubscriptionSettingsGet(
+  deps: SubscriptionSettingsDeps = defaultDeps,
+) {
   try {
+    const { response } = await deps.requireAdminRouteScope({
+      canAccess: hasSubscriptionSettingsManageScope,
+      forbiddenMessage: 'Only owner-scoped admins can manage subscription branding.',
+    });
+    if (response) {
+      return response;
+    }
+
     // Fetch all settings
     const allKeys = [
       'supportLink',
@@ -53,7 +79,7 @@ export async function GET() {
       ...brandingKeys,
     ];
 
-    const settings = await db.settings.findMany({
+    const settings = await deps.settings.findMany({
       where: { key: { in: allKeys } },
     });
 
@@ -93,7 +119,7 @@ export async function GET() {
       showWelcome: settingsMap.get('subscriptionShowWelcome')
         ? settingsMap.get('subscriptionShowWelcome') === 'true'
         : defaultBranding.showWelcome,
-      customCss: settingsMap.get('subscriptionCustomCss') || '',
+      customCss: '',
       fontFamily: settingsMap.get('subscriptionFontFamily') || '',
       fontUrl: settingsMap.get('subscriptionFontUrl') || '',
       layout: settingsMap.get('subscriptionLayout') || defaultBranding.layout,
@@ -146,17 +172,26 @@ export async function GET() {
       branding,
     });
   } catch (error) {
-    console.error('Failed to fetch settings:', error);
+    deps.logError('Failed to fetch settings:', error);
     return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function GET() {
+  return handleSubscriptionSettingsGet();
+}
+
+export async function handleSubscriptionSettingsPost(
+  request: NextRequest,
+  deps: SubscriptionSettingsDeps = defaultDeps,
+) {
   try {
-    // Verify admin session
-    const user = await getCurrentUser();
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { response } = await deps.requireAdminRouteScope({
+      canAccess: hasSubscriptionSettingsManageScope,
+      forbiddenMessage: 'Only owner-scoped admins can manage subscription branding.',
+    });
+    if (response) {
+      return response;
     }
 
     const body = await request.json();
@@ -170,17 +205,17 @@ export async function POST(request: NextRequest) {
 
     // Build upsert operations
     const operations: Promise<unknown>[] = [
-      db.settings.upsert({
+      deps.settings.upsert({
         where: { key: 'supportLink' },
         update: { value: supportLink || '' },
         create: { key: 'supportLink', value: supportLink || '' },
       }),
-      db.settings.upsert({
+      deps.settings.upsert({
         where: { key: 'defaultSubscriptionTheme' },
         update: { value: defaultSubscriptionTheme || 'dark' },
         create: { key: 'defaultSubscriptionTheme', value: defaultSubscriptionTheme || 'dark' },
       }),
-      db.settings.upsert({
+      deps.settings.upsert({
         where: { key: 'defaultLanguage' },
         update: { value: defaultLanguage || 'en' },
         create: { key: 'defaultLanguage', value: defaultLanguage || 'en' },
@@ -190,7 +225,7 @@ export async function POST(request: NextRequest) {
     // Only update API key if a new one is provided (not the masked value)
     if (unsplashApiKey && !unsplashApiKey.includes('*')) {
       operations.push(
-        db.settings.upsert({
+        deps.settings.upsert({
           where: { key: 'unsplashApiKey' },
           update: { value: JSON.stringify(unsplashApiKey) },
           create: { key: 'unsplashApiKey', value: JSON.stringify(unsplashApiKey) },
@@ -199,7 +234,7 @@ export async function POST(request: NextRequest) {
     } else if (unsplashApiKey === '') {
       // Clear the API key if empty string is sent
       operations.push(
-        db.settings.deleteMany({
+        deps.settings.deleteMany({
           where: { key: 'unsplashApiKey' },
         })
       );
@@ -213,7 +248,6 @@ export async function POST(request: NextRequest) {
         subscriptionBrandName: branding.brandName,
         subscriptionFooterText: branding.footerText,
         subscriptionWelcomeMessage: branding.welcomeMessage,
-        subscriptionCustomCss: branding.customCss,
         subscriptionFontFamily: branding.fontFamily,
         subscriptionFontUrl: branding.fontUrl,
         subscriptionLayout: branding.layout,
@@ -225,7 +259,7 @@ export async function POST(request: NextRequest) {
       // Number settings
       if (branding.logoSize !== undefined) {
         operations.push(
-          db.settings.upsert({
+          deps.settings.upsert({
             where: { key: 'subscriptionLogoSize' },
             update: { value: String(branding.logoSize) },
             create: { key: 'subscriptionLogoSize', value: String(branding.logoSize) },
@@ -260,7 +294,7 @@ export async function POST(request: NextRequest) {
       for (const [key, value] of Object.entries(stringSettings)) {
         if (value !== undefined) {
           operations.push(
-            db.settings.upsert({
+            deps.settings.upsert({
               where: { key },
               update: { value: value || '' },
               create: { key, value: value || '' },
@@ -273,7 +307,7 @@ export async function POST(request: NextRequest) {
       for (const [key, value] of Object.entries(booleanSettings)) {
         if (value !== undefined) {
           operations.push(
-            db.settings.upsert({
+            deps.settings.upsert({
               where: { key },
               update: { value: String(value) },
               create: { key, value: String(value) },
@@ -286,7 +320,7 @@ export async function POST(request: NextRequest) {
       for (const [key, value] of Object.entries(jsonSettings)) {
         if (value !== undefined) {
           operations.push(
-            db.settings.upsert({
+            deps.settings.upsert({
               where: { key },
               update: { value: JSON.stringify(value) },
               create: { key, value: JSON.stringify(value) },
@@ -296,11 +330,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    operations.push(
+      deps.settings.deleteMany({
+        where: { key: 'subscriptionCustomCss' },
+      })
+    );
+
     await Promise.all(operations);
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Failed to save settings:', error);
+    deps.logError('Failed to save settings:', error);
     return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
   }
+}
+
+export async function POST(request: NextRequest) {
+  return handleSubscriptionSettingsPost(request);
 }

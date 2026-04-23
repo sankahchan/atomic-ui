@@ -2,6 +2,9 @@ import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
   type TelegramAdminKeyCallbackPayload,
   type TelegramAdminMenuAction,
+  type TelegramCommerceViewAction,
+  type TelegramCommerceViewCallbackPayload,
+  type TelegramCommerceViewSection,
   type TelegramDynamicSupportActionCallbackPayload,
   type TelegramDynamicSupportUserAction,
   type TelegramInboxMenuAction,
@@ -31,6 +34,9 @@ import {
 export type {
   TelegramAdminKeyCallbackPayload,
   TelegramAdminMenuAction,
+  TelegramCommerceViewAction,
+  TelegramCommerceViewCallbackPayload,
+  TelegramCommerceViewSection,
   TelegramDynamicSupportActionCallbackPayload,
   TelegramDynamicSupportUserAction,
   TelegramInboxMenuAction,
@@ -66,6 +72,7 @@ const TELEGRAM_SERVER_CHANGE_ACTION_CALLBACK_PREFIX = 'srvreq';
 const TELEGRAM_DYNAMIC_SUPPORT_CALLBACK_PREFIX = 'dynsup';
 const TELEGRAM_NOTIFICATION_PREFERENCE_CALLBACK_PREFIX = 'notipref';
 const TELEGRAM_MENU_CALLBACK_PREFIX = 'tgmenu';
+const TELEGRAM_COMMERCE_VIEW_CALLBACK_PREFIX = 'tgcv';
 const TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX = 'supq';
 const TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX = 'supthread';
 const TELEGRAM_ADMIN_KEY_CALLBACK_PREFIX = 'admkey';
@@ -74,45 +81,45 @@ type TelegramCommandShortcut = {
   command: string;
   labelEn: string;
   labelMy: string;
+  aliases?: string[];
 };
 
 const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
-    { command: '/buy', labelEn: '🛒 Buy key', labelMy: '🛒 Key ဝယ်မည်' },
-    { command: '/mykeys', labelEn: '🗂 My keys', labelMy: '🗂 Key များ' },
+    { command: '/buy', labelEn: '🛒 Buy', labelMy: '🛒 ဝယ်မည်', aliases: ['🛒 Buy key', '🛒 Key ဝယ်မည်'] },
+    { command: '/mykeys', labelEn: '🗂 Keys', labelMy: '🗂 Key များ', aliases: ['🗂 My keys'] },
   ],
   [
-    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offer များ' },
     { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
-  ],
-  [
     { command: '/orders', labelEn: '🧾 Orders', labelMy: '🧾 Orders' },
-    { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
   ],
   [
-    { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
-    { command: '/trial', labelEn: '🎁 Free trial', labelMy: '🎁 Free Trial' },
+    { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
+    { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
   ],
   [
     { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
     { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
   ],
   [
-    { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
-    { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
+    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offers', aliases: ['🎟 Offer များ'] },
+    { command: '/trial', labelEn: '🎁 Trial', labelMy: '🎁 Trial', aliases: ['🎁 Free trial', '🎁 Free Trial'] },
   ],
   [
-    { command: '/sub', labelEn: '📎 Sub links', labelMy: '📎 Sub Links' },
-    { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
-  ],
-  [
-    { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
+    { command: '/sub', labelEn: '📎 Links', labelMy: '📎 Links', aliases: ['📎 Sub links', '📎 Sub Links'] },
     { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
   ],
   [
     { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
     { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
   ],
+];
+
+const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
+  { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
+  { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
+  { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
+  { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
 ];
 
 const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
@@ -146,13 +153,21 @@ function getTelegramShortcutLabel(shortcut: TelegramCommandShortcut, locale: Sup
   return locale === 'my' ? shortcut.labelMy : shortcut.labelEn;
 }
 
-function listTelegramCommandShortcuts(isAdmin: boolean) {
+function listVisibleTelegramCommandShortcuts(isAdmin: boolean) {
   return [...TELEGRAM_USER_COMMAND_ROWS, ...(isAdmin ? TELEGRAM_ADMIN_COMMAND_ROWS : [])];
+}
+
+function listTelegramCommandShortcutAliases(isAdmin: boolean) {
+  return [
+    ...TELEGRAM_USER_COMMAND_ROWS.flat(),
+    ...TELEGRAM_HIDDEN_USER_SHORTCUTS,
+    ...(isAdmin ? TELEGRAM_ADMIN_COMMAND_ROWS.flat() : []),
+  ];
 }
 
 export function getCommandKeyboard(isAdmin: boolean, locale: SupportedLocale = 'en') {
   return {
-    keyboard: listTelegramCommandShortcuts(isAdmin).map((row) =>
+    keyboard: listVisibleTelegramCommandShortcuts(isAdmin).map((row) =>
       row.map((shortcut) => ({ text: getTelegramShortcutLabel(shortcut, locale) })),
     ),
     resize_keyboard: true,
@@ -169,17 +184,16 @@ export function normalizeTelegramReplyKeyboardCommand(
     return null;
   }
 
-  for (const row of listTelegramCommandShortcuts(isAdmin)) {
-    for (const shortcut of row) {
-      const aliases = [
-        shortcut.command,
-        shortcut.command.replace(/^\//, ''),
-        shortcut.labelEn,
-        shortcut.labelMy,
-      ];
-      if (aliases.some((alias) => alias.trim().toLowerCase() === normalized)) {
-        return shortcut.command;
-      }
+  for (const shortcut of listTelegramCommandShortcutAliases(isAdmin)) {
+    const aliases = [
+      shortcut.command,
+      shortcut.command.replace(/^\//, ''),
+      shortcut.labelEn,
+      shortcut.labelMy,
+      ...(shortcut.aliases || []),
+    ];
+    if (aliases.some((alias) => alias.trim().toLowerCase() === normalized)) {
+      return shortcut.command;
     }
   }
 
@@ -515,6 +529,111 @@ export function buildTelegramMenuCallbackData(
   action: string,
 ) {
   return `${TELEGRAM_MENU_CALLBACK_PREFIX}:${section}:${action}`;
+}
+
+const TELEGRAM_COMMERCE_VIEW_SECTION_CODES: Record<TelegramCommerceViewSection, string> = {
+  buy: 'b',
+  keys: 'k',
+  premium: 'p',
+  premiumregion: 'r',
+  supportstatus: 's',
+  orders: 'o',
+  renew: 'n',
+};
+
+const TELEGRAM_COMMERCE_VIEW_ACTION_CODES: Record<TelegramCommerceViewAction, string> = {
+  home: 'h',
+  page: 'p',
+  detail: 'd',
+  compare: 'c',
+  filter: 'f',
+};
+
+function decodeTelegramCommerceViewSection(code?: string | null): TelegramCommerceViewSection | null {
+  switch (code) {
+    case 'b':
+      return 'buy';
+    case 'k':
+      return 'keys';
+    case 'p':
+      return 'premium';
+    case 'r':
+      return 'premiumregion';
+    case 's':
+      return 'supportstatus';
+    case 'o':
+      return 'orders';
+    case 'n':
+      return 'renew';
+    default:
+      return null;
+  }
+}
+
+function decodeTelegramCommerceViewAction(code?: string | null): TelegramCommerceViewAction | null {
+  switch (code) {
+    case 'h':
+      return 'home';
+    case 'p':
+      return 'page';
+    case 'd':
+      return 'detail';
+    case 'c':
+      return 'compare';
+    case 'f':
+      return 'filter';
+    default:
+      return null;
+  }
+}
+
+export function buildTelegramCommerceViewCallbackData(
+  section: TelegramCommerceViewSection,
+  action: TelegramCommerceViewAction,
+  primary?: string | null,
+  secondary?: string | null,
+) {
+  const parts = [
+    TELEGRAM_COMMERCE_VIEW_CALLBACK_PREFIX,
+    TELEGRAM_COMMERCE_VIEW_SECTION_CODES[section],
+    TELEGRAM_COMMERCE_VIEW_ACTION_CODES[action],
+  ];
+
+  if (primary) {
+    parts.push(primary);
+  }
+
+  if (secondary) {
+    parts.push(secondary);
+  }
+
+  return parts.join(':');
+}
+
+export function parseTelegramCommerceViewCallbackData(
+  data?: string | null,
+): TelegramCommerceViewCallbackPayload | null {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts[0] !== TELEGRAM_COMMERCE_VIEW_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const section = decodeTelegramCommerceViewSection(parts[1]);
+  const action = decodeTelegramCommerceViewAction(parts[2]);
+  if (!section || !action) {
+    return null;
+  }
+
+  return {
+    section,
+    action,
+    primary: parts[3]?.trim() || null,
+    secondary: parts[4]?.trim() || null,
+  };
 }
 
 export function parseTelegramMenuCallbackData(data?: string | null): TelegramMenuCallbackPayload | null {

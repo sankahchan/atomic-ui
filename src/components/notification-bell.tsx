@@ -16,11 +16,11 @@ export function NotificationBell() {
             variant="ghost"
             size="icon"
             asChild
-            className="relative text-muted-foreground hover:text-foreground"
+            className="relative h-9 w-9 text-muted-foreground hover:text-foreground sm:h-10 sm:w-10"
             title="Notifications"
         >
             <Link href="/dashboard/notifications">
-                <Bell className="h-5 w-5" />
+                <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
                 {unreadCount > 0 && (
                     <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
                 )}

@@ -8,12 +8,14 @@ Use this when you want a brand-new VPS to come up with the same install path eve
 - installs the minimal system packages needed to run the installer
 - downloads `install.sh` from the GitHub ref you choose
 - runs the normal Atomic-UI installer with your panel/share domain settings
+- applies the Prisma schema through the repo's non-interactive safety wrapper so fresh installs do not stall on a confirmation prompt
 - verifies that `atomic-ui.service` is running
 - probes the local panel route before finishing
 
 It is intended for **first-time installs** on a clean VPS.
 
 For updates on an existing server, use `scripts/deploy-vps.sh` instead.
+For turning a fresh server into a restored copy of an existing production server, continue with [new-server-from-production-backup.md](new-server-from-production-backup.md) after bootstrap.
 
 ## Before you run it
 
@@ -25,10 +27,14 @@ For updates on an existing server, use `scripts/deploy-vps.sh` instead.
    - panel domain only
    - panel domain + public share subdomain
 5. Choose non-default admin credentials for production.
+6. Decide whether to keep the generated random panel path or set a fixed one such as `control-center`.
+7. Decide whether to keep the default Postgres runtime or explicitly opt into SQLite.
 
 ## Quick usage
 
 ### Bare IP install
+
+This now installs onto local Postgres by default:
 
 ```bash
 BOOTSTRAP_HOST=152.42.255.135 \
@@ -53,6 +59,34 @@ BOOTSTRAP_TELEGRAM_BOT_TOKEN='123456:ABCDEF' \
 bash scripts/bootstrap-vps.sh
 ```
 
+### Predictable first-login path
+
+Use this when you want the panel to come up at a fixed path instead of a generated random one:
+
+```bash
+BOOTSTRAP_HOST=152.42.255.135 \
+BOOTSTRAP_PASSWORD='your-vps-password' \
+BOOTSTRAP_PANEL_PATH='control-center' \
+BOOTSTRAP_DEFAULT_ADMIN_USERNAME='admin' \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
+bash scripts/bootstrap-vps.sh
+```
+
+### Opt into SQLite instead
+
+Use this only when you explicitly want a SQLite runtime on the fresh VPS:
+
+```bash
+BOOTSTRAP_HOST=152.42.255.135 \
+BOOTSTRAP_PASSWORD='your-vps-password' \
+BOOTSTRAP_DATABASE_ENGINE='sqlite' \
+BOOTSTRAP_DEFAULT_ADMIN_USERNAME='admin' \
+BOOTSTRAP_DEFAULT_ADMIN_PASSWORD='change-this-now' \
+bash scripts/bootstrap-vps.sh
+```
+
+If you already have a managed Postgres database, pass `BOOTSTRAP_DATABASE_URL` instead of using the installer-managed local Postgres defaults.
+
 ## Supported inputs
 
 | Variable | Purpose |
@@ -63,6 +97,14 @@ bash scripts/bootstrap-vps.sh
 | `BOOTSTRAP_REPO` | GitHub repo slug. Defaults to `sankahchan/atomic-ui`. |
 | `BOOTSTRAP_INSTALL_REF` | Branch, tag, or commit SHA to install. Defaults to `main`. |
 | `BOOTSTRAP_INSTALL_HTTPS` | `auto`, `require`, or `false`. Defaults to `auto`. |
+| `BOOTSTRAP_DATABASE_ENGINE` | `postgres` or `sqlite`. Defaults to `postgres` for fresh VPS installs. |
+| `BOOTSTRAP_DATABASE_URL` | Optional Postgres connection string. If set, the installer uses it instead of creating a local Postgres database. |
+| `BOOTSTRAP_PANEL_PATH` | Optional fixed panel path such as `control-center`. If omitted, the installer generates a random path. |
+| `BOOTSTRAP_POSTGRES_HOST` | Host for installer-managed Postgres. Keep this local (`127.0.0.1` or `localhost`). |
+| `BOOTSTRAP_POSTGRES_PORT` | Port for installer-managed Postgres. Defaults to `5432`. |
+| `BOOTSTRAP_POSTGRES_DB` | Database name for installer-managed Postgres. Defaults to `atomic_ui`. |
+| `BOOTSTRAP_POSTGRES_USER` | User name for installer-managed Postgres. Defaults to `atomic_ui_app`. |
+| `BOOTSTRAP_POSTGRES_PASSWORD` | Optional password for installer-managed Postgres. If omitted, the installer generates one and writes it into `.env`. |
 | `BOOTSTRAP_ACME_EMAIL` | Email used for certificate setup. |
 | `BOOTSTRAP_PANEL_DOMAIN` | Canonical admin domain. Optional. |
 | `BOOTSTRAP_PUBLIC_SHARE_DOMAIN` | Public share/client host. Optional. |
@@ -80,11 +122,11 @@ bash scripts/bootstrap-vps.sh
    - login page loads
    - dashboard loads
    - share page host is correct
-5. If Telegram is configured, confirm the webhook later with:
+   - database engine matches what you asked for
+5. If Telegram is configured, sign in to the dashboard Notifications workspace and use the webhook set/reset controls there.
+6. Confirm inbound Telegram delivery against the public panel URL after the webhook is set.
 
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://your-panel-host/your-panel-path/api/telegram/webhook
-```
+Atomic-UI registers Telegram webhooks with a secret token and rejects incoming webhook requests that do not include the matching `x-telegram-bot-api-secret-token` header.
 
 ## Common causes of failure on fresh VPS
 
@@ -98,3 +140,4 @@ curl -s -o /dev/null -w '%{http_code}\n' https://your-panel-host/your-panel-path
 
 - use `scripts/deploy-vps.sh` for normal updates
 - use `install.sh` directly if you are already logged into the VPS and want to install from inside the server
+- use [new-server-from-production-backup.md](new-server-from-production-backup.md) when the fresh server must restore a production backup and become a live replacement

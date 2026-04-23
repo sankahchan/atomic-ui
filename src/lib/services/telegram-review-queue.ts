@@ -44,13 +44,13 @@ export function buildTelegramReviewQueueSummaryKeyboard(input: {
   return {
     inline_keyboard: [
       [
-        option('all', isMyanmar ? 'All' : 'All'),
-        option('mine', isMyanmar ? 'Mine' : 'Mine'),
-        option('unclaimed', isMyanmar ? 'Unclaimed' : 'Unclaimed'),
+        option('all', isMyanmar ? 'အားလုံး' : 'All'),
+        option('mine', isMyanmar ? 'ကိုယ်ပိုင်' : 'Mine'),
+        option('unclaimed', isMyanmar ? 'မယူရသေး' : 'Unclaimed'),
       ],
       [
         {
-          text: isMyanmar ? '⚡ Next needing action' : '⚡ Next needing action',
+          text: isMyanmar ? '⚡ နောက်ထပ်စစ်ရန်' : '⚡ Next needing action',
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue_unclaimed'),
         },
         {
@@ -58,13 +58,13 @@ export function buildTelegramReviewQueueSummaryKeyboard(input: {
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
         },
         {
-          text: isMyanmar ? '💸 Refunds' : '💸 Refunds',
+          text: isMyanmar ? '💸 Refund များ' : '💸 Refunds',
           callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
         },
       ],
       [
         {
-          text: isMyanmar ? '🧭 Admin home' : '🧭 Admin home',
+          text: isMyanmar ? '🧭 Admin စင်တာ' : '🧭 Admin home',
           callback_data: buildTelegramMenuCallbackData('admin', 'home'),
         },
       ],
@@ -72,45 +72,52 @@ export function buildTelegramReviewQueueSummaryKeyboard(input: {
   };
 }
 
-function buildTelegramOrderReviewAlertMessage(input: {
+export function buildTelegramOrderReviewAlertMessage(input: {
   order: TelegramAdminReviewQueueOrder;
   locale: SupportedLocale;
   mode: 'initial' | 'reminder' | 'updated';
-  panelUrl: string;
 }) {
-  const { order, locale, mode, panelUrl } = input;
+  const { order, locale, mode } = input;
   const ui = getTelegramUi(locale);
   const isMyanmar = locale === 'my';
-  const reviewFocusLines = isMyanmar
-    ? [
-        '<b>Review checklist</b>',
-        '• screenshot ရှင်းလင်းမှု',
-        '• amount / method / plan ကိုက်ညီမှု',
-        '• duplicate proof warning ရှိ/မရှိ',
-        '• quick reject preset သုံးရန် လို/မလို',
-      ]
-    : [
-        '<b>Review checklist</b>',
-        '• screenshot clarity',
-        '• amount / method / plan match',
-        '• duplicate-proof warning',
-        '• whether a quick reject preset is enough',
-      ];
   const ownershipLabel = order.assignedReviewerEmail
-    ? `🧷 ${isMyanmar ? 'Claimed by' : 'Claimed by'}: <b>${escapeHtml(order.assignedReviewerEmail)}</b>`
-    : `🧷 ${isMyanmar ? 'Queue ownership' : 'Queue ownership'}: <b>${isMyanmar ? 'Unclaimed' : 'Unclaimed'}</b>`;
+    ? `🧷 ${isMyanmar ? 'ယူထားသူ' : 'Claimed by'}: <b>${escapeHtml(order.assignedReviewerEmail)}</b>`
+    : `🧷 ${isMyanmar ? 'တာဝန်ယူသူ' : 'Queue ownership'}: <b>${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}</b>`;
   const queueHint =
     mode === 'reminder'
       ? isMyanmar
-        ? 'Reminder'
+        ? 'သတိပေးချက်'
         : 'Reminder'
       : mode === 'updated'
         ? isMyanmar
           ? 'Live queue card'
           : 'Live queue card'
         : isMyanmar
-          ? 'New review item'
+          ? 'Review item အသစ်'
           : 'New review item';
+  const proofHint = order.paymentMessageId
+    ? isMyanmar
+      ? '📎 မူရင်း screenshot ကို ဤ card အပေါ်တွင် copy လုပ်ပေးထားပါသည်။'
+      : '📎 The original screenshot is copied just above this card.'
+    : isMyanmar
+      ? 'မူရင်း screenshot ကို ဤနေရာတွင် copy မရသဖြင့် panel button ဖြင့် စစ်ဆေးပေးပါ။'
+      : 'The original screenshot was not copied here, so review it from the panel button.';
+  const actionHint = isMyanmar
+    ? 'Buttons အောက်မှ claim, approve, reject, သို့မဟုတ် panel ကို ဖွင့်နိုင်ပါသည်။'
+    : 'Use the buttons below to claim, approve, reject, or open the panel.';
+  const requesterSummary = [
+    `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
+    `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
+  ].join(' • ');
+  const paymentSnapshot = [
+    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
+    `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
+    order.paymentSubmittedAt
+      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' • ');
 
   return [
     mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
@@ -118,41 +125,26 @@ function buildTelegramOrderReviewAlertMessage(input: {
     `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
     `${isMyanmar ? 'Queue' : 'Queue'}: <b>${queueHint}</b>`,
     '',
-    '<b>📎 Proof summary</b>',
+    isMyanmar ? '<b>📎 Proof အနှစ်ချုပ်</b>' : '<b>📎 Proof snapshot</b>',
     order.priceLabel ? `💰 ${ui.priceLabel}: <b>${escapeHtml(order.priceLabel)}</b>` : '',
-    `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
-    `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
-    order.paymentSubmittedAt
-      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
-      : '',
-    `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
-    '',
-    '<b>🧭 Queue ownership</b>',
-    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
+    requesterSummary,
+    paymentSnapshot,
     order.selectedServerName ? `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}</b>` : '',
     ownershipLabel,
-    order.paymentMessageId
-      ? isMyanmar
-        ? '📎 မူရင်း screenshot ကို ဤ summary မတိုင်မီ copy လုပ်ပေးထားပါသည်။'
-        : '📎 The original screenshot is copied just above this review summary.'
-      : isMyanmar
-        ? 'မူရင်း screenshot copy မရရှိသဖြင့် panel တွင် proof ကို စစ်ဆေးပေးပါ။'
-        : 'The original screenshot could not be copied here, so review it in the panel.',
     order.duplicateProofOrderCode
       ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
       : '',
     order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
     order.targetAccessKeyId ? `${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>` : '',
     '',
-    ...reviewFocusLines,
-    '',
-    `${ui.orderReviewPanelLabel}: ${panelUrl}`,
+    proofHint,
+    actionHint,
   ]
     .filter(Boolean)
     .join('\n');
 }
 
-function buildTelegramOrderReviewAlertKeyboard(input: {
+export function buildTelegramOrderReviewAlertKeyboard(input: {
   orderId: string;
   locale: SupportedLocale;
   panelUrl: string;
@@ -167,10 +159,10 @@ function buildTelegramOrderReviewAlertKeyboard(input: {
           text:
             input.claimed
               ? input.locale === 'my'
-                ? '🧷 Claimed'
+                ? '🧷 ယူထားပြီး'
                 : '🧷 Claimed'
               : input.locale === 'my'
-                ? '🧷 Claim'
+                ? '🧷 ယူမည်'
                 : '🧷 Claim',
           callback_data: buildTelegramOrderReviewCallbackData(
             'claim',
@@ -179,7 +171,7 @@ function buildTelegramOrderReviewAlertKeyboard(input: {
           ),
         },
         {
-          text: input.locale === 'my' ? '⬅️ Prev' : '⬅️ Prev',
+          text: input.locale === 'my' ? '⬅️ ယခင်' : '⬅️ Prev',
           callback_data: buildTelegramOrderReviewCallbackData(
             'prev',
             input.orderId,
@@ -187,7 +179,7 @@ function buildTelegramOrderReviewAlertKeyboard(input: {
           ),
         },
         {
-          text: input.locale === 'my' ? '➡️ Next' : '➡️ Next',
+          text: input.locale === 'my' ? '➡️ နောက်' : '➡️ Next',
           callback_data: buildTelegramOrderReviewCallbackData(
             'next',
             input.orderId,
@@ -251,7 +243,6 @@ export async function sendTelegramOrderReviewCardToChat(input: {
       order: input.order,
       locale: input.locale,
       mode: input.mode,
-      panelUrl,
     }),
     {
       replyMarkup: buildTelegramOrderReviewAlertKeyboard({
@@ -294,14 +285,14 @@ export async function handleTelegramReviewQueueCommand(input: {
   const modeLabel =
     mode === 'mine'
       ? input.locale === 'my'
-        ? 'Assigned to me'
+        ? 'ကိုယ်ပိုင် queue'
         : 'Assigned to me'
       : mode === 'unclaimed'
         ? input.locale === 'my'
-          ? 'Unclaimed only'
+          ? 'မယူရသေးသော item များ'
           : 'Unclaimed only'
         : input.locale === 'my'
-          ? 'All pending'
+          ? 'Pending item အားလုံး'
           : 'All pending';
 
   await sendTelegramMessage(
@@ -312,14 +303,14 @@ export async function handleTelegramReviewQueueCommand(input: {
       '',
       `${modeLabel}`,
       input.locale === 'my'
-        ? `${snapshot.totalPending} pending • ${snapshot.unclaimed} unclaimed • ${snapshot.mine} mine`
+        ? `${snapshot.totalPending} ခု pending • ${snapshot.unclaimed} ခု မယူရသေး • ${snapshot.mine} ခု ကိုယ်ပိုင်`
         : `${snapshot.totalPending} pending • ${snapshot.unclaimed} unclaimed • ${snapshot.mine} mine`,
       input.locale === 'my'
-        ? `${snapshot.duplicateWarnings} duplicate-proof warning`
+        ? `${snapshot.duplicateWarnings} ခု duplicate-proof သတိပေးချက်`
         : `${snapshot.duplicateWarnings} duplicate-proof warning`,
       '',
       input.locale === 'my'
-        ? `Showing ${snapshot.orders.length} item(s). Use /reviewqueue mine or /reviewqueue unclaimed when needed.`
+        ? `${snapshot.orders.length} ခုကို ပြထားပါသည်။ /reviewqueue mine သို့မဟုတ် /reviewqueue unclaimed ဖြင့် filter ပြောင်းနိုင်ပါသည်။`
         : `Showing ${snapshot.orders.length} item(s). Use /reviewqueue mine or /reviewqueue unclaimed when needed.`,
     ].join('\n'),
     {
@@ -372,10 +363,10 @@ export async function sendTelegramNextReviewQueueCard(input: {
       input.chatId,
       input.direction === 'prev'
         ? input.locale === 'my'
-          ? '📭 ဤ queue filter အတွက် ယခင် review item မရှိတော့ပါ။'
+          ? '📭 ဤ filter အတွက် ယခင် review item မရှိတော့ပါ။'
           : '📭 There is no previous pending review item in this queue filter.'
         : input.locale === 'my'
-          ? '📭 ဤ queue filter အတွက် နောက်ထပ် pending review item မရှိတော့ပါ။'
+          ? '📭 ဤ filter အတွက် နောက်ထပ် pending review item မရှိတော့ပါ။'
           : '📭 There are no more pending review items in this queue filter.',
       {
         replyMarkup: buildTelegramReviewQueueSummaryKeyboard({

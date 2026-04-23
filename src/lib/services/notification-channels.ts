@@ -1,7 +1,15 @@
 import { createHmac } from 'crypto';
 import { z } from 'zod';
 import { db } from '@/lib/db';
+import {
+  decryptSettingSecret,
+  encryptSettingSecret,
+  isEncryptedSettingSecret,
+  isMaskedSettingSecret,
+  maskSettingSecret,
+} from '@/lib/settings-crypto';
 import { sendNotificationEmail } from '@/lib/services/email';
+import { parseTelegramBotSettingsValue } from '@/lib/telegram-bot-settings';
 import { getTelegramConfig, sendTelegramMessageDetailed } from '@/lib/services/telegram-runtime';
 
 export const MAX_NOTIFICATION_COOLDOWN_MINUTES = 24 * 60;
@@ -71,12 +79,143 @@ function parseRecordConfig(value: string) {
       return {};
     }
 
-    return Object.fromEntries(
+    const next = Object.fromEntries(
       Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
     );
+
+    if (typeof next.signingSecret === 'string') {
+      next.signingSecret = decryptSettingSecret(next.signingSecret);
+    }
+
+    if (typeof next.headers === 'string') {
+      next.headers = decryptWebhookHeadersValue(next.headers);
+    }
+
+    return next;
   } catch {
     return {};
   }
+}
+
+function decryptWebhookHeadersValue(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return '{}';
+    }
+
+    return JSON.stringify(
+      Object.fromEntries(
+        Object.entries(parsed)
+          .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+          .map(([key, headerValue]) => [key, decryptSettingSecret(headerValue)]),
+      ),
+    );
+  } catch {
+    return '{}';
+  }
+}
+
+function encryptWebhookHeadersValue(headers: Record<string, string>) {
+  return JSON.stringify(
+    Object.fromEntries(
+      Object.entries(headers).map(([key, value]) => [key, value.trim() ? encryptSettingSecret(value) : '']),
+    ),
+  );
+}
+
+export function sanitizeNotificationChannelForClient(channel: ParsedNotificationChannel): ParsedNotificationChannel {
+  const nextConfig = { ...channel.config };
+
+  if (typeof nextConfig.signingSecret === 'string') {
+    nextConfig.signingSecret = maskSettingSecret(nextConfig.signingSecret);
+  }
+
+  if (typeof nextConfig.headers === 'string') {
+    nextConfig.headers = JSON.stringify(
+      Object.fromEntries(
+        Object.entries(parseWebhookHeaders(nextConfig.headers)).map(([key, value]) => [
+          key,
+          maskSettingSecret(value),
+        ]),
+      ),
+    );
+  }
+
+  return {
+    ...channel,
+    config: nextConfig,
+  };
+}
+
+export function notificationChannelNeedsSecretMigration(config: Record<string, unknown>) {
+  if (typeof config.signingSecret === 'string' && config.signingSecret.trim()) {
+    if (!isEncryptedSettingSecret(config.signingSecret.trim())) {
+      return true;
+    }
+  }
+
+  if (typeof config.headers === 'string' && config.headers.trim()) {
+    try {
+      const parsed = JSON.parse(config.headers) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return Object.values(parsed).some(
+          (value) => typeof value === 'string' && value.trim().length > 0 && !isEncryptedSettingSecret(value.trim()),
+        );
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+export function buildStoredNotificationChannelConfig(
+  input: {
+    signingSecret?: string | null;
+    headers?: Record<string, string>;
+  },
+  existingConfig?: Record<string, unknown>,
+) {
+  const next: Record<string, unknown> = {
+    ...(existingConfig || {}),
+  };
+
+  if (typeof input.signingSecret === 'string') {
+    const trimmedSecret = input.signingSecret.trim();
+    if (trimmedSecret.length === 0) {
+      next.signingSecret = '';
+    } else if (isMaskedSettingSecret(trimmedSecret)) {
+      next.signingSecret =
+        typeof existingConfig?.signingSecret === 'string' && existingConfig.signingSecret.trim().length > 0
+          ? encryptSettingSecret(existingConfig.signingSecret)
+          : '';
+    } else {
+      next.signingSecret = encryptSettingSecret(trimmedSecret);
+    }
+  }
+
+  if (input.headers) {
+    const persistedHeaders = Object.fromEntries(
+      Object.entries(input.headers).map(([key, value]) => {
+        const trimmedValue = value.trim();
+        if (
+          isMaskedSettingSecret(trimmedValue) &&
+          typeof existingConfig?.headers === 'string'
+        ) {
+          const existingHeaders = parseWebhookHeaders(existingConfig.headers);
+          return [key, existingHeaders[key] ?? ''];
+        }
+
+        return [key, trimmedValue];
+      }),
+    );
+
+    next.headers = encryptWebhookHeadersValue(persistedHeaders);
+  }
+
+  return next;
 }
 
 export function parseNotificationChannelRecord(record: {
@@ -140,7 +279,7 @@ function parseEventCooldowns(value: string | undefined) {
   }
 }
 
-function parseWebhookHeaders(value: string | undefined) {
+export function parseWebhookHeaders(value: string | undefined) {
   if (!value) {
     return {};
   }
@@ -237,8 +376,8 @@ async function getTelegramBotToken(config: Record<string, string>) {
   }
 
   try {
-    const parsed = JSON.parse(telegramSettings.value) as Record<string, unknown>;
-    return typeof parsed.botToken === 'string' && parsed.botToken.trim() ? parsed.botToken : null;
+    const parsed = parseTelegramBotSettingsValue(telegramSettings.value);
+    return parsed && typeof parsed.botToken === 'string' && parsed.botToken.trim() ? parsed.botToken : null;
   } catch {
     return null;
   }

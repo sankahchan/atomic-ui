@@ -36,22 +36,36 @@ export default function SettingsPage() {
             </Card>
 
             <Tabs defaultValue="subscription" className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="subscription">
-                        <Palette className="w-4 h-4 mr-2" />
-                        Subscription Page
+                <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-[1.25rem] p-1.5">
+                    <TabsTrigger
+                        value="subscription"
+                        className="h-auto min-h-11 min-w-0 flex-1 basis-[calc(50%-0.125rem)] justify-start gap-2 whitespace-normal rounded-[1rem] px-3 py-2.5 text-left leading-tight sm:flex-none sm:basis-auto sm:justify-center"
+                    >
+                        <Palette className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 break-words">Subscription Page</span>
                     </TabsTrigger>
-                    <TabsTrigger value="backup">
-                        <Shield className="w-4 h-4 mr-2" />
-                        Backup & Restore
+                    <TabsTrigger
+                        value="backup"
+                        className="h-auto min-h-11 min-w-0 flex-1 basis-[calc(50%-0.125rem)] justify-start gap-2 whitespace-normal rounded-[1rem] px-3 py-2.5 text-left leading-tight sm:flex-none sm:basis-auto sm:justify-center"
+                    >
+                        <Shield className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 break-words">Backup & Restore</span>
                     </TabsTrigger>
-                    <TabsTrigger value="general" disabled>
-                        <Settings className="w-4 h-4 mr-2" />
-                        General
+                    <TabsTrigger
+                        value="general"
+                        disabled
+                        className="h-auto min-h-11 min-w-0 flex-1 basis-[calc(50%-0.125rem)] justify-start gap-2 whitespace-normal rounded-[1rem] px-3 py-2.5 text-left leading-tight sm:flex-none sm:basis-auto sm:justify-center"
+                    >
+                        <Settings className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 break-words">General</span>
                     </TabsTrigger>
-                    <TabsTrigger value="account" disabled>
-                        <User className="w-4 h-4 mr-2" />
-                        Account
+                    <TabsTrigger
+                        value="account"
+                        disabled
+                        className="h-auto min-h-11 min-w-0 flex-1 basis-[calc(50%-0.125rem)] justify-start gap-2 whitespace-normal rounded-[1rem] px-3 py-2.5 text-left leading-tight sm:flex-none sm:basis-auto sm:justify-center"
+                    >
+                        <User className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 break-words">Account</span>
                     </TabsTrigger>
                 </TabsList>
 

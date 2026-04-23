@@ -10,6 +10,7 @@
  */
 
 import https from 'https';
+import type { TLSSocket } from 'tls';
 
 // Type definitions for Outline API responses
 export interface OutlineServer {
@@ -45,6 +46,19 @@ export interface OutlineMetrics {
 
 export interface OutlineDataLimit {
   bytes: number;
+}
+
+export function normalizeCertificateFingerprint(value: string | null | undefined) {
+  return (value || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+}
+
+export function matchesCertificateFingerprint(
+  actualFingerprint: string | null | undefined,
+  expectedFingerprint: string | null | undefined,
+) {
+  const actual = normalizeCertificateFingerprint(actualFingerprint);
+  const expected = normalizeCertificateFingerprint(expectedFingerprint);
+  return actual.length > 0 && expected.length > 0 && actual === expected;
 }
 
 // Error class for Outline API errors
@@ -142,6 +156,30 @@ export class OutlineClient {
             resolve(JSON.parse(data) as T);
           } catch {
             reject(new OutlineApiError('Failed to parse response', 0, data));
+          }
+        });
+      });
+
+      req.on('socket', (socket) => {
+        const tlsSocket = socket as TLSSocket;
+        tlsSocket.once('secureConnect', () => {
+          const peerCertificate = tlsSocket.getPeerCertificate();
+          const actualFingerprint =
+            peerCertificate && typeof peerCertificate.fingerprint256 === 'string'
+              ? peerCertificate.fingerprint256
+              : null;
+
+          if (!matchesCertificateFingerprint(actualFingerprint, this.certSha256)) {
+            req.destroy(
+              new OutlineApiError(
+                'Outline server certificate fingerprint mismatch',
+                0,
+                {
+                  expectedFingerprint: this.certSha256,
+                  actualFingerprint,
+                },
+              ),
+            );
           }
         });
       });

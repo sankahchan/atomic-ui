@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { Loader2, Shield, KeyRound, ArrowLeft, Fingerprint } from 'lucide-react';
+import { Loader2, Shield, KeyRound, ArrowLeft, FingerprintPattern } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { startAuthentication } from '@simplewebauthn/browser';
 
@@ -256,7 +256,7 @@ function Verify2FAContent() {
               )}
               {webAuthnEnabled && (
                 <TabsTrigger value="passkey">
-                  <Fingerprint className="h-4 w-4 mr-2" />
+                  <FingerprintPattern className="h-4 w-4 mr-2" />
                   Passkey
                 </TabsTrigger>
               )}
@@ -354,7 +354,7 @@ function Verify2FAContent() {
                     </>
                   ) : (
                     <>
-                      <Fingerprint className="mr-2 h-5 w-5" />
+                      <FingerprintPattern className="mr-2 h-5 w-5" />
                       Verify with Passkey
                     </>
                   )}

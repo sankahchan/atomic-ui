@@ -16,7 +16,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/hooks/use-locale';
@@ -103,8 +115,8 @@ function ReportDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-3xl">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
             {report?.name || 'Loading...'}
@@ -115,13 +127,21 @@ function ReportDetailDialog({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
+          <DialogBody>
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          </DialogBody>
         ) : report?.reportData ? (
-          <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Report snapshot</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Review the key metrics, busiest servers, and export actions for this reporting window.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
@@ -165,7 +185,8 @@ function ReportDetailDialog({
                   </p>
                 </CardContent>
               </Card>
-            </div>
+              </div>
+            </DialogSection>
 
             {isScheduledSummary ? (
               <Card>
@@ -256,7 +277,7 @@ function ReportDetailDialog({
             ))}
 
             {/* Download Buttons */}
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               <Button
                 variant="outline"
                 onClick={() => window.open(withBasePath(`/api/reports/download?id=${reportId}&format=csv`), '_blank')}
@@ -279,9 +300,11 @@ function ReportDetailDialog({
                 Download PDF
               </Button>
             </div>
-          </div>
+          </DialogBody>
         ) : (
-          <p className="text-muted-foreground py-8 text-center">No report data available.</p>
+          <DialogBody>
+            <p className="py-8 text-center text-muted-foreground">No report data available.</p>
+          </DialogBody>
         )}
       </DialogContent>
     </Dialog>
@@ -435,7 +458,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <section className="ops-showcase">
-        <div className="ops-showcase-grid">
+        <div className="grid gap-5">
           <div className="space-y-5 self-start">
             <Badge variant="outline" className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200">
               <FileText className="h-3.5 w-3.5" />
@@ -1125,8 +1148,8 @@ export default function ReportsPage() {
 
       {/* Generate Report Dialog */}
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-primary" />
               Generate Usage Report
@@ -1136,57 +1159,63 @@ export default function ReportsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            {/* Report Type */}
-            <div className="space-y-2">
-              <Label>Report Type</Label>
-              <Select
-                value={reportType}
-                onValueChange={(v) => setReportType(v as 'MONTHLY' | 'WEEKLY')}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MONTHLY">Monthly Report</SelectItem>
-                  <SelectItem value="WEEKLY">Weekly Report (Last 7 Days)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Report window</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Choose whether to generate a full monthly summary or a rolling weekly snapshot.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
-            {/* Month Selector (only for monthly) */}
-            {reportType === 'MONTHLY' && (
-              <div className="space-y-2">
-                <Label>Select Month</Label>
-                <Select
-                  value={selectedMonth}
-                  onValueChange={setSelectedMonth}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMonths.map((m, i) => (
-                      <SelectItem key={i} value={i.toString()}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Generates a report covering the entire selected month.
-                </p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Report type</Label>
+                  <Select
+                    value={reportType}
+                    onValueChange={(v) => setReportType(v as 'MONTHLY' | 'WEEKLY')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MONTHLY">Monthly report</SelectItem>
+                      <SelectItem value="WEEKLY">Weekly report (last 7 days)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {reportType === 'MONTHLY' && (
+                  <div className="space-y-2">
+                    <Label>Select month</Label>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableMonths.map((m, i) => (
+                          <SelectItem key={i} value={i.toString()}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Generates a report covering the entire selected month.
+                    </p>
+                  </div>
+                )}
+
+                {reportType === 'WEEKLY' && (
+                  <div className="ops-modal-note">
+                    This generates a report for the last 7 days, including today.
+                  </div>
+                )}
               </div>
-            )}
+            </DialogSection>
+          </DialogBody>
 
-            {reportType === 'WEEKLY' && (
-              <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-                This will generate a report for the last 7 days, including today.
-              </p>
-            )}
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button variant="outline" onClick={() => setGenerateOpen(false)}>
               Cancel
             </Button>

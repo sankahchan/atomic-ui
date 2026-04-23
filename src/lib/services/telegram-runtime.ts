@@ -15,7 +15,17 @@ import {
   type SendTelegramMessageResult,
   type TelegramNotificationPreferenceKey,
 } from '@/lib/services/telegram-domain-types';
+import { getJwtSecretString } from '@/lib/session-secret';
 import { escapeHtml } from '@/lib/services/telegram-ui';
+import {
+  resolveTelegramWebhookSecret,
+  TELEGRAM_WEBHOOK_SECRET_HEADER,
+} from '@/lib/telegram-webhook-secret';
+import {
+  parseTelegramBotSettingsValue,
+  serializeTelegramBotSettingsValue,
+  telegramBotSettingsNeedSecretMigration,
+} from '@/lib/telegram-bot-settings';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 
@@ -24,6 +34,7 @@ export type TelegramParseMode = 'HTML' | 'Markdown';
 export interface TelegramConfig {
   botToken: string;
   botUsername?: string;
+  webhookSecretToken?: string;
   adminChatIds: string[];
   welcomeMessage?: string;
   keyNotFoundMessage?: string;
@@ -56,16 +67,12 @@ export async function getTelegramDefaultLocale(): Promise<SupportedLocale> {
   ]);
 
   if (botSetting?.value) {
-    try {
-      const parsed = JSON.parse(botSetting.value) as Record<string, unknown>;
-      const configured = coerceSupportedLocale(
-        typeof parsed.defaultLanguage === 'string' ? parsed.defaultLanguage : undefined,
-      );
-      if (configured) {
-        return configured;
-      }
-    } catch {
-      // Ignore malformed bot settings and fall back to the app default.
+    const parsed = parseTelegramBotSettingsValue(botSetting.value);
+    const configured = coerceSupportedLocale(
+      typeof parsed?.defaultLanguage === 'string' ? parsed.defaultLanguage : undefined,
+    );
+    if (configured) {
+      return configured;
     }
   }
 
@@ -435,61 +442,114 @@ export async function getTelegramBotUsername(
   return null;
 }
 
+export function getTelegramWebhookSecret(botToken: string, persistedSecret?: unknown) {
+  return resolveTelegramWebhookSecret({
+    botToken,
+    persistedSecret,
+    configuredSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
+    jwtSecret: getJwtSecretString(),
+  });
+}
+
+async function ensurePersistedTelegramWebhookSecret(config: Record<string, unknown>) {
+  const botToken =
+    typeof config.botToken === 'string' && config.botToken.trim().length > 0
+      ? config.botToken
+      : null;
+  if (!botToken) {
+    return null;
+  }
+
+  const storedSecret =
+    typeof config.webhookSecretToken === 'string' && config.webhookSecretToken.trim().length > 0
+      ? config.webhookSecretToken.trim()
+      : null;
+  const webhookSecretToken = getTelegramWebhookSecret(botToken, storedSecret);
+
+  if (!storedSecret) {
+    try {
+      await db.settings.update({
+        where: { key: 'telegram_bot' },
+        data: {
+          value: serializeTelegramBotSettingsValue({
+            ...config,
+            webhookSecretToken,
+          }),
+        },
+      });
+    } catch (error) {
+      console.error('Failed to persist Telegram webhook secret:', error);
+    }
+  }
+
+  return webhookSecretToken;
+}
+
 export async function getTelegramConfig(): Promise<TelegramConfig | null> {
   const settings = await db.settings.findUnique({ where: { key: 'telegram_bot' } });
   if (settings) {
-    try {
-      const config = JSON.parse(settings.value) as Record<string, unknown>;
-      if (config.isEnabled && typeof config.botToken === 'string' && config.botToken.trim()) {
-        const localizedWelcomeMessages = buildDefaultTelegramTemplateMap(
-          DEFAULT_TELEGRAM_WELCOME_MESSAGES,
-          config.localizedWelcomeMessages,
-        );
-        const localizedKeyNotFoundMessages = buildDefaultTelegramTemplateMap(
-          DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
-          config.localizedKeyNotFoundMessages,
-        );
-
-        return {
-          botToken: config.botToken,
-          botUsername:
-            typeof config.botUsername === 'string' && config.botUsername.trim()
-              ? config.botUsername
-              : undefined,
-          adminChatIds: Array.isArray(config.adminChatIds)
-            ? config.adminChatIds.filter(
-                (value): value is string => typeof value === 'string' && value.trim().length > 0,
-              )
-            : [],
-          welcomeMessage:
-            typeof config.welcomeMessage === 'string' && config.welcomeMessage.trim()
-              ? config.welcomeMessage
-              : DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
-          keyNotFoundMessage:
-            typeof config.keyNotFoundMessage === 'string' && config.keyNotFoundMessage.trim()
-              ? config.keyNotFoundMessage
-              : DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
-          localizedWelcomeMessages,
-          localizedKeyNotFoundMessages,
-          dailyDigestEnabled: Boolean(config.dailyDigestEnabled),
-          dailyDigestHour:
-            typeof config.dailyDigestHour === 'number' ? config.dailyDigestHour : 9,
-          dailyDigestMinute:
-            typeof config.dailyDigestMinute === 'number' ? config.dailyDigestMinute : 0,
-          digestLookbackHours:
-            typeof config.digestLookbackHours === 'number' ? config.digestLookbackHours : 24,
-          defaultLanguage:
-            coerceSupportedLocale(
-              typeof config.defaultLanguage === 'string' ? config.defaultLanguage : undefined,
-            ) || (await getTelegramDefaultLocale()),
-          showLanguageSelectorOnStart:
-            typeof config.showLanguageSelectorOnStart === 'boolean'
-              ? config.showLanguageSelectorOnStart
-              : true,
-        };
+    const config = parseTelegramBotSettingsValue(settings.value);
+    if (config?.isEnabled && typeof config.botToken === 'string' && config.botToken.trim()) {
+      if (telegramBotSettingsNeedSecretMigration(settings.value)) {
+        void db.settings
+          .update({
+            where: { key: 'telegram_bot' },
+            data: { value: serializeTelegramBotSettingsValue(config) },
+          })
+          .catch((error) => {
+            console.error('Failed to migrate Telegram bot secrets to encrypted storage:', error);
+          });
       }
-    } catch {
-      // Fall through to channel-based configuration.
+
+      const localizedWelcomeMessages = buildDefaultTelegramTemplateMap(
+        DEFAULT_TELEGRAM_WELCOME_MESSAGES,
+        config.localizedWelcomeMessages,
+      );
+      const localizedKeyNotFoundMessages = buildDefaultTelegramTemplateMap(
+        DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+        config.localizedKeyNotFoundMessages,
+      );
+
+      const webhookSecretToken = await ensurePersistedTelegramWebhookSecret(config);
+
+      return {
+        botToken: config.botToken,
+        botUsername:
+          typeof config.botUsername === 'string' && config.botUsername.trim()
+            ? config.botUsername
+            : undefined,
+        webhookSecretToken: webhookSecretToken || getTelegramWebhookSecret(config.botToken),
+        adminChatIds: Array.isArray(config.adminChatIds)
+          ? config.adminChatIds.filter(
+              (value): value is string => typeof value === 'string' && value.trim().length > 0,
+            )
+          : [],
+        welcomeMessage:
+          typeof config.welcomeMessage === 'string' && config.welcomeMessage.trim()
+            ? config.welcomeMessage
+            : DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
+        keyNotFoundMessage:
+          typeof config.keyNotFoundMessage === 'string' && config.keyNotFoundMessage.trim()
+            ? config.keyNotFoundMessage
+            : DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
+        localizedWelcomeMessages,
+        localizedKeyNotFoundMessages,
+        dailyDigestEnabled: Boolean(config.dailyDigestEnabled),
+        dailyDigestHour:
+          typeof config.dailyDigestHour === 'number' ? config.dailyDigestHour : 9,
+        dailyDigestMinute:
+          typeof config.dailyDigestMinute === 'number' ? config.dailyDigestMinute : 0,
+        digestLookbackHours:
+          typeof config.digestLookbackHours === 'number' ? config.digestLookbackHours : 24,
+        defaultLanguage:
+          coerceSupportedLocale(
+            typeof config.defaultLanguage === 'string' ? config.defaultLanguage : undefined,
+          ) || (await getTelegramDefaultLocale()),
+        showLanguageSelectorOnStart:
+          typeof config.showLanguageSelectorOnStart === 'boolean'
+            ? config.showLanguageSelectorOnStart
+            : true,
+      };
     }
   }
 
@@ -523,6 +583,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
             typeof config.botUsername === 'string' && config.botUsername.trim()
               ? config.botUsername
               : undefined,
+          webhookSecretToken: getTelegramWebhookSecret(botToken, config.webhookSecretToken),
           adminChatIds,
           dailyDigestEnabled: false,
           dailyDigestHour: 9,

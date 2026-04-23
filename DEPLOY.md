@@ -41,7 +41,7 @@ HEALTH_CHECK_ENABLED=true
 Before the first production build, validate the generated `.env`:
 
 ```bash
-npm install
+npm ci --include=dev
 npm run env:check -- --env-file=.env
 ```
 
@@ -101,6 +101,7 @@ bash scripts/bootstrap-vps.sh
 ```
 
 See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for the full checklist and all supported inputs.
+If the new host must restore a production backup and become a replacement server, continue with [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md) after bootstrap.
 
 ### 1. First-time install
 
@@ -108,12 +109,12 @@ See [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md) for the full chec
 git clone https://github.com/sankahchan/atomic-ui.git
 cd atomic-ui
 cp .env.example .env
-npm install
+npm ci --include=dev
 npm run db:generate
 npm run db:push
 npm run setup
 npm run env:check -- --env-file=.env
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 ```
 
 Or use the one-command installer directly from inside the VPS, which now prefers HTTPS by default:
@@ -157,8 +158,9 @@ On small VPS instances, do not rebuild while the panel is still running if memor
 ```bash
 cd /opt/atomic-ui
 git pull --ff-only origin main
+npm ci --include=dev
 systemctl stop atomic-ui.service
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl start atomic-ui.service
 ```
 
@@ -231,7 +233,7 @@ For direct VPS deployments:
 ```bash
 git pull --ff-only origin main
 systemctl stop atomic-ui.service
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl start atomic-ui.service
 npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password='your-password'
 ```
@@ -249,7 +251,7 @@ Before major upgrades:
 
 1. Create a backup in the dashboard.
 2. Copy it off the server.
-3. Restore it in a staging/disposable instance.
+3. Restore it in a staging/disposable instance with `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip` while the app service is stopped.
 4. Run the smoke test against that restored instance.
 
 For SQLite-to-Postgres migrations, replace the dashboard backup/restore steps with:
@@ -258,12 +260,20 @@ For SQLite-to-Postgres migrations, replace the dashboard backup/restore steps wi
 2. `npm run db:cutover:import`
 3. `npm run db:cutover:verify`
 
+If you are standing up a separate replacement VPS from an existing production Postgres backup instead of migrating one host in place, use [docs/new-server-from-production-backup.md](docs/new-server-from-production-backup.md).
+
 If a direct VPS deploy fails:
 
 1. `git reset --hard <previous-commit>` is not recommended on a shared working tree; instead checkout the last known good commit in a clean deploy directory or use `git checkout <commit>` on the VPS only if you control that host.
-2. Rebuild with `NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh`.
+2. Rebuild with `NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh`.
 3. Restart `atomic-ui.service`.
 4. Re-run the smoke test and inspect `journalctl -u atomic-ui.service -n 50`.
+
+## Operator notes
+
+- SQLite restore is offline-only. The running web app blocks restore requests and points operators to `npm run restore:sqlite -- --backup /absolute/path/to/backup.zip`.
+- Telegram webhook set/reset uses Telegram's `secret_token` support. Atomic-UI sends a derived secret when registering the webhook and rejects incoming webhook requests that do not include the matching `x-telegram-bot-api-secret-token` header.
+- Subscription branding custom CSS is intentionally removed. Legacy `subscriptionCustomCss` values are ignored and any new settings save clears that stale key.
 
 ## Troubleshooting
 - **Logs**: `docker-compose logs -f`

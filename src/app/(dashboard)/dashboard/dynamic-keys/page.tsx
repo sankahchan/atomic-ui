@@ -18,7 +18,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogSection,
+  DialogSectionDescription,
+  DialogSectionHeader,
+  DialogSectionTitle,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
@@ -576,8 +588,8 @@ function CreateDAKDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(920px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-primary" />
             {t('dynamic_keys.dialog.create_title')}
@@ -587,7 +599,15 @@ function CreateDAKDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-0">
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Basics</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Choose the template, short link identity, and dynamic-key type before you move into routing policy.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
           <div className="space-y-2">
             <Label>Routing Template</Label>
             <Select
@@ -712,6 +732,16 @@ function CreateDAKDialog({
               ))}
             </div>
           </div>
+
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Routing policy</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Tune encryption, load balancing, preferred regions, automatic rotation, and recovery behavior in one place.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
           {/* Encryption method */}
           <div className="space-y-2">
@@ -939,6 +969,16 @@ function CreateDAKDialog({
             compact
           />
 
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Limits and lifecycle</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Capture contact info, set quota and expiration, and leave the routing identity with the right context for future support.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
           {/* Contact info */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -1063,6 +1103,16 @@ function CreateDAKDialog({
             />
           </div>
 
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>After create</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Decide what should happen immediately after the dynamic key is created so the next admin step is automatic.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
           <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
             <div className="space-y-1">
               <p className="text-sm font-medium">After create</p>
@@ -1113,7 +1163,10 @@ function CreateDAKDialog({
             </div>
           </div>
 
-          <DialogFooter>
+            </DialogSection>
+          </DialogBody>
+
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button
               type="button"
               variant="outline"
@@ -1203,61 +1256,74 @@ function QRCodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{t('dynamic_keys.detail.qr_code')}: {dak.name}</DialogTitle>
           <DialogDescription>
-            {t('dynamic_keys.detail.scan_qr')}
+            Scan the QR code in Outline, or copy the stable subscription link when you need to deliver it manually.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col items-center py-4">
-          {isLoading ? (
-            <div className="w-[200px] h-[200px] bg-muted rounded-lg animate-pulse" />
-          ) : qrCode ? (
-            <QRCodeWithLogo
-              dataUrl={qrCode}
-              size={200}
-            />
-          ) : (
-            <div className="w-[200px] h-[200px] bg-muted rounded-lg flex items-center justify-center">
-              <p className="text-muted-foreground text-sm">{t('dynamic_keys.dialog.generate_failed')}</p>
-            </div>
-          )}
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>QR connection</DialogSectionTitle>
+              <DialogSectionDescription>
+                This QR uses the stable dynamic route, so clients can reconnect without exposing the underlying backend key.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
 
-          <div className="flex flex-col gap-2 mt-4 w-full">
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleCopyUrl}
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                {t('dynamic_keys.actions.copy_url')}
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  if (dak?.dynamicUrl) {
-                    const ssconfUrl = getSsconfUrl(dak.dynamicUrl, dak.name, dak.publicSlug);
-                    copyToClipboard(ssconfUrl, t('dynamic_keys.msg.copied'), t('dynamic_keys.msg.ssconf_copied'));
-                  }
-                }}
-              >
-                <Link2 className="w-4 h-4 mr-2" />
-                ssconf://
-              </Button>
+            <div className="flex flex-col items-center gap-4">
+              {isLoading ? (
+                <div className="h-[220px] w-[220px] animate-pulse rounded-[1.2rem] bg-muted" />
+              ) : qrCode ? (
+                <div className="ops-modal-stat-card flex items-center justify-center p-4">
+                  <QRCodeWithLogo dataUrl={qrCode} size={200} />
+                </div>
+              ) : (
+                <div className="ops-modal-stat-card flex h-[220px] w-full items-center justify-center text-center text-sm text-muted-foreground">
+                  {t('dynamic_keys.dialog.generate_failed')}
+                </div>
+              )}
             </div>
+          </DialogSection>
 
-            <div className="p-2 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">{t('dynamic_keys.detail.subscription_url')}:</p>
-              <code className="text-xs break-all select-all">
-                {dak?.dynamicUrl ? getSubscriptionUrl(dak.dynamicUrl, dak.publicSlug) : ''}
-              </code>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Stable subscription link</DialogSectionTitle>
+              <DialogSectionDescription>
+                Share this URL when the customer wants the raw subscription or when a QR scan is not practical.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+
+            <div className="ops-modal-code-panel">
+              {dak?.dynamicUrl ? getSubscriptionUrl(dak.dynamicUrl, dak.publicSlug) : ''}
             </div>
-          </div>
-        </div>
+          </DialogSection>
+        </DialogBody>
+
+        <DialogFooter className="ops-modal-sticky-footer">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (dak?.dynamicUrl) {
+                const ssconfUrl = getSsconfUrl(dak.dynamicUrl, dak.name, dak.publicSlug);
+                copyToClipboard(ssconfUrl, t('dynamic_keys.msg.copied'), t('dynamic_keys.msg.ssconf_copied'));
+              }
+            }}
+          >
+            <Link2 className="mr-2 h-4 w-4" />
+            ssconf://
+          </Button>
+          <Button type="button" onClick={handleCopyUrl}>
+            <Copy className="mr-2 h-4 w-4" />
+            {t('dynamic_keys.actions.copy_url')}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1307,10 +1373,10 @@ function BulkExtendDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
+            <Clock className="h-5 w-5 text-primary" />
             {t('dynamic_keys.bulk.extend_title')}
           </DialogTitle>
           <DialogDescription>
@@ -1321,8 +1387,15 @@ function BulkExtendDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          <div className="flex flex-wrap gap-2">
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Extension window</DialogSectionTitle>
+              <DialogSectionDescription>
+                Choose a preset or enter a custom duration for the selected routing identities.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+            <div className="flex flex-wrap gap-2">
             {quickOptions.map((d) => (
               <Button
                 key={d}
@@ -1343,24 +1416,34 @@ function BulkExtendDialog({
             >
               {t('dynamic_keys.bulk.custom')}
             </Button>
-          </div>
-
-          {useCustom && (
-            <div className="space-y-2">
-              <Label htmlFor="customDays">{t('dynamic_keys.bulk.custom_days')}</Label>
-              <Input
-                id="customDays"
-                type="number"
-                min="1"
-                placeholder={t('dynamic_keys.bulk.custom_days_placeholder')}
-                value={customDays}
-                onChange={(e) => setCustomDays(e.target.value)}
-              />
             </div>
-          )}
-        </div>
 
-        <DialogFooter>
+            {useCustom && (
+              <div className="space-y-2">
+                <Label htmlFor="customDays">{t('dynamic_keys.bulk.custom_days')}</Label>
+                <Input
+                  id="customDays"
+                  type="number"
+                  min="1"
+                  placeholder={t('dynamic_keys.bulk.custom_days_placeholder')}
+                  value={customDays}
+                  onChange={(e) => setCustomDays(e.target.value)}
+                />
+              </div>
+            )}
+          </DialogSection>
+
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Apply to selection</DialogSectionTitle>
+            </DialogSectionHeader>
+            <div className="ops-modal-note">
+              {count} {selectedLabel} will be extended by {useCustom ? (customDays || '0') : days} days.
+            </div>
+          </DialogSection>
+        </DialogBody>
+
+        <DialogFooter className="ops-modal-sticky-footer">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('dynamic_keys.dialog.cancel')}
           </Button>
@@ -1411,10 +1494,10 @@ function BulkTagsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
-            <Tag className="w-5 h-5 text-primary" />
+            <Tag className="h-5 w-5 text-primary" />
             {mode === 'add' ? t('dynamic_keys.bulk.tags_add_title') : t('dynamic_keys.bulk.tags_remove_title')}
           </DialogTitle>
           <DialogDescription>
@@ -1425,22 +1508,30 @@ function BulkTagsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="tags">{t('dynamic_keys.bulk.tags_label')}</Label>
-            <Input
-              id="tags"
-              placeholder={t('dynamic_keys.bulk.tags_placeholder')}
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              {t('dynamic_keys.bulk.tags_help')}
-            </p>
-          </div>
-        </div>
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>Tag list</DialogSectionTitle>
+              <DialogSectionDescription>
+                Use comma-separated tags to group or clean up the selected routing identities.
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+            <div className="space-y-2">
+              <Label htmlFor="tags">{t('dynamic_keys.bulk.tags_label')}</Label>
+              <Input
+                id="tags"
+                placeholder={t('dynamic_keys.bulk.tags_placeholder')}
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('dynamic_keys.bulk.tags_help')}
+              </p>
+            </div>
+          </DialogSection>
+        </DialogBody>
 
-        <DialogFooter>
+        <DialogFooter className="ops-modal-sticky-footer">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('dynamic_keys.dialog.cancel')}
           </Button>
@@ -1479,47 +1570,60 @@ function BulkProgressDialog({
   const { t } = useLocale();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-lg overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Check the summary and any failed items before moving to the next batch action.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">
+        <DialogBody>
           {isPending ? (
-            <div className="flex flex-col items-center gap-4 py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <DialogSection className="items-center text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">{t('dynamic_keys.bulk.progress.processing')}</p>
-            </div>
+            </DialogSection>
           ) : results ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+            <>
+              <DialogSection>
+                <DialogSectionHeader>
+                  <DialogSectionTitle>Operation summary</DialogSectionTitle>
+                </DialogSectionHeader>
+                <div className="ops-modal-card-grid-2">
+                  <div className="ops-modal-stat-card">
                   <p className="text-2xl font-bold text-green-500">{results.success}</p>
                   <p className="text-sm text-green-500">{t('dynamic_keys.bulk.progress.successful')}</p>
-                </div>
-                <div className="flex-1 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  </div>
+                  <div className="ops-modal-stat-card">
                   <p className="text-2xl font-bold text-red-500">{results.failed}</p>
                   <p className="text-sm text-red-500">{t('dynamic_keys.bulk.progress.failed')}</p>
+                  </div>
                 </div>
-              </div>
+              </DialogSection>
 
               {results.errors && results.errors.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">{t('dynamic_keys.bulk.progress.errors')}</p>
-                  <div className="max-h-40 overflow-y-auto space-y-1">
+                <DialogSection>
+                  <DialogSectionHeader>
+                    <DialogSectionTitle>{t('dynamic_keys.bulk.progress.errors')}</DialogSectionTitle>
+                    <DialogSectionDescription>
+                      These routing identities still need attention or a smaller follow-up action.
+                    </DialogSectionDescription>
+                  </DialogSectionHeader>
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
                     {results.errors.map((err, i) => (
-                      <div key={i} className="text-xs p-2 rounded bg-red-500/10 text-red-400">
+                      <div key={i} className="ops-modal-note ops-modal-note-danger text-xs text-red-500 dark:text-red-300">
                         <span className="font-medium">{err.name || err.id}:</span> {err.error}
                       </div>
                     ))}
                   </div>
-                </div>
+                </DialogSection>
               )}
-            </div>
+            </>
           ) : null}
-        </div>
+        </DialogBody>
 
-        <DialogFooter>
+        <DialogFooter className="ops-modal-sticky-footer">
           <Button onClick={() => onOpenChange(false)} disabled={isPending}>
             {isPending ? t('dynamic_keys.bulk.progress.processing') : t('dynamic_keys.bulk.progress.close')}
           </Button>
@@ -1662,189 +1766,227 @@ function EditDAKDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(920px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{t('dynamic_keys.dialog.edit_title')}</DialogTitle>
           <DialogDescription>
-            {t('dynamic_keys.dialog.edit_desc')}
+            Update contact details, quota, and routing rules without leaving the current list view.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="editName">{t('dynamic_keys.dialog.name')}</Label>
-            <Input
-              id="editName"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
+        <form onSubmit={handleSubmit}>
+          <DialogBody>
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Identity and lifecycle</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Keep the route name, owner contact fields, and expiry model aligned with the current customer state.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="editEmail">{t('dynamic_keys.dialog.email')}</Label>
-            <Input
-              id="editEmail"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="editName">{t('dynamic_keys.dialog.name')}</Label>
+                  <Input
+                    id="editName"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editTelegram">{t('dynamic_keys.dialog.telegram')}</Label>
-            <Input
-              id="editTelegram"
-              value={formData.telegramId}
-              onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editEmail">{t('dynamic_keys.dialog.email')}</Label>
+                  <Input
+                    id="editEmail"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editDataLimit">{t('dynamic_keys.dialog.data_limit')}</Label>
-            <Input
-              id="editDataLimit"
-              type="number"
-              placeholder={t('dynamic_keys.dialog.data_limit_placeholder')}
-              value={formData.dataLimitGB}
-              onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
-              min="0"
-              step="0.5"
-            />
-          </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="editTelegram">{t('dynamic_keys.dialog.telegram')}</Label>
+                  <Input
+                    id="editTelegram"
+                    value={formData.telegramId}
+                    onChange={(e) => setFormData({ ...formData, telegramId: e.target.value })}
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editDuration">{t('dynamic_keys.dialog.duration')}</Label>
-            <Input
-              id="editDuration"
-              type="number"
-              placeholder="30"
-              value={formData.durationDays}
-              onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
-              min="1"
-            />
-            <p className="text-xs text-muted-foreground">
-              {t('dynamic_keys.dialog.duration_help')}
-            </p>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editDataLimit">{t('dynamic_keys.dialog.data_limit')}</Label>
+                  <Input
+                    id="editDataLimit"
+                    type="number"
+                    placeholder={t('dynamic_keys.dialog.data_limit_placeholder')}
+                    value={formData.dataLimitGB}
+                    onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
+                    min="0"
+                    step="0.5"
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="editExpiration">{t('dynamic_keys.dialog.expiration_date')}</Label>
-            <Input
-              id="editExpiration"
-              type="date"
-              value={formData.expiresAt}
-              onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">
-              {t('dynamic_keys.dialog.expiration_date_help')}
-            </p>
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editDuration">{t('dynamic_keys.dialog.duration')}</Label>
+                  <Input
+                    id="editDuration"
+                    type="number"
+                    placeholder="30"
+                    value={formData.durationDays}
+                    onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
+                    min="1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('dynamic_keys.dialog.duration_help')}
+                  </p>
+                </div>
 
-          <div className="space-y-2">
-            <Label>Load Balancer Algorithm</Label>
-            <Select
-              value={formData.loadBalancerAlgorithm}
-              onValueChange={(value) =>
-                setFormData({ ...formData, loadBalancerAlgorithm: value as typeof formData.loadBalancerAlgorithm })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select algorithm" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="IP_HASH">IP Hash (Consistent)</SelectItem>
-                <SelectItem value="RANDOM">Random</SelectItem>
-                <SelectItem value="ROUND_ROBIN">Round Robin</SelectItem>
-                <SelectItem value="LEAST_LOAD">Least Load (Smart)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Preferred Routing Order</Label>
-            <DynamicRoutingPreferencesEditor
-              preferredRegionMode={formData.preferredRegionMode}
-              serverTagIds={formData.serverTagIds}
-              preferredServerIds={formData.preferredServerIds}
-              preferredCountryCodes={formData.preferredCountryCodes}
-              preferredServerWeights={formData.preferredServerWeights}
-              preferredCountryWeights={formData.preferredCountryWeights}
-              sessionStickinessMode={formData.sessionStickinessMode}
-              drainGraceMinutes={formData.drainGraceMinutes}
-              compact
-              onChange={(next) =>
-                setFormData((current) => ({
-                  ...current,
-                  preferredRegionMode: next.preferredRegionMode,
-                  serverTagIds: next.serverTagIds,
-                  preferredServerIds: next.preferredServerIds,
-                  preferredCountryCodes: next.preferredCountryCodes,
-                  preferredServerWeights: next.preferredServerWeights,
-                  preferredCountryWeights: next.preferredCountryWeights,
-                  sessionStickinessMode: next.sessionStickinessMode,
-                  drainGraceMinutes: next.drainGraceMinutes,
-                }))
-              }
-            />
-          </div>
-
-          <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-            <h4 className="text-sm font-semibold">{t('dynamic_keys.routing.auto_recovery.title')}</h4>
-            <div className="flex items-center justify-between space-x-2">
-              <div className="space-y-0.5">
-                <Label>{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</Label>
-                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins_desc')}</p>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="editExpiration">{t('dynamic_keys.dialog.expiration_date')}</Label>
+                  <Input
+                    id="editExpiration"
+                    type="date"
+                    value={formData.expiresAt}
+                    onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('dynamic_keys.dialog.expiration_date_help')}
+                  </p>
+                </div>
               </div>
-              <Switch
-                checked={formData.autoClearStalePins}
-                onCheckedChange={(checked) => setFormData({ ...formData, autoClearStalePins: checked })}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between space-x-2">
-              <div className="space-y-0.5">
-                <Label>{t('dynamic_keys.routing.auto_recovery.relax_only')}</Label>
-                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only_desc')}</p>
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Routing preferences</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Tune the balancing model and preferred destinations for this dynamic route.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Load balancer algorithm</Label>
+                  <Select
+                    value={formData.loadBalancerAlgorithm}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, loadBalancerAlgorithm: value as typeof formData.loadBalancerAlgorithm })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select algorithm" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IP_HASH">IP hash (consistent)</SelectItem>
+                      <SelectItem value="RANDOM">Random</SelectItem>
+                      <SelectItem value="ROUND_ROBIN">Round robin</SelectItem>
+                      <SelectItem value="LEAST_LOAD">Least load</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Preferred routing order</Label>
+                  <DynamicRoutingPreferencesEditor
+                    preferredRegionMode={formData.preferredRegionMode}
+                    serverTagIds={formData.serverTagIds}
+                    preferredServerIds={formData.preferredServerIds}
+                    preferredCountryCodes={formData.preferredCountryCodes}
+                    preferredServerWeights={formData.preferredServerWeights}
+                    preferredCountryWeights={formData.preferredCountryWeights}
+                    sessionStickinessMode={formData.sessionStickinessMode}
+                    drainGraceMinutes={formData.drainGraceMinutes}
+                    compact
+                    onChange={(next) =>
+                      setFormData((current) => ({
+                        ...current,
+                        preferredRegionMode: next.preferredRegionMode,
+                        serverTagIds: next.serverTagIds,
+                        preferredServerIds: next.preferredServerIds,
+                        preferredCountryCodes: next.preferredCountryCodes,
+                        preferredServerWeights: next.preferredServerWeights,
+                        preferredCountryWeights: next.preferredCountryWeights,
+                        sessionStickinessMode: next.sessionStickinessMode,
+                        drainGraceMinutes: next.drainGraceMinutes,
+                      }))
+                    }
+                  />
+                </div>
               </div>
-              <Switch
-                checked={formData.autoFallbackToPrefer}
-                onCheckedChange={(checked) => setFormData({ ...formData, autoFallbackToPrefer: checked })}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between space-x-2">
-              <div className="space-y-0.5">
-                <Label>{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</Label>
-                <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy_desc')}</p>
+            </DialogSection>
+
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>{t('dynamic_keys.routing.auto_recovery.title')}</DialogSectionTitle>
+                <DialogSectionDescription>
+                  Decide how the route should recover when backend assignments become stale or unhealthy.
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+
+              <div className="space-y-4 rounded-xl border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
+                    <Label>{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</Label>
+                    <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins_desc')}</p>
+                  </div>
+                  <Switch
+                    checked={formData.autoClearStalePins}
+                    onCheckedChange={(checked) => setFormData({ ...formData, autoClearStalePins: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
+                    <Label>{t('dynamic_keys.routing.auto_recovery.relax_only')}</Label>
+                    <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only_desc')}</p>
+                  </div>
+                  <Switch
+                    checked={formData.autoFallbackToPrefer}
+                    onCheckedChange={(checked) => setFormData({ ...formData, autoFallbackToPrefer: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-0.5">
+                    <Label>{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</Label>
+                    <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy_desc')}</p>
+                  </div>
+                  <Switch
+                    checked={formData.autoSkipUnhealthy}
+                    onCheckedChange={(checked) => setFormData({ ...formData, autoSkipUnhealthy: checked })}
+                  />
+                </div>
               </div>
-              <Switch
-                checked={formData.autoSkipUnhealthy}
-                onCheckedChange={(checked) => setFormData({ ...formData, autoSkipUnhealthy: checked })}
+
+              <DynamicRoutingAlertRulesEditor
+                value={formData.routingAlertRules}
+                onChange={(nextValue) => setFormData((current) => ({ ...current, routingAlertRules: nextValue }))}
+                compact
               />
-            </div>
-          </div>
+            </DialogSection>
 
-          <DynamicRoutingAlertRulesEditor
-            value={formData.routingAlertRules}
-            onChange={(nextValue) => setFormData((current) => ({ ...current, routingAlertRules: nextValue }))}
-            compact
-          />
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>Internal note</DialogSectionTitle>
+              </DialogSectionHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="editNotes">{t('dynamic_keys.dialog.notes')}</Label>
-            <Input
-              id="editNotes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="editNotes">{t('dynamic_keys.dialog.notes')}</Label>
+                <Input
+                  id="editNotes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                />
+              </div>
+            </DialogSection>
+          </DialogBody>
 
-          <DialogFooter>
+          <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('dynamic_keys.dialog.cancel')}
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('dynamic_keys.dialog.save_changes')}
             </Button>
           </DialogFooter>
@@ -2486,179 +2628,127 @@ export default function DynamicKeysPage() {
   return (
     <div className="space-y-6">
       <section className="ops-showcase space-y-4">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-          <div className="space-y-3">
-            <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
-              <KeyRound className="h-3.5 w-3.5" />
-              {t('dynamic_keys.title')}
-            </span>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.45rem]">{t('dynamic_keys.title')}</h1>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                {t('dynamic_keys.desc')}
-              </p>
-            </div>
-
-            <div className="hidden gap-2.5 md:grid lg:grid-cols-3 xl:max-w-[48rem]">
-              <div className="ops-action-tile min-h-[88px] items-start rounded-[1.2rem] p-3.5">
-                <div className="space-y-2">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary dark:border-cyan-400/16 dark:bg-cyan-400/10 dark:text-cyan-200">
-                    <Link2 className="h-4 w-4" />
-                  </span>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">{t('dynamic_keys.title')}</p>
-                    <p className="text-xs leading-5 text-muted-foreground">{t('dynamic_keys.desc')}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="ops-action-tile min-h-[88px] items-start rounded-[1.2rem] p-3.5">
-                <div className="space-y-2">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary dark:border-cyan-400/16 dark:bg-cyan-400/10 dark:text-cyan-200">
-                    <Shuffle className="h-4 w-4" />
-                  </span>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">{t('dynamic_keys.type.self_managed')}</p>
-                    <p className="text-xs leading-5 text-muted-foreground">{t('dynamic_keys.dialog.type.self_managed_desc')}</p>
-                  </div>
-                </div>
-              </div>
-              <Link href="/dashboard/archived" className="ops-action-tile min-h-[88px] items-start rounded-[1.2rem] p-3.5">
-                <div className="space-y-2">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary dark:border-cyan-400/16 dark:bg-cyan-400/10 dark:text-cyan-200">
-                    <Archive className="h-4 w-4" />
-                  </span>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">{t('nav.archived') || 'Archived'}</p>
-                    <p className="text-xs leading-5 text-muted-foreground">{t('dynamic_keys.desc')}</p>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </div>
-
-          <div className="hidden xl:block">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
+          <div className="space-y-4">
             <div className="space-y-3">
-              <div className="ops-hero-aside space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="ops-section-heading">Routing control</p>
-                    <p className="text-sm font-semibold">{t('dynamic_keys.title')}</p>
-                    <p className="text-sm text-muted-foreground">{t('dynamic_keys.desc')}</p>
-                  </div>
+              <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
+                <KeyRound className="h-3.5 w-3.5" />
+                {t('dynamic_keys.title')}
+              </span>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.45rem]">{t('dynamic_keys.title')}</h1>
                   <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
                     <Shuffle className="mr-1 h-3.5 w-3.5" />
                     Adaptive
                   </Badge>
                 </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="ops-kpi-tile p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Active keys
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{stats?.total ?? 0} total routing identities</p>
-                  </div>
-                  <div className="ops-kpi-tile p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Online now
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Live users with recent traffic</p>
-                  </div>
-                  <div className="ops-kpi-tile p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Self-managed
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.selfManaged ?? 0}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{stats?.manual ?? 0} manual routing profiles</p>
-                  </div>
-                  <div className="ops-kpi-tile p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Focused view
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold leading-none">{hasAnyFilters ? 'On' : 'All'}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {hasAnyFilters ? 'Filters are narrowing routing results' : 'Showing the full routing fleet'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button onClick={() => setCreateDialogOpen(true)} className="h-10 w-full justify-center rounded-2xl sm:col-span-2">
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t('dynamic_keys.create')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-10 w-full justify-center rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
-                    onClick={() => syncAllMutation.mutate()}
-                    disabled={syncAllMutation.isPending}
-                  >
-                    <RefreshCw className={cn('mr-2 h-4 w-4', syncAllMutation.isPending && 'animate-spin')} />
-                    {syncAllMutation.isPending ? t('dynamic_keys.syncing') : t('dynamic_keys.sync_servers')}
-                  </Button>
-                  <Button variant="outline" className="h-10 w-full justify-start rounded-2xl border-border/70 bg-background/70 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]" asChild>
-                    <Link href="/dashboard/archived">
-                      <Archive className="mr-2 h-4 w-4" />
-                      {t('nav.archived') || 'Archived'}
-                    </Link>
-                  </Button>
-                </div>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+                  Manage stable subscription URLs, routing policies, and live sync state without leaving the first screen full of empty space.
+                </p>
               </div>
+            </div>
 
-              <div className="ops-support-card space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">Routing memory</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      Track which guardrails and live routing filters are shaping this view.
-                    </p>
-                  </div>
-                  {hasAnyFilters ? (
-                    <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-[11px]" onClick={clearAllFilters}>
-                      <X className="mr-1 h-3 w-3" />
-                      {t('keys.clear_filters')}
-                    </Button>
-                  ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setCreateDialogOpen(true)} className="h-10 rounded-full px-4">
+                <Plus className="mr-2 h-4 w-4" />
+                Create dynamic key
+              </Button>
+              <Button
+                variant="outline"
+                className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                onClick={() => syncAllMutation.mutate()}
+                disabled={syncAllMutation.isPending}
+              >
+                <RefreshCw className={cn('mr-2 h-4 w-4', syncAllMutation.isPending && 'animate-spin')} />
+                {syncAllMutation.isPending ? t('dynamic_keys.syncing') : 'Sync routing'}
+              </Button>
+              <Button
+                variant="outline"
+                className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                asChild
+              >
+                <Link href="/dashboard/archived">
+                  <Archive className="mr-2 h-4 w-4" />
+                  View archive
+                </Link>
+              </Button>
+            </div>
+
+            <div className="ops-support-card space-y-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Current routing view</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Keep routing filters, quota checks, and live activity visible while you work through the fleet.
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className={cn('ops-pill', hasAnyFilters ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200' : '')}>
-                    <Filter className="h-3.5 w-3.5" />
-                    {hasAnyFilters ? 'Focused routes' : 'All routes'}
-                  </span>
-                  <span className="ops-pill">
-                    <Wifi className="h-3.5 w-3.5" />
-                    {onlineCount} online
-                  </span>
-                  <span className="ops-pill">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    {filters.quickFilters.overQuota ? 'Quota watch active' : 'Quota watch ready'}
-                  </span>
-                </div>
+                {hasAnyFilters ? (
+                  <Button variant="ghost" size="sm" className="h-8 rounded-full px-3 text-[11px]" onClick={clearAllFilters}>
+                    <X className="mr-1 h-3 w-3" />
+                    {t('keys.clear_filters')}
+                  </Button>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={cn('ops-pill', hasAnyFilters ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200' : '')}>
+                  <Filter className="h-3.5 w-3.5" />
+                  {hasAnyFilters ? 'Filtered routes' : 'Showing all routes'}
+                </span>
+                <span className="ops-pill">
+                  <Wifi className="h-3.5 w-3.5" />
+                  {onlineCount} online now
+                </span>
+                <span className="ops-pill">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {filters.quickFilters.overQuota ? 'Quota watch active' : 'Quota watch ready'}
+                </span>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="ops-mobile-action-stack grid gap-2 sm:hidden">
-          <div className="flex items-center justify-between gap-3 rounded-[1rem] border border-border/60 bg-background/55 px-3 py-2 dark:border-cyan-400/12 dark:bg-[rgba(4,10,20,0.68)]">
-            <div>
-              <p className="text-sm font-semibold">Routing workspace</p>
-              <p className="text-[11px] text-muted-foreground">Create, sync, and switch between list or grouped routing views.</p>
+          <div className="ops-hero-aside space-y-4">
+            <div className="space-y-1">
+              <p className="ops-section-heading">Routing overview</p>
+              <p className="text-sm font-semibold">Live fleet state</p>
+              <p className="text-sm text-muted-foreground">
+                Watch active links, current traffic, and how much of the fleet is self-managed versus manual.
+              </p>
             </div>
-            <Badge variant="outline" className="rounded-full">{onlineCount} online</Badge>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="ops-kpi-tile p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Active keys
+                </p>
+                <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{stats?.total ?? 0} total routing identities</p>
+              </div>
+              <div className="ops-kpi-tile p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Recent traffic
+                </p>
+                <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Keys with recent activity</p>
+              </div>
+              <div className="ops-kpi-tile p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Self-managed
+                </p>
+                <p className="mt-2 text-2xl font-semibold leading-none">{stats?.selfManaged ?? 0}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{stats?.manual ?? 0} manual profiles</p>
+              </div>
+              <div className="ops-kpi-tile p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  List scope
+                </p>
+                <p className="mt-2 text-2xl font-semibold leading-none">{hasAnyFilters ? 'Filtered' : 'Full'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {hasAnyFilters ? 'Filters are narrowing the routing list' : 'You are seeing the complete routing fleet'}
+                </p>
+              </div>
+            </div>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)} className="h-11 w-full justify-center rounded-full">
-            <Plus className="w-4 h-4 mr-2" />
-            {t('dynamic_keys.create')}
-          </Button>
-          <Button variant="outline" className="h-11 w-full justify-center rounded-full" asChild>
-            <Link href="/dashboard/archived">
-              <Archive className="w-4 h-4 mr-2" />
-              {t('nav.archived') || 'Archived'}
-            </Link>
-          </Button>
         </div>
 
         {stats && (

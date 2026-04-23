@@ -33,10 +33,7 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
 
   // External packages for server components (required for Prisma and native modules)
-  experimental: {
-    instrumentationHook: true,
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs', 'systeminformation'],
-  },
+  serverExternalPackages: ['@prisma/client', 'bcryptjs', 'systeminformation'],
   images: {
     remotePatterns: [
       {
@@ -97,5 +94,4 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-
 

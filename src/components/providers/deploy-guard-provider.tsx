@@ -5,7 +5,11 @@ import { usePathname } from 'next/navigation';
 import { ToastAction } from '@/components/ui/toast';
 import { useToast } from '@/hooks/use-toast';
 import { getBasePath, withBasePath } from '@/lib/base-path';
-import { CLIENT_BUILD_HEADER_NAME } from '@/lib/deploy-guard';
+import {
+  buildFetchRequestWithClientBuild,
+  isNextRouterRscFetch,
+  isSameOriginUrl,
+} from '@/lib/deploy-guard-client';
 
 type DeployGuardProviderProps = {
   children: React.ReactNode;
@@ -17,7 +21,10 @@ type AppVersionPayload = {
   builtAt?: string | null;
 };
 
+type BuildStatus = 'current' | 'stale' | 'unknown';
+
 const DEPLOY_GUARD_POLL_MS = 60_000;
+const DEPLOY_GUARD_INLINE_CHECK_TTL_MS = 5_000;
 const STALE_SERVER_ACTION_PATTERNS = [
   'Failed to find Server Action',
   'older or newer deployment',
@@ -72,45 +79,6 @@ function isStaleServerActionError(error: unknown) {
   return STALE_SERVER_ACTION_PATTERNS.some((pattern) => text.includes(pattern));
 }
 
-function getRequestUrl(input: RequestInfo | URL) {
-  if (typeof input === 'string') {
-    return input;
-  }
-
-  if (input instanceof URL) {
-    return input.toString();
-  }
-
-  return input.url;
-}
-
-function isSameOriginUrl(url: string) {
-  try {
-    return new URL(url, window.location.href).origin === window.location.origin;
-  } catch {
-    return false;
-  }
-}
-
-function buildFetchRequestWithClientBuild(
-  input: RequestInfo | URL,
-  init: RequestInit | undefined,
-  buildId: string,
-) {
-  if (!buildId) {
-    return [input, init] as const;
-  }
-
-  const requestUrl = getRequestUrl(input);
-  if (!isSameOriginUrl(requestUrl)) {
-    return [input, init] as const;
-  }
-
-  const request = new Request(input, init);
-  request.headers.set(CLIENT_BUILD_HEADER_NAME, buildId);
-  return [request] as const;
-}
-
 function resolveSubmitMethod(form: HTMLFormElement, submitter: HTMLElement | null) {
   const submitterMethod =
     submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement
@@ -126,7 +94,7 @@ function shouldGuardFormSubmit(form: HTMLFormElement, submitter: HTMLElement | n
     return false;
   }
 
-  return isSameOriginUrl(form.getAttribute('action') || window.location.href);
+  return isSameOriginUrl(form.getAttribute('action') || window.location.href, window.location.href);
 }
 
 export function DeployGuardProvider({
@@ -141,6 +109,15 @@ export function DeployGuardProvider({
   const reloadTimerRef = useRef<number | null>(null);
   const bypassedFormsRef = useRef(new WeakSet<HTMLFormElement>());
   const pendingFormsRef = useRef(new WeakSet<HTMLFormElement>());
+  const inlineBuildStatusRef = useRef<{
+    checkedAt: number;
+    status: BuildStatus;
+    promise: Promise<BuildStatus> | null;
+  }>({
+    checkedAt: 0,
+    status: 'unknown',
+    promise: null,
+  });
 
   const triggerReload = useCallback(
     (reason: 'new-build' | 'stale-action') => {
@@ -209,6 +186,44 @@ export function DeployGuardProvider({
     }
   }, []);
 
+  const resolveRecentBuildStatus = useCallback(async () => {
+    const cached = inlineBuildStatusRef.current;
+    const now = Date.now();
+    if (now - cached.checkedAt < DEPLOY_GUARD_INLINE_CHECK_TTL_MS) {
+      return cached.status;
+    }
+
+    if (cached.promise) {
+      return cached.promise;
+    }
+
+    const promise = resolveBuildStatus()
+      .then((status) => {
+        inlineBuildStatusRef.current = {
+          checkedAt: Date.now(),
+          status,
+          promise: null,
+        };
+        return status;
+      })
+      .catch(() => {
+        inlineBuildStatusRef.current = {
+          checkedAt: Date.now(),
+          status: 'unknown',
+          promise: null,
+        };
+        return 'unknown' as const;
+      });
+
+    inlineBuildStatusRef.current = {
+      checkedAt: cached.checkedAt,
+      status: cached.status,
+      promise,
+    };
+
+    return promise;
+  }, [resolveBuildStatus]);
+
   const checkForNewBuild = useCallback(async () => {
     if (reloadTriggeredRef.current || isPublicSharePath(pathname)) {
       return;
@@ -228,11 +243,22 @@ export function DeployGuardProvider({
 
     window.fetch = async (...args) => {
       const buildId = initialBuildIdRef.current?.trim();
-      const requestArgs = buildFetchRequestWithClientBuild(args[0], args[1], buildId);
-      const response =
-        requestArgs.length === 1
-          ? await originalFetch(requestArgs[0])
-          : await originalFetch(requestArgs[0], requestArgs[1]);
+      if (
+        !reloadTriggeredRef.current &&
+        isNextRouterRscFetch(args[0], args[1], window.location.href) &&
+        (await resolveRecentBuildStatus()) === 'stale'
+      ) {
+        triggerReload('new-build');
+        throw new Error('STALE_BUILD');
+      }
+
+      const requestArgs = buildFetchRequestWithClientBuild(
+        args[0],
+        args[1],
+        buildId,
+        window.location.href,
+      );
+      const response = await originalFetch(requestArgs[0], requestArgs[1]);
 
       if (
         !reloadTriggeredRef.current &&
@@ -346,7 +372,7 @@ export function DeployGuardProvider({
         window.clearTimeout(reloadTimerRef.current);
       }
     };
-  }, [pathname, checkForNewBuild, resolveBuildStatus, triggerReload]);
+  }, [pathname, checkForNewBuild, resolveBuildStatus, resolveRecentBuildStatus, triggerReload]);
 
   return children;
 }

@@ -29,9 +29,12 @@ export function BottomTabBar() {
   };
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[calc(var(--safe-area-bottom)+1rem)] pt-2 lg:hidden">
-      <div className="glass-bottom-bar ops-mobile-dock mx-auto h-[var(--bottom-bar-height)] max-w-[26rem] px-2">
-        <div className="grid h-full grid-cols-5 gap-1">
+    <nav
+      aria-label="Primary mobile navigation"
+      className="fixed inset-x-0 bottom-0 z-50 px-2.5 pb-[calc(var(--safe-area-bottom)+0.55rem)] pt-1.5 lg:hidden"
+    >
+      <div className="glass-bottom-bar ops-mobile-dock mx-auto w-full max-w-[24rem]">
+        <div className="flex h-full items-end justify-between gap-1">
           {primaryDashboardNavItems.map((tab) => {
             const active = isActive(tab);
             const Icon = tab.icon;
@@ -42,14 +45,15 @@ export function BottomTabBar() {
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'ops-mobile-dock-item',
+                  active ? 'flex-[1.08]' : 'flex-1',
                   active && 'ops-mobile-dock-item-active'
                 )}
               >
-                <div className={cn('ops-mobile-dock-icon', active && 'ops-mobile-dock-icon-active')}>
-                  <Icon className="h-5 w-5" />
+                <div className={cn('ops-mobile-dock-pill', active && 'ops-mobile-dock-pill-active')}>
+                  <Icon className="h-4 w-4" />
                 </div>
                 <span className={cn('ops-mobile-dock-label', active && 'ops-mobile-dock-label-active')}>
-                  {t(tab.labelKey)}
+                  {t(tab.mobileLabelKey)}
                 </span>
               </Link>
             );

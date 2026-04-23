@@ -1,13 +1,81 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildTelegramHelpMessage } from '@/lib/services/telegram-admin';
+import {
+  buildTelegramAdminHomeKeyboard,
+  buildTelegramHelpMessage,
+} from '@/lib/services/telegram-admin';
+import {
+  buildTelegramCouponReminderMessage,
+  buildTelegramTrialExpiringReminderMessage,
+} from '@/lib/services/telegram-reminders';
+import {
+  buildTelegramSupportReplySubmittedMessage,
+  buildTelegramSupportStatusSummaryMessage,
+  buildTelegramSupportThreadStartMessage,
+  resolveTelegramSupportIssuePrompt,
+} from '@/lib/services/telegram-support-cards';
+import {
+  buildTelegramInboxEmptyMessage,
+  buildTelegramInboxTip,
+  buildTelegramInboxTitle,
+} from '@/lib/services/telegram-inbox-ui';
+import { buildTelegramReviewQueueSummaryKeyboard } from '@/lib/services/telegram-review-queue';
+import {
+  buildTelegramOrderReviewAlertKeyboard,
+  buildTelegramOrderReviewAlertMessage,
+} from '@/lib/services/telegram-review-queue';
+import {
+  buildTelegramPremiumSupportQueueCardMessage,
+  buildTelegramSupportQueueReplyKeyboard,
+  buildTelegramSupportQueueShortcutMessage,
+  buildTelegramSupportQueueSummaryKeyboard,
+} from '@/lib/services/telegram-premium-support-queue';
+import {
+  buildTelegramSupportThreadQueueMessage,
+  buildTelegramSupportThreadQueueReplyKeyboard,
+  buildTelegramSupportThreadsSummaryKeyboard,
+} from '@/lib/services/telegram-support-console';
 import {
   findUnsupportedTelegramHtmlTags,
+  measureTelegramKeyboardLayout,
+  measureTelegramMessageLayout,
   normalizeTelegramUtf8Text,
   sanitizeTelegramHtmlMessage,
   validateTelegramHtmlMessage,
 } from '@/lib/services/telegram-message-validation';
+import { getCommandKeyboard } from '@/lib/services/telegram-callbacks';
 import { getTelegramUi } from '@/lib/services/telegram-ui';
+
+function assertTelegramMessageBudget(
+  message: string,
+  limits: { maxLines: number; maxChars: number },
+) {
+  const layout = measureTelegramMessageLayout(message);
+  assert.ok(
+    layout.nonEmptyLineCount <= limits.maxLines,
+    `Expected <= ${limits.maxLines} non-empty lines, got ${layout.nonEmptyLineCount}:\n${message}`,
+  );
+  assert.ok(
+    layout.visibleCharacterCount <= limits.maxChars,
+    `Expected <= ${limits.maxChars} visible chars, got ${layout.visibleCharacterCount}:\n${message}`,
+  );
+}
+
+function assertTelegramKeyboardBudget(
+  keyboard: { inline_keyboard?: Array<Array<{ text?: string }>>; keyboard?: Array<Array<{ text?: string }>> },
+  limits: { maxRows: number; maxButtonsPerRow: number; maxButtonTextLength: number },
+) {
+  const layout = measureTelegramKeyboardLayout(keyboard);
+  assert.ok(layout.rowCount <= limits.maxRows, `Expected <= ${limits.maxRows} rows, got ${layout.rowCount}`);
+  assert.ok(
+    layout.maxButtonsPerRow <= limits.maxButtonsPerRow,
+    `Expected <= ${limits.maxButtonsPerRow} buttons per row, got ${layout.maxButtonsPerRow}`,
+  );
+  assert.ok(
+    layout.maxButtonTextLength <= limits.maxButtonTextLength,
+    `Expected button text length <= ${limits.maxButtonTextLength}, got ${layout.maxButtonTextLength}`,
+  );
+}
 
 test('telegram HTML validator accepts supported tags', () => {
   const message = '<b>Hello</b>\n<a href="https://example.com">Open</a>\n<code>ABC</code>';
@@ -55,6 +123,9 @@ test('telegram help message stays valid HTML for user and admin variants', () =>
 
   assert.deepEqual(validateTelegramHtmlMessage(userHelp), { valid: true, invalidTags: [] });
   assert.deepEqual(validateTelegramHtmlMessage(adminHelp), { valid: true, invalidTags: [] });
+  assert.match(userHelp, /Quick command guide/);
+  assert.doesNotMatch(userHelp, /Available Commands/);
+  assert.match(adminHelp, /Admin commands/);
 });
 
 test('telegram usage and status hint strings stay HTML-safe', () => {
@@ -71,4 +142,411 @@ test('telegram usage and status hint strings stay HTML-safe', () => {
   for (const sample of samples) {
     assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
   }
+});
+
+test('telegram start surfaces stay summary-first', () => {
+  const ui = getTelegramUi('en');
+  const hello = ui.hello('User', 'Welcome text', 123456, '');
+  const welcomeBack = ui.welcomeBack('User');
+  const linked = ui.accountLinked('User');
+
+  assert.match(hello, /Quick menu/);
+  assert.doesNotMatch(hello, /Useful shortcuts/);
+  assert.match(welcomeBack, /Start here/);
+  assert.doesNotMatch(welcomeBack, /announcement and support updates/);
+  assert.doesNotMatch(linked, /everything from Telegram/);
+  assert.deepEqual(validateTelegramHtmlMessage(hello), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(welcomeBack), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(linked), { valid: true, invalidTags: [] });
+});
+
+test('telegram payment and refund reply strings stay compact and HTML-safe', () => {
+  const ui = getTelegramUi('en');
+  const samples = [
+    ui.activeOrderPendingReview('ORD-123'),
+    ui.paymentProofRequired,
+    ui.orderProofPending('ORD-123'),
+    ui.orderPaymentProofReminder('ORD-123'),
+    ui.orderRejectedFollowUpReminder('ORD-123'),
+    ui.refundRequested('ORD-123'),
+    ui.refundRequestApproved('ORD-123'),
+    ui.refundRequestRejected('ORD-123'),
+  ];
+
+  for (const sample of samples) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.ok(sample.split('\n').length <= 3);
+  }
+
+  assert.doesNotMatch(ui.activeOrderPendingReview('ORD-123'), /waiting for review/);
+  assert.doesNotMatch(ui.paymentProofRequired, /Make sure the amount, transfer ID, and time are clearly visible, then wait for review\./);
+  assert.doesNotMatch(ui.orderProofPending('ORD-123'), /It is now waiting for admin review/);
+  assert.doesNotMatch(ui.refundRequested('ORD-123'), /after admin review/);
+});
+
+test('telegram premium prompts and order outcomes stay compact and HTML-safe', () => {
+  const ui = getTelegramUi('en');
+  const samples = [
+    ui.premiumRegionPrompt('Onn', 'SG, JP, US'),
+    ui.premiumRegionRequestSubmitted('Onn', 'SG'),
+    ui.premiumRouteIssueSubmitted('Onn'),
+    ui.premiumSupportRequestPending('PRM-123'),
+    ui.premiumFollowUpPrompt('PRM-123', 'Onn'),
+    ui.premiumFollowUpSubmitted('PRM-123'),
+    ui.orderRejected('ORD-123'),
+    ui.orderApproved('ORD-123'),
+    ui.receiptFooter,
+  ];
+
+  for (const sample of samples) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.ok(sample.split('\n').length <= 4);
+  }
+
+  assert.doesNotMatch(ui.premiumRegionPrompt('Onn', 'SG, JP, US'), /manual review/);
+  assert.doesNotMatch(ui.premiumRegionRequestSubmitted('Onn', 'SG'), /follow up/);
+  assert.doesNotMatch(ui.premiumRouteIssueSubmitted('Onn'), /has been sent to the admin/);
+  assert.doesNotMatch(ui.premiumFollowUpSubmitted('PRM-123'), /has been sent to the admin/);
+  assert.doesNotMatch(ui.orderRejected('ORD-123'), /please contact the admin/i);
+  assert.doesNotMatch(ui.receiptFooter, /client URL/i);
+});
+
+test('telegram promo reminder messages stay compact and keep links in buttons', () => {
+  const ui = getTelegramUi('en');
+  const samples = [
+    buildTelegramTrialExpiringReminderMessage({
+      locale: 'en',
+      keyName: 'Onn iPhone 15',
+      hoursLeft: 6,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.trialCouponTitle,
+      keyName: 'Onn iPhone 15',
+      body: ui.trialCouponBody(6),
+      couponCode: 'SAVE20',
+      discountLabel: '20% off',
+      hint: ui.trialCouponHint,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.renewalCouponTitle,
+      keyName: 'Onn iPhone 15',
+      body: ui.renewalCouponBody(3),
+      couponCode: 'RENEW10',
+      discountLabel: '10% off',
+      hint: ui.couponReadyHint,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.premiumUpsellCouponTitle,
+      keyName: 'Onn iPhone 15',
+      body: ui.premiumUpsellCouponBody(82),
+      couponCode: 'PREMIUM15',
+      discountLabel: '15% off',
+      hint: ui.couponReadyHint,
+    }),
+    buildTelegramCouponReminderMessage({
+      locale: 'en',
+      title: ui.winbackCouponTitle,
+      body: ui.winbackCouponBody(30),
+      couponCode: 'COMEHOME',
+      discountLabel: '25% off',
+      hint: ui.couponReadyHint,
+    }),
+  ];
+
+  for (const sample of samples) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.ok(sample.split('\n').length <= 7);
+    assert.doesNotMatch(sample, /https?:\/\//);
+  }
+
+  assert.doesNotMatch(ui.trialExpiringUpsell, /before the trial expires/i);
+  assert.doesNotMatch(ui.trialCouponHint, /\/buy COUPON-CODE/);
+  assert.doesNotMatch(ui.premiumUpsellCouponBody(82), /more stable premium plan/i);
+});
+
+test('telegram support intake messages stay compact and HTML-safe', () => {
+  const prompts = [
+    resolveTelegramSupportIssuePrompt('ORDER', 'en'),
+    resolveTelegramSupportIssuePrompt('KEY', 'en'),
+    resolveTelegramSupportIssuePrompt('SERVER', 'en'),
+    resolveTelegramSupportIssuePrompt('BILLING', 'en'),
+    resolveTelegramSupportIssuePrompt('GENERAL', 'en'),
+  ];
+
+  for (const prompt of prompts) {
+    assert.deepEqual(validateTelegramHtmlMessage(prompt), { valid: true, invalidTags: [] });
+    assert.ok(prompt.split('\n').length <= 2);
+    assert.doesNotMatch(prompt, /next message/i);
+  }
+
+  const start = buildTelegramSupportThreadStartMessage({
+    threadCode: 'SUP-123',
+    issueCategory: 'BILLING',
+    locale: 'en',
+  });
+  const submitted = buildTelegramSupportReplySubmittedMessage({
+    threadCode: 'SUP-123',
+    locale: 'en',
+  });
+
+  for (const sample of [start, submitted]) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assert.doesNotMatch(sample, /https?:\/\//);
+  }
+
+  assert.ok(start.split('\n').length <= 9);
+  assert.ok(submitted.split('\n').length <= 2);
+  assert.doesNotMatch(start, /\bSLA\b/);
+  assert.doesNotMatch(start, /\bAge\b/);
+  assert.doesNotMatch(submitted, /support queue/i);
+  assert.doesNotMatch(submitted, /as soon as it is available/i);
+});
+
+test('support hub copy avoids awkward legacy wording', () => {
+  const line = 'Choose the category you need and start a new support thread.';
+  assert.deepEqual(validateTelegramHtmlMessage(line), { valid: true, invalidTags: [] });
+  assert.doesNotMatch(line, /real support thread/i);
+});
+
+test('myanmar help copy stays localized and html-safe', () => {
+  const help = buildTelegramHelpMessage({ isAdmin: true, locale: 'my' });
+
+  assert.deepEqual(validateTelegramHtmlMessage(help), { valid: true, invalidTags: [] });
+  assert.match(help, /အမြန် command guide/);
+  assert.match(help, /Admin command များ/);
+  assert.doesNotMatch(help, /Quick command guide/);
+});
+
+test('myanmar inbox copy avoids english fallback text', () => {
+  const title = buildTelegramInboxTitle('SUPPORT', 'my');
+  const empty = buildTelegramInboxEmptyMessage('SUPPORT', 'my');
+  const tip = buildTelegramInboxTip('ALL', 'my');
+
+  for (const sample of [title, empty, tip]) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+  }
+
+  assert.match(title, /အကူအညီ inbox/);
+  assert.match(empty, /support update မရှိသေးပါ/);
+  assert.match(tip, /button များဖြင့် category/);
+  assert.doesNotMatch(empty, /No recent support updates yet/);
+});
+
+test('myanmar support summary and admin queue labels stay localized', () => {
+  const summary = buildTelegramSupportStatusSummaryMessage({
+    locale: 'my',
+    threads: [
+      {
+        id: 'thr_1',
+        threadCode: 'SUP-123',
+        issueCategory: 'ORDER',
+        status: 'OPEN',
+        waitingOn: 'ADMIN',
+        createdAt: new Date('2026-04-20T00:00:00Z'),
+        updatedAt: new Date('2026-04-20T02:00:00Z'),
+      },
+    ],
+    premiumRequests: [],
+  });
+  const keyboard = buildTelegramReviewQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+
+  assert.deepEqual(validateTelegramHtmlMessage(summary), { valid: true, invalidTags: [] });
+  assert.match(summary, /သင့် support center/);
+  assert.match(summary, /Admin အဖြေ စောင့်နေ/);
+  assert.doesNotMatch(summary, /Your support center/);
+
+  const firstRow = keyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  assert.match(firstRow, /အားလုံး/);
+  assert.match(firstRow, /ကိုယ်ပိုင်/);
+  assert.match(firstRow, /မယူရသေး/);
+});
+
+test('telegram user and admin keyboards stay within mobile row budgets', () => {
+  const userKeyboard = getCommandKeyboard(false, 'en');
+  const adminKeyboard = getCommandKeyboard(true, 'my');
+  const adminHomeKeyboard = buildTelegramAdminHomeKeyboard({
+    locale: 'my',
+    adminActor: {
+      isAdmin: true,
+      userId: 'admin_1',
+      email: 'owner@example.com',
+      scope: 'OWNER',
+    },
+    pendingReview: 4,
+    supportOpen: 7,
+    customerSupportOpen: 5,
+    premiumSupportOpen: 2,
+    pendingRefunds: 3,
+    scheduledAnnouncements: 1,
+    failedDeliveries: 0,
+  });
+  const reviewKeyboard = buildTelegramReviewQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+  const supportConsoleKeyboard = buildTelegramSupportThreadsSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+  const premiumQueueKeyboard = buildTelegramSupportQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'all',
+  });
+  const reviewActionKeyboard = buildTelegramOrderReviewAlertKeyboard({
+    orderId: 'ord_1',
+    locale: 'en',
+    panelUrl: 'https://panel.example/orders/ord_1',
+    queueMode: 'all',
+  });
+  const supportReplyKeyboard = buildTelegramSupportThreadQueueReplyKeyboard({
+    threadId: 'thr_1',
+    locale: 'en',
+    panelUrl: 'https://panel.example/support/thr_1',
+    mode: 'all',
+    claimedByMe: false,
+    isClaimed: false,
+  });
+  const premiumReplyKeyboard = buildTelegramSupportQueueReplyKeyboard({
+    requestId: 'req_1',
+    locale: 'my',
+    panelUrl: 'https://panel.example/premium/req_1',
+    mode: 'all',
+  });
+
+  for (const keyboard of [userKeyboard, adminKeyboard]) {
+    assertTelegramKeyboardBudget(keyboard, {
+      maxRows: 14,
+      maxButtonsPerRow: 2,
+      maxButtonTextLength: 20,
+    });
+  }
+
+  for (const keyboard of [
+    adminHomeKeyboard,
+    reviewKeyboard,
+    supportConsoleKeyboard,
+    premiumQueueKeyboard,
+    reviewActionKeyboard,
+    supportReplyKeyboard,
+    premiumReplyKeyboard,
+  ]) {
+    assertTelegramKeyboardBudget(keyboard, {
+      maxRows: 8,
+      maxButtonsPerRow: 3,
+      maxButtonTextLength: 32,
+    });
+  }
+});
+
+test('admin queue cards stay compact and button-first', () => {
+  const reviewCard = buildTelegramOrderReviewAlertMessage({
+    locale: 'en',
+    mode: 'initial',
+    order: {
+      id: 'ord_1',
+      orderCode: 'ORD-123',
+      planName: 'Premium / 1 Month / 200 GB',
+      planCode: 'premium_1m_200gb',
+      assignedReviewerEmail: null,
+      priceLabel: '6,000 Kyat',
+      telegramUsername: 'sankahchan',
+      telegramUserId: '7989641645',
+      paymentSubmittedAt: new Date('2026-04-22T00:00:00Z'),
+      paymentProofType: 'photo',
+      paymentMethodLabel: 'KBZPay',
+      selectedServerName: 'SG-2',
+      paymentMessageId: 123,
+      duplicateProofOrderCode: null,
+      requestedName: 'Onn',
+      targetAccessKeyId: 'key_123',
+    } as any,
+  });
+  const supportThreadCard = buildTelegramSupportThreadQueueMessage({
+    locale: 'my',
+    thread: {
+      id: 'thr_1',
+      threadCode: 'SUP-123',
+      issueCategory: 'ORDER',
+      status: 'OPEN',
+      waitingOn: 'ADMIN',
+      firstAdminReplyAt: null,
+      firstResponseDueAt: new Date('2026-04-22T06:00:00Z'),
+      assignedAdminName: null,
+      telegramUsername: 'customer_one',
+      telegramUserId: '123456',
+      createdAt: new Date('2026-04-22T00:00:00Z'),
+      updatedAt: new Date('2026-04-22T01:30:00Z'),
+      replies: [
+        {
+          id: 'rep_1',
+          senderType: 'USER',
+          message: 'Payment proof is attached. The transfer id is visible in the screenshot.',
+          createdAt: new Date('2026-04-22T01:00:00Z'),
+          mediaUrl: null,
+        },
+      ],
+    } as any,
+  });
+  const premiumQueueCard = buildTelegramPremiumSupportQueueCardMessage({
+    locale: 'my',
+    request: {
+      id: 'req_1',
+      requestCode: 'PRM-123',
+      requestType: 'REGION_CHANGE',
+      followUpPending: true,
+      dynamicAccessKey: {
+        id: 'dak_1',
+        name: 'Onn',
+      },
+      createdAt: new Date('2026-04-22T00:00:00Z'),
+      updatedAt: new Date('2026-04-22T01:00:00Z'),
+      replies: [
+        {
+          id: 'rep_1',
+          senderType: 'USER',
+          message: 'Please switch this key to SG first. JP is unstable for my current route.',
+          createdAt: new Date('2026-04-22T00:30:00Z'),
+        },
+      ],
+    } as any,
+  });
+
+  for (const message of [reviewCard, supportThreadCard, premiumQueueCard]) {
+    assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+    assert.doesNotMatch(message, /https?:\/\//);
+  }
+
+  assertTelegramMessageBudget(reviewCard, { maxLines: 14, maxChars: 520 });
+  assertTelegramMessageBudget(supportThreadCard, { maxLines: 11, maxChars: 420 });
+  assertTelegramMessageBudget(premiumQueueCard, { maxLines: 10, maxChars: 380 });
+});
+
+test('myanmar premium queue helpers stay localized and compact', () => {
+  const queueKeyboard = buildTelegramSupportQueueSummaryKeyboard({
+    locale: 'my',
+    mode: 'admin',
+  });
+  const workingMessage = buildTelegramSupportQueueShortcutMessage('wk', 'my');
+  const detailMessage = buildTelegramSupportQueueShortcutMessage('nd', 'my');
+  const handledMessage = buildTelegramSupportQueueShortcutMessage('hd', 'my');
+
+  const firstRow = queueKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  assert.match(firstRow, /အားလုံး/);
+  assert.match(firstRow, /Admin စောင့်နေ/);
+  assert.match(firstRow, /User စောင့်နေ/);
+
+  for (const message of [workingMessage, detailMessage, handledMessage]) {
+    assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+    assertTelegramMessageBudget(message, { maxLines: 2, maxChars: 100 });
+  }
+
+  assert.doesNotMatch(workingMessage, /We are checking this now/);
+  assert.doesNotMatch(detailMessage, /Please send a little more detail/);
+  assert.doesNotMatch(handledMessage, /This issue has been handled/);
 });

@@ -11,7 +11,19 @@ import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getCountryFlag } from '@/lib/utils';
 import { useLocale } from '@/hooks/use-locale';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogSection,
+    DialogSectionDescription,
+    DialogSectionHeader,
+    DialogSectionTitle,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Label } from '@/components/ui/label';
 import {
@@ -497,24 +509,35 @@ export function ServerList() {
 
             {/* Import dialog */}
             <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
+                <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-[min(720px,calc(100vw-2rem))]">
+                    <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
                         <DialogTitle>Import Servers</DialogTitle>
                         <DialogDescription>
                             Paste a JSON export file to import servers. Servers with duplicate API URLs will be skipped.
                             Connectivity will be validated before importing.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-3 py-2">
-                        <Label>JSON Data</Label>
-                        <textarea
-                            className="w-full min-h-[200px] p-3 rounded-lg border border-border bg-background text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
-                            placeholder={'Paste exported JSON here...\n\n{\n  "servers": [\n    { "name": "...", "apiUrl": "...", "apiCertSha256": "..." }\n  ]\n}'}
-                            value={importJson}
-                            onChange={(e) => setImportJson(e.target.value)}
-                        />
-                    </div>
-                    <DialogFooter>
+                    <DialogBody>
+                        <DialogSection>
+                            <DialogSectionHeader>
+                                <DialogSectionTitle>Server export payload</DialogSectionTitle>
+                                <DialogSectionDescription>
+                                    Paste the server export JSON from another Atomic-UI install. Duplicates will be skipped before import.
+                                </DialogSectionDescription>
+                            </DialogSectionHeader>
+
+                            <div className="space-y-3">
+                                <Label>JSON data</Label>
+                                <textarea
+                                    className="min-h-[220px] w-full resize-y rounded-xl border border-border bg-background p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                    placeholder={'Paste exported JSON here...\n\n{\n  "servers": [\n    { "name": "...", "apiUrl": "...", "apiCertSha256": "..." }\n  ]\n}'}
+                                    value={importJson}
+                                    onChange={(e) => setImportJson(e.target.value)}
+                                />
+                            </div>
+                        </DialogSection>
+                    </DialogBody>
+                    <DialogFooter className="ops-modal-sticky-footer">
                         <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancel</Button>
                         <Button onClick={handleImport} disabled={!importJson.trim() || importMutation.isPending}>
                             {importMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}

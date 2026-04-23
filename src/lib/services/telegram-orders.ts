@@ -1,17 +1,26 @@
 import { db } from '@/lib/db';
 import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import { type SupportedLocale } from '@/lib/i18n/config';
-import {
-  buildSharePageUrl,
-  buildShortShareUrl,
-  buildSubscriptionClientUrl,
-} from '@/lib/subscription-links';
 import { evaluateTelegramOrderRefundEligibility } from '@/lib/services/telegram-finance';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
+import { buildTelegramCommerceViewCallbackData } from '@/lib/services/telegram-callbacks';
+import {
+  getTelegramSalesSettings,
+  resolveTelegramSalesPlan,
+  resolveTelegramSalesPlanLabel,
+  type TelegramSalesSettings,
+  type TelegramSalesPlanCode,
+} from '@/lib/services/telegram-sales';
+import {
+  buildTelegramCommerceCard,
+  buildTelegramCommerceMessage,
+  buildTelegramCommercePagerRow,
+  paginateTelegramCommerce,
+  truncateTelegramCommerceButtonLabel,
+} from '@/lib/services/telegram-commerce-ui';
 import {
   buildTelegramOrderTimelineChipRow,
   buildTelegramOrderNextStepText,
-  buildTelegramOrderTimelineLines,
   escapeHtml,
   formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
@@ -27,6 +36,67 @@ import {
 import { formatBytes } from '@/lib/utils';
 
 type TelegramOrdersFilter = 'ALL' | 'ACTION' | 'REVIEW' | 'COMPLETED';
+
+function buildTelegramOrdersCountsLine(input: {
+  attentionCount: number;
+  reviewCount: number;
+  completedCount: number;
+  totalCount: number;
+}) {
+  const segments = [
+    input.attentionCount > 0 ? `${input.attentionCount} need action` : null,
+    input.reviewCount > 0 ? `${input.reviewCount} under review` : null,
+    input.completedCount > 0 ? `${input.completedCount} completed` : null,
+  ].filter(Boolean) as string[];
+
+  return segments.join(' • ') || `${input.totalCount} recent`;
+}
+
+function buildTelegramCompactOrderStateLine(order: TelegramUserOrder, ui: ReturnType<typeof getTelegramUi>) {
+  const stateLine = formatTelegramOrderStateLine({
+    orderCode: order.orderCode,
+    planName: (order as TelegramUserOrder & { displayPlanLabel?: string | null }).displayPlanLabel || order.planName,
+    planCode: order.planCode,
+    durationMonths: order.durationMonths,
+    durationDays: order.durationDays,
+    requestedName: order.requestedName,
+  });
+  const duplicatedPrefix = `#${order.orderCode}`;
+  const trimmedStateLine = stateLine.startsWith(duplicatedPrefix)
+    ? stateLine.slice(duplicatedPrefix.length).replace(/^\s*•\s*/, '')
+    : stateLine;
+
+  return trimmedStateLine.trim() || formatTelegramOrderKindLabel(order.kind, ui);
+}
+
+function resolveTelegramOrderDisplayPlanLabel(
+  order: {
+    planCode?: string | null;
+    planName?: string | null;
+  },
+  locale: SupportedLocale,
+  settings: TelegramSalesSettings,
+) {
+  if (order.planCode) {
+    const plan = resolveTelegramSalesPlan(settings, order.planCode as TelegramSalesPlanCode);
+    if (plan) {
+      return resolveTelegramSalesPlanLabel(plan, locale);
+    }
+  }
+
+  return order.planName || order.planCode || null;
+}
+
+function normalizeTelegramOrderPlanLabels<T extends { planCode?: string | null; planName?: string | null }>(
+  orders: T[],
+  locale: SupportedLocale,
+  settings: TelegramSalesSettings,
+) {
+  return orders.map((order) => ({
+    ...order,
+    displayPlanLabel: resolveTelegramOrderDisplayPlanLabel(order, locale, settings),
+  }));
+}
 
 function parseTelegramOrdersFilter(argsText?: string | null): TelegramOrdersFilter {
   const normalized = argsText?.trim().toLowerCase() || '';
@@ -66,6 +136,119 @@ function buildTelegramOrdersKeyboard(locale: SupportedLocale, filter: TelegramOr
       ],
     ],
   };
+}
+
+function buildTelegramOrdersCommerceKeyboard(input: {
+  locale: SupportedLocale;
+  filter: TelegramOrdersFilter;
+  orders: TelegramUserOrder[];
+  page: number;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const pagination = paginateTelegramCommerce(input.orders, input.page);
+  const option = (targetFilter: TelegramOrdersFilter, label: string) => ({
+    text: input.filter === targetFilter ? `• ${label}` : label,
+    callback_data: buildTelegramCommerceViewCallbackData(
+      'orders',
+      'filter',
+      targetFilter.toLowerCase(),
+      '1',
+    ),
+  });
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      option('ALL', isMyanmar ? 'အားလုံး' : 'All'),
+      option('ACTION', isMyanmar ? 'လုပ်ဆောင်ရန်' : 'Need action'),
+    ],
+    [
+      option('REVIEW', isMyanmar ? 'စစ်ဆေးနေ' : 'Under review'),
+      option('COMPLETED', isMyanmar ? 'ပြီးဆုံး' : 'Completed'),
+    ],
+  ];
+
+  for (const order of pagination.pageItems) {
+    rows.push([{
+      text: truncateTelegramCommerceButtonLabel(
+        `${input.locale === 'my' ? 'Open' : 'Open'} ${order.orderCode}`,
+        36,
+      ),
+      callback_data: buildTelegramCommerceViewCallbackData(
+        'orders',
+        'detail',
+        order.id,
+        `${input.filter.toLowerCase()},${pagination.page}`,
+      ),
+    }]);
+  }
+
+  const pager = buildTelegramCommercePagerRow({
+    locale: input.locale,
+    section: 'orders',
+    page: pagination.page,
+    totalItems: input.orders.length,
+    secondary: input.filter.toLowerCase(),
+  });
+  if (pager) {
+    rows.push(pager);
+  }
+
+  return { inline_keyboard: rows };
+}
+
+export function buildTelegramOrdersSummaryMessage(input: {
+  locale: SupportedLocale;
+  filter: TelegramOrdersFilter;
+  attentionOrders: TelegramUserOrder[];
+  reviewOrders: TelegramUserOrder[];
+  completedOrders: TelegramUserOrder[];
+  filteredOrders: TelegramUserOrder[];
+  page: number;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const pagination = paginateTelegramCommerce(input.filteredOrders, input.page);
+  const cards = pagination.pageItems.map((order) =>
+    buildTelegramCommerceCard(
+      `${formatTelegramOrderStatusIcon(order.status)} <b>${escapeHtml(order.orderCode)}</b>`,
+      [
+        escapeHtml(buildTelegramCompactOrderStateLine(order, ui)),
+        `${ui.statusLineLabel}: ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}`,
+        buildTelegramOrderProgressSummary({ order, locale: input.locale }),
+      ],
+    ),
+  );
+
+  return buildTelegramCommerceMessage({
+    title: ui.ordersTitle,
+    statsLine: buildTelegramOrdersCountsLine({
+      attentionCount: input.attentionOrders.length,
+      reviewCount: input.reviewOrders.length,
+      completedCount: input.completedOrders.length,
+      totalCount: input.filteredOrders.length,
+    }),
+    intro:
+      input.locale === 'my'
+        ? 'Filter ကိုပြောင်းပြီး Open ကိုနှိပ်ကာ detail card ကိုဖွင့်နိုင်သည်။'
+        : 'Use filters, then tap Open for the detail card.',
+    cards: cards.length
+      ? cards
+      : [
+          input.filter === 'ACTION'
+            ? input.locale === 'my'
+              ? '📭 လက်ရှိလုပ်ဆောင်ရန်လိုသော order မရှိသေးပါ။'
+              : '📭 There are no orders that need action right now.'
+            : input.filter === 'REVIEW'
+              ? input.locale === 'my'
+                ? '📭 လက်ရှိ review စောင့်နေသော order မရှိသေးပါ။'
+                : '📭 There are no orders under review right now.'
+              : input.filter === 'COMPLETED'
+                ? input.locale === 'my'
+                  ? '📭 လတ်တလော completed order မရှိသေးပါ။'
+                  : '📭 There are no completed orders yet.'
+                : input.locale === 'my'
+                  ? '📭 Recent order မရှိသေးပါ။'
+                  : '📭 There are no recent orders yet.',
+        ],
+  });
 }
 
 function buildTelegramOrderProgressSummary(input: {
@@ -154,7 +337,7 @@ export async function findTelegramOrderForUser(input: {
   });
 }
 
-export type TelegramUserOrder = Awaited<ReturnType<typeof findTelegramOrderForUser>>;
+export type TelegramUserOrder = NonNullable<Awaited<ReturnType<typeof findTelegramOrderForUser>>>;
 
 export async function listRefundEligibleTelegramOrders(
   chatId: number,
@@ -236,98 +419,79 @@ export async function buildTelegramOrderStatusMessage(input: {
   const locale = input.locale;
   const ui = getTelegramUi(locale);
   const isMyanmar = locale === 'my';
+  const settings = await getTelegramSalesSettings();
+  const displayPlanLabel = resolveTelegramOrderDisplayPlanLabel(order, locale, settings);
   const statusIcon = formatTelegramOrderStatusIcon(order.status);
   const nextStep = buildTelegramOrderNextStepText(order, ui);
-  const stateLine = formatTelegramOrderStateLine(order);
-  const summaryTitle = isMyanmar ? '<b>📦 Order details</b>' : '<b>📦 Order details</b>';
-  const currentStateTitle = isMyanmar ? '<b>📌 Current state</b>' : '<b>📌 Current state</b>';
-  const lines = [
-    ui.orderStatusTitle,
-    '',
-    `${statusIcon} <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
-    stateLine ? `🧾 ${escapeHtml(stateLine)}` : '',
-    nextStep ? `👉 ${ui.orderNextStepLabel}: <b>${escapeHtml(nextStep)}</b>` : '',
-    buildTelegramOrderTimelineChipRow({ order }),
-    buildTelegramOrderProgressSummary({ order, locale })
-      ? `⏱ ${escapeHtml(buildTelegramOrderProgressSummary({ order, locale }) || '')}`
-      : '',
-    '',
-    currentStateTitle,
-    `${ui.orderCodeLabel}: <b>${escapeHtml(order.orderCode)}</b>`,
-    `${ui.orderTypeLabel}: ${escapeHtml(formatTelegramOrderKindLabel(order.kind, ui))}`,
-  ];
+  const stateLine = buildTelegramCompactOrderStateLine(
+    { ...order, displayPlanLabel } as TelegramUserOrder & { displayPlanLabel?: string | null },
+    ui,
+  );
+  const progressSummary = buildTelegramOrderProgressSummary({ order, locale });
+  const detailLines: string[] = [];
+  const paymentLines: string[] = [];
+  const footerLines: string[] = [];
 
-  lines.push('', summaryTitle);
-
-  if (order.planName || order.planCode) {
-    lines.push(`${ui.planLabel}: <b>${escapeHtml(order.planName || order.planCode || '')}</b>`);
+  if (displayPlanLabel) {
+    detailLines.push(`${ui.planLabel}: <b>${escapeHtml(displayPlanLabel)}</b>`);
   }
 
-  if (order.priceLabel) {
-    lines.push(`${ui.priceLabel}: ${escapeHtml(order.priceLabel)}`);
-  }
-
-  if (order.durationMonths) {
-    lines.push(
-      `${ui.durationLabel}: ${escapeHtml(
-        locale === 'my'
-          ? `${order.durationMonths} လ`
-          : `${order.durationMonths} month${order.durationMonths === 1 ? '' : 's'}`,
-      )}`,
-    );
-  }
-
-  if (order.durationDays) {
-    lines.push(
-      `${ui.durationLabel}: ${escapeHtml(
-        locale === 'my'
-          ? `${order.durationDays} ရက်`
-          : `${order.durationDays} day${order.durationDays === 1 ? '' : 's'}`,
-      )}`,
-    );
-  }
-
-  if (order.requestedName) {
-    lines.push(`${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>`);
-  }
-
-  if (order.orderMode === 'GIFT' && order.giftRecipientLabel) {
-    lines.push(`${isMyanmar ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(order.giftRecipientLabel)}</b>`);
-  }
-
-  if (order.referralCode) {
-    lines.push(`${isMyanmar ? 'Referral' : 'Referral'}: <b>${escapeHtml(order.referralCode)}</b>`);
-  }
-
-  if (order.requestedEmail) {
-    lines.push(`${ui.emailLabel}: <code>${escapeHtml(order.requestedEmail)}</code>`);
-  }
-
-  if (order.kind === 'RENEW') {
-    const renewalTargetId = order.targetAccessKeyId || order.targetDynamicKeyId;
-    if (renewalTargetId) {
-      lines.push(`${ui.renewalTargetLabel}: <code>${escapeHtml(renewalTargetId)}</code>`);
-    }
+  const durationLabel = order.durationMonths
+    ? locale === 'my'
+      ? `${order.durationMonths} လ`
+      : `${order.durationMonths} month${order.durationMonths === 1 ? '' : 's'}`
+    : order.durationDays
+      ? locale === 'my'
+        ? `${order.durationDays} ရက်`
+        : `${order.durationDays} day${order.durationDays === 1 ? '' : 's'}`
+      : null;
+  const requestLineSegments = [
+    order.priceLabel ? `${ui.priceLabel}: ${escapeHtml(order.priceLabel)}` : null,
+    durationLabel ? `${ui.durationLabel}: ${escapeHtml(durationLabel)}` : null,
+    order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : null,
+  ].filter(Boolean) as string[];
+  if (requestLineSegments.length > 0) {
+    detailLines.push(requestLineSegments.join(' • '));
   }
 
   if (order.selectedServerName) {
     const flag = order.selectedServerCountryCode
       ? ` ${getFlagEmoji(order.selectedServerCountryCode)}`
       : '';
-    lines.push(
+    const serverLineSegments = [
       `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}${flag}</b>`,
-    );
+      order.referralCode
+        ? `${isMyanmar ? 'Referral' : 'Referral'}: <b>${escapeHtml(order.referralCode)}</b>`
+        : null,
+    ].filter(Boolean) as string[];
+    detailLines.push(serverLineSegments.join(' • '));
   }
 
-  if (order.paymentMethodLabel) {
-    lines.push('', `<b>${isMyanmar ? '💳 Payment & review' : '💳 Payment & review'}</b>`);
-    lines.push(`${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>`);
+  if (order.kind === 'RENEW') {
+    const renewalTargetId = order.targetAccessKeyId || order.targetDynamicKeyId;
+    if (renewalTargetId) {
+      detailLines.push(`${ui.renewalTargetLabel}: <code>${escapeHtml(renewalTargetId)}</code>`);
+    }
   }
 
-  lines.push(`${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`);
+  if (order.orderMode === 'GIFT' && order.giftRecipientLabel) {
+    detailLines.push(`${isMyanmar ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(order.giftRecipientLabel)}</b>`);
+  }
+
+  if (order.requestedEmail) {
+    detailLines.push(`${ui.emailLabel}: <code>${escapeHtml(order.requestedEmail)}</code>`);
+  }
+
+  const paymentSummarySegments = [
+    `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
+    order.paymentMethodLabel
+      ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>`
+      : null,
+  ].filter(Boolean) as string[];
+  paymentLines.push(paymentSummarySegments.join(' • '));
 
   if (order.paymentSubmittedAt) {
-    lines.push(
+    paymentLines.push(
       `${ui.paymentSubmittedLabel}: ${escapeHtml(
         formatTelegramDateTime(order.paymentSubmittedAt, locale),
       )}`,
@@ -335,25 +499,23 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.reviewedAt) {
-    lines.push(
+    paymentLines.push(
       `${ui.reviewedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.reviewedAt, locale))}`,
     );
   }
 
   if (order.fulfilledAt) {
-    lines.push(
+    paymentLines.push(
       `${ui.fulfilledAtLabel}: ${escapeHtml(formatTelegramDateTime(order.fulfilledAt, locale))}`,
     );
-  }
-
-  if (order.rejectedAt) {
-    lines.push(
+  } else if (order.rejectedAt) {
+    paymentLines.push(
       `${ui.rejectedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.rejectedAt, locale))}`,
     );
   }
 
   if (order.refundRequestStatus) {
-    lines.push(
+    paymentLines.push(
       `${ui.refundRequestStatusLabel}: <b>${escapeHtml(
         formatTelegramRefundRequestStatusLabel(order.refundRequestStatus, ui),
       )}</b>`,
@@ -361,7 +523,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.refundRequestedAt) {
-    lines.push(
+    paymentLines.push(
       `${ui.refundRequestedAtLabel}: ${escapeHtml(
         formatTelegramDateTime(order.refundRequestedAt, locale),
       )}`,
@@ -369,7 +531,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.refundRequestReviewedAt) {
-    lines.push(
+    paymentLines.push(
       `${ui.refundReviewedAtLabel}: ${escapeHtml(
         formatTelegramDateTime(order.refundRequestReviewedAt, locale),
       )}`,
@@ -377,69 +539,71 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.refundReviewReasonCode) {
-    lines.push(
+    paymentLines.push(
       `${ui.refundReasonLabel}: ${escapeHtml(
         resolveRefundReasonPresetLabel(order.refundReviewReasonCode) || order.refundReviewReasonCode,
       )}`,
     );
   }
 
-  if (order.customerMessage?.trim()) {
-    lines.push('', `<b>${isMyanmar ? '📝 Customer note' : '📝 Customer note'}</b>`, escapeHtml(order.customerMessage.trim()));
-  }
-
-  if (order.refundRequestCustomerMessage?.trim()) {
-    lines.push('', `<b>${isMyanmar ? '📝 Customer note' : '📝 Customer note'}</b>`, escapeHtml(order.refundRequestCustomerMessage.trim()));
-  }
-
   if (order.refundRequestStatus === 'PENDING') {
-    lines.push('', `<b>${isMyanmar ? '💸 Finance update' : '💸 Finance update'}</b>`, escapeHtml(ui.refundPendingHelp));
+    footerLines.push(escapeHtml(ui.refundPendingHelp));
   } else if (order.refundRequestStatus === 'APPROVED') {
-    lines.push('', `<b>${isMyanmar ? '💸 Finance update' : '💸 Finance update'}</b>`, escapeHtml(ui.refundApprovedHelp));
+    footerLines.push(escapeHtml(ui.refundApprovedHelp));
   } else if (order.refundRequestStatus === 'REJECTED') {
-    lines.push('', `<b>${isMyanmar ? '💸 Finance update' : '💸 Finance update'}</b>`, escapeHtml(ui.refundRejectedHelp));
+    footerLines.push(escapeHtml(ui.refundRejectedHelp));
   }
 
-  if (
-    order.status === 'AWAITING_PAYMENT_METHOD' ||
-    order.status === 'AWAITING_PAYMENT_PROOF' ||
-    order.status === 'PENDING_REVIEW' ||
-    order.status === 'REJECTED' ||
-    order.status === 'CANCELLED'
-  ) {
-    lines.push(
-      '',
-      `<b>${isMyanmar ? '🛟 What you can do now' : '🛟 What you can do now'}</b>`,
-      escapeHtml(
-        order.status === 'AWAITING_PAYMENT_METHOD'
-          ? isMyanmar
-            ? 'Payment method ကို အရင် ရွေးပြီးနောက် screenshot အဆင့်ကို ဆက်သွားပါ။'
-            : 'Choose your payment method first, then continue to the screenshot step.'
-          : order.status === 'AWAITING_PAYMENT_PROOF'
-            ? isMyanmar
-              ? 'ငွေပေးချေပြီး screenshot ကို ဤ chat ထဲသို့ ပို့ပါ။ Payment guide ဖြင့် account detail ကို ပြန်ကြည့်နိုင်ပြီး Payment method ပြောင်းရန် button ကိုလည်း အသုံးပြုနိုင်ပါသည်။'
-              : 'Complete payment and send the screenshot in this chat. Use Payment guide to recheck the account details, or Switch payment method if needed.'
-            : order.status === 'PENDING_REVIEW'
-              ? isMyanmar
-                ? 'ယခု order သည် admin review စောင့်နေပါသည်။ Screenshot ကို ထပ်မပို့ဘဲ update စောင့်ပါ။'
-                : 'This order is waiting for admin review. Wait for an update instead of sending another screenshot.'
-              : order.status === 'REJECTED'
-                ? isMyanmar
-                  ? 'လိုအပ်ပါက Restart same plan ကို အသုံးပြုပြီး screenshot သို့မဟုတ် payment method ကို ပြန်စနိုင်ပါသည်။'
-                  : 'Use Restart same plan if you want to restart this exact flow with a fresh screenshot or payment method.'
-                : isMyanmar
-                  ? 'ဤ order ကို ပိတ်ထားပါသည်။ အသစ်စရန် /buy သို့မဟုတ် /renew ကို သုံးနိုင်ပါသည်။'
-                  : 'This order is closed. Use /buy or /renew to start again.',
+  const cards = [
+      buildTelegramCommerceCard(
+        '📌 <b>Current status</b>',
+        [
+          [
+            `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
+            progressSummary ? escapeHtml(progressSummary) : null,
+          ].filter(Boolean).join(' • '),
+          stateLine ? escapeHtml(stateLine) : null,
+          nextStep ? `${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}` : null,
+          buildTelegramOrderTimelineChipRow({ order }),
+        ],
       ),
-      escapeHtml(
-        isMyanmar
-          ? 'အောက်ရှိ buttons များသည် order အခြေအနေနှင့် ကိုက်ညီအောင် ပြောင်းလဲထားပါသည်။'
-          : 'The buttons below are matched to the current order state.',
+  ];
+
+  if (detailLines.length > 0) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '📦 <b>Order detail</b>',
+        detailLines,
       ),
     );
   }
 
-  lines.push('', ...buildTelegramOrderTimelineLines({ order, locale, ui }));
+  if (paymentLines.length > 0) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '💳 <b>Payment & review</b>',
+        paymentLines,
+      ),
+    );
+  }
+
+  if (order.customerMessage?.trim()) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '📝 <b>Customer note</b>',
+        [`${escapeHtml(order.customerMessage.trim())}`],
+      ),
+    );
+  }
+
+  if (order.refundRequestCustomerMessage?.trim()) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '💸 <b>Refund note</b>',
+        [`${escapeHtml(order.refundRequestCustomerMessage.trim())}`],
+      ),
+    );
+  }
 
   const relatedAccessKeyId = order.approvedAccessKeyId || order.targetAccessKeyId;
   if (relatedAccessKeyId) {
@@ -456,40 +620,23 @@ export async function buildTelegramOrderStatusMessage(input: {
     });
 
     if (key) {
-      const token = key.subscriptionToken
-        ? key.subscriptionToken
-        : await input.ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
-
-      const sharePageUrl = key.sharePageEnabled
-        ? key.publicSlug
-          ? buildShortShareUrl(key.publicSlug, {
-              source: 'telegram_order_status',
-              lang: locale,
-            })
-          : buildSharePageUrl(token, { source: 'telegram_order_status', lang: locale })
-        : null;
-
-      const outlineClientUrl = key.clientLinkEnabled
-        ? key.publicSlug
-          ? buildSubscriptionClientUrl(key.publicSlug, key.name, {
-              source: 'telegram_order_status',
-              shortPath: true,
-            })
-          : buildSubscriptionClientUrl(token, key.name, {
-              source: 'telegram_order_status',
-            })
-        : null;
-
-      lines.push('', `<b>${isMyanmar ? '🔗 Delivered access' : '🔗 Delivered access'}</b>`);
-      lines.push(`${ui.deliveredKeyLabel}: <b>${escapeHtml(key.name)}</b>`);
-
-      if (sharePageUrl) {
-        lines.push(`🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
-      }
-
-      if (outlineClientUrl) {
-        lines.push(`⚡ ${ui.outlineClientUrlLabel}: <code>${escapeHtml(outlineClientUrl)}</code>`);
-      }
+      cards.push(
+        buildTelegramCommerceCard(
+          '🔗 <b>Delivered access</b>',
+          [
+            `${ui.deliveredKeyLabel}: <b>${escapeHtml(key.name)}</b>`,
+            escapeHtml(
+              key.sharePageEnabled
+                ? input.locale === 'my'
+                  ? 'Open, renew, and receipt actions stay in the buttons below.'
+                  : 'Open, renew, and receipt actions stay in the buttons below.'
+                : input.locale === 'my'
+                  ? 'Renew, receipt, and support actions stay in the buttons below.'
+                  : 'Renew, receipt, and support actions stay in the buttons below.',
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -520,45 +667,41 @@ export async function buildTelegramOrderStatusMessage(input: {
     });
 
     if (dynamicKey) {
-      const { sharePageUrl, subscriptionUrl, outlineClientUrl } = input.getDynamicKeyMessagingUrls(
-        dynamicKey,
-        'telegram_order_status',
-        locale,
-      );
       const poolSummary = formatTelegramDynamicPoolSummary(dynamicKey, ui);
-
-      lines.push('', `<b>${isMyanmar ? '🔗 Delivered access' : '🔗 Delivered access'}</b>`);
-      lines.push(`${ui.deliveredKeyLabel}: <b>${escapeHtml(dynamicKey.name)}</b>`);
-      lines.push(`💎 ${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`);
-      lines.push(`✨ ${ui.premiumStableLink}`);
-      if (dynamicKey.type === 'SELF_MANAGED') {
-        lines.push(`⚡ ${ui.premiumAutoFailover}`);
-      }
-      lines.push(`🧭 ${escapeHtml(poolSummary)}`);
-
-      if (dynamicKey.sharePageEnabled && sharePageUrl) {
-        lines.push(`🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
-      }
-
-      if (subscriptionUrl) {
-        lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
-      }
-
-      if (outlineClientUrl) {
-        lines.push(`⚡ ${ui.outlineClientUrlLabel}: <code>${escapeHtml(outlineClientUrl)}</code>`);
-      }
+      cards.push(
+        buildTelegramCommerceCard(
+          '🔗 <b>Delivered access</b>',
+          [
+            `${ui.deliveredKeyLabel}: <b>${escapeHtml(dynamicKey.name)}</b>`,
+            `💎 ${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`,
+            `🧭 ${escapeHtml(poolSummary)}`,
+            escapeHtml(
+              dynamicKey.sharePageEnabled
+                ? input.locale === 'my'
+                  ? 'Open, renew, region, and support actions stay in the buttons below.'
+                  : 'Open, renew, region, and support actions stay in the buttons below.'
+                : input.locale === 'my'
+                  ? 'Renew, region, and support actions stay in the buttons below.'
+                  : 'Renew, region, and support actions stay in the buttons below.',
+            ),
+          ],
+        ),
+      );
     }
   }
 
   if (order.status === 'AWAITING_PAYMENT_PROOF' || order.status === 'PENDING_REVIEW') {
-    lines.push(
-      '',
-      `<b>${isMyanmar ? '🛟 Need help?' : '🛟 Need help?'}</b>`,
-      ui.orderSupportHint,
-    );
+    footerLines.push(ui.orderSupportHint);
   }
 
-  return lines.join('\n');
+  return buildTelegramCommerceMessage({
+    title: ui.orderStatusTitle,
+    statsLine: `${statusIcon} <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(
+      formatTelegramOrderKindLabel(order.kind, ui),
+    )}`,
+    cards,
+    footerLines,
+  });
 }
 
 export async function handleOrdersCommand(input: {
@@ -614,93 +757,141 @@ export async function handleOrdersCommand(input: {
         : filter === 'COMPLETED'
           ? completedOrders
           : orders;
-  const lines = [
-    ui.ordersTitle,
-    '',
-    `${attentionOrders.length} need action • ${reviewOrders.length} under review • ${completedOrders.length} completed`,
-    '',
-  ];
-  const sections =
-    filter === 'ACTION'
-      ? ([[ui.ordersAttentionTitle, attentionOrders]] as const)
-      : filter === 'REVIEW'
-        ? ([[ui.ordersReviewTitle, reviewOrders]] as const)
-        : filter === 'COMPLETED'
-          ? ([[ui.ordersCompletedTitle, completedOrders]] as const)
-          : ([
-              [ui.ordersAttentionTitle, attentionOrders],
-              [ui.ordersReviewTitle, reviewOrders],
-              [ui.ordersCompletedTitle, completedOrders],
-            ] as const);
-
-  for (const [title, sectionOrders] of sections) {
-    if (sectionOrders.length === 0) {
-      continue;
-    }
-
-    lines.push(title);
-    for (const order of sectionOrders) {
-      const nextStep = buildTelegramOrderNextStepText(order, ui);
-      lines.push(
-        `${formatTelegramOrderStatusIcon(order.status)} ${escapeHtml(
-          formatTelegramOrderStateLine({
-            orderCode: order.orderCode,
-            planName: order.planName,
-            planCode: order.planCode,
-            durationMonths: order.durationMonths,
-            durationDays: order.durationDays,
-            requestedName: order.requestedName,
-          }),
-        )}`,
-      );
-      lines.push(
-        `  ${ui.statusLineLabel}: ${escapeHtml(
-          formatTelegramOrderStatusLabel(order.status, ui),
-        )} • ${escapeHtml(formatTelegramDateTime(order.createdAt, input.locale))}`,
-      );
-      lines.push(`  ${buildTelegramOrderTimelineChipRow({ order })}`);
-      if (nextStep) {
-        lines.push(`  ${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}`);
-      }
-    }
-    lines.push('');
-  }
-
-  if (filteredOrders.length === 0) {
-    lines.push(
-      filter === 'ACTION'
-        ? input.locale === 'my'
-          ? '📭 လက်ရှိလုပ်ဆောင်ရန်လိုသော order မရှိသေးပါ။'
-          : '📭 There are no orders that need action right now.'
-        : filter === 'REVIEW'
-          ? input.locale === 'my'
-            ? '📭 လက်ရှိ review စောင့်နေသော order မရှိသေးပါ။'
-            : '📭 There are no orders under review right now.'
-          : input.locale === 'my'
-            ? '📭 လတ်တလော completed order မရှိသေးပါ။'
-            : '📭 There are no completed orders yet.',
-      '',
-    );
-  }
-
-  lines.push(ui.ordersHint);
-  const summaryMessage = lines.join('\n');
+  const salesSettings = await getTelegramSalesSettings();
+  const [normalizedAttentionOrders, normalizedReviewOrders, normalizedCompletedOrders, normalizedFilteredOrders] =
+    [
+      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(completedOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale, salesSettings),
+    ];
+  const summaryMessage = buildTelegramOrdersSummaryMessage({
+    locale: input.locale,
+    filter,
+    attentionOrders: normalizedAttentionOrders as TelegramUserOrder[],
+    reviewOrders: normalizedReviewOrders as TelegramUserOrder[],
+    completedOrders: normalizedCompletedOrders as TelegramUserOrder[],
+    filteredOrders: normalizedFilteredOrders as TelegramUserOrder[],
+    page: 1,
+  });
   const sentSummary = await input.sendTelegramMessage(input.botToken, input.chatId, summaryMessage, {
-    replyMarkup: buildTelegramOrdersKeyboard(input.locale, filter),
+    replyMarkup: buildTelegramOrdersCommerceKeyboard({
+      locale: input.locale,
+      filter,
+      orders: normalizedFilteredOrders as TelegramUserOrder[],
+      page: 1,
+    }),
   });
 
-  const latestOrder = filteredOrders[0] || attentionOrders[0] || reviewOrders[0] || orders[0];
-  if (latestOrder) {
+  return sentSummary ? null : summaryMessage;
+}
+
+export async function handleTelegramOrdersCommerceView(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  action: 'home' | 'page' | 'detail' | 'filter';
+  primary?: string | null;
+  secondary?: string | null;
+  sendTelegramMessage: (
+    botToken: string,
+    chatId: number | string,
+    text: string,
+    options?: {
+      parseMode?: 'HTML' | 'Markdown';
+      replyMarkup?: Record<string, unknown>;
+      disableWebPagePreview?: boolean;
+    },
+  ) => Promise<boolean>;
+  sendTelegramOrderStatusCard: (input: {
+    botToken: string;
+    chatId: number;
+    order: TelegramUserOrder;
+    locale: SupportedLocale;
+    appendLatestHint?: boolean;
+  }) => Promise<boolean>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const orders = await listTelegramOrdersForUser(input.chatId, input.telegramUserId, 12);
+  if (!orders.length) {
+    return ui.ordersEmpty;
+  }
+
+  const filter =
+    input.action === 'filter'
+      ? parseTelegramOrdersFilter(input.primary)
+      : parseTelegramOrdersFilter(input.secondary);
+  const pageSeed =
+    input.action === 'filter'
+      ? input.secondary
+      : input.action === 'detail'
+        ? input.secondary?.split(',')[1]
+        : input.primary;
+  const page = Number.parseInt(pageSeed || '1', 10) || 1;
+  const attentionOrders = orders.filter((order) =>
+    [
+      'AWAITING_KEY_SELECTION',
+      'AWAITING_PLAN',
+      'AWAITING_MONTHS',
+      'AWAITING_SERVER_SELECTION',
+      'AWAITING_PAYMENT_METHOD',
+      'AWAITING_PAYMENT_PROOF',
+      'REJECTED',
+      'CANCELLED',
+    ].includes(order.status),
+  );
+  const reviewOrders = orders.filter((order) => ['PENDING_REVIEW', 'APPROVED'].includes(order.status));
+  const completedOrders = orders.filter((order) => order.status === 'FULFILLED');
+  const filteredOrders =
+    filter === 'ACTION'
+      ? attentionOrders
+      : filter === 'REVIEW'
+        ? reviewOrders
+        : filter === 'COMPLETED'
+          ? completedOrders
+          : orders;
+  const salesSettings = await getTelegramSalesSettings();
+  const [normalizedAttentionOrders, normalizedReviewOrders, normalizedCompletedOrders, normalizedFilteredOrders] =
+    [
+      normalizeTelegramOrderPlanLabels(attentionOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(reviewOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(completedOrders, input.locale, salesSettings),
+      normalizeTelegramOrderPlanLabels(filteredOrders, input.locale, salesSettings),
+    ];
+
+  if (input.action === 'detail') {
+    const order = orders.find((candidate) => candidate.id === input.primary);
+    if (!order) {
+      return ui.orderStatusLatestNotFound;
+    }
     await input.sendTelegramOrderStatusCard({
       botToken: input.botToken,
       chatId: input.chatId,
-      order: latestOrder,
+      order,
       locale: input.locale,
-      appendLatestHint: true,
     });
+    return null;
   }
 
-  return sentSummary ? null : summaryMessage;
+  const message = buildTelegramOrdersSummaryMessage({
+    locale: input.locale,
+    filter,
+    attentionOrders: normalizedAttentionOrders as TelegramUserOrder[],
+    reviewOrders: normalizedReviewOrders as TelegramUserOrder[],
+    completedOrders: normalizedCompletedOrders as TelegramUserOrder[],
+    filteredOrders: normalizedFilteredOrders as TelegramUserOrder[],
+    page,
+  });
+  const sent = await input.sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramOrdersCommerceKeyboard({
+      locale: input.locale,
+      filter,
+      orders: normalizedFilteredOrders as TelegramUserOrder[],
+      page,
+    }),
+  });
+  return sent ? null : message;
 }
 
 export async function handleOrderStatusCommand(input: {
@@ -792,49 +983,11 @@ export async function handleRefundCommand(input: {
   if (refundableOrders.length === 0 && recentRefundRequests.length === 0) {
     return [ui.refundNoEligibleOrders, '', ui.refundPolicySummary].join('\n');
   }
-
-  const summaryLines = [ui.refundCenterTitle, '', ui.refundPolicySummary];
-
-  if (recentRefundRequests.length > 0) {
-    summaryLines.push(
-      '',
-      `<b>${ui.refundRecentRequestsTitle}</b>`,
-      ...recentRefundRequests.map((order) => {
-        const details = [
-          escapeHtml(order.orderCode),
-          escapeHtml(formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || '', ui)),
-        ];
-        if (order.refundRequestedAt) {
-          details.push(escapeHtml(formatTelegramDateTime(order.refundRequestedAt, input.locale)));
-        }
-        if (order.refundReviewReasonCode) {
-          details.push(
-            escapeHtml(
-              resolveRefundReasonPresetLabel(order.refundReviewReasonCode) ||
-                order.refundReviewReasonCode,
-            ),
-          );
-        }
-        return `• ${details.join(' • ')}`;
-      }),
-    );
-  }
-
-  if (refundableOrders.length > 0) {
-    summaryLines.push(
-      '',
-      `<b>${ui.refundEligibleSectionTitle}</b>`,
-      ...refundableOrders.map(
-        ({ order, refundEligibility }, index) =>
-          `${index + 1}. ${escapeHtml(formatTelegramOrderStateLine(order))} • ${escapeHtml(
-            formatBytes(refundEligibility.usedBytes),
-          )}`,
-      ),
-      '',
-      ui.refundEligibleOrdersHint,
-    );
-  }
-  const summaryMessage = summaryLines.join('\n');
+  const summaryMessage = buildTelegramRefundSummaryMessage({
+    locale: input.locale,
+    recentRefundRequests,
+    refundableOrders,
+  });
   const sentSummary = await input.sendTelegramMessage(
     input.botToken,
     input.chatId,
@@ -851,4 +1004,69 @@ export async function handleRefundCommand(input: {
   }
 
   return sentSummary ? null : summaryMessage;
+}
+
+export function buildTelegramRefundSummaryMessage(input: {
+  locale: SupportedLocale;
+  recentRefundRequests: Array<TelegramUserOrder>;
+  refundableOrders: Array<{
+    order: TelegramUserOrder;
+    refundEligibility: {
+      usedBytes: bigint | number;
+    };
+  }>;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const cards: string[] = [];
+
+  if (input.recentRefundRequests.length > 0) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '💸 <b>Recent refund status</b>',
+        input.recentRefundRequests.slice(0, 3).map((order) => {
+          const details = [
+            `<b>${escapeHtml(order.orderCode)}</b>`,
+            escapeHtml(formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui)),
+            order.refundRequestedAt
+              ? escapeHtml(formatTelegramDateTime(order.refundRequestedAt, input.locale))
+              : null,
+            order.refundReviewReasonCode
+              ? escapeHtml(
+                  resolveRefundReasonPresetLabel(order.refundReviewReasonCode) ||
+                    order.refundReviewReasonCode,
+                )
+              : null,
+          ].filter(Boolean) as string[];
+          return details.join(' • ');
+        }),
+      ),
+    );
+  }
+
+  if (input.refundableOrders.length > 0) {
+    cards.push(
+      buildTelegramCommerceCard(
+        '🧾 <b>Eligible now</b>',
+        input.refundableOrders.slice(0, 3).map(({ order, refundEligibility }, index) =>
+          `${index + 1}. ${escapeHtml(buildTelegramCompactOrderStateLine(order, ui))} • ${escapeHtml(
+            formatBytes(refundEligibility.usedBytes),
+          )}`,
+        ),
+      ),
+    );
+  }
+
+  return buildTelegramCommerceMessage({
+    title: ui.refundCenterTitle,
+    statsLine: `${input.recentRefundRequests.length} recent • ${input.refundableOrders.length} eligible`,
+    intro:
+      input.locale === 'my'
+        ? 'Refund summary ကို အတိုချုံးပြထားသည်။ Refund လုပ်နိုင်သော order card များကို အောက်တွင် ဆက်ပို့ပါမည်။'
+        : 'This refund summary stays short. Eligible order cards are sent below.',
+    cards,
+    footerLines: [
+      ui.refundPolicySummary,
+      input.refundableOrders.length > 0 ? ui.refundEligibleOrdersHint : null,
+    ],
+  });
 }

@@ -64,8 +64,8 @@ export interface SubscriptionBranding {
   localizedWelcomeMessages?: LocalizedTemplateMap;
   showWelcome?: boolean;      // Show/hide welcome message
 
-  // Custom CSS
-  customCss?: string;         // Inject custom CSS
+  // Deprecated. Kept for compatibility only; custom CSS is intentionally ignored.
+  customCss?: string;
 
   // Fonts
   fontFamily?: string;        // Google Font name
