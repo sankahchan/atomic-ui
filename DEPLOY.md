@@ -114,7 +114,7 @@ npm run db:generate
 npm run db:push
 npm run setup
 npm run env:check -- --env-file=.env
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 ```
 
 Or use the one-command installer directly from inside the VPS, which now prefers HTTPS by default:
@@ -160,7 +160,7 @@ cd /opt/atomic-ui
 git pull --ff-only origin main
 npm ci --include=dev
 systemctl stop atomic-ui.service
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl start atomic-ui.service
 ```
 
@@ -233,7 +233,7 @@ For direct VPS deployments:
 ```bash
 git pull --ff-only origin main
 systemctl stop atomic-ui.service
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 systemctl start atomic-ui.service
 npm run smoke -- --base-url=http://127.0.0.1:2053 --email=admin --password='your-password'
 ```
@@ -265,7 +265,7 @@ If you are standing up a separate replacement VPS from an existing production Po
 If a direct VPS deploy fails:
 
 1. `git reset --hard <previous-commit>` is not recommended on a shared working tree; instead checkout the last known good commit in a clean deploy directory or use `git checkout <commit>` on the VPS only if you control that host.
-2. Rebuild with `NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh`.
+2. Rebuild with `NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh`.
 3. Restart `atomic-ui.service`.
 4. Re-run the smoke test and inspect `journalctl -u atomic-ui.service -n 50`.
 

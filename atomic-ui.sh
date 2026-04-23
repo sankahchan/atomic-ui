@@ -495,7 +495,7 @@ build_app() {
     cd "$INSTALL_DIR" || return 1
     rm -rf .next
     
-    if ! NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
+    if ! NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
         print_error "Build failed"
         print_info "Please check the build output above for errors"
         return 1
@@ -1250,7 +1250,7 @@ EOF
         print_success "APP_URL and NEXT_PUBLIC_APP_URL updated"
 
         print_step "Rebuilding application with new URL..."
-        NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+        NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
         systemctl restart ${SERVICE_NAME}
         print_success "Application restarted with new domain"
     fi
@@ -1532,7 +1532,7 @@ update_service() {
     node scripts/prisma-safe-db-push.js
     
     print_step "Building application..."
-    NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+    NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 
     if ! create_service "${CURRENT_PORT}"; then
         print_error "Failed to refresh systemd service"

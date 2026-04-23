@@ -143,7 +143,7 @@ Then regenerate Prisma, push the schema, rebuild the standalone bundle, and resy
 cd /opt/atomic-ui
 sh scripts/prisma-command.sh generate
 node scripts/prisma-safe-db-push.js
-NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
+NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh
 APP_DIR=/opt/atomic-ui SERVICE_NAME=atomic-ui.service bash scripts/sync-systemd-service.sh
 systemctl restart atomic-ui.service
 ```

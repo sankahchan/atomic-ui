@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.3 - 2026-04-23
+
+### Changed
+
+- Upgraded Next.js, `eslint-config-next`, `node-cron`, `nodemailer`, and `systeminformation` to patched versions while keeping the VPS lockfile install flow deterministic.
+- Replaced the abandoned DigitalOcean SDK dependency with a small typed API client for provisioning calls.
+
+### Fixed
+
+- Cleared the current `npm audit` vulnerability report, including the transitive `request`/`form-data` chain previously pulled in by the DigitalOcean SDK.
+
 ## v1.2.2 - 2026-04-23
 
 ### Changed

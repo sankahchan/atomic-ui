@@ -579,7 +579,7 @@ fi
 
 # Build
 echo -e "${BLUE}[*]${NC} Building application..."
-if ! NODE_HEAP_MB=640 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
+if ! NODE_HEAP_MB=1024 PUBLISH_STANDALONE=true bash scripts/build-low-memory.sh 2>&1; then
     echo -e "${RED}[✗]${NC} Build failed"
     echo -e "${YELLOW}[!]${NC} Please check the build output above for errors"
     exit 1
