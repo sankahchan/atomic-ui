@@ -91,7 +91,7 @@
     "recharts": "^2.15.4",
     "superjson": "^2.2.1",
     "systeminformation": "^5.31.5",
-    "tailwind-merge": "^2.2.1",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.22.4",
     "zustand": "^4.5.2"
