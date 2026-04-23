@@ -91,7 +91,7 @@
     "react-qr-code": "^2.0.18",
     "recharts": "^2.15.4",
     "superjson": "^2.2.1",
-    "systeminformation": "^5.30.3",
+    "systeminformation": "^5.31.5",
     "tailwind-merge": "^2.2.1",
     "tailwindcss-animate": "^1.0.7",
     "undici": "^7.18.2",
