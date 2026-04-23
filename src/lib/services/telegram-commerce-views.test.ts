@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildTelegramBuySummaryMessage,
+  buildTelegramBuyPlanDetailMessage,
   buildTelegramRenewSummaryMessage,
 } from '@/lib/services/telegram-order-state';
 import { buildTelegramInboxSummaryMessage } from '@/lib/services/telegram-inbox-ui';
@@ -100,6 +101,8 @@ test('buy summary stays concise in english and removes legacy essay text', () =>
 
   assert.match(message, /1\.\s+🔑/);
   assert.match(message, /2\.\s+💎/);
+  assert.match(message, /3 plans • 1 standard • 1 premium • 1 trial/);
+  assert.doesNotMatch(message, /This flow is now simple/);
   assert.doesNotMatch(message, /How buying works/);
   assert.doesNotMatch(message, /Compare your options/);
   assert.doesNotMatch(message, /https?:\/\//);
@@ -125,6 +128,22 @@ test('buy summary preserves concise numbering in myanmar locale', () => {
   assert.match(message, /1\.\s+🔑/);
   assert.match(message, /2\.\s+💎/);
   assert.doesNotMatch(message, /How buying works/);
+});
+
+test('buy plan detail stays compact and avoids repeating the plan title before the card', () => {
+  const message = buildTelegramBuyPlanDetailMessage({
+    locale: 'en',
+    orderCode: 'ORD-123',
+    plan: samplePlans[0] as any,
+    index: 1,
+    totalPlans: samplePlans.length,
+  });
+
+  assert.match(message, /ℹ️ <b>Plan detail 1\/3<\/b>/);
+  assert.match(message, /Order <b>ORD-123<\/b>/);
+  assert.equal((message.match(/1 Month \/ 150 GB/g) || []).length, 1);
+  assert.doesNotMatch(message, /Detail for order/);
+  assert.ok(message.split('\n').length <= 11);
 });
 
 test('my keys summary stays compact and omits raw urls and latest reply dumps', () => {
