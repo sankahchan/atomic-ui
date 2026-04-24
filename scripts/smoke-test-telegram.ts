@@ -236,6 +236,8 @@ async function main() {
     { text: '/admin', label: 'admin /admin', admin: true },
     { text: '/reviewqueue', label: 'admin /reviewqueue', admin: true },
     { text: '/supportqueue', label: 'admin /supportqueue', admin: true },
+    { text: '/supportthreads', label: 'admin /supportthreads', admin: true },
+    { text: '/refunds', label: 'admin /refunds', admin: true },
     { text: '/announcements', label: 'admin /announcements', admin: true },
     { text: '/finance', label: 'admin /finance', admin: true },
   ];
