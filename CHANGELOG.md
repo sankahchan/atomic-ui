@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.4 - 2026-04-25
+
+### Changed
+
+- Simplified Telegram admin queues for review, support, refunds, and finance so admin commands stay summary-first and button-first on mobile.
+- Added live Telegram smoke coverage for `/supportthreads` and `/refunds` so admin refund/support surfaces are checked during deploy QA.
+
+### Fixed
+
+- Fixed admin refund queue button coverage with a safe production QA path that verifies claim callbacks without touching real customer data.
+- Confirmed deployed Telegram admin commands and post-deploy logs are clean after the admin UX rollout.
+
 ## v1.2.3 - 2026-04-23
 
 ### Changed
