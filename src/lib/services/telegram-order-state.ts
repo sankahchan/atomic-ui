@@ -694,7 +694,7 @@ function buildTelegramRenewSummaryKeyboard(input: {
   const pagination = paginateTelegramCommerce(input.keys, input.page);
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = pagination.pageItems.map((key, index) => [{
     text: truncateTelegramCommerceButtonLabel(
-      `${pagination.startIndex + index + 1}. ${key.kind === 'dynamic' ? '💎' : '🔑'} ${key.name}`,
+      `${pagination.startIndex + index + 1}. 🔁 ${key.kind === 'dynamic' ? '💎' : '🔑'} ${key.name}`,
       38,
     ),
     callback_data: buildTelegramOrderActionCallbackData(

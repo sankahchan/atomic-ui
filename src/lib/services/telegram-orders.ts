@@ -138,7 +138,31 @@ function buildTelegramOrdersKeyboard(locale: SupportedLocale, filter: TelegramOr
   };
 }
 
-function buildTelegramOrdersCommerceKeyboard(input: {
+function buildTelegramOrderListButtonLabel(input: {
+  order: TelegramUserOrder;
+  locale: SupportedLocale;
+}) {
+  const { order, locale } = input;
+  const isMyanmar = locale === 'my';
+  const action =
+    order.status === 'AWAITING_PAYMENT_METHOD'
+      ? isMyanmar ? 'Pay' : 'Pay'
+      : order.status === 'AWAITING_PAYMENT_PROOF'
+        ? isMyanmar ? 'Proof' : 'Proof'
+        : order.status === 'PENDING_REVIEW' || order.status === 'APPROVED'
+          ? isMyanmar ? 'Review' : 'Review'
+          : order.status === 'FULFILLED'
+            ? isMyanmar ? 'Done' : 'Done'
+            : order.status === 'REJECTED'
+              ? isMyanmar ? 'Retry' : 'Retry'
+              : order.status === 'CANCELLED'
+                ? isMyanmar ? 'Restart' : 'Restart'
+                : isMyanmar ? 'Open' : 'Open';
+
+  return `${formatTelegramOrderStatusIcon(order.status)} ${order.orderCode} • ${action}`;
+}
+
+export function buildTelegramOrdersCommerceKeyboard(input: {
   locale: SupportedLocale;
   filter: TelegramOrdersFilter;
   orders: TelegramUserOrder[];
@@ -169,7 +193,10 @@ function buildTelegramOrdersCommerceKeyboard(input: {
   for (const order of pagination.pageItems) {
     rows.push([{
       text: truncateTelegramCommerceButtonLabel(
-        `${input.locale === 'my' ? 'Open' : 'Open'} ${order.orderCode}`,
+        buildTelegramOrderListButtonLabel({
+          order,
+          locale: input.locale,
+        }),
         36,
       ),
       callback_data: buildTelegramCommerceViewCallbackData(
