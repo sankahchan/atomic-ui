@@ -5,6 +5,12 @@ import {
   buildTelegramHelpMessage,
 } from '@/lib/services/telegram-admin';
 import {
+  buildTelegramRefundQueueCardKeyboard,
+  buildTelegramRefundQueueCardMessage,
+  buildTelegramRefundQueueSummaryKeyboard,
+  buildTelegramRefundQueueSummaryMessage,
+} from '@/lib/services/telegram-admin-finance';
+import {
   buildTelegramCouponReminderMessage,
   buildTelegramTrialExpiringReminderMessage,
 } from '@/lib/services/telegram-reminders';
@@ -423,6 +429,14 @@ test('telegram user and admin keyboards stay within mobile row budgets', () => {
     panelUrl: 'https://panel.example/premium/req_1',
     mode: 'all',
   });
+  const refundSummaryKeyboard = buildTelegramRefundQueueSummaryKeyboard({
+    locale: 'en',
+  });
+  const refundCardKeyboard = buildTelegramRefundQueueCardKeyboard({
+    locale: 'en',
+    orderId: 'ord_1',
+    panelUrl: 'https://panel.example/orders/ord_1',
+  });
 
   for (const keyboard of [userKeyboard, adminKeyboard]) {
     assertTelegramKeyboardBudget(keyboard, {
@@ -440,6 +454,8 @@ test('telegram user and admin keyboards stay within mobile row budgets', () => {
     reviewActionKeyboard,
     supportReplyKeyboard,
     premiumReplyKeyboard,
+    refundSummaryKeyboard,
+    refundCardKeyboard,
   ]) {
     assertTelegramKeyboardBudget(keyboard, {
       maxRows: 8,
@@ -547,6 +563,29 @@ test('admin queue cards stay compact and button-first', () => {
       ],
     } as any,
   });
+  const refundSummary = buildTelegramRefundQueueSummaryMessage({
+    locale: 'en',
+    totalPending: 4,
+    unclaimed: 2,
+    claimed: 2,
+    hasItems: true,
+  });
+  const refundCard = buildTelegramRefundQueueCardMessage({
+    locale: 'en',
+    order: {
+      id: 'ord_refund_1',
+      orderCode: 'ORD-REFUND',
+      requestedEmail: 'customer@example.com',
+      telegramUsername: 'customer_one',
+      telegramUserId: '123456',
+      priceAmount: 6000,
+      priceCurrency: 'MMK',
+      refundRequestedAt: new Date('2026-04-22T00:30:00Z'),
+      refundRequestMessage: 'The key was not used and I want a refund before approval closes.',
+      refundAssignedReviewerUserId: null,
+      refundAssignedReviewerEmail: null,
+    } as any,
+  });
 
   for (const message of [
     reviewSummary,
@@ -555,6 +594,8 @@ test('admin queue cards stay compact and button-first', () => {
     supportThreadCard,
     premiumQueueSummary,
     premiumQueueCard,
+    refundSummary,
+    refundCard,
   ]) {
     assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
     assert.doesNotMatch(message, /https?:\/\//);
@@ -576,6 +617,10 @@ test('admin queue cards stay compact and button-first', () => {
   assertTelegramMessageBudget(premiumQueueSummary, { maxLines: 5, maxChars: 220 });
   assert.doesNotMatch(premiumQueueCard, /Use the buttons below/);
   assertTelegramMessageBudget(premiumQueueCard, { maxLines: 8, maxChars: 300 });
+  assert.match(refundSummary, /Opening the next refund below/);
+  assertTelegramMessageBudget(refundSummary, { maxLines: 3, maxChars: 180 });
+  assert.doesNotMatch(refundCard, /https?:\/\//);
+  assertTelegramMessageBudget(refundCard, { maxLines: 6, maxChars: 300 });
 });
 
 test('myanmar premium queue helpers stay localized and compact', () => {

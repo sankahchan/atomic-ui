@@ -1,6 +1,8 @@
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
   type TelegramAdminKeyCallbackPayload,
+  type TelegramAdminRefundAction,
+  type TelegramAdminRefundCallbackPayload,
   type TelegramAdminMenuAction,
   type TelegramCommerceViewAction,
   type TelegramCommerceViewCallbackPayload,
@@ -33,6 +35,8 @@ import {
 } from '@/lib/services/telegram-domain-types';
 export type {
   TelegramAdminKeyCallbackPayload,
+  TelegramAdminRefundAction,
+  TelegramAdminRefundCallbackPayload,
   TelegramAdminMenuAction,
   TelegramCommerceViewAction,
   TelegramCommerceViewCallbackPayload,
@@ -76,6 +80,7 @@ const TELEGRAM_COMMERCE_VIEW_CALLBACK_PREFIX = 'tgcv';
 const TELEGRAM_SUPPORT_QUEUE_CALLBACK_PREFIX = 'supq';
 const TELEGRAM_SUPPORT_THREAD_CALLBACK_PREFIX = 'supthread';
 const TELEGRAM_ADMIN_KEY_CALLBACK_PREFIX = 'admkey';
+const TELEGRAM_ADMIN_REFUND_CALLBACK_PREFIX = 'admrefund';
 
 type TelegramCommandShortcut = {
   command: string;
@@ -299,6 +304,46 @@ export function parseTelegramOrderReviewCallbackData(data?: string | null): Tele
     orderId,
     secondary: parts[3]?.trim() || null,
   } as const;
+}
+
+export function buildTelegramAdminRefundCallbackData(
+  action: TelegramAdminRefundAction,
+  orderId: string,
+  secondary?: string,
+) {
+  return secondary
+    ? `${TELEGRAM_ADMIN_REFUND_CALLBACK_PREFIX}:${action}:${orderId}:${secondary}`
+    : `${TELEGRAM_ADMIN_REFUND_CALLBACK_PREFIX}:${action}:${orderId}`;
+}
+
+export function parseTelegramAdminRefundCallbackData(data?: string | null): TelegramAdminRefundCallbackPayload | null {
+  if (!data) {
+    return null;
+  }
+
+  const parts = data.split(':');
+  if (parts.length < 3 || parts.length > 4 || parts[0] !== TELEGRAM_ADMIN_REFUND_CALLBACK_PREFIX) {
+    return null;
+  }
+
+  const action =
+    parts[1] === 'claim'
+      ? 'claim'
+      : parts[1] === 'next'
+        ? 'next'
+        : parts[1] === 'prev'
+          ? 'prev'
+          : null;
+  const orderId = parts[2]?.trim();
+  if (!action || !orderId) {
+    return null;
+  }
+
+  return {
+    action,
+    orderId,
+    secondary: parts[3]?.trim() || null,
+  };
 }
 
 export function buildTelegramOrderActionCallbackData(

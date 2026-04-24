@@ -2,6 +2,13 @@ import { writeAuditLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { getFinanceControls, runTelegramFinanceDigestCycle } from '@/lib/services/telegram-finance';
+import {
+  buildTelegramAdminRefundCallbackData,
+  buildTelegramMenuCallbackData,
+  type TelegramAdminRefundAction,
+} from '@/lib/services/telegram-callbacks';
+import { buildTelegramOrderPanelUrl } from '@/lib/services/telegram-panel-links';
+import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { escapeHtml, formatTelegramDateTime } from '@/lib/services/telegram-ui';
 import { type TelegramAdminActor } from '@/lib/services/telegram-admin-core';
 
@@ -13,6 +20,181 @@ function formatTelegramAdminMoneyMap(entries: Map<string, number>) {
   return Array.from(entries.entries())
     .map(([currency, amount]) => `${amount.toLocaleString()} ${currency}`)
     .join(' • ');
+}
+
+async function getTelegramRefundQueueSnapshot(input?: { limit?: number }) {
+  const where = { refundRequestStatus: 'PENDING' } as const;
+  const [orders, totalPending, unclaimed] = await Promise.all([
+    db.telegramOrder.findMany({
+      where,
+      select: {
+        id: true,
+        orderCode: true,
+        requestedEmail: true,
+        telegramUsername: true,
+        telegramUserId: true,
+        priceAmount: true,
+        priceCurrency: true,
+        refundRequestedAt: true,
+        refundRequestMessage: true,
+        refundAssignedReviewerUserId: true,
+        refundAssignedReviewerEmail: true,
+      },
+      orderBy: [{ refundRequestedAt: 'asc' }, { createdAt: 'asc' }],
+      take: input?.limit ?? 1,
+    }),
+    db.telegramOrder.count({ where }),
+    db.telegramOrder.count({
+      where: {
+        ...where,
+        refundAssignedReviewerUserId: null,
+      },
+    }),
+  ]);
+
+  return {
+    orders,
+    totalPending,
+    unclaimed,
+    claimed: Math.max(0, totalPending - unclaimed),
+  };
+}
+
+type TelegramRefundQueueOrder =
+  Awaited<ReturnType<typeof getTelegramRefundQueueSnapshot>>['orders'][number];
+
+function formatTelegramRefundAmount(order: TelegramRefundQueueOrder) {
+  const currency = (order.priceCurrency || 'MMK').trim().toUpperCase();
+  if (!order.priceAmount) {
+    return `0 ${currency}`;
+  }
+
+  return `${order.priceAmount.toLocaleString('en-US')} ${currency === 'MMK' ? 'Kyat' : currency}`;
+}
+
+function compactTelegramRefundText(value?: string | null) {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > 96 ? `${normalized.slice(0, 93)}...` : normalized;
+}
+
+export function buildTelegramRefundQueueSummaryMessage(input: {
+  locale: SupportedLocale;
+  totalPending: number;
+  unclaimed: number;
+  claimed: number;
+  hasItems: boolean;
+}) {
+  const isMyanmar = input.locale === 'my';
+  return [
+    isMyanmar ? '💸 <b>Refund queue</b>' : '💸 <b>Refund queue</b>',
+    isMyanmar
+      ? `${input.totalPending} pending • ${input.unclaimed} unclaimed • ${input.claimed} claimed`
+      : `${input.totalPending} pending • ${input.unclaimed} unclaimed • ${input.claimed} claimed`,
+    input.hasItems
+      ? isMyanmar
+        ? 'နောက် refund ကို အောက်တွင် ဖွင့်ထားပါသည်။'
+        : 'Opening the next refund below.'
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function buildTelegramRefundQueueSummaryKeyboard(input: {
+  locale: SupportedLocale;
+}) {
+  const isMyanmar = input.locale === 'my';
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: isMyanmar ? '🔄 Refresh' : '🔄 Refresh',
+          callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
+        },
+        {
+          text: isMyanmar ? '📋 Reviews' : '📋 Reviews',
+          callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
+        },
+        {
+          text: isMyanmar ? '💼 Finance' : '💼 Finance',
+          callback_data: buildTelegramMenuCallbackData('admin', 'finance'),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '🧭 Admin home' : '🧭 Admin home',
+          callback_data: buildTelegramMenuCallbackData('admin', 'home'),
+        },
+      ],
+    ],
+  };
+}
+
+export function buildTelegramRefundQueueCardMessage(input: {
+  locale: SupportedLocale;
+  order: TelegramRefundQueueOrder;
+}) {
+  const { locale, order } = input;
+  const isMyanmar = locale === 'my';
+  const customer = order.requestedEmail || order.telegramUsername || order.telegramUserId || 'Unknown customer';
+  const claimLine = order.refundAssignedReviewerEmail
+    ? `🧷 <b>${isMyanmar ? 'Claimed by' : 'Claimed by'}:</b> ${escapeHtml(order.refundAssignedReviewerEmail)}`
+    : `🧷 <b>${isMyanmar ? 'Unclaimed' : 'Unclaimed'}</b>`;
+  const reason = compactTelegramRefundText(order.refundRequestMessage);
+
+  return [
+    isMyanmar ? '💸 <b>Refund request</b>' : '💸 <b>Refund request</b>',
+    `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(formatTelegramRefundAmount(order))}`,
+    `👤 <b>${escapeHtml(customer)}</b> • <code>${escapeHtml(order.telegramUserId)}</code>`,
+    order.refundRequestedAt ? `🕒 ${escapeHtml(formatTelegramDateTime(order.refundRequestedAt, locale))}` : '',
+    claimLine,
+    reason ? `${isMyanmar ? 'Reason' : 'Reason'}: ${escapeHtml(reason)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function buildTelegramRefundQueueCardKeyboard(input: {
+  locale: SupportedLocale;
+  orderId: string;
+  panelUrl: string;
+  claimed?: boolean;
+}) {
+  const isMyanmar = input.locale === 'my';
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: input.claimed
+            ? isMyanmar ? '🧷 Claimed' : '🧷 Claimed'
+            : isMyanmar ? '🧷 Claim' : '🧷 Claim',
+          callback_data: buildTelegramAdminRefundCallbackData('claim', input.orderId),
+        },
+        {
+          text: isMyanmar ? '⬅️ Prev' : '⬅️ Prev',
+          callback_data: buildTelegramAdminRefundCallbackData('prev', input.orderId),
+        },
+        {
+          text: isMyanmar ? '➡️ Next' : '➡️ Next',
+          callback_data: buildTelegramAdminRefundCallbackData('next', input.orderId),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '🧾 Panel' : '🧾 Panel',
+          url: input.panelUrl,
+        },
+        {
+          text: isMyanmar ? '💼 Finance' : '💼 Finance',
+          callback_data: buildTelegramMenuCallbackData('admin', 'finance'),
+        },
+      ],
+    ],
+  };
 }
 
 export async function handleFinanceCommand(locale: SupportedLocale) {
@@ -108,60 +290,117 @@ export async function handleSendFinanceCommand(locale: SupportedLocale) {
     : `💸 Sent the finance digest to ${result.adminChats} admin chat(s).`;
 }
 
-export async function handleRefundsCommand(locale: SupportedLocale) {
-  const pendingRefunds = await db.telegramOrder.findMany({
-    where: {
-      refundRequestStatus: 'PENDING',
+async function sendTelegramRefundQueueCardToChat(input: {
+  botToken: string;
+  chatId: string | number;
+  locale: SupportedLocale;
+  order: TelegramRefundQueueOrder;
+}) {
+  const panelUrl = await buildTelegramOrderPanelUrl(input.order.id);
+  return sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    buildTelegramRefundQueueCardMessage({
+      locale: input.locale,
+      order: input.order,
+    }),
+    {
+      replyMarkup: buildTelegramRefundQueueCardKeyboard({
+        locale: input.locale,
+        orderId: input.order.id,
+        panelUrl,
+        claimed: Boolean(input.order.refundAssignedReviewerUserId),
+      }),
     },
-    select: {
-      orderCode: true,
-      requestedEmail: true,
-      priceAmount: true,
-      priceCurrency: true,
-      refundRequestedAt: true,
-      refundAssignedReviewerEmail: true,
-    },
-    orderBy: [{ refundRequestedAt: 'asc' }, { createdAt: 'asc' }],
-    take: 5,
-  });
+  );
+}
 
-  if (!pendingRefunds.length) {
-    return locale === 'my'
+async function sendTelegramNextRefundQueueCard(input: {
+  botToken: string;
+  chatId: string | number;
+  locale: SupportedLocale;
+  excludeOrderId?: string | null;
+  direction?: 'next' | 'prev';
+}) {
+  const snapshot = await getTelegramRefundQueueSnapshot({ limit: 20 });
+  const currentIndex = snapshot.orders.findIndex((order) => order.id === (input.excludeOrderId || null));
+  const nextOrder =
+    currentIndex >= 0
+      ? input.direction === 'prev'
+        ? snapshot.orders[currentIndex - 1] || null
+        : snapshot.orders[currentIndex + 1] || null
+      : snapshot.orders.find((order) => order.id !== (input.excludeOrderId || null)) || null;
+
+  if (!nextOrder) {
+    await sendTelegramMessage(
+      input.botToken,
+      input.chatId,
+      input.direction === 'prev'
+        ? input.locale === 'my'
+          ? '📭 ယခင် refund request မရှိတော့ပါ။'
+          : '📭 There is no previous pending refund request.'
+        : input.locale === 'my'
+          ? '📭 နောက်ထပ် pending refund request မရှိတော့ပါ။'
+          : '📭 There are no more pending refund requests.',
+      {
+        replyMarkup: buildTelegramRefundQueueSummaryKeyboard({ locale: input.locale }),
+      },
+    );
+    return null;
+  }
+
+  await sendTelegramRefundQueueCardToChat({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    locale: input.locale,
+    order: nextOrder,
+  });
+  return nextOrder;
+}
+
+export async function handleRefundsCommand(input: {
+  chatId: string | number;
+  locale: SupportedLocale;
+  botToken: string;
+  adminActor: TelegramAdminActor;
+}) {
+  const snapshot = await getTelegramRefundQueueSnapshot({ limit: 1 });
+
+  if (!snapshot.orders.length) {
+    return input.locale === 'my'
       ? '✅ Pending refund request မရှိပါ။'
       : '✅ There are no pending refund requests.';
   }
 
-  const lines = [
-    locale === 'my' ? '🧾 <b>Pending refund request များ</b>' : '🧾 <b>Pending refund requests</b>',
-    '',
-  ];
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    buildTelegramRefundQueueSummaryMessage({
+      locale: input.locale,
+      totalPending: snapshot.totalPending,
+      unclaimed: snapshot.unclaimed,
+      claimed: snapshot.claimed,
+      hasItems: true,
+    }),
+    {
+      replyMarkup: buildTelegramRefundQueueSummaryKeyboard({ locale: input.locale }),
+    },
+  );
 
-  for (const order of pendingRefunds) {
-    lines.push(
-      `• <b>${escapeHtml(order.orderCode)}</b>`,
-      `  ${order.priceAmount ? `${order.priceAmount.toLocaleString()} ${(order.priceCurrency || 'MMK').toUpperCase()}` : '0'}`,
-      `  ${escapeHtml(order.requestedEmail || (locale === 'my' ? 'မသိရသော user' : 'Unknown customer'))}`,
-      `  ${formatTelegramDateTime(order.refundRequestedAt || new Date(), locale)}`,
-      `  ${locale === 'my' ? 'Reviewer' : 'Reviewer'}: ${escapeHtml(order.refundAssignedReviewerEmail || (locale === 'my' ? 'မယူရသေး' : 'Unclaimed'))}`,
-      '',
-    );
-  }
+  await sendTelegramRefundQueueCardToChat({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    locale: input.locale,
+    order: snapshot.orders[0],
+  });
 
-  return lines.join('\n');
+  return null;
 }
 
-export async function handleClaimRefundCommand(
-  argsText: string,
-  locale: SupportedLocale,
+async function claimTelegramRefundRequest(
+  query: string,
   actor: TelegramAdminActor,
 ) {
-  const query = argsText.trim();
-  if (!query) {
-    return locale === 'my'
-      ? 'အသုံးပြုပုံ: /claimrefund ORDER-CODE'
-      : 'Usage: /claimrefund ORDER-CODE';
-  }
-
   const order = await db.telegramOrder.findFirst({
     where: {
       OR: [{ orderCode: query.toUpperCase() }, { id: query }],
@@ -176,25 +415,34 @@ export async function handleClaimRefundCommand(
   });
 
   if (!order) {
-    return locale === 'my' ? 'Refund order မတွေ့ပါ။' : 'Refund order not found.';
+    throw new Error('Refund order not found.');
   }
   if (order.refundRequestStatus !== 'PENDING') {
-    return locale === 'my'
-      ? 'Pending refund request မဟုတ်ပါ။'
-      : 'That order is not waiting for refund review.';
+    throw new Error('That order is not waiting for refund review.');
   }
   if (order.refundAssignedReviewerUserId && order.refundAssignedReviewerUserId !== actor.userId) {
-    return locale === 'my'
-      ? `ဤ refund request ကို ${order.refundAssignedReviewerEmail || 'အခြား admin'} က claim လုပ်ထားသည်။`
-      : `This refund request is already claimed by ${order.refundAssignedReviewerEmail || 'another admin'}.`;
+    throw new Error(`This refund request is already claimed by ${order.refundAssignedReviewerEmail || 'another admin'}.`);
   }
 
-  await db.telegramOrder.update({
+  const updated = await db.telegramOrder.update({
     where: { id: order.id },
     data: {
       refundAssignedReviewerUserId: actor.userId,
       refundAssignedReviewerEmail: actor.email || 'telegram-admin',
       refundAssignedAt: new Date(),
+    },
+    select: {
+      id: true,
+      orderCode: true,
+      requestedEmail: true,
+      telegramUsername: true,
+      telegramUserId: true,
+      priceAmount: true,
+      priceCurrency: true,
+      refundRequestedAt: true,
+      refundRequestMessage: true,
+      refundAssignedReviewerUserId: true,
+      refundAssignedReviewerEmail: true,
     },
   });
 
@@ -210,9 +458,62 @@ export async function handleClaimRefundCommand(
     },
   });
 
-  return locale === 'my'
-    ? `🧾 ${order.orderCode} ကို claim လုပ်ပြီးပါပြီ။`
-    : `🧾 Claimed refund request ${order.orderCode}.`;
+  return updated;
+}
+
+export async function handleTelegramRefundQueueCallback(input: {
+  action: TelegramAdminRefundAction;
+  orderId: string;
+  chatId: string | number;
+  locale: SupportedLocale;
+  botToken: string;
+  adminActor: TelegramAdminActor;
+}) {
+  if (input.action === 'claim') {
+    const order = await claimTelegramRefundRequest(input.orderId, input.adminActor);
+    await sendTelegramRefundQueueCardToChat({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      locale: input.locale,
+      order,
+    });
+    return input.locale === 'my'
+      ? `Claimed ${order.orderCode}`
+      : `Claimed ${order.orderCode}`;
+  }
+
+  await sendTelegramNextRefundQueueCard({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    locale: input.locale,
+    excludeOrderId: input.orderId,
+    direction: input.action === 'prev' ? 'prev' : 'next',
+  });
+  return input.locale === 'my' ? 'Sent' : 'Sent';
+}
+
+export async function handleClaimRefundCommand(
+  argsText: string,
+  locale: SupportedLocale,
+  actor: TelegramAdminActor,
+) {
+  const query = argsText.trim();
+  if (!query) {
+    return locale === 'my'
+      ? 'အသုံးပြုပုံ: /claimrefund ORDER-CODE'
+      : 'Usage: /claimrefund ORDER-CODE';
+  }
+
+  try {
+    const order = await claimTelegramRefundRequest(query, actor);
+    return locale === 'my'
+      ? `🧾 ${order.orderCode} ကို claim လုပ်ပြီးပါပြီ။`
+      : `🧾 Claimed refund request ${order.orderCode}.`;
+  } catch (error) {
+    return locale === 'my'
+      ? (error as Error).message
+      : (error as Error).message;
+  }
 }
 
 export async function handleReassignRefundCommand(

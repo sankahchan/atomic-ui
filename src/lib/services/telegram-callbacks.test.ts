@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 
 import {
   buildTelegramAdminKeyCallbackData,
+  buildTelegramAdminRefundCallbackData,
   buildTelegramCommerceViewCallbackData,
   buildTelegramMenuCallbackData,
   buildTelegramOrderReviewCallbackData,
   buildTelegramSupportQueueCallbackData,
   getCommandKeyboard,
   parseTelegramAdminKeyCallbackData,
+  parseTelegramAdminRefundCallbackData,
   parseTelegramCommerceViewCallbackData,
   normalizeTelegramReplyKeyboardCommand,
   parseTelegramMenuCallbackData,
@@ -92,6 +94,30 @@ test('telegram order review callbacks support quick reject presets', () => {
       secondary: 'mine',
     },
   );
+});
+
+test('telegram admin refund callbacks round-trip compact queue actions', () => {
+  assert.deepEqual(
+    parseTelegramAdminRefundCallbackData(
+      buildTelegramAdminRefundCallbackData('claim', 'ord_123'),
+    ),
+    {
+      action: 'claim',
+      orderId: 'ord_123',
+      secondary: null,
+    },
+  );
+  assert.deepEqual(
+    parseTelegramAdminRefundCallbackData(
+      buildTelegramAdminRefundCallbackData('next', 'ord_123', 'queue'),
+    ),
+    {
+      action: 'next',
+      orderId: 'ord_123',
+      secondary: 'queue',
+    },
+  );
+  assert.equal(parseTelegramAdminRefundCallbackData('admrefund:refund:ord_1'), null);
 });
 
 test('telegram menu callbacks support admin and user filters', () => {

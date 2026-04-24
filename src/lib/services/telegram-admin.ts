@@ -58,6 +58,7 @@ export {
   handleRefundsCommand,
   handleReassignRefundCommand,
   handleSendFinanceCommand,
+  handleTelegramRefundQueueCallback,
 } from '@/lib/services/telegram-admin-finance';
 export {
   handleAdminToggleCommand,
