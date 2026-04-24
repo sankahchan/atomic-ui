@@ -19,7 +19,10 @@ import {
   buildTelegramInboxTip,
   buildTelegramInboxTitle,
 } from '@/lib/services/telegram-inbox-ui';
-import { buildTelegramReviewQueueSummaryKeyboard } from '@/lib/services/telegram-review-queue';
+import {
+  buildTelegramReviewQueueSummaryKeyboard,
+  buildTelegramReviewQueueSummaryMessage,
+} from '@/lib/services/telegram-review-queue';
 import {
   buildTelegramOrderReviewAlertKeyboard,
   buildTelegramOrderReviewAlertMessage,
@@ -445,6 +448,15 @@ test('telegram user and admin keyboards stay within mobile row budgets', () => {
 });
 
 test('admin queue cards stay compact and button-first', () => {
+  const reviewSummary = buildTelegramReviewQueueSummaryMessage({
+    locale: 'en',
+    mode: 'all',
+    totalPending: 7,
+    unclaimed: 3,
+    mine: 2,
+    duplicateWarnings: 1,
+    hasItems: true,
+  });
   const reviewCard = buildTelegramOrderReviewAlertMessage({
     locale: 'en',
     mode: 'initial',
@@ -517,12 +529,19 @@ test('admin queue cards stay compact and button-first', () => {
     } as any,
   });
 
-  for (const message of [reviewCard, supportThreadCard, premiumQueueCard]) {
+  for (const message of [reviewSummary, reviewCard, supportThreadCard, premiumQueueCard]) {
     assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
     assert.doesNotMatch(message, /https?:\/\//);
   }
 
-  assertTelegramMessageBudget(reviewCard, { maxLines: 14, maxChars: 520 });
+  assert.match(reviewSummary, /Opening the next item below/);
+  assert.doesNotMatch(reviewSummary, /Showing \d+ item/);
+  assertTelegramMessageBudget(reviewSummary, { maxLines: 6, maxChars: 220 });
+
+  assert.doesNotMatch(reviewCard, /Proof snapshot/);
+  assert.doesNotMatch(reviewCard, /Use the buttons below/);
+  assert.doesNotMatch(reviewCard, /Queue:/);
+  assertTelegramMessageBudget(reviewCard, { maxLines: 9, maxChars: 360 });
   assertTelegramMessageBudget(supportThreadCard, { maxLines: 11, maxChars: 420 });
   assertTelegramMessageBudget(premiumQueueCard, { maxLines: 10, maxChars: 380 });
 });

@@ -72,6 +72,55 @@ export function buildTelegramReviewQueueSummaryKeyboard(input: {
   };
 }
 
+export function buildTelegramReviewQueueSummaryMessage(input: {
+  locale: SupportedLocale;
+  mode: TelegramReviewQueueMode;
+  totalPending: number;
+  unclaimed: number;
+  mine: number;
+  duplicateWarnings: number;
+  hasItems: boolean;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const modeLabel =
+    input.mode === 'mine'
+      ? isMyanmar
+        ? 'ကိုယ်ပိုင် queue'
+        : 'Assigned to me'
+      : input.mode === 'unclaimed'
+        ? isMyanmar
+          ? 'မယူရသေးသော item များ'
+          : 'Unclaimed only'
+        : isMyanmar
+          ? 'Pending item အားလုံး'
+          : 'All pending';
+  const duplicateLabel =
+    input.duplicateWarnings > 0
+      ? isMyanmar
+        ? `${input.duplicateWarnings} ခု duplicate-proof သတိပေးချက်`
+        : `${input.duplicateWarnings} duplicate-proof warning${input.duplicateWarnings === 1 ? '' : 's'}`
+      : '';
+  const nextHint = input.hasItems
+    ? isMyanmar
+      ? 'နောက် item ကို အောက်တွင် ဖွင့်ထားပါသည်။ Filter သို့မဟုတ် Prev/Next ဖြင့် ဆက်ကြည့်နိုင်ပါသည်။'
+      : 'Opening the next item below. Use filters or Prev/Next to move.'
+    : '';
+
+  return [
+    '📋 <b>Review queue</b>',
+    '',
+    modeLabel,
+    isMyanmar
+      ? `${input.totalPending} ခု pending • ${input.unclaimed} ခု မယူရသေး • ${input.mine} ခု ကိုယ်ပိုင်`
+      : `${input.totalPending} pending • ${input.unclaimed} unclaimed • ${input.mine} mine`,
+    duplicateLabel,
+    '',
+    nextHint,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function buildTelegramOrderReviewAlertMessage(input: {
   order: TelegramAdminReviewQueueOrder;
   locale: SupportedLocale;
@@ -81,64 +130,53 @@ export function buildTelegramOrderReviewAlertMessage(input: {
   const ui = getTelegramUi(locale);
   const isMyanmar = locale === 'my';
   const ownershipLabel = order.assignedReviewerEmail
-    ? `🧷 ${isMyanmar ? 'ယူထားသူ' : 'Claimed by'}: <b>${escapeHtml(order.assignedReviewerEmail)}</b>`
-    : `🧷 ${isMyanmar ? 'တာဝန်ယူသူ' : 'Queue ownership'}: <b>${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}</b>`;
-  const queueHint =
-    mode === 'reminder'
-      ? isMyanmar
-        ? 'သတိပေးချက်'
-        : 'Reminder'
-      : mode === 'updated'
-        ? isMyanmar
-          ? 'Live queue card'
-          : 'Live queue card'
-        : isMyanmar
-          ? 'Review item အသစ်'
-          : 'New review item';
+    ? `🧷 <b>${isMyanmar ? 'ယူထားသူ' : 'Claimed by'}:</b> ${escapeHtml(order.assignedReviewerEmail)}`
+    : `🧷 <b>${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}</b>`;
   const proofHint = order.paymentMessageId
     ? isMyanmar
-      ? '📎 မူရင်း screenshot ကို ဤ card အပေါ်တွင် copy လုပ်ပေးထားပါသည်။'
-      : '📎 The original screenshot is copied just above this card.'
+      ? '📎 Screenshot ကို ဤ card အပေါ်တွင် copy လုပ်ထားပါသည်။'
+      : '📎 Screenshot copied above.'
     : isMyanmar
-      ? 'မူရင်း screenshot ကို ဤနေရာတွင် copy မရသဖြင့် panel button ဖြင့် စစ်ဆေးပေးပါ။'
-      : 'The original screenshot was not copied here, so review it from the panel button.';
-  const actionHint = isMyanmar
-    ? 'Buttons အောက်မှ claim, approve, reject, သို့မဟုတ် panel ကို ဖွင့်နိုင်ပါသည်။'
-    : 'Use the buttons below to claim, approve, reject, or open the panel.';
-  const requesterSummary = [
-    `${ui.requesterLabel}: <b>${escapeHtml(order.telegramUsername || order.telegramUserId)}</b>`,
-    `${ui.telegramIdLabel}: <code>${escapeHtml(order.telegramUserId)}</code>`,
-  ].join(' • ');
+      ? '📎 Panel မှ screenshot ကို စစ်ပါ။'
+      : '📎 Review the screenshot from the panel.';
+  const requesterHandle = escapeHtml(order.telegramUsername || order.telegramUserId || '—');
+  const requesterSummary = order.telegramUserId
+    ? `👤 <b>${requesterHandle}</b> • <code>${escapeHtml(order.telegramUserId)}</code>`
+    : `👤 <b>${requesterHandle}</b>`;
   const paymentSnapshot = [
-    order.paymentMethodLabel ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>` : '',
-    `${ui.paymentProofLabel}: ${escapeHtml(order.paymentProofType || 'photo')}`,
-    order.paymentSubmittedAt
-      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
-      : '',
+    order.priceLabel ? `💰 <b>${escapeHtml(order.priceLabel)}</b>` : '',
+    order.paymentMethodLabel ? escapeHtml(order.paymentMethodLabel) : '',
+    escapeHtml(order.paymentProofType || 'photo'),
   ]
     .filter(Boolean)
     .join(' • ');
+  const serverAndNameSummary = [
+    order.selectedServerName ? `🖥 <b>${escapeHtml(order.selectedServerName)}</b>` : '',
+    order.requestedName ? `🏷 <b>${escapeHtml(order.requestedName)}</b>` : '',
+  ]
+    .filter(Boolean)
+    .join(' • ');
+  const submittedAtSummary = order.paymentSubmittedAt
+    ? `🕒 ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
+    : '';
+  const renewalTargetSummary = order.targetAccessKeyId
+    ? `🔁 <code>${escapeHtml(order.targetAccessKeyId)}</code>`
+    : '';
 
   return [
     mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
     '',
     `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
-    `${isMyanmar ? 'Queue' : 'Queue'}: <b>${queueHint}</b>`,
-    '',
-    isMyanmar ? '<b>📎 Proof အနှစ်ချုပ်</b>' : '<b>📎 Proof snapshot</b>',
-    order.priceLabel ? `💰 ${ui.priceLabel}: <b>${escapeHtml(order.priceLabel)}</b>` : '',
-    requesterSummary,
     paymentSnapshot,
-    order.selectedServerName ? `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}</b>` : '',
+    requesterSummary,
+    serverAndNameSummary,
+    submittedAtSummary,
+    renewalTargetSummary,
     ownershipLabel,
     order.duplicateProofOrderCode
       ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
       : '',
-    order.requestedName ? `${ui.requestedNameLabel}: <b>${escapeHtml(order.requestedName)}</b>` : '',
-    order.targetAccessKeyId ? `${ui.renewalTargetLabel}: <code>${escapeHtml(order.targetAccessKeyId)}</code>` : '',
-    '',
     proofHint,
-    actionHint,
   ]
     .filter(Boolean)
     .join('\n');
@@ -151,7 +189,6 @@ export function buildTelegramOrderReviewAlertKeyboard(input: {
   queueMode?: TelegramReviewQueueMode;
   claimed?: boolean;
 }) {
-  const ui = getTelegramUi(input.locale);
   return {
     inline_keyboard: [
       [
@@ -171,6 +208,16 @@ export function buildTelegramOrderReviewAlertKeyboard(input: {
           ),
         },
         {
+          text: input.locale === 'my' ? '✅ အတည်ပြု' : '✅ Approve',
+          callback_data: buildTelegramOrderReviewCallbackData('approve', input.orderId),
+        },
+        {
+          text: input.locale === 'my' ? '❌ ပယ်ရန်' : '❌ Reject',
+          callback_data: buildTelegramOrderReviewCallbackData('reject', input.orderId),
+        },
+      ],
+      [
+        {
           text: input.locale === 'my' ? '⬅️ ယခင်' : '⬅️ Prev',
           callback_data: buildTelegramOrderReviewCallbackData(
             'prev',
@@ -186,34 +233,25 @@ export function buildTelegramOrderReviewAlertKeyboard(input: {
             input.queueMode || 'all',
           ),
         },
-      ],
-      [
         {
-          text: ui.orderApproveActionLabel,
-          callback_data: buildTelegramOrderReviewCallbackData('approve', input.orderId),
-        },
-        {
-          text: ui.orderRejectActionLabel,
-          callback_data: buildTelegramOrderReviewCallbackData('reject', input.orderId),
+          text: input.locale === 'my' ? '🧾 Panel' : '🧾 Panel',
+          url: input.panelUrl,
         },
       ],
       [
         {
-          text: ui.orderRejectDuplicateActionLabel,
+          text: input.locale === 'my' ? '🪞 Duplicate' : '🪞 Duplicate',
           callback_data: buildTelegramOrderReviewCallbackData('reject_duplicate', input.orderId),
         },
         {
-          text: ui.orderRejectBlurryActionLabel,
+          text: input.locale === 'my' ? '🫥 Blurry' : '🫥 Blurry',
           callback_data: buildTelegramOrderReviewCallbackData('reject_blurry', input.orderId),
         },
-      ],
-      [
         {
-          text: ui.orderRejectWrongAmountActionLabel,
+          text: input.locale === 'my' ? '💸 Amount' : '💸 Amount',
           callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', input.orderId),
         },
       ],
-      [{ text: ui.orderManualReviewActionLabel, url: input.panelUrl }],
     ],
   };
 }
@@ -273,7 +311,7 @@ export async function handleTelegramReviewQueueCommand(input: {
   const snapshot = await getTelegramReviewQueueSnapshot({
     reviewerUserId: input.adminActor.userId,
     mode,
-    limit: 3,
+    limit: 1,
   });
 
   if (snapshot.orders.length === 0) {
@@ -282,37 +320,18 @@ export async function handleTelegramReviewQueueCommand(input: {
       : '📭 There are no pending review orders right now.';
   }
 
-  const modeLabel =
-    mode === 'mine'
-      ? input.locale === 'my'
-        ? 'ကိုယ်ပိုင် queue'
-        : 'Assigned to me'
-      : mode === 'unclaimed'
-        ? input.locale === 'my'
-          ? 'မယူရသေးသော item များ'
-          : 'Unclaimed only'
-        : input.locale === 'my'
-          ? 'Pending item အားလုံး'
-          : 'All pending';
-
   await sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my' ? '📋 <b>Review queue</b>' : '📋 <b>Review queue</b>',
-      '',
-      `${modeLabel}`,
-      input.locale === 'my'
-        ? `${snapshot.totalPending} ခု pending • ${snapshot.unclaimed} ခု မယူရသေး • ${snapshot.mine} ခု ကိုယ်ပိုင်`
-        : `${snapshot.totalPending} pending • ${snapshot.unclaimed} unclaimed • ${snapshot.mine} mine`,
-      input.locale === 'my'
-        ? `${snapshot.duplicateWarnings} ခု duplicate-proof သတိပေးချက်`
-        : `${snapshot.duplicateWarnings} duplicate-proof warning`,
-      '',
-      input.locale === 'my'
-        ? `${snapshot.orders.length} ခုကို ပြထားပါသည်။ /reviewqueue mine သို့မဟုတ် /reviewqueue unclaimed ဖြင့် filter ပြောင်းနိုင်ပါသည်။`
-        : `Showing ${snapshot.orders.length} item(s). Use /reviewqueue mine or /reviewqueue unclaimed when needed.`,
-    ].join('\n'),
+    buildTelegramReviewQueueSummaryMessage({
+      locale: input.locale,
+      mode,
+      totalPending: snapshot.totalPending,
+      unclaimed: snapshot.unclaimed,
+      mine: snapshot.mine,
+      duplicateWarnings: snapshot.duplicateWarnings,
+      hasItems: snapshot.orders.length > 0,
+    }),
     {
       replyMarkup: buildTelegramReviewQueueSummaryKeyboard({
         locale: input.locale,
