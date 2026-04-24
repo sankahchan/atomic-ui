@@ -97,6 +97,7 @@ export type TelegramOrderUserAction =
 export type TelegramServerChangeReviewAction = 'approve' | 'reject';
 export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
+export type TelegramAdminRefundAction = 'claim' | 'next' | 'prev';
 export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support' | 'orders';
 export type TelegramCommerceViewSection =
   | 'buy'
@@ -206,6 +207,12 @@ export type TelegramServerChangeActionCallbackPayload = {
 export type TelegramDynamicSupportActionCallbackPayload = {
   action: TelegramDynamicSupportUserAction;
   primary: string;
+  secondary: string | null;
+};
+
+export type TelegramAdminRefundCallbackPayload = {
+  action: TelegramAdminRefundAction;
+  orderId: string;
   secondary: string | null;
 };
 
