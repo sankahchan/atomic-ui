@@ -28,12 +28,14 @@ import {
   buildTelegramOrderReviewAlertMessage,
 } from '@/lib/services/telegram-review-queue';
 import {
+  buildTelegramPremiumSupportQueueSummaryMessage,
   buildTelegramPremiumSupportQueueCardMessage,
   buildTelegramSupportQueueReplyKeyboard,
   buildTelegramSupportQueueShortcutMessage,
   buildTelegramSupportQueueSummaryKeyboard,
 } from '@/lib/services/telegram-premium-support-queue';
 import {
+  buildTelegramSupportThreadsSummaryMessage,
   buildTelegramSupportThreadQueueMessage,
   buildTelegramSupportThreadQueueReplyKeyboard,
   buildTelegramSupportThreadsSummaryKeyboard,
@@ -505,6 +507,23 @@ test('admin queue cards stay compact and button-first', () => {
       ],
     } as any,
   });
+  const supportThreadSummary = buildTelegramSupportThreadsSummaryMessage({
+    locale: 'en',
+    mode: 'all',
+    totalOpen: 8,
+    waitingAdmin: 4,
+    waitingUser: 3,
+    overdue: 2,
+    hasItems: true,
+  });
+  const premiumQueueSummary = buildTelegramPremiumSupportQueueSummaryMessage({
+    locale: 'en',
+    mode: 'admin',
+    totalOpen: 5,
+    waitingAdmin: 3,
+    waitingUser: 2,
+    hasItems: true,
+  });
   const premiumQueueCard = buildTelegramPremiumSupportQueueCardMessage({
     locale: 'my',
     request: {
@@ -529,7 +548,14 @@ test('admin queue cards stay compact and button-first', () => {
     } as any,
   });
 
-  for (const message of [reviewSummary, reviewCard, supportThreadCard, premiumQueueCard]) {
+  for (const message of [
+    reviewSummary,
+    reviewCard,
+    supportThreadSummary,
+    supportThreadCard,
+    premiumQueueSummary,
+    premiumQueueCard,
+  ]) {
     assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
     assert.doesNotMatch(message, /https?:\/\//);
   }
@@ -542,8 +568,14 @@ test('admin queue cards stay compact and button-first', () => {
   assert.doesNotMatch(reviewCard, /Use the buttons below/);
   assert.doesNotMatch(reviewCard, /Queue:/);
   assertTelegramMessageBudget(reviewCard, { maxLines: 9, maxChars: 360 });
-  assertTelegramMessageBudget(supportThreadCard, { maxLines: 11, maxChars: 420 });
-  assertTelegramMessageBudget(premiumQueueCard, { maxLines: 10, maxChars: 380 });
+  assert.match(supportThreadSummary, /Opening the next thread below/);
+  assertTelegramMessageBudget(supportThreadSummary, { maxLines: 6, maxChars: 220 });
+  assert.doesNotMatch(supportThreadCard, /Use the buttons below/);
+  assertTelegramMessageBudget(supportThreadCard, { maxLines: 8, maxChars: 320 });
+  assert.match(premiumQueueSummary, /Opening the next request below/);
+  assertTelegramMessageBudget(premiumQueueSummary, { maxLines: 5, maxChars: 220 });
+  assert.doesNotMatch(premiumQueueCard, /Use the buttons below/);
+  assertTelegramMessageBudget(premiumQueueCard, { maxLines: 8, maxChars: 300 });
 });
 
 test('myanmar premium queue helpers stay localized and compact', () => {
