@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.5 - 2026-04-25
+
+### Changed
+
+- Simplified Telegram `/orders` and `/renew` entry screens so buttons show the next user action clearly on mobile.
+- Simplified Telegram `/admin` into a compact summary-first admin home with button-first queue navigation.
+
+### Fixed
+
+- Fixed Premium support queue navigation so “Next needing action” opens the support admin queue instead of the order review queue.
+- Verified the deployed Telegram webhook, admin commands, and post-deploy logs after the Telegram UX rollout.
+
 ## v1.2.4 - 2026-04-25
 
 ### Changed
