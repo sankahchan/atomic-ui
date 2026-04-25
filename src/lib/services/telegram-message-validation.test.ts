@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildTelegramAdminHomeKeyboard,
+  buildTelegramAdminHomeMessage,
   buildTelegramHelpMessage,
 } from '@/lib/services/telegram-admin';
 import {
@@ -54,7 +55,7 @@ import {
   sanitizeTelegramHtmlMessage,
   validateTelegramHtmlMessage,
 } from '@/lib/services/telegram-message-validation';
-import { getCommandKeyboard } from '@/lib/services/telegram-callbacks';
+import { getCommandKeyboard, parseTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
 import { getTelegramUi } from '@/lib/services/telegram-ui';
 
 function assertTelegramMessageBudget(
@@ -497,6 +498,25 @@ test('admin queue cards stay compact and button-first', () => {
       targetAccessKeyId: 'key_123',
     } as any,
   });
+  const adminHome = buildTelegramAdminHomeMessage({
+    locale: 'en',
+    adminActor: {
+      isAdmin: true,
+      userId: 'admin_1',
+      email: 'owner@example.com',
+      scope: 'OWNER',
+    },
+    pendingReview: 7,
+    unclaimedReview: 3,
+    customerSupportWaitingAdmin: 4,
+    premiumSupportWaitingAdmin: 2,
+    pendingRefunds: 1,
+    myRefunds: 1,
+    scheduledAnnouncements: 2,
+    failedDeliveries: 1,
+    todayFulfilledCount: 5,
+    todayRevenue: 36000,
+  });
   const supportThreadCard = buildTelegramSupportThreadQueueMessage({
     locale: 'my',
     thread: {
@@ -590,6 +610,7 @@ test('admin queue cards stay compact and button-first', () => {
   for (const message of [
     reviewSummary,
     reviewCard,
+    adminHome,
     supportThreadSummary,
     supportThreadCard,
     premiumQueueSummary,
@@ -609,6 +630,11 @@ test('admin queue cards stay compact and button-first', () => {
   assert.doesNotMatch(reviewCard, /Use the buttons below/);
   assert.doesNotMatch(reviewCard, /Queue:/);
   assertTelegramMessageBudget(reviewCard, { maxLines: 9, maxChars: 360 });
+  assert.match(adminHome, /Needs attention/);
+  assert.match(adminHome, /Choose the next admin action from the buttons below/);
+  assert.doesNotMatch(adminHome, /Quick next actions/);
+  assert.doesNotMatch(adminHome, /\/createkey|\/reviewqueue|\/finance/);
+  assertTelegramMessageBudget(adminHome, { maxLines: 11, maxChars: 460 });
   assert.match(supportThreadSummary, /Opening the next thread below/);
   assertTelegramMessageBudget(supportThreadSummary, { maxLines: 6, maxChars: 220 });
   assert.doesNotMatch(supportThreadCard, /Use the buttons below/);
@@ -624,6 +650,25 @@ test('admin queue cards stay compact and button-first', () => {
 });
 
 test('myanmar premium queue helpers stay localized and compact', () => {
+  const adminHome = buildTelegramAdminHomeMessage({
+    locale: 'my',
+    adminActor: {
+      isAdmin: true,
+      userId: 'admin_1',
+      email: 'owner@example.com',
+      scope: 'OWNER',
+    },
+    pendingReview: 7,
+    unclaimedReview: 3,
+    customerSupportWaitingAdmin: 4,
+    premiumSupportWaitingAdmin: 2,
+    pendingRefunds: 1,
+    myRefunds: 1,
+    scheduledAnnouncements: 2,
+    failedDeliveries: 1,
+    todayFulfilledCount: 5,
+    todayRevenue: 36000,
+  });
   const queueKeyboard = buildTelegramSupportQueueSummaryKeyboard({
     locale: 'my',
     mode: 'admin',
@@ -633,14 +678,28 @@ test('myanmar premium queue helpers stay localized and compact', () => {
   const handledMessage = buildTelegramSupportQueueShortcutMessage('hd', 'my');
 
   const firstRow = queueKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  const nextActionCallback = parseTelegramMenuCallbackData(
+    queueKeyboard.inline_keyboard[1]?.[0]?.callback_data,
+  );
   assert.match(firstRow, /အားလုံး/);
   assert.match(firstRow, /Admin စောင့်နေ/);
   assert.match(firstRow, /User စောင့်နေ/);
+  assert.deepEqual(nextActionCallback, {
+    section: 'admin',
+    action: 'supportqueue_admin',
+  });
 
   for (const message of [workingMessage, detailMessage, handledMessage]) {
     assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
     assertTelegramMessageBudget(message, { maxLines: 2, maxChars: 100 });
   }
+
+  assert.deepEqual(validateTelegramHtmlMessage(adminHome), { valid: true, invalidTags: [] });
+  assert.match(adminHome, /စစ်ရန်လိုသည်/);
+  assert.match(adminHome, /နောက်လုပ်ဆောင်ချက်ကို/);
+  assert.doesNotMatch(adminHome, /Needs attention|Choose the next admin action|Quick next actions/);
+  assert.doesNotMatch(adminHome, /\/createkey|\/reviewqueue|\/finance/);
+  assertTelegramMessageBudget(adminHome, { maxLines: 11, maxChars: 460 });
 
   assert.doesNotMatch(workingMessage, /We are checking this now/);
   assert.doesNotMatch(detailMessage, /Please send a little more detail/);
