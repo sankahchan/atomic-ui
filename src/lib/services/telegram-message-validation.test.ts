@@ -677,11 +677,34 @@ test('myanmar premium queue helpers stay localized and compact', () => {
     locale: 'my',
     mode: 'admin',
   });
+  const premiumQueueSummary = buildTelegramPremiumSupportQueueSummaryMessage({
+    locale: 'my',
+    mode: 'admin',
+    totalOpen: 5,
+    waitingAdmin: 3,
+    waitingUser: 2,
+    hasItems: true,
+  });
   const premiumReplyKeyboard = buildTelegramSupportQueueReplyKeyboard({
     requestId: 'req_1',
     locale: 'my',
     panelUrl: 'https://panel.example/premium/req_1',
     mode: 'admin',
+  });
+  const reviewActionKeyboard = buildTelegramOrderReviewAlertKeyboard({
+    locale: 'my',
+    orderId: 'ord_1',
+    panelUrl: 'https://panel.example/orders/ord_1',
+  });
+  const refundSummary = buildTelegramRefundQueueSummaryMessage({
+    locale: 'my',
+    totalPending: 4,
+    unclaimed: 2,
+    claimed: 2,
+    hasItems: true,
+  });
+  const refundSummaryKeyboard = buildTelegramRefundQueueSummaryKeyboard({
+    locale: 'my',
   });
   const refundCard = buildTelegramRefundQueueCardMessage({
     locale: 'my',
@@ -710,6 +733,10 @@ test('myanmar premium queue helpers stay localized and compact', () => {
 
   const firstRow = queueKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
   const premiumReplyFirstRow = premiumReplyKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  const premiumReplySecondRow = premiumReplyKeyboard.inline_keyboard[1]?.map((button) => button.text).join(' | ') || '';
+  const reviewActionThirdRow = reviewActionKeyboard.inline_keyboard[2]?.map((button) => button.text).join(' | ') || '';
+  const refundSummaryFirstRow = refundSummaryKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  const refundSummarySecondRow = refundSummaryKeyboard.inline_keyboard[1]?.map((button) => button.text).join(' | ') || '';
   const refundFirstRow = refundKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
   const nextActionCallback = parseTelegramMenuCallbackData(
     queueKeyboard.inline_keyboard[1]?.[0]?.callback_data,
@@ -728,17 +755,30 @@ test('myanmar premium queue helpers stay localized and compact', () => {
   }
 
   assert.deepEqual(validateTelegramHtmlMessage(adminHome), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(premiumQueueSummary), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(refundSummary), { valid: true, invalidTags: [] });
   assert.deepEqual(validateTelegramHtmlMessage(refundCard), { valid: true, invalidTags: [] });
   assert.match(adminHome, /စစ်ရန်လိုသည်/);
   assert.match(adminHome, /နောက်လုပ်ဆောင်ချက်ကို/);
+  assert.match(premiumQueueSummary, /Premium support စစ်ရန်/);
+  assert.match(refundSummary, /Refund စစ်ရန်/);
+  assert.match(refundSummary, /မယူရသေး/);
   assert.match(refundCard, /Refund တောင်းဆိုချက်/);
   assert.match(refundCard, /အကြောင်းရင်း/);
   assert.doesNotMatch(adminHome, /Needs attention|Choose the next admin action|Quick next actions/);
   assert.doesNotMatch(adminHome, /\/createkey|\/reviewqueue|\/finance/);
+  assert.doesNotMatch(premiumQueueSummary, /Premium support queue|Need admin reply|Opening the next request below/);
+  assert.doesNotMatch(refundSummary, /Refund queue|pending •|unclaimed|claimed|Opening the next refund below/);
   assert.doesNotMatch(refundCard, /Claimed by|Unclaimed|Reason:/);
   assert.doesNotMatch(premiumReplyFirstRow, /Working on it|Need details|Handled/);
+  assert.doesNotMatch(premiumReplySecondRow, /Next|Panel/);
+  assert.doesNotMatch(reviewActionThirdRow, /Duplicate|Blurry|Amount/);
+  assert.doesNotMatch(refundSummaryFirstRow, /Refresh|Reviews/);
+  assert.doesNotMatch(refundSummarySecondRow, /Admin home/);
   assert.doesNotMatch(refundFirstRow, /Claim|Prev|Next/);
   assertTelegramMessageBudget(adminHome, { maxLines: 11, maxChars: 460 });
+  assertTelegramMessageBudget(premiumQueueSummary, { maxLines: 5, maxChars: 220 });
+  assertTelegramMessageBudget(refundSummary, { maxLines: 3, maxChars: 180 });
   assertTelegramMessageBudget(refundCard, { maxLines: 6, maxChars: 300 });
 
   assert.doesNotMatch(workingMessage, /We are checking this now/);

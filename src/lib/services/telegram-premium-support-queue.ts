@@ -147,7 +147,7 @@ export function buildTelegramSupportQueueSummaryKeyboard(input: {
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue_admin'),
         },
         {
-          text: isMyanmar ? '📋 Review queue' : '📋 Review queue',
+          text: isMyanmar ? '📋 Review များ' : '📋 Review queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
         },
         {
@@ -196,7 +196,7 @@ export function buildTelegramPremiumSupportQueueSummaryMessage(input: {
     : '';
 
   return [
-    isMyanmar ? '💎 <b>Premium support queue</b>' : '💎 <b>Premium support queue</b>',
+    isMyanmar ? '💎 <b>Premium support စစ်ရန်</b>' : '💎 <b>Premium support queue</b>',
     '',
     modeLabel,
     stats,
@@ -245,7 +245,7 @@ export function buildTelegramPremiumSupportQueueCardMessage(input: {
 
   return [
     input.locale === 'my'
-      ? '💎 <b>Premium support thread</b>'
+      ? '💎 <b>Premium support</b>'
       : '💎 <b>Premium support thread</b>',
     '',
     `<b>${escapeHtml(input.request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}`,
@@ -283,7 +283,7 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '⬅️ Queue' : '⬅️ Queue',
+          text: isMyanmar ? '⬅️ စာရင်း' : '⬅️ Queue',
           callback_data: buildTelegramMenuCallbackData(
             'admin',
             input.mode === 'admin'
@@ -294,11 +294,11 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
           ),
         },
         {
-          text: isMyanmar ? '➡️ Next' : '➡️ Next',
+          text: isMyanmar ? '➡️ နောက်' : '➡️ Next',
           callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
         },
         {
-          text: isMyanmar ? '🧾 Panel' : '🧾 Panel',
+          text: isMyanmar ? '🧾 Dashboard' : '🧾 Panel',
           url: input.panelUrl,
         },
       ],

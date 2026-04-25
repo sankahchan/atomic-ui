@@ -90,9 +90,9 @@ export function buildTelegramRefundQueueSummaryMessage(input: {
 }) {
   const isMyanmar = input.locale === 'my';
   return [
-    isMyanmar ? '💸 <b>Refund queue</b>' : '💸 <b>Refund queue</b>',
+    isMyanmar ? '💸 <b>Refund စစ်ရန်</b>' : '💸 <b>Refund queue</b>',
     isMyanmar
-      ? `${input.totalPending} pending • ${input.unclaimed} unclaimed • ${input.claimed} claimed`
+      ? `${input.totalPending} ခု စောင့်နေ • ${input.unclaimed} ခု မယူရသေး • ${input.claimed} ခု ယူထားပြီး`
       : `${input.totalPending} pending • ${input.unclaimed} unclaimed • ${input.claimed} claimed`,
     input.hasItems
       ? isMyanmar
@@ -112,11 +112,11 @@ export function buildTelegramRefundQueueSummaryKeyboard(input: {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '🔄 Refresh' : '🔄 Refresh',
+          text: isMyanmar ? '🔄 ပြန်စစ်' : '🔄 Refresh',
           callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
         },
         {
-          text: isMyanmar ? '📋 Reviews' : '📋 Reviews',
+          text: isMyanmar ? '📋 Review များ' : '📋 Reviews',
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
         },
         {
@@ -126,7 +126,7 @@ export function buildTelegramRefundQueueSummaryKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '🧭 Admin home' : '🧭 Admin home',
+          text: isMyanmar ? '🧭 Admin စင်တာ' : '🧭 Admin home',
           callback_data: buildTelegramMenuCallbackData('admin', 'home'),
         },
       ],
@@ -185,7 +185,7 @@ export function buildTelegramRefundQueueCardKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '🧾 Panel' : '🧾 Panel',
+          text: isMyanmar ? '🧾 Dashboard' : '🧾 Panel',
           url: input.panelUrl,
         },
         {
@@ -478,7 +478,7 @@ export async function handleTelegramRefundQueueCallback(input: {
       order,
     });
     return input.locale === 'my'
-      ? `Claimed ${order.orderCode}`
+      ? `${order.orderCode} ကို ယူထားပြီးပါပြီ`
       : `Claimed ${order.orderCode}`;
   }
 
@@ -489,7 +489,7 @@ export async function handleTelegramRefundQueueCallback(input: {
     excludeOrderId: input.orderId,
     direction: input.action === 'prev' ? 'prev' : 'next',
   });
-  return input.locale === 'my' ? 'Sent' : 'Sent';
+  return input.locale === 'my' ? 'ပို့ပြီးပါပြီ' : 'Sent';
 }
 
 export async function handleClaimRefundCommand(

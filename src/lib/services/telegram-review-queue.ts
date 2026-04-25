@@ -236,21 +236,21 @@ export function buildTelegramOrderReviewAlertKeyboard(input: {
           ),
         },
         {
-          text: input.locale === 'my' ? '🧾 Panel' : '🧾 Panel',
+          text: input.locale === 'my' ? '🧾 Dashboard' : '🧾 Panel',
           url: input.panelUrl,
         },
       ],
       [
         {
-          text: input.locale === 'my' ? '🪞 Duplicate' : '🪞 Duplicate',
+          text: input.locale === 'my' ? '🪞 ထပ်နေ' : '🪞 Duplicate',
           callback_data: buildTelegramOrderReviewCallbackData('reject_duplicate', input.orderId),
         },
         {
-          text: input.locale === 'my' ? '🫥 Blurry' : '🫥 Blurry',
+          text: input.locale === 'my' ? '🫥 မရှင်း' : '🫥 Blurry',
           callback_data: buildTelegramOrderReviewCallbackData('reject_blurry', input.orderId),
         },
         {
-          text: input.locale === 'my' ? '💸 Amount' : '💸 Amount',
+          text: input.locale === 'my' ? '💸 ငွေပမာဏ' : '💸 Amount',
           callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', input.orderId),
         },
       ],
