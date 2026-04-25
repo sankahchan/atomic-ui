@@ -24,6 +24,7 @@ import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { createOutlineClient } from '@/lib/outline-api';
 import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
+import { isPlaywrightSmokeEnv } from '@/lib/playwright-smoke';
 import {
   buildDynamicOutlineUrl,
   buildDynamicSharePageUrl,
@@ -5837,6 +5838,10 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
     | 'EXPIRED';
   daysLeft?: number;
 }) {
+  if (isPlaywrightSmokeEnv()) {
+    return;
+  }
+
   if (input.type === 'CREATED' || input.type === 'ENABLED') {
     return sendAccessKeySharePageToTelegram({
       accessKeyId: input.accessKeyId,

@@ -34,6 +34,7 @@ function setSmokeEnv() {
   process.env.NEXT_PUBLIC_BASE_PATH = '';
   process.env.JWT_SECRET = 'playwright-smoke-secret';
   process.env.DISABLE_SCHEDULER = '1';
+  process.env.PLAYWRIGHT_SMOKE = '1';
   process.env.NODE_ENV = 'development';
 }
 
