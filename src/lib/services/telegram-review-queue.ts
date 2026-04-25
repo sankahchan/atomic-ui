@@ -160,7 +160,9 @@ export function buildTelegramOrderReviewAlertMessage(input: {
     ? `🕒 ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
     : '';
   const renewalTargetSummary = order.targetAccessKeyId
-    ? `🔁 <code>${escapeHtml(order.targetAccessKeyId)}</code>`
+    ? isMyanmar
+      ? '🔁 သက်တမ်းတိုး order'
+      : '🔁 Renewal order'
     : '';
 
   return [

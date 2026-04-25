@@ -1185,21 +1185,23 @@ export function buildTelegramLatestReplyPreviewLines(input: {
         ? 'Admin'
         : 'Admin'
       : input.locale === 'my'
-        ? 'You'
+        ? 'User'
         : 'You';
   const maxLength = input.maxLength ?? 120;
   const preview = input.reply.message.slice(0, maxLength);
   const lines = [
-    `${input.locale === 'my' ? 'Latest reply' : 'Latest reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
+    `${input.locale === 'my' ? 'နောက်ဆုံး reply' : 'Latest reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
   ];
 
   if (input.reply.mediaKind) {
     lines.push(
       input.reply.mediaKind === 'IMAGE'
         ? input.locale === 'my'
-          ? 'Attachment: Image'
+          ? 'တွဲဖိုင်: Image'
           : 'Attachment: Image'
-        : `Attachment: ${input.reply.mediaFilename || (input.locale === 'my' ? 'File' : 'File')}`,
+        : input.locale === 'my'
+          ? `တွဲဖိုင်: ${input.reply.mediaFilename || 'File'}`
+          : `Attachment: ${input.reply.mediaFilename || 'File'}`,
     );
   }
 

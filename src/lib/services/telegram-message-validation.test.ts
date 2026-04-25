@@ -629,6 +629,8 @@ test('admin queue cards stay compact and button-first', () => {
   assert.doesNotMatch(reviewCard, /Proof snapshot/);
   assert.doesNotMatch(reviewCard, /Use the buttons below/);
   assert.doesNotMatch(reviewCard, /Queue:/);
+  assert.match(reviewCard, /Renewal order/);
+  assert.doesNotMatch(reviewCard, /key_123/);
   assertTelegramMessageBudget(reviewCard, { maxLines: 9, maxChars: 360 });
   assert.match(adminHome, /Needs attention/);
   assert.match(adminHome, /Choose the next admin action from the buttons below/);
@@ -642,6 +644,8 @@ test('admin queue cards stay compact and button-first', () => {
   assert.match(premiumQueueSummary, /Opening the next request below/);
   assertTelegramMessageBudget(premiumQueueSummary, { maxLines: 5, maxChars: 220 });
   assert.doesNotMatch(premiumQueueCard, /Use the buttons below/);
+  assert.match(premiumQueueCard, /နောက်ဆုံး reply/);
+  assert.doesNotMatch(premiumQueueCard, /Latest reply/);
   assertTelegramMessageBudget(premiumQueueCard, { maxLines: 8, maxChars: 300 });
   assert.match(refundSummary, /Opening the next refund below/);
   assertTelegramMessageBudget(refundSummary, { maxLines: 3, maxChars: 180 });
@@ -673,11 +677,40 @@ test('myanmar premium queue helpers stay localized and compact', () => {
     locale: 'my',
     mode: 'admin',
   });
+  const premiumReplyKeyboard = buildTelegramSupportQueueReplyKeyboard({
+    requestId: 'req_1',
+    locale: 'my',
+    panelUrl: 'https://panel.example/premium/req_1',
+    mode: 'admin',
+  });
+  const refundCard = buildTelegramRefundQueueCardMessage({
+    locale: 'my',
+    order: {
+      id: 'ord_refund_1',
+      orderCode: 'ORD-REFUND',
+      requestedEmail: 'customer@example.com',
+      telegramUsername: 'customer_one',
+      telegramUserId: '123456',
+      priceAmount: 6000,
+      priceCurrency: 'MMK',
+      refundRequestedAt: new Date('2026-04-22T00:30:00Z'),
+      refundRequestMessage: 'The key was not used and I want a refund before approval closes.',
+      refundAssignedReviewerUserId: null,
+      refundAssignedReviewerEmail: null,
+    } as any,
+  });
+  const refundKeyboard = buildTelegramRefundQueueCardKeyboard({
+    locale: 'my',
+    orderId: 'ord_1',
+    panelUrl: 'https://panel.example/orders/ord_1',
+  });
   const workingMessage = buildTelegramSupportQueueShortcutMessage('wk', 'my');
   const detailMessage = buildTelegramSupportQueueShortcutMessage('nd', 'my');
   const handledMessage = buildTelegramSupportQueueShortcutMessage('hd', 'my');
 
   const firstRow = queueKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  const premiumReplyFirstRow = premiumReplyKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
+  const refundFirstRow = refundKeyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
   const nextActionCallback = parseTelegramMenuCallbackData(
     queueKeyboard.inline_keyboard[1]?.[0]?.callback_data,
   );
@@ -695,11 +728,18 @@ test('myanmar premium queue helpers stay localized and compact', () => {
   }
 
   assert.deepEqual(validateTelegramHtmlMessage(adminHome), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(refundCard), { valid: true, invalidTags: [] });
   assert.match(adminHome, /စစ်ရန်လိုသည်/);
   assert.match(adminHome, /နောက်လုပ်ဆောင်ချက်ကို/);
+  assert.match(refundCard, /Refund တောင်းဆိုချက်/);
+  assert.match(refundCard, /အကြောင်းရင်း/);
   assert.doesNotMatch(adminHome, /Needs attention|Choose the next admin action|Quick next actions/);
   assert.doesNotMatch(adminHome, /\/createkey|\/reviewqueue|\/finance/);
+  assert.doesNotMatch(refundCard, /Claimed by|Unclaimed|Reason:/);
+  assert.doesNotMatch(premiumReplyFirstRow, /Working on it|Need details|Handled/);
+  assert.doesNotMatch(refundFirstRow, /Claim|Prev|Next/);
   assertTelegramMessageBudget(adminHome, { maxLines: 11, maxChars: 460 });
+  assertTelegramMessageBudget(refundCard, { maxLines: 6, maxChars: 300 });
 
   assert.doesNotMatch(workingMessage, /We are checking this now/);
   assert.doesNotMatch(detailMessage, /Please send a little more detail/);

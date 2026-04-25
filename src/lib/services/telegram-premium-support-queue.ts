@@ -269,15 +269,15 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '👀 Working on it' : '👀 Working on it',
+          text: isMyanmar ? '👀 စစ်နေ' : '👀 Working on it',
           callback_data: buildTelegramSupportQueueCallbackData('wk', input.requestId, input.mode),
         },
         {
-          text: isMyanmar ? '❓ Need details' : '❓ Need details',
+          text: isMyanmar ? '❓ Detail လို' : '❓ Need details',
           callback_data: buildTelegramSupportQueueCallbackData('nd', input.requestId, input.mode),
         },
         {
-          text: isMyanmar ? '✅ Handled' : '✅ Handled',
+          text: isMyanmar ? '✅ ပြီးပြီ' : '✅ Handled',
           callback_data: buildTelegramSupportQueueCallbackData('hd', input.requestId, input.mode),
         },
       ],
