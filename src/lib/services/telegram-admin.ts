@@ -639,13 +639,88 @@ export function buildTelegramAdminHomeKeyboard(input: {
   };
 }
 
+export function buildTelegramAdminHomeMessage(input: {
+  locale: SupportedLocale;
+  adminActor: TelegramAdminActor;
+  pendingReview: number;
+  unclaimedReview: number;
+  customerSupportWaitingAdmin: number;
+  premiumSupportWaitingAdmin: number;
+  pendingRefunds: number;
+  myRefunds: number;
+  scheduledAnnouncements: number;
+  failedDeliveries: number;
+  todayFulfilledCount: number;
+  todayRevenue: number;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const needsAdmin = input.customerSupportWaitingAdmin + input.premiumSupportWaitingAdmin;
+  const lines = [
+    isMyanmar ? '🧭 <b>Admin စင်တာ</b>' : '🧭 <b>Admin home</b>',
+    input.adminActor.email
+      ? isMyanmar
+        ? `<b>${escapeHtml(input.adminActor.email)}</b> ဖြင့် ဝင်ထားသည်`
+        : `Signed in as <b>${escapeHtml(input.adminActor.email)}</b>`
+      : isMyanmar
+        ? 'Admin chat access ဖြင့် ဝင်ထားသည်'
+        : 'Signed in with admin chat access',
+    '',
+    isMyanmar ? '<b>စစ်ရန်လိုသည်</b>' : '<b>Needs attention</b>',
+  ];
+
+  if (hasTelegramReviewManageScope(input.adminActor.scope)) {
+    lines.push(
+      isMyanmar
+        ? `📋 Review: ${input.pendingReview} ခု စောင့်နေ • ${input.unclaimedReview} ခု မယူရသေး`
+        : `📋 Review: ${input.pendingReview} pending • ${input.unclaimedReview} unclaimed`,
+      isMyanmar
+        ? `🛟 Support: ${needsAdmin} ခု admin စောင့်နေ • customer ${input.customerSupportWaitingAdmin} • premium ${input.premiumSupportWaitingAdmin}`
+        : `🛟 Support: ${needsAdmin} need admin • ${input.customerSupportWaitingAdmin} customer • ${input.premiumSupportWaitingAdmin} premium`,
+    );
+  }
+
+  if (hasFinanceManageScope(input.adminActor.scope)) {
+    lines.push(
+      isMyanmar
+        ? `💸 Refunds: ${input.pendingRefunds} ခု စောင့်နေ${input.adminActor.userId ? ` • ${input.myRefunds} ခု ကိုယ်ပိုင်` : ''}`
+        : `💸 Refunds: ${input.pendingRefunds} pending${input.adminActor.userId ? ` • ${input.myRefunds} mine` : ''}`,
+    );
+  }
+
+  if (hasTelegramAnnouncementManageScope(input.adminActor.scope)) {
+    lines.push(
+      isMyanmar
+        ? `📢 Broadcasts: ${input.scheduledAnnouncements} ခု သတ်မှတ်ထား • ${input.failedDeliveries} ခု မအောင်မြင်`
+        : `📢 Broadcasts: ${input.scheduledAnnouncements} scheduled • ${input.failedDeliveries} failed`,
+    );
+  }
+
+  if (hasFinanceManageScope(input.adminActor.scope)) {
+    lines.push(
+      '',
+      isMyanmar ? '<b>ယနေ့</b>' : '<b>Today</b>',
+      isMyanmar
+        ? `✅ ပြီးစီး: ${input.todayFulfilledCount} • ${input.todayRevenue.toLocaleString('en-US')} Kyat`
+        : `✅ Fulfilled: ${input.todayFulfilledCount} • ${input.todayRevenue.toLocaleString('en-US')} Kyat`,
+    );
+  }
+
+  lines.push(
+    '',
+    isMyanmar
+      ? 'နောက်လုပ်ဆောင်ချက်ကို အောက်က button များဖြင့် ရွေးပါ။'
+      : 'Choose the next admin action from the buttons below.',
+  );
+
+  return lines.filter(Boolean).join('\n');
+}
+
 export async function handleAdminHomeCommand(input: {
   locale: SupportedLocale;
   adminActor: TelegramAdminActor;
   botToken?: string;
   chatId?: string | number | null;
 }) {
-  const isMyanmar = input.locale === 'my';
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
@@ -754,72 +829,20 @@ export async function handleAdminHomeCommand(input: {
   const supportOpen = customerSupportOpen + premiumSupportOpen;
   const todayRevenue = todayRevenueAggregate._sum.priceAmount || 0;
 
-  const quickActionLines = [
-    ...(hasKeyManageScope(input.adminActor.scope)
-      ? [
-          isMyanmar ? '• /createkey - ပုံမှန် key ဖန်တီးရန်' : '• /createkey - create a normal key',
-          isMyanmar ? '• /createdynamic - dynamic key ဖန်တီးရန်' : '• /createdynamic - create a dynamic key',
-          isMyanmar ? '• /managekey - key ရှာဖွေ/စီမံရန်' : '• /managekey - manage normal keys',
-          isMyanmar ? '• /managedynamic - dynamic key စီမံရန်' : '• /managedynamic - manage dynamic keys',
-        ]
-      : []),
-    ...(hasTelegramReviewManageScope(input.adminActor.scope)
-      ? [
-          isMyanmar ? '• /reviewqueue - pending order များ စစ်ရန်' : '• /reviewqueue - review pending orders',
-          isMyanmar ? '• /supportqueue - support queue ကို ဖွင့်ရန်' : '• /supportqueue - open support queues',
-        ]
-      : []),
-    ...(hasFinanceManageScope(input.adminActor.scope)
-      ? [
-          isMyanmar ? '• /refunds - refund စောင့်ဆိုင်းချက်များ' : '• /refunds - pending refunds',
-          isMyanmar ? '• /finance - ငွေကြေးအနှစ်ချုပ်' : '• /finance - finance summary',
-        ]
-      : []),
-    ...(hasTelegramAnnouncementManageScope(input.adminActor.scope)
-      ? [isMyanmar ? '• /announcements - announcement history' : '• /announcements - broadcast history']
-      : []),
-    isMyanmar ? '• /status - server အခြေအနေ' : '• /status - server status',
-  ];
-
-  const message = [
-    isMyanmar ? '🧭 <b>Admin စင်တာ</b>' : '🧭 <b>Admin home</b>',
-    '',
-    input.adminActor.email
-      ? isMyanmar
-        ? `<b>${escapeHtml(input.adminActor.email)}</b> ဖြင့် ဝင်ထားသည်`
-        : `Signed in as <b>${escapeHtml(input.adminActor.email)}</b>`
-      : isMyanmar
-        ? 'Admin chat access ဖြင့် ဝင်ထားသည်'
-        : 'Signed in with admin chat access',
-    '',
-    isMyanmar ? '<b>Queue အနှစ်ချုပ်</b>' : '<b>Queues</b>',
-    isMyanmar
-      ? `• Review: ${pendingReview} ခု pending • ${unclaimedReview} ခု မယူရသေး`
-      : `• Review: ${pendingReview} pending • ${unclaimedReview} unclaimed`,
-    isMyanmar
-      ? `• Support: ${supportOpen} ခု စုစုပေါင်း • customer ${customerSupportOpen} ခု • premium ${premiumSupportOpen} ခု`
-      : `• Support: ${supportOpen} total • ${customerSupportOpen} customer • ${premiumSupportOpen} premium`,
-    isMyanmar
-      ? `• Admin စောင့်နေ: customer ${customerSupportWaitingAdmin} ခု • premium ${premiumSupportWaitingAdmin} ခု`
-      : `• Need admin: ${customerSupportWaitingAdmin} customer • ${premiumSupportWaitingAdmin} premium`,
-    isMyanmar
-      ? `• Refunds: ${pendingRefunds} ခု pending${input.adminActor.userId ? ` • ${myRefunds} ခု ကိုယ်ပိုင်` : ''}`
-      : `• Refunds: ${pendingRefunds} pending${input.adminActor.userId ? ` • ${myRefunds} mine` : ''}`,
-    isMyanmar
-      ? `• Broadcasts: ${scheduledAnnouncements} ခု schedule လုပ်ထား • ${failedDeliveries} ခု မအောင်မြင်`
-      : `• Broadcasts: ${scheduledAnnouncements} scheduled • ${failedDeliveries} failed deliveries`,
-    '',
-    isMyanmar ? '<b>ငွေကြေး snapshot</b>' : '<b>Finance snapshot</b>',
-    isMyanmar
-      ? `• ယနေ့ပြီးစီး: ${todayFulfilledCount}`
-      : `• Today fulfilled: ${todayFulfilledCount}`,
-    isMyanmar
-      ? `• ယနေ့ဝင်ငွေ: ${todayRevenue.toLocaleString('en-US')} Kyat`
-      : `• Today revenue: ${todayRevenue.toLocaleString('en-US')} Kyat`,
-    '',
-    isMyanmar ? '<b>အမြန် next action များ</b>' : '<b>Quick next actions</b>',
-    ...quickActionLines,
-  ].join('\n');
+  const message = buildTelegramAdminHomeMessage({
+    locale: input.locale,
+    adminActor: input.adminActor,
+    pendingReview,
+    unclaimedReview,
+    customerSupportWaitingAdmin,
+    premiumSupportWaitingAdmin,
+    pendingRefunds,
+    myRefunds,
+    scheduledAnnouncements,
+    failedDeliveries,
+    todayFulfilledCount,
+    todayRevenue,
+  });
 
   if (input.botToken && input.chatId != null) {
     await sendTelegramMessage(input.botToken, input.chatId, message, {

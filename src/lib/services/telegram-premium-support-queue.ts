@@ -144,7 +144,7 @@ export function buildTelegramSupportQueueSummaryKeyboard(input: {
       [
         {
           text: isMyanmar ? '⚡ နောက်ထပ်စစ်ရန်' : '⚡ Next needing action',
-          callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue_unclaimed'),
+          callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue_admin'),
         },
         {
           text: isMyanmar ? '📋 Review queue' : '📋 Review queue',
