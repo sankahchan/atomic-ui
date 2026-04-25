@@ -142,17 +142,17 @@ export function buildTelegramRefundQueueCardMessage(input: {
   const isMyanmar = locale === 'my';
   const customer = order.requestedEmail || order.telegramUsername || order.telegramUserId || 'Unknown customer';
   const claimLine = order.refundAssignedReviewerEmail
-    ? `🧷 <b>${isMyanmar ? 'Claimed by' : 'Claimed by'}:</b> ${escapeHtml(order.refundAssignedReviewerEmail)}`
-    : `🧷 <b>${isMyanmar ? 'Unclaimed' : 'Unclaimed'}</b>`;
+    ? `🧷 <b>${isMyanmar ? 'ယူထားသူ' : 'Claimed by'}:</b> ${escapeHtml(order.refundAssignedReviewerEmail)}`
+    : `🧷 <b>${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}</b>`;
   const reason = compactTelegramRefundText(order.refundRequestMessage);
 
   return [
-    isMyanmar ? '💸 <b>Refund request</b>' : '💸 <b>Refund request</b>',
+    isMyanmar ? '💸 <b>Refund တောင်းဆိုချက်</b>' : '💸 <b>Refund request</b>',
     `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(formatTelegramRefundAmount(order))}`,
     `👤 <b>${escapeHtml(customer)}</b> • <code>${escapeHtml(order.telegramUserId)}</code>`,
     order.refundRequestedAt ? `🕒 ${escapeHtml(formatTelegramDateTime(order.refundRequestedAt, locale))}` : '',
     claimLine,
-    reason ? `${isMyanmar ? 'Reason' : 'Reason'}: ${escapeHtml(reason)}` : '',
+    reason ? `${isMyanmar ? 'အကြောင်းရင်း' : 'Reason'}: ${escapeHtml(reason)}` : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -170,16 +170,16 @@ export function buildTelegramRefundQueueCardKeyboard(input: {
       [
         {
           text: input.claimed
-            ? isMyanmar ? '🧷 Claimed' : '🧷 Claimed'
-            : isMyanmar ? '🧷 Claim' : '🧷 Claim',
+            ? isMyanmar ? '🧷 ယူထားပြီး' : '🧷 Claimed'
+            : isMyanmar ? '🧷 ယူမည်' : '🧷 Claim',
           callback_data: buildTelegramAdminRefundCallbackData('claim', input.orderId),
         },
         {
-          text: isMyanmar ? '⬅️ Prev' : '⬅️ Prev',
+          text: isMyanmar ? '⬅️ ယခင်' : '⬅️ Prev',
           callback_data: buildTelegramAdminRefundCallbackData('prev', input.orderId),
         },
         {
-          text: isMyanmar ? '➡️ Next' : '➡️ Next',
+          text: isMyanmar ? '➡️ နောက်' : '➡️ Next',
           callback_data: buildTelegramAdminRefundCallbackData('next', input.orderId),
         },
       ],
