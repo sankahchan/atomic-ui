@@ -19,6 +19,7 @@ import {
   buildTelegramPremiumSupportStatusMessage,
 } from '@/lib/services/telegram-premium';
 import {
+  buildTelegramOrdersCommerceKeyboard,
   buildTelegramOrderStatusMessage,
   buildTelegramOrdersSummaryMessage,
   buildTelegramRefundSummaryMessage,
@@ -370,6 +371,44 @@ test('orders summary keeps timeline and next-step detail out of the list view', 
   assert.match(message, /\nNew\nStatus: Awaiting plan selection/);
   assert.match(message, /Flow ended • restart available/);
   assert.match(message, /Step 4\/4 • Delivered/);
+});
+
+test('orders keyboard labels show the next action instead of generic open text', () => {
+  const keyboard = buildTelegramOrdersCommerceKeyboard({
+    locale: 'en',
+    filter: 'ALL',
+    page: 1,
+    orders: [
+      {
+        id: 'ord_pay',
+        orderCode: 'ORD-PAY',
+        status: 'AWAITING_PAYMENT_METHOD',
+      },
+      {
+        id: 'ord_proof',
+        orderCode: 'ORD-PROOF',
+        status: 'AWAITING_PAYMENT_PROOF',
+      },
+      {
+        id: 'ord_done',
+        orderCode: 'ORD-DONE',
+        status: 'FULFILLED',
+      },
+      {
+        id: 'ord_retry',
+        orderCode: 'ORD-RETRY',
+        status: 'REJECTED',
+      },
+    ] as any,
+  });
+  const buttonLabels = keyboard.inline_keyboard.flat().map((button) => button.text);
+
+  assert.ok(buttonLabels.includes('🟡 ORD-PAY • Pay'));
+  assert.ok(buttonLabels.includes('🟡 ORD-PROOF • Proof'));
+  assert.ok(buttonLabels.includes('🟢 ORD-DONE • Done'));
+  assert.match(buttonLabels.join('\n'), /Next/);
+  assert.doesNotMatch(buttonLabels.join('\n'), /Open ORD-/);
+  assert.ok(buttonLabels.every((label) => label.length <= 36));
 });
 
 test('orders summary prefers normalized display labels over stored localized plan names', () => {
