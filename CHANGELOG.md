@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.6 - 2026-04-25
+
+### Changed
+
+- Polished Telegram admin queue cards so renewal review items hide raw key IDs and stay action-first on mobile.
+- Localized Myanmar admin queue/detail labels across review, premium support, and refund flows.
+
+### Fixed
+
+- Fixed remaining English fallback labels in Myanmar admin keyboards, including duplicate-proof, blurry-proof, amount, navigation, panel, refresh, and admin-home actions.
+- Verified production Telegram smoke coverage with Myanmar admin locale after deployment.
+
 ## v1.2.5 - 2026-04-25
 
 ### Changed
