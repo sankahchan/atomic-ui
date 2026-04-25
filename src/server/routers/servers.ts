@@ -15,6 +15,7 @@ import { router, protectedProcedure, adminProcedure, publicProcedure } from '../
 import { hasOutageManageScope } from '@/lib/admin-scope';
 import { db } from '@/lib/db';
 import { createOutlineClient, parseOutlineConfig } from '@/lib/outline-api';
+import { buildPlaywrightSmokeLiveStats, isPlaywrightSmokeEnv } from '@/lib/playwright-smoke';
 import { TRPCError } from '@trpc/server';
 import { logger } from '@/lib/logger';
 import { acquireSyncLock, releaseSyncLock, getSyncLockStatus } from '@/lib/sync-lock';
@@ -1168,7 +1169,22 @@ export const serversRouter = router({
         where: { id: input.id },
       });
 
-      if (!server) return { activeConnections: 0, bandwidthBps: 0 };
+      if (!server) return { activeConnections: 0, bandwidthBps: 0, keyStats: {} };
+
+      if (isPlaywrightSmokeEnv()) {
+        const keys = await db.accessKey.findMany({
+          where: {
+            serverId: input.id,
+            status: 'ACTIVE',
+          },
+          select: {
+            outlineKeyId: true,
+            usedBytes: true,
+          },
+        });
+
+        return buildPlaywrightSmokeLiveStats(keys);
+      }
 
       const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
 
@@ -1209,7 +1225,7 @@ export const serversRouter = router({
         };
       } catch (error) {
         logger.error('Failed to get live stats', error);
-        return { activeConnections: 0, bandwidthBps: 0 };
+        return { activeConnections: 0, bandwidthBps: 0, keyStats: {} };
       }
     }),
 
