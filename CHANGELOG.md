@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.7 - 2026-04-26
+
+### Changed
+
+- Added Telegram admin queue detail drill-down cards for review, refund, support-thread, and premium support flows so admins can inspect context without reopening long message dumps.
+- Hardened the stale-tab deploy guard so same-origin POST actions carry an immutable client-build marker even after the shared build cookie refreshes.
+
+### Fixed
+
+- Fixed the intermittent `Failed to find Server Action "x"` production error burst that could happen when an older dashboard tab submitted actions after a newer deploy.
+- Rechecked live production Telegram admin callbacks, dashboard deploy health, and post-deploy runtime logs after shipping the admin drill-down and stale-tab guard changes.
+
 ## v1.2.6 - 2026-04-25
 
 ### Changed
