@@ -162,6 +162,63 @@ function buildTelegramOrderListButtonLabel(input: {
   return `${formatTelegramOrderStatusIcon(order.status)} ${order.orderCode} • ${action}`;
 }
 
+function truncateTelegramOrderDetailText(value: string, maxLength = 140) {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, maxLength - 1)}…`;
+}
+
+async function resolveTelegramRenewalTargetLabel(input: {
+  order: TelegramUserOrder;
+  locale: SupportedLocale;
+}) {
+  if (input.order.targetAccessKeyId) {
+    const accessKey = await db.accessKey.findUnique({
+      where: { id: input.order.targetAccessKeyId },
+      select: {
+        name: true,
+        server: {
+          select: {
+            name: true,
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (accessKey) {
+      const serverLabel = accessKey.server
+        ? `${accessKey.server.name}${accessKey.server.countryCode ? ` ${getFlagEmoji(accessKey.server.countryCode)}` : ''}`
+        : null;
+      return [accessKey.name, serverLabel].filter(Boolean).join(' • ');
+    }
+
+    return input.order.targetAccessKeyId;
+  }
+
+  if (input.order.targetDynamicKeyId) {
+    const dynamicKey = await db.dynamicAccessKey.findUnique({
+      where: { id: input.order.targetDynamicKeyId },
+      select: {
+        name: true,
+      },
+    });
+
+    if (dynamicKey) {
+      return input.locale === 'my'
+        ? `${dynamicKey.name} • Premium`
+        : `${dynamicKey.name} • Premium`;
+    }
+
+    return input.order.targetDynamicKeyId;
+  }
+
+  return null;
+}
+
 export function buildTelegramOrdersCommerceKeyboard(input: {
   locale: SupportedLocale;
   filter: TelegramOrdersFilter;
@@ -458,6 +515,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   const detailLines: string[] = [];
   const paymentLines: string[] = [];
   const footerLines: string[] = [];
+  const noteLines: string[] = [];
 
   if (displayPlanLabel) {
     detailLines.push(`${ui.planLabel}: <b>${escapeHtml(displayPlanLabel)}</b>`);
@@ -495,9 +553,9 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.kind === 'RENEW') {
-    const renewalTargetId = order.targetAccessKeyId || order.targetDynamicKeyId;
-    if (renewalTargetId) {
-      detailLines.push(`${ui.renewalTargetLabel}: <code>${escapeHtml(renewalTargetId)}</code>`);
+    const renewalTargetLabel = await resolveTelegramRenewalTargetLabel({ order, locale });
+    if (renewalTargetLabel) {
+      detailLines.push(`${ui.renewalTargetLabel}: <b>${escapeHtml(renewalTargetLabel)}</b>`);
     }
   }
 
@@ -517,52 +575,44 @@ export async function buildTelegramOrderStatusMessage(input: {
   ].filter(Boolean) as string[];
   paymentLines.push(paymentSummarySegments.join(' • '));
 
-  if (order.paymentSubmittedAt) {
-    paymentLines.push(
-      `${ui.paymentSubmittedLabel}: ${escapeHtml(
-        formatTelegramDateTime(order.paymentSubmittedAt, locale),
-      )}`,
-    );
+  const reviewTimelineSegments = [
+    order.paymentSubmittedAt
+      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(
+          formatTelegramDateTime(order.paymentSubmittedAt, locale),
+        )}`
+      : null,
+    order.reviewedAt
+      ? `${ui.reviewedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.reviewedAt, locale))}`
+      : null,
+    order.fulfilledAt
+      ? `${ui.fulfilledAtLabel}: ${escapeHtml(formatTelegramDateTime(order.fulfilledAt, locale))}`
+      : order.rejectedAt
+        ? `${ui.rejectedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.rejectedAt, locale))}`
+        : null,
+  ].filter(Boolean) as string[];
+  if (reviewTimelineSegments.length > 0) {
+    paymentLines.push(reviewTimelineSegments.join(' • '));
   }
 
-  if (order.reviewedAt) {
-    paymentLines.push(
-      `${ui.reviewedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.reviewedAt, locale))}`,
-    );
-  }
-
-  if (order.fulfilledAt) {
-    paymentLines.push(
-      `${ui.fulfilledAtLabel}: ${escapeHtml(formatTelegramDateTime(order.fulfilledAt, locale))}`,
-    );
-  } else if (order.rejectedAt) {
-    paymentLines.push(
-      `${ui.rejectedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.rejectedAt, locale))}`,
-    );
-  }
-
-  if (order.refundRequestStatus) {
-    paymentLines.push(
-      `${ui.refundRequestStatusLabel}: <b>${escapeHtml(
-        formatTelegramRefundRequestStatusLabel(order.refundRequestStatus, ui),
-      )}</b>`,
-    );
-  }
-
-  if (order.refundRequestedAt) {
-    paymentLines.push(
-      `${ui.refundRequestedAtLabel}: ${escapeHtml(
-        formatTelegramDateTime(order.refundRequestedAt, locale),
-      )}`,
-    );
-  }
-
-  if (order.refundRequestReviewedAt) {
-    paymentLines.push(
-      `${ui.refundReviewedAtLabel}: ${escapeHtml(
-        formatTelegramDateTime(order.refundRequestReviewedAt, locale),
-      )}`,
-    );
+  const refundSegments = [
+    order.refundRequestStatus
+      ? `${ui.refundRequestStatusLabel}: <b>${escapeHtml(
+          formatTelegramRefundRequestStatusLabel(order.refundRequestStatus, ui),
+        )}</b>`
+      : null,
+    order.refundRequestedAt
+      ? `${ui.refundRequestedAtLabel}: ${escapeHtml(
+          formatTelegramDateTime(order.refundRequestedAt, locale),
+        )}`
+      : null,
+    order.refundRequestReviewedAt
+      ? `${ui.refundReviewedAtLabel}: ${escapeHtml(
+          formatTelegramDateTime(order.refundRequestReviewedAt, locale),
+        )}`
+      : null,
+  ].filter(Boolean) as string[];
+  if (refundSegments.length > 0) {
+    paymentLines.push(refundSegments.join(' • '));
   }
 
   if (order.refundReviewReasonCode) {
@@ -615,21 +665,23 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.customerMessage?.trim()) {
-    cards.push(
-      buildTelegramCommerceCard(
-        '📝 <b>Customer note</b>',
-        [`${escapeHtml(order.customerMessage.trim())}`],
-      ),
+    noteLines.push(
+      `${input.locale === 'my' ? 'Order note' : 'Order note'}: ${escapeHtml(
+        truncateTelegramOrderDetailText(order.customerMessage),
+      )}`,
     );
   }
 
   if (order.refundRequestCustomerMessage?.trim()) {
-    cards.push(
-      buildTelegramCommerceCard(
-        '💸 <b>Refund note</b>',
-        [`${escapeHtml(order.refundRequestCustomerMessage.trim())}`],
-      ),
+    noteLines.push(
+      `${input.locale === 'my' ? 'Refund note' : 'Refund note'}: ${escapeHtml(
+        truncateTelegramOrderDetailText(order.refundRequestCustomerMessage),
+      )}`,
     );
+  }
+
+  if (noteLines.length > 0) {
+    cards.push(buildTelegramCommerceCard('📝 <b>Notes</b>', noteLines));
   }
 
   const relatedAccessKeyId = order.approvedAccessKeyId || order.targetAccessKeyId;
@@ -722,8 +774,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   return buildTelegramCommerceMessage({
-    title: ui.orderStatusTitle,
-    statsLine: `${statusIcon} <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(
+    title: `${ui.orderStatusTitle.replace('</b>', ` · ${escapeHtml(order.orderCode)}</b>`)} • ${statusIcon} ${escapeHtml(
       formatTelegramOrderKindLabel(order.kind, ui),
     )}`,
     cards,
