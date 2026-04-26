@@ -49,6 +49,15 @@ type TelegramSupportThreadQueueRecord = Awaited<
   ReturnType<typeof listTelegramSupportThreadsForAdminQueue>
 >['threads'][number];
 
+function compactTelegramSupportThreadText(value?: string | null, maxLength = 100) {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
+}
+
 export function formatTelegramRelativeAge(date: Date, locale: SupportedLocale) {
   const diffMs = Date.now() - date.getTime();
   const totalMinutes = Math.max(1, Math.floor(diffMs / (60 * 1000)));
@@ -219,8 +228,10 @@ export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
   claimedByMe: boolean;
   isClaimed: boolean;
   attachmentUrl?: string | null;
+  includeDetail?: boolean;
 }) {
   const isMyanmar = input.locale === 'my';
+  const includeDetail = input.includeDetail ?? true;
   return {
     inline_keyboard: [
       [
@@ -257,6 +268,14 @@ export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
         },
       ],
       [
+        ...(includeDetail
+          ? [
+              {
+                text: isMyanmar ? 'ℹ️ အသေးစိတ်' : 'ℹ️ Detail',
+                callback_data: buildTelegramSupportQueueCallbackData('dt', `thr_${input.threadId}`, input.mode),
+              },
+            ]
+          : []),
         {
           text: isMyanmar ? '📌 Panel သို့ တင်မည်' : '📌 Escalate',
           callback_data: buildTelegramSupportQueueCallbackData('es', `thr_${input.threadId}`, input.mode),
@@ -290,6 +309,52 @@ export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
   };
 }
 
+export function buildTelegramSupportThreadQueueDetailMessage(input: {
+  locale: SupportedLocale;
+  thread: TelegramSupportThreadQueueRecord;
+}) {
+  const latestReply = input.thread.replies?.[input.thread.replies.length - 1] || null;
+  const state = getTelegramSupportThreadState({
+    status: input.thread.status,
+    waitingOn: input.thread.waitingOn,
+    locale: input.locale,
+  });
+  const contextParts = [
+    input.thread.relatedOrderCode
+      ? `${input.locale === 'my' ? 'Order' : 'Order'} ${escapeHtml(input.thread.relatedOrderCode)}`
+      : '',
+    input.thread.relatedKeyName
+      ? `${input.locale === 'my' ? 'Key' : 'Key'} ${escapeHtml(input.thread.relatedKeyName)}`
+      : '',
+    input.thread.relatedServerName
+      ? `${input.locale === 'my' ? 'Server' : 'Server'} ${escapeHtml(input.thread.relatedServerName)}`
+      : '',
+  ].filter(Boolean);
+  const subject = compactTelegramSupportThreadText(input.thread.subject, 84);
+  const latestReplyPreview = buildTelegramLatestReplyPreviewLines({
+    reply: latestReply,
+    locale: input.locale,
+    maxLength: 84,
+  }).map((line) => escapeHtml(line));
+
+  return [
+    input.locale === 'my'
+      ? 'ℹ️ <b>Support thread အသေးစိတ်</b>'
+      : 'ℹ️ <b>Support thread detail</b>',
+    '',
+    `<b>${escapeHtml(input.thread.threadCode)}</b> • ${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}`,
+    `👤 <b>${escapeHtml(input.thread.telegramUsername || input.thread.telegramUserId || '—')}</b> • ${escapeHtml(state.label)}`,
+    input.thread.firstResponseDueAt
+      ? `⏱ ${escapeHtml(formatTelegramDateTime(input.thread.firstResponseDueAt, input.locale))}`
+      : '',
+    contextParts.length > 0 ? `🧩 ${contextParts.join(' • ')}` : '',
+    subject ? `${input.locale === 'my' ? '📝 အကြောင်းအရာ' : '📝 Subject'}: ${escapeHtml(subject)}` : '',
+    ...latestReplyPreview,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 async function sendTelegramSupportThreadQueueCardToChat(input: {
   botToken: string;
   chatId: string | number;
@@ -321,6 +386,43 @@ async function sendTelegramSupportThreadQueueCardToChat(input: {
         ),
         isClaimed: Boolean(input.thread.assignedAdminUserId),
         attachmentUrl: latestReply?.mediaUrl || null,
+      }),
+    },
+  );
+}
+
+export async function sendTelegramSupportThreadQueueDetailToChat(input: {
+  botToken: string;
+  chatId: string | number;
+  locale: SupportedLocale;
+  thread: TelegramSupportThreadQueueRecord;
+  mode: TelegramSupportQueueMode;
+  adminActor: TelegramAdminActor;
+}) {
+  const latestReply = input.thread.replies?.[input.thread.replies.length - 1] || null;
+  const panelUrl = await buildTelegramSupportThreadPanelUrl(input.thread);
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    buildTelegramSupportThreadQueueDetailMessage({
+      locale: input.locale,
+      thread: input.thread,
+    }),
+    {
+      replyMarkup: buildTelegramSupportThreadQueueReplyKeyboard({
+        threadId: input.thread.id,
+        locale: input.locale,
+        panelUrl,
+        mode: input.mode,
+        claimedByMe: Boolean(
+          input.thread.assignedAdminUserId
+          && input.adminActor.userId
+          && input.thread.assignedAdminUserId === input.adminActor.userId,
+        ),
+        isClaimed: Boolean(input.thread.assignedAdminUserId),
+        attachmentUrl: latestReply?.mediaUrl || null,
+        includeDetail: false,
       }),
     },
   );

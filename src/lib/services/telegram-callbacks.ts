@@ -280,6 +280,8 @@ export function parseTelegramOrderReviewCallbackData(data?: string | null): Tele
       ? 'approve'
       : parts[1] === 'claim'
       ? 'claim'
+        : parts[1] === 'detail'
+          ? 'detail'
         : parts[1] === 'next'
           ? 'next'
           : parts[1] === 'prev'
@@ -329,6 +331,8 @@ export function parseTelegramAdminRefundCallbackData(data?: string | null): Tele
   const action =
     parts[1] === 'claim'
       ? 'claim'
+      : parts[1] === 'detail'
+        ? 'detail'
       : parts[1] === 'next'
         ? 'next'
         : parts[1] === 'prev'
@@ -753,6 +757,8 @@ export function parseTelegramSupportQueueCallbackData(
                   ? 'rp'
                   : parts[1] === 'es'
                     ? 'es'
+                    : parts[1] === 'dt'
+                      ? 'dt'
                     : null;
   const requestId = parts[2]?.trim();
 

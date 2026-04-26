@@ -94,6 +94,17 @@ test('telegram order review callbacks support quick reject presets', () => {
       secondary: 'mine',
     },
   );
+
+  assert.deepEqual(
+    parseTelegramOrderReviewCallbackData(
+      buildTelegramOrderReviewCallbackData('detail', 'ord_detail', 'all'),
+    ),
+    {
+      action: 'detail',
+      orderId: 'ord_detail',
+      secondary: 'all',
+    },
+  );
 });
 
 test('telegram admin refund callbacks round-trip compact queue actions', () => {
@@ -115,6 +126,16 @@ test('telegram admin refund callbacks round-trip compact queue actions', () => {
       action: 'next',
       orderId: 'ord_123',
       secondary: 'queue',
+    },
+  );
+  assert.deepEqual(
+    parseTelegramAdminRefundCallbackData(
+      buildTelegramAdminRefundCallbackData('detail', 'ord_456'),
+    ),
+    {
+      action: 'detail',
+      orderId: 'ord_456',
+      secondary: null,
     },
   );
   assert.equal(parseTelegramAdminRefundCallbackData('admrefund:refund:ord_1'), null);
@@ -205,6 +226,17 @@ test('telegram support queue callbacks preserve queue mode secondary', () => {
       action: 'nx',
       requestId: 'req_123',
       secondary: 'user',
+    },
+  );
+
+  assert.deepEqual(
+    parseTelegramSupportQueueCallbackData(
+      buildTelegramSupportQueueCallbackData('dt', 'req_123', 'admin'),
+    ),
+    {
+      action: 'dt',
+      requestId: 'req_123',
+      secondary: 'admin',
     },
   );
 });

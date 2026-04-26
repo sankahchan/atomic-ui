@@ -328,6 +328,7 @@ import {
   handleTelegramSupportQueueCommand,
   sendTelegramNextSupportQueueCard,
   sendTelegramSupportQueueCardToChat,
+  sendTelegramSupportQueueDetailById,
   buildTelegramSupportQueueSummaryKeyboard,
 } from '@/lib/services/telegram-premium-support-queue';
 import {
@@ -336,14 +337,17 @@ import {
   handleTelegramSupportThreadsQueueCommand,
   resolveTelegramSupportQueueMode,
   sendTelegramNextSupportThreadQueueCard,
+  sendTelegramSupportThreadQueueDetailToChat,
   type TelegramSupportQueueMode,
 } from '@/lib/services/telegram-support-console';
 import {
   buildTelegramServerNoticeShortcutMessage,
+  findTelegramReviewQueueOrderById,
   handleTelegramReviewQueueCommand,
   resolveTelegramReviewQueueMode,
   sendTelegramNextReviewQueueCard,
   sendTelegramOrderReviewCardToChat,
+  sendTelegramOrderReviewDetailToChat,
 } from '@/lib/services/telegram-review-queue';
 import {
   buildTelegramDynamicKeyPanelUrl,
@@ -7047,6 +7051,23 @@ export async function handleTelegramCallbackQuery(
             return null;
           }
 
+          if (supportQueueAction.action === 'dt') {
+            await sendTelegramSupportThreadQueueDetailToChat({
+              botToken: config.botToken,
+              chatId,
+              locale,
+              thread,
+              mode,
+              adminActor,
+            });
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'အသေးစိတ်ကို ဖွင့်ပြီးပါပြီ။' : 'Opened thread detail.',
+            );
+            return null;
+          }
+
           const reviewerName =
             adminActor.email
             || callbackQuery.from.username
@@ -7163,6 +7184,22 @@ export async function handleTelegramCallbackQuery(
             locale === 'my'
               ? 'Sent the support-thread reply.'
               : 'Sent the support-thread reply.',
+          );
+          return null;
+        }
+
+        if (supportQueueAction.action === 'dt') {
+          await sendTelegramSupportQueueDetailById({
+            botToken: config.botToken,
+            chatId,
+            locale,
+            requestId: supportQueueAction.requestId,
+            mode,
+          });
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            locale === 'my' ? 'အသေးစိတ်ကို ဖွင့်ပြီးပါပြီ။' : 'Opened support detail.',
           );
           return null;
         }
@@ -9093,6 +9130,25 @@ export async function handleTelegramCallbackQuery(
           adminLocale === 'my'
             ? `Claimed ${claimedOrder.orderCode}`
             : `Claimed ${claimedOrder.orderCode}`,
+        );
+      } else if (orderAction.action === 'detail') {
+        const order = await findTelegramReviewQueueOrderById(orderAction.orderId);
+        if (!order) {
+          throw new Error('Telegram order not found.');
+        }
+
+        await sendTelegramOrderReviewDetailToChat({
+          botToken: config.botToken,
+          adminChatId: chatId,
+          order,
+          locale: adminLocale,
+          queueMode: resolveTelegramReviewQueueMode(orderAction.secondary || ''),
+        });
+
+        await answerTelegramCallbackQuery(
+          config.botToken,
+          callbackQuery.id,
+          adminLocale === 'my' ? 'အသေးစိတ်ကို ဖွင့်ပြီးပါပြီ။' : 'Opened review detail.',
         );
       } else if (orderAction.action === 'next' || orderAction.action === 'prev') {
         await sendTelegramNextReviewQueueCard({

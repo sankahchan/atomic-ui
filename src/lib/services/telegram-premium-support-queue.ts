@@ -36,6 +36,15 @@ type TelegramPremiumSupportQueueRequest = Awaited<
   }>;
 };
 
+function compactTelegramSupportQueueText(value?: string | null, maxLength = 100) {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
+}
+
 function getTelegramPremiumSupportQueueState(input: {
   request: {
     status: string;
@@ -263,8 +272,10 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
   locale: SupportedLocale;
   panelUrl: string;
   mode: TelegramSupportQueueMode;
+  includeDetail?: boolean;
 }) {
   const isMyanmar = input.locale === 'my';
+  const includeDetail = input.includeDetail ?? true;
   return {
     inline_keyboard: [
       [
@@ -281,29 +292,107 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
           callback_data: buildTelegramSupportQueueCallbackData('hd', input.requestId, input.mode),
         },
       ],
-      [
-        {
-          text: isMyanmar ? '⬅️ စာရင်း' : '⬅️ Queue',
-          callback_data: buildTelegramMenuCallbackData(
-            'admin',
-            input.mode === 'admin'
-              ? 'supportqueue_admin'
-              : input.mode === 'user'
-                ? 'supportqueue_user'
-                : 'supportqueue',
-          ),
-        },
-        {
-          text: isMyanmar ? '➡️ နောက်' : '➡️ Next',
-          callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
-        },
-        {
-          text: isMyanmar ? '🧾 Dashboard' : '🧾 Panel',
-          url: input.panelUrl,
-        },
-      ],
+      includeDetail
+        ? [
+            {
+              text: isMyanmar ? '⬅️ စာရင်း' : '⬅️ Queue',
+              callback_data: buildTelegramMenuCallbackData(
+                'admin',
+                input.mode === 'admin'
+                  ? 'supportqueue_admin'
+                  : input.mode === 'user'
+                    ? 'supportqueue_user'
+                    : 'supportqueue',
+              ),
+            },
+            {
+              text: isMyanmar ? 'ℹ️ အသေးစိတ်' : 'ℹ️ Detail',
+              callback_data: buildTelegramSupportQueueCallbackData('dt', input.requestId, input.mode),
+            },
+            {
+              text: isMyanmar ? '➡️ နောက်' : '➡️ Next',
+              callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
+            },
+          ]
+        : [
+            {
+              text: isMyanmar ? '⬅️ စာရင်း' : '⬅️ Queue',
+              callback_data: buildTelegramMenuCallbackData(
+                'admin',
+                input.mode === 'admin'
+                  ? 'supportqueue_admin'
+                  : input.mode === 'user'
+                    ? 'supportqueue_user'
+                    : 'supportqueue',
+              ),
+            },
+            {
+              text: isMyanmar ? '➡️ နောက်' : '➡️ Next',
+              callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
+            },
+            {
+              text: isMyanmar ? '🧾 Dashboard' : '🧾 Panel',
+              url: input.panelUrl,
+            },
+          ],
+      ...(includeDetail
+        ? [[{ text: isMyanmar ? '🧾 Dashboard' : '🧾 Panel', url: input.panelUrl }]]
+        : []),
     ],
   };
+}
+
+export function buildTelegramPremiumSupportQueueDetailMessage(input: {
+  locale: SupportedLocale;
+  request: TelegramPremiumSupportQueueRequest;
+}) {
+  const latestReply = input.request.replies?.[input.request.replies.length - 1] || null;
+  const state = getTelegramPremiumSupportQueueState({
+    request: input.request,
+    locale: input.locale,
+  });
+  const latestReplyPreview = buildTelegramLatestReplyPreviewLines({
+    reply: latestReply,
+    locale: input.locale,
+    maxLength: 84,
+  }).map((line) => escapeHtml(line));
+  const routingParts = [
+    input.request.requestedRegionCode
+      ? `${input.locale === 'my' ? 'Region' : 'Region'} ${escapeHtml(input.request.requestedRegionCode)}`
+      : '',
+    input.request.currentResolvedServerName
+      ? `${input.locale === 'my' ? 'Route' : 'Route'} ${escapeHtml(input.request.currentResolvedServerName)}`
+      : '',
+    input.request.appliedPinServerName
+      ? `${input.locale === 'my' ? 'Pin' : 'Pin'} ${escapeHtml(input.request.appliedPinServerName)}`
+      : '',
+  ].filter(Boolean);
+  const poolLabel = compactTelegramSupportQueueText(input.request.currentPoolSummary, 72);
+  const contextParts = [
+    poolLabel ? `${input.locale === 'my' ? 'Pool' : 'Pool'} ${escapeHtml(poolLabel)}` : '',
+    input.request.linkedOutageServerName
+      ? `${input.locale === 'my' ? 'Incident' : 'Incident'} ${escapeHtml(input.request.linkedOutageServerName)}`
+      : '',
+  ].filter(Boolean);
+  const note = compactTelegramSupportQueueText(
+    input.request.adminNote || input.request.customerMessage,
+    84,
+  );
+
+  return [
+    input.locale === 'my'
+      ? 'ℹ️ <b>Premium support အသေးစိတ်</b>'
+      : 'ℹ️ <b>Premium support detail</b>',
+    '',
+    `<b>${escapeHtml(input.request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}`,
+    `🔑 <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b> • ${escapeHtml(state.label)}`,
+    routingParts.length > 0 ? `🛰 ${routingParts.join(' • ')}` : '',
+    contextParts.length > 0 ? `🌐 ${contextParts.join(' • ')}` : '',
+    note ? `${input.locale === 'my' ? '📝 မှတ်ချက်' : '📝 Note'}: ${escapeHtml(note)}` : '',
+    ...latestReplyPreview,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export async function sendTelegramSupportQueueCardToChat(input: {
@@ -332,6 +421,74 @@ export async function sendTelegramSupportQueueCardToChat(input: {
       }),
     },
   );
+}
+
+async function findTelegramSupportQueueRequestById(requestId: string) {
+  return db.telegramPremiumSupportRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      dynamicAccessKey: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 8,
+      },
+    },
+  });
+}
+
+export async function sendTelegramSupportQueueDetailToChat(input: {
+  botToken: string;
+  chatId: string | number;
+  locale: SupportedLocale;
+  request: TelegramPremiumSupportQueueRequest;
+  mode: TelegramSupportQueueMode;
+}) {
+  const panelUrl = await buildTelegramPremiumSupportPanelUrl(input.request.id);
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    buildTelegramPremiumSupportQueueDetailMessage({
+      locale: input.locale,
+      request: input.request,
+    }),
+    {
+      replyMarkup: buildTelegramSupportQueueReplyKeyboard({
+        requestId: input.request.id,
+        locale: input.locale,
+        panelUrl,
+        mode: input.mode,
+        includeDetail: false,
+      }),
+    },
+  );
+}
+
+export async function sendTelegramSupportQueueDetailById(input: {
+  botToken: string;
+  chatId: string | number;
+  locale: SupportedLocale;
+  requestId: string;
+  mode: TelegramSupportQueueMode;
+}) {
+  const request = await findTelegramSupportQueueRequestById(input.requestId);
+  if (!request) {
+    throw new Error('Support request not found.');
+  }
+
+  await sendTelegramSupportQueueDetailToChat({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    locale: input.locale,
+    request,
+    mode: input.mode,
+  });
+  return request;
 }
 
 export async function handleTelegramSupportQueueCommand(input: {

@@ -1,4 +1,5 @@
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
+import { db } from '@/lib/db';
 import { type TelegramAdminActor } from '@/lib/services/telegram-admin-core';
 import { getTelegramReviewQueueSnapshot } from '@/lib/services/telegram-admin-review';
 import {
@@ -16,6 +17,153 @@ import {
 
 type TelegramAdminReviewQueueOrder =
   Awaited<ReturnType<typeof getTelegramReviewQueueSnapshot>>['orders'][number];
+
+function compactTelegramQueueText(value?: string | null, maxLength = 96) {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
+}
+
+function buildTelegramReviewCustomerSummary(order: TelegramAdminReviewQueueOrder) {
+  return order.requestedEmail || order.telegramUsername || order.telegramUserId || '—';
+}
+
+function formatTelegramReviewOrderKind(order: TelegramAdminReviewQueueOrder, locale: SupportedLocale) {
+  const isMyanmar = locale === 'my';
+  if (order.orderMode === 'GIFT') {
+    return isMyanmar ? 'Gift order' : 'Gift order';
+  }
+  if (order.kind === 'RENEW') {
+    return isMyanmar ? 'Renewal' : 'Renewal';
+  }
+  return isMyanmar ? 'New order' : 'New order';
+}
+
+function formatTelegramReviewDeliveryLabel(order: TelegramAdminReviewQueueOrder, locale: SupportedLocale) {
+  const typeLabel =
+    order.deliveryType === 'DYNAMIC_KEY'
+      ? locale === 'my'
+        ? 'Premium link'
+        : 'Premium link'
+      : locale === 'my'
+        ? 'Standard key'
+        : 'Standard key';
+  const planLabel = order.planName || order.planCode || null;
+  return planLabel ? `${typeLabel} • ${planLabel}` : typeLabel;
+}
+
+async function resolveTelegramReviewRenewalTargetLabel(order: TelegramAdminReviewQueueOrder) {
+  if (order.targetAccessKeyId) {
+    const accessKey = await db.accessKey.findUnique({
+      where: { id: order.targetAccessKeyId },
+      select: { name: true },
+    });
+    if (accessKey?.name) {
+      return accessKey.name;
+    }
+  }
+
+  if (order.targetDynamicKeyId) {
+    const dynamicKey = await db.dynamicAccessKey.findUnique({
+      where: { id: order.targetDynamicKeyId },
+      select: { name: true },
+    });
+    if (dynamicKey?.name) {
+      return dynamicKey.name;
+    }
+  }
+
+  return null;
+}
+
+function buildTelegramOrderReviewKeyboardRows(input: {
+  orderId: string;
+  locale: SupportedLocale;
+  panelUrl: string;
+  queueMode?: TelegramReviewQueueMode;
+  claimed?: boolean;
+  includeDetail?: boolean;
+}) {
+  const queueMode = input.queueMode || 'all';
+  const includeDetail = input.includeDetail ?? true;
+
+  return [
+    [
+      {
+        text:
+          input.claimed
+            ? input.locale === 'my'
+              ? '🧷 ယူထားပြီး'
+              : '🧷 Claimed'
+            : input.locale === 'my'
+              ? '🧷 ယူမည်'
+              : '🧷 Claim',
+        callback_data: buildTelegramOrderReviewCallbackData(
+          'claim',
+          input.orderId,
+          queueMode,
+        ),
+      },
+      {
+        text: input.locale === 'my' ? '✅ အတည်ပြု' : '✅ Approve',
+        callback_data: buildTelegramOrderReviewCallbackData('approve', input.orderId),
+      },
+      {
+        text: input.locale === 'my' ? '❌ ပယ်ရန်' : '❌ Reject',
+        callback_data: buildTelegramOrderReviewCallbackData('reject', input.orderId),
+      },
+    ],
+    includeDetail
+      ? [
+          {
+            text: input.locale === 'my' ? '⬅️ ယခင်' : '⬅️ Prev',
+            callback_data: buildTelegramOrderReviewCallbackData('prev', input.orderId, queueMode),
+          },
+          {
+            text: input.locale === 'my' ? 'ℹ️ အသေးစိတ်' : 'ℹ️ Detail',
+            callback_data: buildTelegramOrderReviewCallbackData('detail', input.orderId, queueMode),
+          },
+          {
+            text: input.locale === 'my' ? '➡️ နောက်' : '➡️ Next',
+            callback_data: buildTelegramOrderReviewCallbackData('next', input.orderId, queueMode),
+          },
+        ]
+      : [
+          {
+            text: input.locale === 'my' ? '⬅️ ယခင်' : '⬅️ Prev',
+            callback_data: buildTelegramOrderReviewCallbackData('prev', input.orderId, queueMode),
+          },
+          {
+            text: input.locale === 'my' ? '➡️ နောက်' : '➡️ Next',
+            callback_data: buildTelegramOrderReviewCallbackData('next', input.orderId, queueMode),
+          },
+          {
+            text: input.locale === 'my' ? '🧾 Dashboard' : '🧾 Panel',
+            url: input.panelUrl,
+          },
+        ],
+    [
+      {
+        text: input.locale === 'my' ? '🪞 ထပ်နေ' : '🪞 Duplicate',
+        callback_data: buildTelegramOrderReviewCallbackData('reject_duplicate', input.orderId),
+      },
+      {
+        text: input.locale === 'my' ? '🫥 မရှင်း' : '🫥 Blurry',
+        callback_data: buildTelegramOrderReviewCallbackData('reject_blurry', input.orderId),
+      },
+      {
+        text: input.locale === 'my' ? '💸 ငွေပမာဏ' : '💸 Amount',
+        callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', input.orderId),
+      },
+    ],
+    ...(includeDetail
+      ? [[{ text: input.locale === 'my' ? '🧾 Dashboard' : '🧾 Panel', url: input.panelUrl }]]
+      : []),
+  ];
+}
 
 export function resolveTelegramReviewQueueMode(argsText: string): TelegramReviewQueueMode {
   const normalized = argsText.trim().toLowerCase();
@@ -190,72 +338,96 @@ export function buildTelegramOrderReviewAlertKeyboard(input: {
   panelUrl: string;
   queueMode?: TelegramReviewQueueMode;
   claimed?: boolean;
+  includeDetail?: boolean;
 }) {
   return {
-    inline_keyboard: [
-      [
-        {
-          text:
-            input.claimed
-              ? input.locale === 'my'
-                ? '🧷 ယူထားပြီး'
-                : '🧷 Claimed'
-              : input.locale === 'my'
-                ? '🧷 ယူမည်'
-                : '🧷 Claim',
-          callback_data: buildTelegramOrderReviewCallbackData(
-            'claim',
-            input.orderId,
-            input.queueMode || 'all',
-          ),
-        },
-        {
-          text: input.locale === 'my' ? '✅ အတည်ပြု' : '✅ Approve',
-          callback_data: buildTelegramOrderReviewCallbackData('approve', input.orderId),
-        },
-        {
-          text: input.locale === 'my' ? '❌ ပယ်ရန်' : '❌ Reject',
-          callback_data: buildTelegramOrderReviewCallbackData('reject', input.orderId),
-        },
-      ],
-      [
-        {
-          text: input.locale === 'my' ? '⬅️ ယခင်' : '⬅️ Prev',
-          callback_data: buildTelegramOrderReviewCallbackData(
-            'prev',
-            input.orderId,
-            input.queueMode || 'all',
-          ),
-        },
-        {
-          text: input.locale === 'my' ? '➡️ နောက်' : '➡️ Next',
-          callback_data: buildTelegramOrderReviewCallbackData(
-            'next',
-            input.orderId,
-            input.queueMode || 'all',
-          ),
-        },
-        {
-          text: input.locale === 'my' ? '🧾 Dashboard' : '🧾 Panel',
-          url: input.panelUrl,
-        },
-      ],
-      [
-        {
-          text: input.locale === 'my' ? '🪞 ထပ်နေ' : '🪞 Duplicate',
-          callback_data: buildTelegramOrderReviewCallbackData('reject_duplicate', input.orderId),
-        },
-        {
-          text: input.locale === 'my' ? '🫥 မရှင်း' : '🫥 Blurry',
-          callback_data: buildTelegramOrderReviewCallbackData('reject_blurry', input.orderId),
-        },
-        {
-          text: input.locale === 'my' ? '💸 ငွေပမာဏ' : '💸 Amount',
-          callback_data: buildTelegramOrderReviewCallbackData('reject_wrong_amount', input.orderId),
-        },
-      ],
-    ],
+    inline_keyboard: buildTelegramOrderReviewKeyboardRows(input),
   };
+}
+
+export function buildTelegramOrderReviewDetailMessage(input: {
+  order: TelegramAdminReviewQueueOrder;
+  locale: SupportedLocale;
+  renewalTargetLabel?: string | null;
+}) {
+  const { order, locale } = input;
+  const isMyanmar = locale === 'my';
+  const customerSummary = buildTelegramReviewCustomerSummary(order);
+  const customerLine = order.telegramUserId
+    ? `👤 <b>${escapeHtml(customerSummary)}</b> • <code>${escapeHtml(order.telegramUserId)}</code>`
+    : `👤 <b>${escapeHtml(customerSummary)}</b>`;
+  const paymentParts = [
+    order.priceLabel ? escapeHtml(order.priceLabel) : '',
+    order.paymentMethodLabel ? escapeHtml(order.paymentMethodLabel) : '',
+  ].filter(Boolean);
+  const serverParts = [
+    order.selectedServerName ? escapeHtml(order.selectedServerName) : '',
+    order.requestedName ? `${isMyanmar ? 'အမည်' : 'Name'} ${escapeHtml(order.requestedName)}` : '',
+  ].filter(Boolean);
+  const note = compactTelegramQueueText(order.paymentCaption || order.customerMessage, 88);
+
+  return [
+    isMyanmar ? 'ℹ️ <b>Review အသေးစိတ်</b>' : 'ℹ️ <b>Review detail</b>',
+    '',
+    `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(formatTelegramReviewOrderKind(order, locale))}`,
+    customerLine,
+    `📦 ${escapeHtml(formatTelegramReviewDeliveryLabel(order, locale))}`,
+    paymentParts.length > 0 ? `💳 ${paymentParts.join(' • ')}` : '',
+    serverParts.length > 0 ? `🖥 ${serverParts.join(' • ')}` : '',
+    input.renewalTargetLabel
+      ? `${isMyanmar ? '🔁 Renew target' : '🔁 Renew target'}: <b>${escapeHtml(input.renewalTargetLabel)}</b>`
+      : '',
+    order.giftRecipientLabel
+      ? `${isMyanmar ? '🎁 လက်ခံသူ' : '🎁 Recipient'}: <b>${escapeHtml(order.giftRecipientLabel)}</b>`
+      : '',
+    note ? `${isMyanmar ? '📝 မှတ်ချက်' : '📝 Note'}: ${escapeHtml(note)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export async function findTelegramReviewQueueOrderById(orderId: string) {
+  return db.telegramOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      reviewedBy: {
+        select: {
+          id: true,
+          email: true,
+        },
+      },
+    },
+  });
+}
+
+export async function sendTelegramOrderReviewDetailToChat(input: {
+  botToken: string;
+  adminChatId: string | number;
+  order: TelegramAdminReviewQueueOrder;
+  locale: SupportedLocale;
+  queueMode?: TelegramReviewQueueMode;
+}) {
+  const panelUrl = await buildTelegramOrderPanelUrl(input.order.id);
+  const renewalTargetLabel = await resolveTelegramReviewRenewalTargetLabel(input.order);
+  return sendTelegramMessage(
+    input.botToken,
+    input.adminChatId,
+    buildTelegramOrderReviewDetailMessage({
+      order: input.order,
+      locale: input.locale,
+      renewalTargetLabel,
+    }),
+    {
+      replyMarkup: buildTelegramOrderReviewAlertKeyboard({
+        orderId: input.order.id,
+        locale: input.locale,
+        panelUrl,
+        queueMode: input.queueMode,
+        claimed: Boolean(input.order.assignedReviewerUserId),
+        includeDetail: false,
+      }),
+    },
+  );
 }
 
 export async function sendTelegramOrderReviewCardToChat(input: {
