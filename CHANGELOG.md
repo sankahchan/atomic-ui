@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.8 - 2026-04-26
+
+### Changed
+
+- Compacted Telegram customer `/order` detail cards so payment, review, and note context stay readable on mobile without pushing action buttons out of view.
+- Compacted Telegram support-thread detail cards into snapshot-first views with a shorter latest-reply block and button-first follow-up actions.
+
+### Fixed
+
+- Fixed Telegram customer detail screens that were still noticeably denser than the newer summary-first commerce flows, especially `/order` and `/supportstatus` thread detail.
+- Rechecked the deployed production webhook path with live `/order` and `/supportstatus` detail probes after shipping the compact customer card updates.
+
 ## v1.2.7 - 2026-04-26
 
 ### Changed
