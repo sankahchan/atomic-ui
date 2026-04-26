@@ -22,6 +22,7 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 import {
   APP_BUILD_COOKIE_NAME,
+  CLIENT_BUILD_QUERY_PARAM_NAME,
   CLIENT_BUILD_HEADER_NAME,
   getCurrentBuildId,
   shouldRejectStaleBuildRequest,
@@ -210,6 +211,7 @@ export async function middleware(request: NextRequest) {
     shouldRejectStaleBuildRequest({
       currentBuildId: getCurrentBuildId(),
       headerBuildId: request.headers.get(CLIENT_BUILD_HEADER_NAME),
+      queryBuildId: request.nextUrl.searchParams.get(CLIENT_BUILD_QUERY_PARAM_NAME),
       cookieBuildId: request.cookies.get(APP_BUILD_COOKIE_NAME)?.value,
     })
   ) {

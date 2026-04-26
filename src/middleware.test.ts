@@ -3,7 +3,11 @@ import test from 'node:test';
 
 import { NextRequest } from 'next/server';
 
-import { APP_BUILD_COOKIE_NAME, CLIENT_BUILD_HEADER_NAME } from '@/lib/deploy-guard';
+import {
+  APP_BUILD_COOKIE_NAME,
+  CLIENT_BUILD_HEADER_NAME,
+  CLIENT_BUILD_QUERY_PARAM_NAME,
+} from '@/lib/deploy-guard';
 import { isPublicRoute, middleware } from '@/middleware';
 
 const originalBuildId = process.env.NEXT_PUBLIC_APP_VERSION;
@@ -81,4 +85,23 @@ test('client build header takes precedence over stale build cookie on server act
 
   assert.notEqual(response.status, 409);
   assert.notEqual(response.headers.get('x-atomic-stale-build'), '1');
+});
+
+test('client build query marker takes precedence over a refreshed build cookie on server action requests', async () => {
+  process.env.NEXT_PUBLIC_APP_VERSION = 'new-build';
+  const request = new NextRequest(
+    `https://example.com/dashboard?${CLIENT_BUILD_QUERY_PARAM_NAME}=old-build`,
+    {
+      method: 'POST',
+      headers: {
+        cookie: `${APP_BUILD_COOKIE_NAME}=new-build`,
+        'next-action': 'x',
+      },
+    },
+  );
+
+  const response = await middleware(request);
+
+  assert.equal(response.status, 409);
+  assert.equal(response.headers.get('x-atomic-stale-build'), '1');
 });
