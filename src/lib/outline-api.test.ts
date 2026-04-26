@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  OutlineClient,
   matchesCertificateFingerprint,
   normalizeCertificateFingerprint,
 } from './outline-api';
@@ -31,4 +32,11 @@ test('matchesCertificateFingerprint rejects mismatched fingerprints', () => {
     ),
     false,
   );
+});
+
+test('OutlineClient disables TLS session caching for repeated self-signed requests', () => {
+  const client = new OutlineClient('https://example.com/manager', 'AA');
+  const agent = (client as unknown as { httpsAgent: { options?: { maxCachedSessions?: number } } }).httpsAgent;
+
+  assert.equal(agent.options?.maxCachedSessions, 0);
 });
