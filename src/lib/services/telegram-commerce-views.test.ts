@@ -24,7 +24,10 @@ import {
   buildTelegramOrdersSummaryMessage,
   buildTelegramRefundSummaryMessage,
 } from '@/lib/services/telegram-orders';
-import { buildTelegramSupportStatusSummaryMessage } from '@/lib/services/telegram-support-cards';
+import {
+  buildTelegramSupportStatusSummaryMessage,
+  buildTelegramSupportThreadStatusMessage,
+} from '@/lib/services/telegram-support-cards';
 
 const samplePlans = [
   {
@@ -612,6 +615,44 @@ test('support status summary shows a short thread list instead of only the lates
   assert.ok(message.split('\n').length <= 18);
 });
 
+test('support thread detail stays compact and keeps actions out of the text body', () => {
+  const message = buildTelegramSupportThreadStatusMessage({
+    locale: 'en',
+    thread: {
+      id: 'thread_1',
+      threadCode: 'SUP-AAA111',
+      issueCategory: 'SERVER',
+      status: 'OPEN',
+      waitingOn: 'ADMIN',
+      createdAt: new Date('2026-04-20T08:00:00.000Z'),
+      updatedAt: new Date('2026-04-20T10:00:00.000Z'),
+      assignedAdminName: 'Sankah',
+      escalatedAt: new Date('2026-04-20T10:05:00.000Z'),
+      relatedOrderCode: 'ORD-123',
+      relatedKeyName: 'Onn',
+      replies: [
+        {
+          id: 'reply_1',
+          senderType: 'ADMIN',
+          message: 'We are checking the SG route now and will update you shortly with the fallback result.',
+          createdAt: new Date('2026-04-20T10:06:00.000Z'),
+          mediaKind: 'IMAGE',
+          mediaFilename: 'proof.png',
+          mediaUrl: 'https://example.com/proof.png',
+        },
+      ],
+    } as any,
+  });
+
+  assert.match(message, /Support thread/);
+  assert.match(message, /Thread snapshot/);
+  assert.match(message, /Latest reply/);
+  assert.match(message, /button below/);
+  assert.doesNotMatch(message, /Attachment is ready below/);
+  assert.doesNotMatch(message, /Latest reply: Admin/);
+  assert.ok(message.split('\n').length <= 15);
+});
+
 test('premium support detail stays compact and avoids timeline dumps', () => {
   const message = buildTelegramPremiumSupportStatusMessage({
     locale: 'en',
@@ -801,8 +842,10 @@ test('order detail stays compact and keeps links in buttons', async () => {
 
   assert.match(message, /Current status/);
   assert.match(message, /Payment & review/);
+  assert.match(message, /Notes/);
+  assert.doesNotMatch(message, /Customer note/);
   assert.doesNotMatch(message, /What you can do now/i);
   assert.doesNotMatch(message, /Order timeline/i);
   assert.doesNotMatch(message, /https?:\/\//);
-  assert.ok(message.split('\n').length <= 24);
+  assert.ok(message.split('\n').length <= 22);
 });

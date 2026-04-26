@@ -10,7 +10,6 @@ import {
   buildTelegramSupportThreadCallbackData,
 } from '@/lib/services/telegram-callbacks';
 import {
-  buildTelegramLatestReplyPreviewLines,
   escapeHtml,
   formatTelegramDateTime,
   formatTelegramPremiumSupportTypeLabel,
@@ -497,70 +496,87 @@ export function buildTelegramSupportThreadStatusMessage(input: {
   };
   locale: SupportedLocale;
 }) {
-  const ui = getTelegramUi(input.locale);
   const state = getTelegramSupportThreadState({
     status: input.thread.status,
     waitingOn: input.thread.waitingOn,
     locale: input.locale,
   });
   const latestReply = input.thread.replies[input.thread.replies.length - 1] || null;
-
-  return [
-    input.locale === 'my'
-      ? '🛟 <b>Support thread အခြေအနေ</b>'
-      : '🛟 <b>Support thread</b>',
-    '',
-    `🧵 <b>${escapeHtml(input.thread.threadCode)}</b>`,
-    `${input.locale === 'my' ? 'အမျိုးအစား' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}</b>`,
-    `${input.locale === 'my' ? 'အခြေအနေ' : 'Status'}: <b>${escapeHtml(state.label)}</b>`,
-    `${input.locale === 'my' ? 'SLA' : 'SLA'}: <b>${escapeHtml(getTelegramSupportThreadSlaLabel({ thread: input.thread, locale: input.locale }))}</b>`,
-    `${input.locale === 'my' ? 'ကြာချိန်' : 'Age'}: <b>${escapeHtml(formatTelegramSupportRelativeAge(input.thread.updatedAt || input.thread.createdAt, input.locale))}</b>`,
+  const snapshotLines = [
+    `${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))} • ${escapeHtml(state.label)}`,
+    `${input.locale === 'my' ? 'SLA' : 'SLA'}: <b>${escapeHtml(
+      getTelegramSupportThreadSlaLabel({ thread: input.thread, locale: input.locale }),
+    )}</b> • ${input.locale === 'my' ? 'ကြာချိန်' : 'Age'}: <b>${escapeHtml(
+      formatTelegramSupportRelativeAge(input.thread.updatedAt || input.thread.createdAt, input.locale),
+    )}</b>`,
     input.thread.assignedAdminName
       ? `${input.locale === 'my' ? 'တာဝန်ယူသူ' : 'Assigned'}: <b>${escapeHtml(input.thread.assignedAdminName)}</b>`
-      : '',
+      : null,
     input.thread.escalatedAt
-      ? `${input.locale === 'my' ? 'တင်ပို့ချိန်' : 'Escalated'}: ${escapeHtml(formatTelegramDateTime(input.thread.escalatedAt, input.locale))}`
-      : '',
-    input.thread.relatedOrderCode
-      ? `${ui.orderCodeLabel}: <b>${escapeHtml(input.thread.relatedOrderCode)}</b>`
-      : '',
-    input.thread.relatedKeyName
-      ? `${input.locale === 'my' ? 'Key' : 'Key'}: <b>${escapeHtml(input.thread.relatedKeyName)}</b>`
-      : '',
-    latestReply?.mediaKind
-      ? `${input.locale === 'my' ? 'Attachment' : 'Attachment'}: <b>${escapeHtml(
-          latestReply.mediaKind === 'IMAGE'
-            ? input.locale === 'my'
-              ? 'ပုံ'
-              : 'Image'
-            : latestReply.mediaKind === 'FILE'
-              ? latestReply.mediaFilename || (input.locale === 'my' ? 'ဖိုင်' : 'File')
-              : latestReply.mediaKind,
-        )}</b>`
-      : '',
-    latestReply?.mediaUrl
-      ? input.locale === 'my'
-        ? 'Attachment ကို အောက်တွင် ဖွင့်နိုင်ပါသည်။'
-        : 'Attachment is ready below.'
-      : '',
-    ...buildTelegramLatestReplyPreviewLines({
-      reply: latestReply,
-      locale: input.locale,
-      maxLength: 140,
-    }).map((line) => escapeHtml(line)),
-    '',
-    input.locale === 'my'
-      ? state.code === 'user'
-        ? 'လိုအပ်သော အချက်အလက်ကို reply လုပ်ပေးပါ။'
-        : state.code === 'handled'
-          ? 'Thread ကို ပြန်ဖွင့်လိုပါက Reply ကို နှိပ်ပြီး message ပို့နိုင်ပါသည်။'
-          : 'Admin reply ကို ဤ chat ထဲမှာ စောင့်နိုင်ပါသည်။'
-      : state.code === 'user'
-        ? 'Reply here with the extra detail we need.'
-        : state.code === 'handled'
-          ? 'Use Reply if you want to reopen this thread.'
-          : 'Wait here for the admin reply in this chat.',
-  ]
-    .filter(Boolean)
-    .join('\n');
+      ? `${input.locale === 'my' ? 'တင်ပို့ချိန်' : 'Escalated'}: ${escapeHtml(
+          formatTelegramDateTime(input.thread.escalatedAt, input.locale),
+        )}`
+      : null,
+    [input.thread.relatedOrderCode ? `Order: <b>${escapeHtml(input.thread.relatedOrderCode)}</b>` : null, input.thread.relatedKeyName ? `Key: <b>${escapeHtml(input.thread.relatedKeyName)}</b>` : null]
+      .filter(Boolean)
+      .join(' • ') || null,
+  ];
+
+  const cards = [
+    buildTelegramCommerceCard(
+      input.locale === 'my' ? '🧵 <b>Thread snapshot</b>' : '🧵 <b>Thread snapshot</b>',
+      snapshotLines,
+    ),
+  ];
+
+  if (latestReply) {
+    const latestReplyPreview = latestReply.message.trim();
+    const latestReplyLines = [
+      `${latestReply.senderType === 'ADMIN' ? 'Admin' : input.locale === 'my' ? 'You' : 'You'} • ${escapeHtml(
+        formatTelegramDateTime(latestReply.createdAt, input.locale),
+      )}`,
+      latestReply.mediaKind
+        ? `${input.locale === 'my' ? 'Attachment' : 'Attachment'}: <b>${escapeHtml(
+            latestReply.mediaKind === 'IMAGE'
+              ? input.locale === 'my'
+                ? 'ပုံ'
+                : 'Image'
+              : latestReply.mediaKind === 'FILE'
+                ? latestReply.mediaFilename || (input.locale === 'my' ? 'ဖိုင်' : 'File')
+                : latestReply.mediaKind,
+          )}</b>${latestReply.mediaUrl ? ` • ${input.locale === 'my' ? 'button below' : 'button below'}` : ''}`
+        : null,
+      latestReplyPreview
+        ? escapeHtml(`${latestReplyPreview.slice(0, 100)}${latestReplyPreview.length > 100 ? '…' : ''}`)
+        : null,
+    ];
+
+    cards.push(
+      buildTelegramCommerceCard(
+        input.locale === 'my' ? '💬 <b>Latest reply</b>' : '💬 <b>Latest reply</b>',
+        latestReplyLines,
+      ),
+    );
+  }
+
+  return buildTelegramCommerceMessage({
+    title:
+      input.locale === 'my'
+        ? `🛟 <b>Support thread · ${escapeHtml(input.thread.threadCode)}</b>`
+        : `🛟 <b>Support thread · ${escapeHtml(input.thread.threadCode)}</b>`,
+    cards,
+    footerLines: [
+      input.locale === 'my'
+        ? state.code === 'user'
+          ? 'လိုအပ်သော အချက်အလက်ကို reply လုပ်ပေးပါ။'
+          : state.code === 'handled'
+            ? 'Thread ကို ပြန်ဖွင့်လိုပါက Reply ကို နှိပ်ပြီး message ပို့နိုင်ပါသည်။'
+            : 'Admin reply ကို ဤ chat ထဲမှာ စောင့်နိုင်ပါသည်။'
+        : state.code === 'user'
+          ? 'Reply here with the extra detail we need.'
+          : state.code === 'handled'
+            ? 'Use Reply if you want to reopen this thread.'
+            : 'Wait here for the admin reply in this chat.',
+    ],
+  });
 }
