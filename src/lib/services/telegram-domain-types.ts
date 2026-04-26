@@ -71,6 +71,7 @@ export type TelegramLocaleSelectorContext = 'start' | 'switch';
 export type TelegramOrderReviewAction =
   | 'approve'
   | 'claim'
+  | 'detail'
   | 'next'
   | 'prev'
   | 'reject'
@@ -97,7 +98,7 @@ export type TelegramOrderUserAction =
 export type TelegramServerChangeReviewAction = 'approve' | 'reject';
 export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
-export type TelegramAdminRefundAction = 'claim' | 'next' | 'prev';
+export type TelegramAdminRefundAction = 'claim' | 'detail' | 'next' | 'prev';
 export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support' | 'orders';
 export type TelegramCommerceViewSection =
   | 'buy'
@@ -151,7 +152,7 @@ export type TelegramSupportMenuAction =
   | 'premium'
   | 'keys';
 
-export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx' | 'cl' | 'uc' | 'rp' | 'es';
+export type TelegramSupportQueueAction = 'wk' | 'nd' | 'hd' | 'nx' | 'cl' | 'uc' | 'rp' | 'es' | 'dt';
 export type TelegramSupportThreadAction = 'new' | 'reply' | 'status' | 'escalate';
 
 export type TelegramNotificationPreferenceKey =

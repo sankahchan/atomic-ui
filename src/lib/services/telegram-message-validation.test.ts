@@ -7,6 +7,7 @@ import {
 } from '@/lib/services/telegram-admin';
 import {
   buildTelegramRefundQueueCardKeyboard,
+  buildTelegramRefundQueueDetailMessage,
   buildTelegramRefundQueueCardMessage,
   buildTelegramRefundQueueSummaryKeyboard,
   buildTelegramRefundQueueSummaryMessage,
@@ -27,6 +28,7 @@ import {
   buildTelegramInboxTitle,
 } from '@/lib/services/telegram-inbox-ui';
 import {
+  buildTelegramOrderReviewDetailMessage,
   buildTelegramReviewQueueSummaryKeyboard,
   buildTelegramReviewQueueSummaryMessage,
 } from '@/lib/services/telegram-review-queue';
@@ -35,6 +37,7 @@ import {
   buildTelegramOrderReviewAlertMessage,
 } from '@/lib/services/telegram-review-queue';
 import {
+  buildTelegramPremiumSupportQueueDetailMessage,
   buildTelegramPremiumSupportQueueSummaryMessage,
   buildTelegramPremiumSupportQueueCardMessage,
   buildTelegramSupportQueueReplyKeyboard,
@@ -42,6 +45,7 @@ import {
   buildTelegramSupportQueueSummaryKeyboard,
 } from '@/lib/services/telegram-premium-support-queue';
 import {
+  buildTelegramSupportThreadQueueDetailMessage,
   buildTelegramSupportThreadsSummaryMessage,
   buildTelegramSupportThreadQueueMessage,
   buildTelegramSupportThreadQueueReplyKeyboard,
@@ -784,4 +788,112 @@ test('myanmar premium queue helpers stay localized and compact', () => {
   assert.doesNotMatch(workingMessage, /We are checking this now/);
   assert.doesNotMatch(detailMessage, /Please send a little more detail/);
   assert.doesNotMatch(handledMessage, /This issue has been handled/);
+});
+
+test('admin queue detail cards stay compact and keep links out of the text body', () => {
+  const reviewDetail = buildTelegramOrderReviewDetailMessage({
+    locale: 'en',
+    renewalTargetLabel: 'Key 90',
+    order: {
+      id: 'ord_1',
+      orderCode: 'ORD-1001',
+      kind: 'RENEW',
+      orderMode: 'SELF',
+      telegramUserId: '123456',
+      telegramUsername: 'buyer_one',
+      requestedEmail: 'buyer@example.com',
+      requestedName: 'Testing',
+      planName: 'Premium / 1 Month / 200 GB',
+      deliveryType: 'DYNAMIC_KEY',
+      priceLabel: '6,000 Kyat',
+      paymentMethodLabel: 'KBZPay',
+      selectedServerName: 'SG-2',
+      paymentCaption: 'Please use the same region if possible.',
+      giftRecipientLabel: null,
+    } as any,
+  });
+  const refundDetail = buildTelegramRefundQueueDetailMessage({
+    locale: 'en',
+    order: {
+      id: 'ord_2',
+      orderCode: 'ORD-2002',
+      kind: 'RENEW',
+      requestedEmail: 'refund@example.com',
+      telegramUsername: 'refund_user',
+      telegramUserId: '234567',
+      priceAmount: 9000,
+      priceCurrency: 'MMK',
+      planName: '2 Months / 300 GB',
+      paymentMethodLabel: 'AYA Pay',
+      financeStatus: 'OPEN',
+      refundRequestedAt: new Date('2026-04-22T00:30:00Z'),
+      refundRequestMessage: 'I renewed by mistake and need the order cancelled before it is fulfilled.',
+    } as any,
+  });
+  const premiumDetail = buildTelegramPremiumSupportQueueDetailMessage({
+    locale: 'en',
+    request: {
+      requestCode: 'PRM-100',
+      requestType: 'ROUTE_ISSUE',
+      requestedRegionCode: 'SG',
+      currentResolvedServerName: 'SG-2',
+      currentPoolSummary: '1 preferred server • 2 fallback routes',
+      linkedOutageServerName: 'SG-1',
+      appliedPinServerName: 'SG-2',
+      adminNote: 'User reported unstable routing after midnight.',
+      customerMessage: null,
+      followUpPending: true,
+      dynamicAccessKey: {
+        id: 'dak_1',
+        name: 'Onn',
+      },
+      replies: [
+        {
+          id: 'reply_1',
+          senderType: 'CUSTOMER',
+          message: 'Routing became slow again after reconnecting.',
+          createdAt: new Date('2026-04-22T01:00:00Z'),
+        },
+      ],
+    } as any,
+  });
+  const supportThreadDetail = buildTelegramSupportThreadQueueDetailMessage({
+    locale: 'en',
+    thread: {
+      id: 'thr_1',
+      threadCode: 'SUP-100',
+      issueCategory: 'PAYMENT',
+      status: 'OPEN',
+      waitingOn: 'ADMIN',
+      telegramUserId: '345678',
+      telegramUsername: 'support_user',
+      relatedOrderCode: 'ORD-2002',
+      relatedKeyName: 'Testing',
+      relatedServerName: 'SG-2',
+      subject: 'Need a quick confirmation before payment proof expires.',
+      firstResponseDueAt: new Date('2026-04-22T01:30:00Z'),
+      replies: [
+        {
+          id: 'reply_2',
+          senderType: 'CUSTOMER',
+          message: 'Can you confirm whether the screenshot is clear enough now?',
+          createdAt: new Date('2026-04-22T01:05:00Z'),
+        },
+      ],
+    } as any,
+  });
+
+  for (const message of [reviewDetail, refundDetail, premiumDetail, supportThreadDetail]) {
+    assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+    assert.doesNotMatch(message, /https?:\/\//);
+  }
+
+  assert.match(reviewDetail, /Review detail/);
+  assert.match(refundDetail, /Refund detail/);
+  assert.match(premiumDetail, /Premium support detail/);
+  assert.match(supportThreadDetail, /Support thread detail/);
+  assertTelegramMessageBudget(reviewDetail, { maxLines: 8, maxChars: 340 });
+  assertTelegramMessageBudget(refundDetail, { maxLines: 7, maxChars: 320 });
+  assertTelegramMessageBudget(premiumDetail, { maxLines: 9, maxChars: 360 });
+  assertTelegramMessageBudget(supportThreadDetail, { maxLines: 8, maxChars: 360 });
 });
