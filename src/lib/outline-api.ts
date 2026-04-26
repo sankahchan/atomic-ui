@@ -90,9 +90,11 @@ export class OutlineClient {
     this.apiUrl = apiUrl.replace(/\/$/, '');
     this.certSha256 = certSha256;
 
-    // Create an HTTPS agent that accepts self-signed certificates
+    // Disable TLS session caching so repeated self-signed manager calls keep
+    // returning the peer certificate fingerprint on every handshake.
     this.httpsAgent = new https.Agent({
       rejectUnauthorized: false,
+      maxCachedSessions: 0,
     });
   }
 
