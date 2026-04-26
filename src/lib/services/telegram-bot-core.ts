@@ -260,6 +260,7 @@ import {
   ensureAccessKeySubscriptionToken,
   getDynamicKeyMessagingUrls,
 } from '@/lib/services/telegram-links';
+import { buildTelegramAdminKeyErrorNotice } from '@/lib/services/telegram-admin-key-errors';
 import { type TelegramUpdate } from '@/lib/services/telegram-domain-types';
 import {
   runTelegramSalesDigestCycle,
@@ -6282,29 +6283,49 @@ export async function handleTelegramCallbackQuery(
         return null;
       }
 
-      const result = await handleTelegramAdminKeyCallback({
-        chatId,
-        telegramUserId: callbackQuery.from.id,
-        locale,
-        botToken: config.botToken,
-        adminActor,
-        action: adminKeyAction.action,
-        primary: adminKeyAction.primary,
-        secondary: adminKeyAction.secondary,
-        deps: {
-          sendTelegramMessage,
-          sendAccessKeySharePageToTelegram,
-          sendDynamicKeySharePageToTelegram,
-          createAccessKeyTelegramConnectLink,
-          createDynamicKeyTelegramConnectLink,
-          copyTelegramMessage,
-        },
-      });
-      if (result.handled) {
+      try {
+        const result = await handleTelegramAdminKeyCallback({
+          chatId,
+          telegramUserId: callbackQuery.from.id,
+          locale,
+          botToken: config.botToken,
+          adminActor,
+          action: adminKeyAction.action,
+          primary: adminKeyAction.primary,
+          secondary: adminKeyAction.secondary,
+          deps: {
+            sendTelegramMessage,
+            sendAccessKeySharePageToTelegram,
+            sendDynamicKeySharePageToTelegram,
+            createAccessKeyTelegramConnectLink,
+            createDynamicKeyTelegramConnectLink,
+            copyTelegramMessage,
+          },
+        });
+        if (result.handled) {
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            result.callbackText || ui.orderActionSent,
+          );
+          return null;
+        }
+      } catch (error) {
+        console.error('Telegram admin key callback error:', error);
+        const notice = buildTelegramAdminKeyErrorNotice(error, locale);
         await answerTelegramCallbackQuery(
           config.botToken,
           callbackQuery.id,
-          result.callbackText || ui.orderActionSent,
+          notice.callbackText,
+        );
+        await sendTelegramMessage(
+          config.botToken,
+          chatId,
+          [
+            notice.chatTitle,
+            '',
+            escapeHtml(notice.chatText),
+          ].join('\n'),
         );
         return null;
       }
