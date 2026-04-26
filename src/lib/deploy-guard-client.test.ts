@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { CLIENT_BUILD_HEADER_NAME } from '@/lib/deploy-guard';
 import {
+  CLIENT_BUILD_HEADER_NAME,
+  CLIENT_BUILD_QUERY_PARAM_NAME,
+} from '@/lib/deploy-guard';
+import {
+  buildFormActionWithClientBuild,
   buildFetchRequestWithClientBuild,
   isNextRouterRscFetch,
 } from '@/lib/deploy-guard-client';
@@ -56,4 +60,17 @@ test('client build header is merged without replacing the original Request objec
   assert.equal(input, request);
   assert.equal(new Headers(init?.headers).get(CLIENT_BUILD_HEADER_NAME), 'current-build');
   assert.equal(new Headers(init?.headers).get('rsc'), '1');
+});
+
+test('same-origin form actions receive an immutable build query marker', () => {
+  const action = buildFormActionWithClientBuild('/dashboard/settings', 'current-build', currentHref);
+  assert.equal(
+    action,
+    `https://example.com/dashboard/settings?${CLIENT_BUILD_QUERY_PARAM_NAME}=current-build`,
+  );
+});
+
+test('cross-origin form actions are left untouched', () => {
+  const action = buildFormActionWithClientBuild('https://other.example/form', 'current-build', currentHref);
+  assert.equal(action, 'https://other.example/form');
 });

@@ -16,6 +16,16 @@ test('request build id prefers immutable client header over cookie', () => {
   );
 });
 
+test('request build id prefers immutable client query marker over cookie when no header exists', () => {
+  assert.equal(
+    resolveRequestBuildId({
+      queryBuildId: 'old-build',
+      cookieBuildId: 'new-build',
+    }),
+    'old-build',
+  );
+});
+
 test('stale server action is rejected when client header is older than current build', () => {
   assert.equal(
     shouldRejectStaleServerAction({
@@ -35,6 +45,17 @@ test('matching immutable client header suppresses false stale-cookie mismatches'
       cookieBuildId: 'old-build',
     }),
     false,
+  );
+});
+
+test('stale server action is rejected when form query marker is older than the current build', () => {
+  assert.equal(
+    shouldRejectStaleServerAction({
+      currentBuildId: 'new-build',
+      queryBuildId: 'old-build',
+      cookieBuildId: 'new-build',
+    }),
+    true,
   );
 });
 

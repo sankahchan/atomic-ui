@@ -1,4 +1,7 @@
-import { CLIENT_BUILD_HEADER_NAME } from '@/lib/deploy-guard';
+import {
+  CLIENT_BUILD_HEADER_NAME,
+  CLIENT_BUILD_QUERY_PARAM_NAME,
+} from '@/lib/deploy-guard';
 
 export type GuardedFetchArgs = readonly [RequestInfo | URL, RequestInit | undefined];
 
@@ -74,4 +77,28 @@ export function buildFetchRequestWithClientBuild(
   const headers = getFetchHeaders(input, init);
   headers.set(CLIENT_BUILD_HEADER_NAME, buildId);
   return [input, { ...init, headers }] as const;
+}
+
+export function buildFormActionWithClientBuild(
+  action: string | null | undefined,
+  buildId: string,
+  currentHref: string,
+) {
+  const normalizedBuildId = buildId.trim();
+  if (!normalizedBuildId) {
+    return action ?? null;
+  }
+
+  const requestUrl = action?.trim() || currentHref;
+  if (!isSameOriginUrl(requestUrl, currentHref)) {
+    return action ?? null;
+  }
+
+  try {
+    const url = new URL(requestUrl, currentHref);
+    url.searchParams.set(CLIENT_BUILD_QUERY_PARAM_NAME, normalizedBuildId);
+    return url.toString();
+  } catch {
+    return action ?? null;
+  }
 }

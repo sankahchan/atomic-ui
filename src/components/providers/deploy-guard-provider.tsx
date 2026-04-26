@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getBasePath, withBasePath } from '@/lib/base-path';
 import {
   buildFetchRequestWithClientBuild,
+  buildFormActionWithClientBuild,
   isNextRouterRscFetch,
   isSameOriginUrl,
 } from '@/lib/deploy-guard-client';
@@ -95,6 +96,48 @@ function shouldGuardFormSubmit(form: HTMLFormElement, submitter: HTMLElement | n
   }
 
   return isSameOriginUrl(form.getAttribute('action') || window.location.href, window.location.href);
+}
+
+function patchFormSubmissionBuild(
+  form: HTMLFormElement,
+  submitter: HTMLElement | null,
+  buildId: string,
+  currentHref: string,
+) {
+  const restoreCallbacks: Array<() => void> = [];
+  const nextFormAction = buildFormActionWithClientBuild(form.getAttribute('action'), buildId, currentHref);
+
+  if (nextFormAction) {
+    const previousAction = form.getAttribute('action');
+    form.setAttribute('action', nextFormAction);
+    restoreCallbacks.push(() => {
+      if (previousAction === null) {
+        form.removeAttribute('action');
+        return;
+      }
+
+      form.setAttribute('action', previousAction);
+    });
+  }
+
+  if (submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement) {
+    const explicitFormAction = submitter.getAttribute('formaction');
+    if (explicitFormAction !== null) {
+      const nextSubmitterAction = buildFormActionWithClientBuild(explicitFormAction, buildId, currentHref);
+      if (nextSubmitterAction) {
+        submitter.setAttribute('formaction', nextSubmitterAction);
+        restoreCallbacks.push(() => {
+          submitter.setAttribute('formaction', explicitFormAction);
+        });
+      }
+    }
+  }
+
+  return () => {
+    for (const restore of restoreCallbacks.reverse()) {
+      restore();
+    }
+  };
 }
 
 export function DeployGuardProvider({
@@ -297,6 +340,8 @@ export function DeployGuardProvider({
       pendingFormsRef.current.add(form);
 
       void (async () => {
+        let restoreFormAction: () => void = () => undefined;
+
         try {
           if ((await resolveBuildStatus()) === 'stale') {
             triggerReload('new-build');
@@ -307,6 +352,12 @@ export function DeployGuardProvider({
             return;
           }
 
+          restoreFormAction = patchFormSubmissionBuild(
+            form,
+            submitter,
+            initialBuildIdRef.current,
+            window.location.href,
+          );
           bypassedFormsRef.current.add(form);
           if (
             (submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement) &&
@@ -318,6 +369,9 @@ export function DeployGuardProvider({
 
           form.requestSubmit();
         } finally {
+          window.setTimeout(() => {
+            restoreFormAction();
+          }, 0);
           pendingFormsRef.current.delete(form);
         }
       })();
