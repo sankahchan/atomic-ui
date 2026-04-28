@@ -529,7 +529,7 @@ test('inbox summary stays compact and avoids category dump walls', () => {
   const message = buildTelegramInboxSummaryMessage({
     locale: 'en',
     mode: 'ALL',
-    summaryLine: '2 announcement(s) • 1 order update(s) • 1 support update(s)',
+    summaryLine: '2 notices • 1 order • 1 support',
     items: [
       {
         icon: '📣',
@@ -562,10 +562,11 @@ test('inbox summary stays compact and avoids category dump walls', () => {
     ],
   });
 
-  assert.match(message, /Your Notice Inbox/);
+  assert.match(message, /Your inbox updates/);
   assert.match(message, /1\.\s+📣/);
   assert.match(message, /2\.\s+🧾/);
   assert.match(message, /3\.\s+💎/);
+  assert.doesNotMatch(message, /announcement\(s\)|support update\(s\)|order update\(s\)/);
   assert.doesNotMatch(message, /Announcements<\/b>/);
   assert.doesNotMatch(message, /Order updates<\/b>/);
   assert.doesNotMatch(message, /Support updates<\/b>/);
