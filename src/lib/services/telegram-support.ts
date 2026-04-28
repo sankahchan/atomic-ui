@@ -4,6 +4,7 @@ export type {
 } from '@/lib/services/telegram-support-types';
 
 export {
+  buildTelegramSupportHubMessage,
   buildTelegramSupportHubKeyboard,
   buildTelegramSupportReplyMediaUrl,
   buildTelegramSupportThreadKeyboard,

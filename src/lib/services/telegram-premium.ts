@@ -650,6 +650,11 @@ type TelegramPremiumSupportListItem = {
   createdAtLabel: string;
 };
 
+function formatTelegramCountLabel(count: number, singular: string, plural?: string) {
+  const pluralLabel = plural || `${singular}s`;
+  return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
 export function buildTelegramPremiumHubMessage(input: {
   locale: SupportedLocale;
   items: TelegramPremiumHubItem[];
@@ -674,11 +679,14 @@ export function buildTelegramPremiumHubMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: ui.premiumHubTitle,
-    statsLine: `${input.items.length} key(s) • ${input.requestCount} recent request(s)`,
+    statsLine: `${formatTelegramCountLabel(input.items.length, 'key')} • ${formatTelegramCountLabel(
+      input.requestCount,
+      'recent request',
+    )}`,
     intro:
       input.locale === 'my'
-        ? 'Premium hub ကို အတိုချုံးပြထားသည်။ Region, issue, status, and More ကို အသုံးပြုနိုင်သည်။'
-        : 'This premium hub stays short. Use Region, Issue, Status, or More for the next step.',
+        ? 'အောက်က button များဖြင့် region, issue, status, more ကို ဆက်လုပ်နိုင်သည်။'
+        : 'Use the buttons below for region, issue, status, or more.',
     cards,
   });
 }
@@ -705,7 +713,7 @@ export function buildTelegramPremiumDetailMessage(input: {
     statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
     intro:
       input.locale === 'my'
-        ? 'Open, region, issue, and status actions stay in the buttons below.'
+        ? 'Open, region, issue, status ကို အောက်က button များဖြင့် ဆက်လုပ်နိုင်သည်။'
         : 'Open, region, issue, and status actions stay in the buttons below.',
     cards: [
       buildTelegramCommerceCard(
@@ -736,11 +744,11 @@ export function buildTelegramPremiumSupportListMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: ui.premiumStatusTitle,
-    statsLine: `${input.items.length} request(s)`,
+    statsLine: formatTelegramCountLabel(input.items.length, 'recent request'),
     intro:
       input.locale === 'my'
-        ? 'Open thread ကို နှိပ်ပြီး request detail ကို ဖွင့်နိုင်သည်။'
-        : 'Use Open thread to view the request detail card.',
+        ? 'Open thread ကို နှိပ်ပြီး compact request card ကို ဖွင့်နိုင်သည်။'
+        : 'Tap Open thread below for the compact request card.',
     cards,
   });
 }
