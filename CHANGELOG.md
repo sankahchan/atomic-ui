@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.9 - 2026-04-29
+
+### Changed
+
+- Compacted Telegram `/support` into a cleaner support hub with shorter recent-thread and premium-request cards, keeping help actions visible on mobile.
+- Polished Telegram customer `/inbox`, `/premium`, and `/premiumregion` so titles, counters, region snapshots, and detail actions read more cleanly in phone-sized chats.
+
+### Fixed
+
+- Fixed lingering awkward inbox and premium wording such as generic `announcement(s)`, `support update(s)`, and `key(s) / request(s)` counters in customer-facing Telegram screens.
+- Revalidated the deployed production Telegram webhook with live `/inbox`, `/premium`, and `/premiumregion` smoke coverage after shipping the customer-card refresh.
+
 ## v1.2.8 - 2026-04-26
 
 ### Changed
