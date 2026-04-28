@@ -650,9 +650,78 @@ type TelegramPremiumSupportListItem = {
   createdAtLabel: string;
 };
 
-function formatTelegramCountLabel(count: number, singular: string, plural?: string) {
+function formatTelegramCountLabel(
+  count: number,
+  locale: SupportedLocale,
+  singular: string,
+  plural?: string,
+  myanmarLabel?: string,
+) {
+  if (locale === 'my') {
+    return `${count} ခု ${myanmarLabel || plural || singular}`;
+  }
+
   const pluralLabel = plural || `${singular}s`;
   return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
+function buildTelegramPremiumHeroCaption(input: {
+  locale: SupportedLocale;
+  keyCount: number;
+  requestCount: number;
+}) {
+  const statsLine = `${formatTelegramCountLabel(input.keyCount, input.locale, 'key')} • ${formatTelegramCountLabel(
+    input.requestCount,
+    input.locale,
+    'recent request',
+    'recent requests',
+    'recent request',
+  )}`;
+
+  return [
+    getTelegramUi(input.locale).premiumHubTitle,
+    '',
+    statsLine,
+    input.locale === 'my'
+      ? 'Atomic-UI Premium • stable route • region-aware support'
+      : 'Atomic-UI Premium • stable route • region-aware support',
+  ].join('\n');
+}
+
+function resolveTelegramPremiumDetailButtonLabel(locale: SupportedLocale) {
+  return locale === 'my' ? 'အသေးစိတ်' : 'Details';
+}
+
+function selectPremiumRegionSnapshotSummaries(analysis: PremiumRegionAnalysis) {
+  const selected: PremiumRegionSummary[] = [];
+  const seen = new Set<string>();
+  const push = (summary: PremiumRegionSummary | null | undefined) => {
+    if (!summary || seen.has(summary.regionCode)) {
+      return;
+    }
+    selected.push(summary);
+    seen.add(summary.regionCode);
+  };
+
+  push(analysis.currentSummary);
+
+  for (const summary of analysis.regionSummaries) {
+    if (analysis.preferredRegions.includes(summary.regionCode) && summary.status !== 'UP') {
+      push(summary);
+    }
+  }
+
+  for (const summary of analysis.regionSummaries) {
+    if (analysis.preferredRegions.includes(summary.regionCode)) {
+      push(summary);
+    }
+  }
+
+  for (const fallback of analysis.suggestedFallbacks) {
+    push(analysis.regionSummaries.find((summary) => summary.regionCode === fallback.regionCode) || null);
+  }
+
+  return selected.slice(0, 3);
 }
 
 export function buildTelegramPremiumHubMessage(input: {
@@ -679,14 +748,17 @@ export function buildTelegramPremiumHubMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: ui.premiumHubTitle,
-    statsLine: `${formatTelegramCountLabel(input.items.length, 'key')} • ${formatTelegramCountLabel(
+    statsLine: `${formatTelegramCountLabel(input.items.length, input.locale, 'key')} • ${formatTelegramCountLabel(
       input.requestCount,
+      input.locale,
+      'recent request',
+      'recent requests',
       'recent request',
     )}`,
     intro:
       input.locale === 'my'
-        ? 'အောက်က button များဖြင့် region, issue, status, more ကို ဆက်လုပ်နိုင်သည်။'
-        : 'Use the buttons below for region, issue, status, or more.',
+        ? 'အောက်က key တစ်ခုကိုရွေးပြီး region, issue, status ကို ဆက်လုပ်နိုင်သည်။'
+        : 'Choose a key below, then use the buttons for region, issue, or status.',
     cards,
   });
 }
@@ -713,8 +785,8 @@ export function buildTelegramPremiumDetailMessage(input: {
     statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
     intro:
       input.locale === 'my'
-        ? 'Open, region, issue, status ကို အောက်က button များဖြင့် ဆက်လုပ်နိုင်သည်။'
-        : 'Open, region, issue, and status actions stay in the buttons below.',
+        ? 'Open, region, issue, status ကို အောက်က button များဖြင့် ဆက်လုပ်ပါ။'
+        : 'Use the buttons below for open, region, issue, or status.',
     cards: [
       buildTelegramCommerceCard(
         '💎 <b>Premium summary</b>',
@@ -744,11 +816,17 @@ export function buildTelegramPremiumSupportListMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: ui.premiumStatusTitle,
-    statsLine: formatTelegramCountLabel(input.items.length, 'recent request'),
+    statsLine: formatTelegramCountLabel(
+      input.items.length,
+      input.locale,
+      'recent request',
+      'recent requests',
+      'recent request',
+    ),
     intro:
       input.locale === 'my'
-        ? 'Open thread ကို နှိပ်ပြီး compact request card ကို ဖွင့်နိုင်သည်။'
-        : 'Tap Open thread below for the compact request card.',
+        ? 'Open thread ကို နှိပ်ပြီး request တစ်ခုချင်းစီကို ကြည့်နိုင်သည်။'
+        : 'Open a request below for the compact thread card.',
     cards,
   });
 }
@@ -769,13 +847,17 @@ export function buildTelegramPremiumRegionDetailMessage(input: {
     ? `${input.analysis.currentServer.name}${input.analysis.currentServer.countryCode ? ` ${getFlagEmoji(input.analysis.currentServer.countryCode)}` : ''}`
     : ui.premiumRegionUnknownStatus;
   const preferredRegionsLabel = input.analysis.preferredRegions.join(', ') || ui.premiumRegionNoAttached;
+  const regionSnapshotSummaries = selectPremiumRegionSnapshotSummaries(input.analysis);
   const regionLines =
-    input.analysis.regionSummaries.length === 0
+    regionSnapshotSummaries.length === 0
       ? [ui.premiumRegionNoAttached]
-      : input.analysis.regionSummaries.slice(0, 3).map((summary) => {
+      : regionSnapshotSummaries.map((summary) => {
           const markers: string[] = [];
           if (summary.isCurrent) {
             markers.push(ui.premiumRegionCurrentRouteLabel);
+          }
+          if (input.analysis.preferredRegions.includes(summary.regionCode) && !summary.isCurrent) {
+            markers.push(ui.premiumRegionPreferredLabel);
           }
           if (summary.serverCount > 0) {
             markers.push(`${summary.serverCount} server${summary.serverCount === 1 ? '' : 's'}`);
@@ -792,7 +874,7 @@ export function buildTelegramPremiumRegionDetailMessage(input: {
         [
           `${ui.premiumRegionPreferredLabel}: ${escapeHtml(preferredRegionsLabel)}`,
           `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}${currentFallback ? ` • ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}` : ''}`,
-          `Last event: ${escapeHtml(formatTelegramPremiumRoutingEventSummary(input.latestRoutingEvent, input.locale))}`,
+          `Event: ${escapeHtml(formatTelegramPremiumRoutingEventSummary(input.latestRoutingEvent, input.locale))}`,
         ],
       ),
       buildTelegramCommerceCard(
@@ -834,7 +916,7 @@ function buildTelegramPremiumHubKeyboard(input: {
           : buildTelegramDynamicSupportActionCallbackData('is', item.id),
       },
       {
-        text: input.locale === 'my' ? 'More' : 'More',
+        text: resolveTelegramPremiumDetailButtonLabel(input.locale),
         callback_data: buildTelegramCommerceViewCallbackData(
           'premium',
           'detail',
@@ -933,6 +1015,11 @@ function buildTelegramPremiumSupportListKeyboard(input: {
   if (input.supportLink) {
     rows.push([{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }]);
   }
+
+  rows.push([{
+    text: input.locale === 'my' ? '← Premium သို့' : '← Premium center',
+    callback_data: buildTelegramCommerceViewCallbackData('premium', 'home', '1'),
+  }]);
 
   return { inline_keyboard: rows };
 }
@@ -1117,18 +1204,11 @@ export async function handlePremiumCommand(input: {
     input.botToken,
     input.chatId,
     getTelegramBrandMediaUrl('premiumShowcase'),
-    [
-      ui.premiumHubTitle,
-      '',
-      input.locale === 'my'
-        ? `${dynamicKeys.length} key(s) • ${recentRequests.length} recent request(s)`
-        : `${dynamicKeys.length} key(s) • ${recentRequests.length} recent request(s)`,
-      ui.premiumStableLink,
-      ui.premiumAutoFailover,
-      input.locale === 'my'
-        ? 'Atomic-UI Premium • stable route • region-aware support'
-        : 'Atomic-UI Premium • stable route • region-aware support',
-    ].join('\n'),
+    buildTelegramPremiumHeroCaption({
+      locale: input.locale,
+      keyCount: dynamicKeys.length,
+      requestCount: recentRequests.length,
+    }),
   );
 
   const message = buildTelegramPremiumHubMessage({

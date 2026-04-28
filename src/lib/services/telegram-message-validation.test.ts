@@ -345,7 +345,7 @@ test('myanmar inbox copy avoids english fallback text', () => {
     assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
   }
 
-  assert.match(title, /အကူအညီ inbox/);
+  assert.match(title, /အကူအညီ အဖြေများ/);
   assert.match(empty, /support update မရှိသေးပါ/);
   assert.match(tip, /button များဖြင့် category/);
   assert.doesNotMatch(empty, /No recent support updates yet/);

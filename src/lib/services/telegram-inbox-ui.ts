@@ -27,21 +27,21 @@ export function buildTelegramInboxTitle(mode: TelegramInboxMode, locale: Support
   const isMyanmar = locale === 'my';
   switch (mode) {
     case 'UNREAD':
-      return isMyanmar ? '📬 <b>မဖတ်ရသေးသော Inbox</b>' : '📬 <b>Your unread inbox</b>';
+      return isMyanmar ? '📬 <b>မဖတ်ရသေးသော update များ</b>' : '📬 <b>Your unread updates</b>';
     case 'PINNED':
-      return isMyanmar ? '📌 <b>Pin လုပ်ထားသော Inbox</b>' : '📌 <b>Your pinned inbox</b>';
+      return isMyanmar ? '📌 <b>Pin လုပ်ထားသော update များ</b>' : '📌 <b>Your pinned updates</b>';
     case 'ORDERS':
-      return isMyanmar ? '🧾 <b>Order inbox</b>' : '🧾 <b>Your order inbox</b>';
+      return isMyanmar ? '🧾 <b>Order update များ</b>' : '🧾 <b>Your order updates</b>';
     case 'SUPPORT':
-      return isMyanmar ? '🛟 <b>အကူအညီ inbox</b>' : '🛟 <b>Your support inbox</b>';
+      return isMyanmar ? '🛟 <b>အကူအညီ အဖြေများ</b>' : '🛟 <b>Your support replies</b>';
     case 'REFUNDS':
-      return isMyanmar ? '💸 <b>Refund inbox</b>' : '💸 <b>Your refund inbox</b>';
+      return isMyanmar ? '💸 <b>Refund update များ</b>' : '💸 <b>Your refund updates</b>';
     case 'ANNOUNCEMENTS':
-      return isMyanmar ? '📣 <b>Announcement inbox</b>' : '📣 <b>Your announcement inbox</b>';
+      return isMyanmar ? '📣 <b>Notice များ</b>' : '📣 <b>Your notices</b>';
     case 'PREMIUM':
-      return isMyanmar ? '💎 <b>Premium inbox</b>' : '💎 <b>Your premium inbox</b>';
+      return isMyanmar ? '💎 <b>Premium update များ</b>' : '💎 <b>Your premium updates</b>';
     default:
-      return isMyanmar ? '📬 <b>သင်၏ Notice Inbox</b>' : '📬 <b>Your Notice Inbox</b>';
+      return isMyanmar ? '📬 <b>သင့် inbox update များ</b>' : '📬 <b>Your inbox updates</b>';
   }
 }
 
@@ -73,13 +73,13 @@ export function buildTelegramInboxTip(mode: TelegramInboxMode, locale: Supported
   const isMyanmar = locale === 'my';
   if (mode === 'ALL') {
     return isMyanmar
-      ? 'အောက်က button များဖြင့် category တစ်ခုချင်းစီ ကြည့်နိုင်ပါသည်။'
-      : 'Tip: use the buttons below for a narrower inbox.';
+      ? 'အောက်က button များဖြင့် category တစ်ခုချင်းစီ သီးသန့်ကြည့်နိုင်ပါသည်။'
+      : 'Use the filters below to open one category at a time.';
   }
 
   return isMyanmar
-    ? 'Update အားလုံးကို တစ်နေရာတည်းမှာ ကြည့်ရန် All သို့ ပြန်ပြောင်းပါ။'
-    : 'Tip: switch back to All to see every update in one place.';
+    ? 'Update အားလုံးကို တစ်နေရာတည်းမှာ ကြည့်ရန် အားလုံး သို့ ပြန်ပြောင်းပါ။'
+    : 'Switch back to All to see every update in one place.';
 }
 
 export function buildTelegramInboxSummaryMessage(input: {

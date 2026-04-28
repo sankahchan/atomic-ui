@@ -103,6 +103,44 @@ function truncateTelegramInboxLine(value: string, limit = 88) {
   return `${value.slice(0, limit - 1)}…`;
 }
 
+function formatTelegramInboxCountLabel(
+  count: number,
+  locale: SupportedLocale,
+  singular: string,
+  plural?: string,
+) {
+  if (locale === 'my') {
+    return `${singular} ${count} ခု`;
+  }
+
+  const pluralLabel = plural || `${singular}s`;
+  return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
+function formatTelegramInboxAnnouncementTypeLabel(type: string, locale: SupportedLocale) {
+  const isMyanmar = locale === 'my';
+  switch ((type || '').trim().toUpperCase()) {
+    case 'PROMO':
+      return isMyanmar ? 'Promo' : 'Promo';
+    case 'MAINTENANCE':
+      return isMyanmar ? 'Maintenance' : 'Maintenance';
+    case 'NEW_SERVER':
+      return isMyanmar ? 'Server အသစ်' : 'New server';
+    case 'ANNOUNCEMENT':
+    case 'INFO':
+    default:
+      return isMyanmar ? 'Notice' : 'Notice';
+  }
+}
+
+function formatTelegramInboxReadStateLabel(readAt: Date | null, locale: SupportedLocale) {
+  if (locale === 'my') {
+    return readAt ? 'ဖတ်ပြီး' : 'မဖတ်ရသေး';
+  }
+
+  return readAt ? 'Read' : 'Unread';
+}
+
 export function buildTelegramNotificationPreferencesKeyboard(
   locale: SupportedLocale,
   preferences: Awaited<ReturnType<typeof getTelegramNotificationPreferences>>,
@@ -384,15 +422,13 @@ export async function handleInboxCommand(input: {
   const summaryParts: string[] = [];
   if (announcements.length) {
     summaryParts.push(
-      input.locale === 'my'
-        ? `Announcement ${announcements.length} ခု`
-        : `${announcements.length} announcement(s)`,
+      formatTelegramInboxCountLabel(announcements.length, input.locale, 'notice', 'notices'),
     );
     inboxItems.push(
       ...announcements.map((delivery) => ({
         icon: delivery.isPinned ? '📌' : '📣',
         title: delivery.announcement.title,
-        detail: `${delivery.announcement.type} • ${delivery.readAt ? 'Read' : 'Unread'}`,
+        detail: `${formatTelegramInboxAnnouncementTypeLabel(delivery.announcement.type, input.locale)} • ${formatTelegramInboxReadStateLabel(delivery.readAt, input.locale)}`,
         meta: formatTelegramDateTime(delivery.sentAt || delivery.createdAt, input.locale),
         sortAt: delivery.sentAt || delivery.createdAt,
       })),
@@ -400,9 +436,7 @@ export async function handleInboxCommand(input: {
   }
   if (orderUpdates.length) {
     summaryParts.push(
-      input.locale === 'my'
-        ? `Order ${orderUpdates.length} ခု`
-        : `${orderUpdates.length} order update(s)`,
+      formatTelegramInboxCountLabel(orderUpdates.length, input.locale, 'order'),
     );
     inboxItems.push(
       ...orderUpdates.map((order) => {
@@ -416,7 +450,7 @@ export async function handleInboxCommand(input: {
         return {
           icon: '🧾',
           title: order.orderCode,
-          detail: `${formatTelegramOrderStatusLabel(order.status, ui)} • ${order.planName || order.planCode || order.kind}`,
+          detail: `${formatTelegramOrderStatusLabel(order.status, ui)} • ${truncateTelegramInboxLine(order.planName || order.planCode || order.kind, 44)}`,
           meta: formatTelegramDateTime(lastActivity, input.locale),
           sortAt: lastActivity,
         };
@@ -425,9 +459,7 @@ export async function handleInboxCommand(input: {
   }
   if (keyLogs.length) {
     summaryParts.push(
-      input.locale === 'my'
-        ? `Key notice ${keyLogs.length} ခု`
-        : `${keyLogs.length} key notice(s)`,
+      formatTelegramInboxCountLabel(keyLogs.length, input.locale, 'key notice'),
     );
     inboxItems.push(
       ...keyLogs.map((log) => ({
@@ -441,9 +473,7 @@ export async function handleInboxCommand(input: {
   }
   if (premiumSupportUpdates.length) {
     summaryParts.push(
-      input.locale === 'my'
-        ? `Support ${premiumSupportUpdates.length} ခု`
-        : `${premiumSupportUpdates.length} support update(s)`,
+      formatTelegramInboxCountLabel(premiumSupportUpdates.length, input.locale, 'support'),
     );
     inboxItems.push(
       ...premiumSupportUpdates.map((request) => {
@@ -465,15 +495,13 @@ export async function handleInboxCommand(input: {
   }
   if (refundUpdates.length) {
     summaryParts.push(
-      input.locale === 'my'
-        ? `Refund ${refundUpdates.length} ခု`
-        : `${refundUpdates.length} refund update(s)`,
+      formatTelegramInboxCountLabel(refundUpdates.length, input.locale, 'refund'),
     );
     inboxItems.push(
       ...refundUpdates.map((order) => ({
         icon: '💸',
         title: order.orderCode,
-        detail: `${formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui)} • ${order.planName || order.kind}`,
+        detail: `${formatTelegramRefundRequestStatusLabel(order.refundRequestStatus || 'PENDING', ui)} • ${truncateTelegramInboxLine(order.planName || order.kind, 44)}`,
         meta: formatTelegramDateTime(order.refundRequestReviewedAt || order.refundRequestedAt || order.updatedAt, input.locale),
         sortAt: order.refundRequestReviewedAt || order.refundRequestedAt || order.updatedAt,
       })),
@@ -481,9 +509,7 @@ export async function handleInboxCommand(input: {
   }
   if (premiumRoutingEvents.length) {
     summaryParts.push(
-      input.locale === 'my'
-        ? `Premium routing ${premiumRoutingEvents.length} ခု`
-        : `${premiumRoutingEvents.length} premium routing update(s)`,
+      formatTelegramInboxCountLabel(premiumRoutingEvents.length, input.locale, 'routing'),
     );
     inboxItems.push(
       ...premiumRoutingEvents.map((event) => ({
