@@ -31,6 +31,7 @@ import {
 } from '@/lib/services/telegram-runtime';
 import { listTelegramPremiumSupportRequestsForUser } from '@/lib/services/telegram-premium';
 import {
+  buildTelegramSupportHubMessage,
   buildTelegramSupportHubKeyboard,
   getTelegramSupportThreadState,
   listTelegramSupportThreadsForUser,
@@ -39,12 +40,13 @@ import {
 import {
   escapeHtml,
   formatExpirationSummary,
+  formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
   formatTelegramPremiumFollowUpState,
+  formatTelegramPremiumSupportTypeLabel,
   formatTelegramQuotaSummary,
   formatTelegramReplyStateLabel,
   formatTelegramServerChoiceLabel,
-  formatTelegramDateTime,
   getDynamicKeyRegionChoices,
   getFlagEmoji,
   getTelegramAccessKeyCategory,
@@ -792,73 +794,47 @@ export async function handleSupportCommand(input: {
   const openThreads = threads.filter((thread) => thread.status !== 'HANDLED');
   const latestThread = threads[0] || null;
   const latestPremiumRequest = premiumRequests[0] || null;
-
-  const lines = [
-    ui.supportHubTitle,
-    '',
-    locale === 'my'
-      ? `${openThreads.length} open support thread(s) • ${premiumRequests.length} premium support item(s)`
-      : `${openThreads.length} open support thread(s) • ${premiumRequests.length} premium support item(s)`,
-    '',
-    input.locale === 'my'
-      ? 'လိုအပ်သော category ကို ရွေးပြီး support thread အသစ် စတင်နိုင်ပါသည်။'
-      : 'Choose the category you need and start a new support thread.',
-  ];
-
-  if (latestThread) {
-    const state = getTelegramSupportThreadState({
-      status: latestThread.status,
-      waitingOn: latestThread.waitingOn,
-      locale,
-    });
-    lines.push(
-      '',
-      locale === 'my' ? '<b>Recent thread</b>' : '<b>Recent thread</b>',
-      `🧵 <b>${escapeHtml(latestThread.threadCode)}</b> • ${escapeHtml(resolveTelegramSupportIssueLabel(latestThread.issueCategory, locale))} • ${escapeHtml(state.label)}`,
-      `${locale === 'my' ? 'Updated' : 'Updated'}: <b>${escapeHtml(formatTelegramDateTime(latestThread.updatedAt, locale))}</b>`,
-    );
-  }
-
-  if (latestPremiumRequest) {
-    lines.push(
-      '',
-      locale === 'my' ? '<b>Recent premium request</b>' : '<b>Recent premium request</b>',
-      `💎 <b>${escapeHtml(latestPremiumRequest.requestCode)}</b>`,
-      `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramPremiumFollowUpState(latestPremiumRequest, ui))}</b> • ${escapeHtml(
-        formatTelegramReplyStateLabel({
-          latestReplySenderType: latestPremiumRequest.replies?.[latestPremiumRequest.replies.length - 1]?.senderType || null,
-          followUpPending: latestPremiumRequest.followUpPending,
-          locale,
-        }),
-      )}`,
-      `${locale === 'my' ? 'Updated' : 'Updated'}: <b>${escapeHtml(formatTelegramDateTime(latestPremiumRequest.updatedAt, locale))}</b>`,
-    );
-  }
-
-  lines.push(
-    '',
-    locale === 'my' ? '<b>Best path</b>' : '<b>Best path</b>',
-    locale === 'my'
-      ? '• Screenshot / payment / order problem များအတွက် Order / payment category ကို ရွေးပါ။'
-      : '• Use Order / payment for screenshot, payment, and order-review problems.',
-    locale === 'my'
-      ? '• Key connection, usage, renew, share page ပြဿနာအတွက် Key / usage ကို ရွေးပါ။'
-      : '• Use Key / usage for connection, usage, renew, and share-page issues.',
-    locale === 'my'
-      ? '• Notice, refund, support reply များကို /inbox နှင့် /supportstatus တွင် တစ်နေရာတည်းမှာ စစ်နိုင်ပါသည်။'
-      : '• Use /inbox and /supportstatus to review notices, refunds, and support replies in one place.',
-    locale === 'my'
-      ? '• Premium route / preferred region အတွက် /premium သို့မဟုတ် /premiumregion ကို အသုံးပြုပါ။'
-      : '• Use /premium or /premiumregion for preferred-region and routing issues.',
-  );
-
-  if (supportLink) {
-    lines.push('', ui.supportHubDirectLink(supportLink));
-  } else {
-    lines.push('', ui.noSupportLink);
-  }
-
-  const message = lines.join('\n');
+  const message = buildTelegramSupportHubMessage({
+    locale,
+    openThreadCount: openThreads.length,
+    recentThreadCount: threads.length,
+    premiumRequestCount: premiumRequests.length,
+    latestThread: latestThread
+      ? {
+          threadCode: latestThread.threadCode,
+          issueLabel: resolveTelegramSupportIssueLabel(latestThread.issueCategory, locale),
+          stateLabel: getTelegramSupportThreadState({
+            status: latestThread.status,
+            waitingOn: latestThread.waitingOn,
+            locale,
+          }).label,
+          updatedAtLabel: formatTelegramDateTime(latestThread.updatedAt, locale),
+        }
+      : null,
+    latestPremiumRequest: latestPremiumRequest
+      ? {
+          requestCode: latestPremiumRequest.requestCode,
+          keyName: latestPremiumRequest.dynamicAccessKey.name,
+          requestTypeLabel: formatTelegramPremiumSupportTypeLabel(
+            latestPremiumRequest.requestType,
+            ui,
+          ),
+          stateLabel: formatTelegramPremiumFollowUpState(latestPremiumRequest, ui),
+          replyStateLabel: formatTelegramReplyStateLabel({
+            latestReplySenderType:
+              latestPremiumRequest.replies?.[latestPremiumRequest.replies.length - 1]?.senderType
+              || null,
+            followUpPending: latestPremiumRequest.followUpPending,
+            locale,
+          }),
+          updatedAtLabel: formatTelegramDateTime(
+            latestPremiumRequest.updatedAt || latestPremiumRequest.createdAt,
+            locale,
+          ),
+        }
+      : null,
+    supportLinkConfigured: Boolean(supportLink),
+  });
   if (input.botToken) {
     const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
       replyMarkup: buildTelegramSupportHubKeyboard({

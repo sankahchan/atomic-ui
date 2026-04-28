@@ -154,6 +154,88 @@ export function buildTelegramSupportReplySubmittedMessage(input: {
   ].join('\n');
 }
 
+export function buildTelegramSupportHubMessage(input: {
+  locale: SupportedLocale;
+  openThreadCount: number;
+  recentThreadCount: number;
+  premiumRequestCount: number;
+  latestThread?: {
+    threadCode: string;
+    issueLabel: string;
+    stateLabel: string;
+    updatedAtLabel: string;
+  } | null;
+  latestPremiumRequest?: {
+    requestCode: string;
+    keyName?: string | null;
+    requestTypeLabel: string;
+    stateLabel: string;
+    replyStateLabel: string;
+    updatedAtLabel: string;
+  } | null;
+  supportLinkConfigured?: boolean;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const stats = [
+    isMyanmar ? `${input.openThreadCount} ခု ဖွင့်ထား` : `${input.openThreadCount} open`,
+    isMyanmar ? `${input.recentThreadCount} ခု recent` : `${input.recentThreadCount} recent`,
+    input.premiumRequestCount > 0
+      ? isMyanmar
+        ? `${input.premiumRequestCount} ခု premium`
+        : `${input.premiumRequestCount} premium`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
+  const cards: string[] = [];
+
+  if (input.latestThread) {
+    cards.push(
+      buildTelegramCommerceCard(
+        isMyanmar ? '🧵 <b>နောက်ဆုံး thread</b>' : '🧵 <b>Latest thread</b>',
+        [
+          `<b>${escapeHtml(input.latestThread.threadCode)}</b> • ${escapeHtml(input.latestThread.issueLabel)}`,
+          `${escapeHtml(input.latestThread.stateLabel)} • ${escapeHtml(input.latestThread.updatedAtLabel)}`,
+        ],
+      ),
+    );
+  }
+
+  if (input.latestPremiumRequest) {
+    cards.push(
+      buildTelegramCommerceCard(
+        isMyanmar ? '💎 <b>နောက်ဆုံး premium request</b>' : '💎 <b>Latest premium request</b>',
+        [
+          [`<b>${escapeHtml(input.latestPremiumRequest.requestCode)}</b>`, input.latestPremiumRequest.keyName ? escapeHtml(input.latestPremiumRequest.keyName) : null]
+            .filter(Boolean)
+            .join(' • '),
+          `${escapeHtml(input.latestPremiumRequest.requestTypeLabel)} • ${escapeHtml(input.latestPremiumRequest.stateLabel)}`,
+          `${escapeHtml(input.latestPremiumRequest.replyStateLabel)} • ${escapeHtml(input.latestPremiumRequest.updatedAtLabel)}`,
+        ],
+      ),
+    );
+  }
+
+  cards.push(
+    buildTelegramCommerceCard(
+      isMyanmar ? '🧭 <b>အမြန်လမ်းညွှန်</b>' : '🧭 <b>Quick routes</b>',
+      [
+        '🧾 Order / payment • screenshot, review',
+        '🔑 Key / usage • renew, share page',
+        '📬 Inbox / premium • reply, route issue',
+      ],
+    ),
+  );
+
+  return buildTelegramCommerceMessage({
+    title: isMyanmar ? '🛟 <b>အကူအညီ စင်တာ</b>' : '🛟 <b>Support center</b>',
+    statsLine: stats,
+    cards,
+    footerLines: input.supportLinkConfigured ? undefined : [getTelegramUi(input.locale).noSupportLink],
+  });
+}
+
 export function getTelegramSupportThreadState(input: {
   status: string;
   waitingOn: string;

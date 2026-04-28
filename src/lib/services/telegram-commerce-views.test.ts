@@ -25,6 +25,7 @@ import {
   buildTelegramRefundSummaryMessage,
 } from '@/lib/services/telegram-orders';
 import {
+  buildTelegramSupportHubMessage,
   buildTelegramSupportStatusSummaryMessage,
   buildTelegramSupportThreadStatusMessage,
 } from '@/lib/services/telegram-support-cards';
@@ -247,7 +248,9 @@ test('premium hub summary keeps links out of the text body', () => {
   });
 
   assert.match(message, /Premium center/);
+  assert.match(message, /1 key • 1 recent request/);
   assert.doesNotMatch(message, /https?:\/\//);
+  assert.doesNotMatch(message, /key\(s\)|request\(s\)/);
   assert.doesNotMatch(message, /Latest reply/i);
 });
 
@@ -612,6 +615,38 @@ test('support status summary shows a short thread list instead of only the lates
   assert.match(message, /SUP-BBB222/);
   assert.match(message, /PRM-111/);
   assert.doesNotMatch(message, /Latest thread:/);
+  assert.ok(message.split('\n').length <= 18);
+});
+
+test('support hub summary stays compact and removes the old bullet wall', () => {
+  const message = buildTelegramSupportHubMessage({
+    locale: 'en',
+    openThreadCount: 1,
+    recentThreadCount: 2,
+    premiumRequestCount: 1,
+    latestThread: {
+      threadCode: 'SUP-AAA111',
+      issueLabel: 'Order / payment',
+      stateLabel: 'Waiting for admin',
+      updatedAtLabel: 'Apr 20, 2026 10:00 AM',
+    },
+    latestPremiumRequest: {
+      requestCode: 'PRM-111',
+      keyName: 'Onn',
+      requestTypeLabel: 'Route issue',
+      stateLabel: 'Waiting for admin',
+      replyStateLabel: 'Admin replied',
+      updatedAtLabel: 'Apr 20, 2026 10:30 AM',
+    },
+    supportLinkConfigured: true,
+  });
+
+  assert.match(message, /Support center/);
+  assert.match(message, /1 open • 2 recent • 1 premium/);
+  assert.match(message, /Latest thread/);
+  assert.match(message, /Latest premium request/);
+  assert.doesNotMatch(message, /Best path/);
+  assert.doesNotMatch(message, /https?:\/\//);
   assert.ok(message.split('\n').length <= 18);
 });
 
