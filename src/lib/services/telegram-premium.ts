@@ -525,6 +525,7 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   const latestReply = request.replies?.[request.replies.length - 1] || null;
   const currentState = formatTelegramPremiumFollowUpState(request, ui);
   const followUpIndicator = formatTelegramReplyStateLabel({
+    status: request.status,
     latestReplySenderType: latestReply?.senderType || null,
     followUpPending: request.followUpPending,
     locale: input.locale,
@@ -606,15 +607,15 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
     request.status === 'PENDING_REVIEW'
       ? input.locale === 'my'
         ? 'Admin review ကို စောင့်ပါ။ လိုအပ်ပါက extra detail တောင်းနိုင်ပါသည်။'
-        : 'Wait for admin review. The admin may ask for extra detail if needed.'
+        : 'Wait for admin review. More detail may be requested.'
       : currentState === ui.premiumAwaitingYourReply
         ? input.locale === 'my'
-          ? 'Admin reply ပို့ထားပါသည်။ Reply to request ဖြင့် thread ကို ဆက်လုပ်နိုင်ပါသည်။'
-          : 'The admin replied. Use Reply to request to continue the same thread.'
+          ? 'Admin အဖြေ ရှိပါသည်။ Thread ကို ဆက်ရန် Reply ကို နှိပ်ပါ။'
+          : 'The admin replied. Tap Reply to continue.'
         : currentState === ui.premiumAwaitingAdminReply
           ? input.locale === 'my'
-            ? 'သင့်နောက်ဆုံး message ကို admin စစ်နေပါသည်။'
-            : 'The admin is reviewing your latest message.'
+            ? 'သင့်နောက်ဆုံး reply ကို Admin စစ်နေပါသည်။'
+            : 'Admin is reviewing your latest reply.'
           : ui.premiumStatusReplyHint;
 
   return buildTelegramCommerceMessage({
@@ -1327,6 +1328,7 @@ export async function handlePremiumSupportStatusCommand(input: {
       statusLabel: formatTelegramPremiumSupportStatusLabel(request.status, ui),
       threadStateLabel: formatTelegramPremiumFollowUpState(request, ui),
       replyStateLabel: formatTelegramReplyStateLabel({
+        status: request.status,
         latestReplySenderType: latestReply?.senderType || null,
         followUpPending: request.followUpPending,
         locale: input.locale,
@@ -1653,6 +1655,7 @@ export async function handleTelegramPremiumSupportStatusCommerceView(input: {
       statusLabel: formatTelegramPremiumSupportStatusLabel(request.status, ui),
       threadStateLabel: formatTelegramPremiumFollowUpState(request, ui),
       replyStateLabel: formatTelegramReplyStateLabel({
+        status: request.status,
         latestReplySenderType: latestReply?.senderType || null,
         followUpPending: request.followUpPending,
         locale: input.locale,

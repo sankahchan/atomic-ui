@@ -684,9 +684,11 @@ test('support thread detail stays compact and keeps actions out of the text body
   assert.match(message, /Thread snapshot/);
   assert.match(message, /Last reply/);
   assert.match(message, /button below/);
+  assert.match(message, /Admin will reply here\./);
   assert.doesNotMatch(message, /Attachment is ready below/);
   assert.doesNotMatch(message, /Latest reply: Admin/);
   assert.doesNotMatch(message, /SLA:/);
+  assert.doesNotMatch(message, /Wait here for the admin reply in this chat\./);
   assert.ok(message.split('\n').length <= 15);
 });
 
@@ -741,11 +743,15 @@ test('premium support detail stays compact and avoids timeline dumps', () => {
   assert.match(message, /PRM-123/);
   assert.match(message, /Request snapshot/);
   assert.match(message, /Route snapshot/);
+  assert.match(message, /Pending • 🕒 Admin reviewing/);
   assert.match(message, /Next step:/);
   assert.match(message, /Last reply/);
+  assert.match(message, /Wait for admin review\. More detail may be requested\./);
   assert.doesNotMatch(message, /What happens next/);
   assert.doesNotMatch(message, /Timeline/i);
   assert.doesNotMatch(message, /Follow-up history/i);
+  assert.doesNotMatch(message, /Waiting for you/);
+  assert.doesNotMatch(message, /The admin is reviewing your latest message\./);
   assert.doesNotMatch(message, /Request type:|Status: <b>Pending review/);
   assert.doesNotMatch(message, /Current premium pool: <b>.*<\/b>\nRequested region: <b>.*<\/b>\nResolved server: <b>.*<\/b>\nUpdated:/);
   assert.ok(message.split('\n').length <= 20);

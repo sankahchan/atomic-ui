@@ -4,6 +4,7 @@ import {
   buildTelegramSupportStatusSummaryKeyboard,
   buildTelegramSupportStatusSummaryMessage,
   buildTelegramSupportHubKeyboard,
+  buildTelegramSupportReplyClosedMessage,
   buildTelegramSupportReplySubmittedMessage,
   buildTelegramSupportThreadStartMessage,
   buildTelegramSupportThreadKeyboard,
@@ -108,9 +109,7 @@ export async function handleTelegramSupportReplyText(input: {
       telegramChatId: String(input.chatId),
       threadId: null,
     });
-    return input.locale === 'my'
-      ? 'ဤ support thread ကို ဆက်မရေးနိုင်တော့ပါ။ /support ကို ပြန်ဖွင့်ပြီး အသစ်စတင်နိုင်ပါသည်။'
-      : 'This support thread can no longer accept replies. Use /support to start again.';
+    return buildTelegramSupportReplyClosedMessage(input.locale);
   }
 
   await addTelegramSupportReply({
@@ -208,9 +207,7 @@ export async function handleTelegramSupportReplyMedia(input: {
       telegramChatId: String(input.chatId),
       threadId: null,
     });
-    return input.locale === 'my'
-      ? 'ဤ support thread ကို ဆက်မရေးနိုင်တော့ပါ။ /support ကို ပြန်ဖွင့်ပြီး အသစ်စတင်နိုင်ပါသည်။'
-      : 'This support thread can no longer accept replies. Use /support to start again.';
+    return buildTelegramSupportReplyClosedMessage(input.locale);
   }
 
   await addTelegramSupportReply({

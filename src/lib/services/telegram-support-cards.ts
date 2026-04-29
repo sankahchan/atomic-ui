@@ -134,10 +134,16 @@ export function buildTelegramSupportThreadStartMessage(input: {
     ],
     footerLines: [
       input.locale === 'my'
-        ? 'ပို့ပြီးနောက် admin reply ကို ဒီ chat ထဲမှာ ရရှိပါမည်။'
-        : 'After you send it, the admin reply will come here.',
+        ? 'Admin အဖြေကို ဒီ chat မှာ ရပါမည်။'
+        : 'Admin will reply in this chat.',
     ],
   });
+}
+
+export function buildTelegramSupportReplyClosedMessage(locale: SupportedLocale) {
+  return locale === 'my'
+    ? '🧵 ဤ thread ပိတ်ထားပါသည်။ အသစ်စရန် /support ကို သုံးပါ။'
+    : '🧵 This thread is closed. Use /support to start a new one.';
 }
 
 export function buildTelegramSupportReplySubmittedMessage(input: {
@@ -149,8 +155,8 @@ export function buildTelegramSupportReplySubmittedMessage(input: {
       ? `✅ <b>${escapeHtml(input.threadCode)}</b> ကို ပို့ပြီးပါပြီ။`
       : `✅ <b>${escapeHtml(input.threadCode)}</b> sent.`,
     input.locale === 'my'
-      ? 'Admin reply ကို ဒီ chat ထဲမှာ စောင့်နိုင်ပါသည်။'
-      : 'Wait here for the admin reply.',
+      ? 'Admin အဖြေကို ဒီ chat မှာ စောင့်ပါ။'
+      : 'Admin will reply here.',
   ].join('\n');
 }
 
@@ -649,15 +655,15 @@ export function buildTelegramSupportThreadStatusMessage(input: {
     footerLines: [
       input.locale === 'my'
         ? state.code === 'user'
-          ? 'လိုအပ်သော အချက်အလက်ကို reply လုပ်ပေးပါ။'
+          ? 'လိုအပ်သည့် အချက်အလက်ကို reply လုပ်ပါ။'
           : state.code === 'handled'
-            ? 'Thread ကို ပြန်ဖွင့်လိုပါက Reply ကို နှိပ်ပြီး message ပို့နိုင်ပါသည်။'
-            : 'Admin reply ကို ဤ chat ထဲမှာ စောင့်နိုင်ပါသည်။'
+            ? 'Thread ကို ပြန်ဖွင့်ရန် Reply ကို နှိပ်ပါ။'
+            : 'Admin အဖြေကို ဒီ chat မှာ စောင့်ပါ။'
         : state.code === 'user'
-          ? 'Reply here with the extra detail we need.'
+          ? 'Reply here with the extra detail.'
           : state.code === 'handled'
-            ? 'Use Reply if you want to reopen this thread.'
-            : 'Wait here for the admin reply in this chat.',
+            ? 'Tap Reply to reopen this thread.'
+            : 'Admin will reply here.',
     ],
   });
 }

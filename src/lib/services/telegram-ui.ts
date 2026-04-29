@@ -104,21 +104,21 @@ export function getTelegramUi(locale: SupportedLocale) {
       isMyanmar
         ? `ℹ️ Premium support request <b>${requestCode}</b> သည် ဖွင့်ထားပြီးဖြစ်ပါသည်။\nAdmin update ကို ဒီ chat မှာ စောင့်ပါ။`
         : `ℹ️ Premium support request <b>${requestCode}</b> is already open.\nWait for the admin update here.`,
-    premiumReplyToRequest: isMyanmar ? 'Request ကို ပြန်စာပို့ရန်' : 'Reply to request',
+    premiumReplyToRequest: isMyanmar ? 'Reply ပို့ရန်' : 'Reply',
     premiumFollowUpPrompt: (requestCode: string, keyName: string) =>
       isMyanmar
-        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် update message ကို ယခုပို့ပါ။\nRoute, region သို့မဟုတ် error detail ကို ထည့်နိုင်ပါသည်။\nမပို့တော့လိုပါက /cancel ကို အသုံးပြုပါ။`
-        : `✍️ Send your update now for <b>${requestCode}</b> (${keyName}).\nInclude route, region, or error detail.\nUse /cancel to stop.`,
+        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် reply ကို ယခုပို့ပါ။\nRoute, region သို့မဟုတ် error detail ကို ထည့်နိုင်ပါသည်။\nမပို့တော့လိုပါက /cancel ကို သုံးပါ။`
+        : `✍️ Send your reply now for <b>${requestCode}</b> (${keyName}).\nAdd route, region, or error detail.\nUse /cancel to stop.`,
     premiumFollowUpSubmitted: (requestCode: string) =>
       isMyanmar
-        ? `📨 <b>${requestCode}</b> အတွက် update ကို ပို့ပြီးပါပြီ။`
-        : `📨 Update sent for <b>${requestCode}</b>.`,
+        ? `📨 <b>${requestCode}</b> အတွက် reply ကို ပို့ပြီးပါပြီ။\nဒီ chat မှာ update ကို စောင့်ပါ။`
+        : `📨 Reply sent for <b>${requestCode}</b>.\nWait here for the update.`,
     premiumFollowUpCancelled: isMyanmar
       ? 'Premium request နောက်ဆက်တွဲ message ကို ပယ်ဖျက်ပြီးပါပြီ။'
       : 'Cancelled the premium follow-up message.',
     premiumFollowUpNotAllowed: isMyanmar
-      ? 'ဤ premium request ကို နောက်ဆက်တွဲ reply မပို့နိုင်တော့ပါ။'
-      : 'This premium request is no longer open for follow-up replies.',
+      ? 'ဤ premium request ပိတ်ထားပါသည်။ အသစ်စတင်ရန် /premium ကို သုံးပါ။'
+      : 'This request is closed. Use /premium to start a new one.',
     premiumFollowUpHistoryTitle: isMyanmar ? 'နောက်ဆက်တွဲ စကားဝိုင်း' : 'Conversation',
     premiumFollowUpFromYou: isMyanmar ? 'သင်' : 'You',
     premiumFollowUpFromAdmin: isMyanmar ? 'Admin' : 'Admin',
@@ -242,12 +242,12 @@ export function getTelegramUi(locale: SupportedLocale) {
       ? 'အသစ် request တစ်ခု စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
       : 'Use /premium to start a new premium support request.',
     premiumOpenRequestLabel: isMyanmar ? 'ဖွင့်ထားသော request' : 'Open request',
-    premiumLatestReplyLabel: isMyanmar ? 'နောက်ဆုံး reply' : 'Latest reply',
-    premiumAwaitingAdminReply: isMyanmar ? 'Admin အဖြေ စောင့်နေ' : 'Waiting for admin',
-    premiumAwaitingYourReply: isMyanmar ? 'သင့်အဖြေ စောင့်နေ' : 'Waiting for you',
+    premiumLatestReplyLabel: isMyanmar ? 'နောက်ဆုံး reply' : 'Last reply',
+    premiumAwaitingAdminReply: isMyanmar ? 'Admin စစ်နေ' : 'Admin reviewing',
+    premiumAwaitingYourReply: isMyanmar ? 'Reply လိုအပ်' : 'Reply needed',
     premiumStatusReplyHint: isMyanmar
-      ? 'လိုအပ်ပါက Reply to request ကိုနှိပ်ပြီး နောက်ဆက်တွဲ message ပို့နိုင်ပါသည်။'
-      : 'Use Reply to request if you want to continue the same support thread.',
+      ? 'Thread ကို ဆက်ရန် Reply ကို နှိပ်ပါ။'
+      : 'Tap Reply to continue this thread.',
     premiumStatusUpdatedLabel: isMyanmar ? 'နောက်ဆုံး update' : 'Updated',
     premiumResponseTimeLabel: isMyanmar ? 'ပထမအဖြေ' : 'First response',
     premiumResolutionTimeLabel: isMyanmar ? 'ဖြေရှင်းပြီး' : 'Resolved',
@@ -1132,6 +1132,10 @@ export function formatTelegramPremiumFollowUpState(
     return ui.premiumStatusDismissed;
   }
 
+  if (request.status === 'PENDING_REVIEW') {
+    return ui.premiumStatusPendingReview;
+  }
+
   if (request.followUpPending) {
     return ui.premiumAwaitingAdminReply;
   }
@@ -1141,24 +1145,21 @@ export function formatTelegramPremiumFollowUpState(
     return ui.premiumAwaitingYourReply;
   }
 
-  if (request.status === 'PENDING_REVIEW') {
-    return ui.premiumStatusPendingReview;
-  }
-
   return formatTelegramPremiumSupportStatusLabel(request.status, ui);
 }
 
 export function formatTelegramReplyStateLabel(input: {
+  status?: string | null;
   followUpPending?: boolean | null;
   latestReplySenderType?: string | null;
   locale: SupportedLocale;
 }) {
-  if (input.latestReplySenderType === 'ADMIN') {
-    return input.locale === 'my' ? '🟡 Waiting for you' : '🟡 Waiting for you';
+  if ((input.status || '').toUpperCase() === 'PENDING_REVIEW' || input.followUpPending) {
+    return input.locale === 'my' ? '🕒 Admin စစ်နေ' : '🕒 Admin reviewing';
   }
 
-  if (input.followUpPending) {
-    return input.locale === 'my' ? '🕒 Waiting for admin' : '🕒 Waiting for admin';
+  if (input.latestReplySenderType === 'ADMIN') {
+    return input.locale === 'my' ? '🟡 Reply လိုအပ်' : '🟡 Reply needed';
   }
 
   return input.locale === 'my' ? '✅ Up to date' : '✅ Up to date';
@@ -1190,7 +1191,7 @@ export function buildTelegramLatestReplyPreviewLines(input: {
   const maxLength = input.maxLength ?? 120;
   const preview = input.reply.message.slice(0, maxLength);
   const lines = [
-    `${input.locale === 'my' ? 'နောက်ဆုံး reply' : 'Latest reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
+    `${input.locale === 'my' ? 'နောက်ဆုံး reply' : 'Last reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
   ];
 
   if (input.reply.mediaKind) {
