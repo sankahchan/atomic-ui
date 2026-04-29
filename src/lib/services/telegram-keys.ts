@@ -821,6 +821,7 @@ export async function handleSupportCommand(input: {
           ),
           stateLabel: formatTelegramPremiumFollowUpState(latestPremiumRequest, ui),
           replyStateLabel: formatTelegramReplyStateLabel({
+            status: latestPremiumRequest.status,
             latestReplySenderType:
               latestPremiumRequest.replies?.[latestPremiumRequest.replies.length - 1]?.senderType
               || null,
