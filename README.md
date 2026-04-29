@@ -72,6 +72,7 @@ wget -qO- https://raw.githubusercontent.com/sankahchan/atomic-ui/main/install.sh
 ```
 
 Fresh VPS installs now default to a local Postgres runtime so production `.postgres.zip` backup bundles can be restored onto replacement servers without an extra database conversion step.
+The installer and direct VPS deploy flow now standardize on Node.js 24.x.
 
 The installer now prefers HTTPS by default. If HTTPS setup fails, it falls back to HTTP and prints the next steps.
 
@@ -116,6 +117,7 @@ npm run build
 ```
 
 `npm run typecheck` is the canonical source-only TypeScript pass for this repo.
+Atomic-UI now expects Node.js 24.x for local development, CI, Docker builds, and direct VPS/systemd installs.
 
 ### Smoke tests
 
@@ -149,6 +151,7 @@ bash scripts/deploy-vps.sh
 ```
 
 For direct VPS deployment details, see [DEPLOY.md](DEPLOY.md).
+Existing VPS hosts that still run Node.js 20 are upgraded to Node.js 24 automatically by `scripts/deploy-vps.sh`.
 
 ## Releases
 

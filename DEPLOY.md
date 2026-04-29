@@ -9,6 +9,7 @@ For low-memory VPS hosts, prefer the built-in low-memory build flow and smoke ch
   - [Install Docker Engine](https://docs.docker.com/engine/install/)
   - [Install Docker Compose](https://docs.docker.com/compose/install/)
 - A domain name pointing to your server (optional but recommended for HTTPS).
+- **Node.js 24.x** for local builds and direct VPS/systemd deployments. The repo installer and `scripts/deploy-vps.sh` now upgrade hosts to Node 24 automatically.
 
 ## Deployment Steps
 
@@ -127,6 +128,7 @@ Installer behavior:
 - `INSTALL_HTTPS=auto` (default): try HTTPS on the server IP, fall back to HTTP if certificate setup fails
 - `INSTALL_HTTPS=require`: fail the install if HTTPS cannot be enabled
 - `INSTALL_HTTPS=false`: skip HTTPS and keep nginx on plain HTTP
+- The installer upgrades the host to Node.js 24.x before running `npm ci`.
 
 ### 2. systemd service
 
@@ -171,6 +173,8 @@ DEPLOY_HOST=your-server-ip \
 DEPLOY_PASSWORD=your-password \
 bash scripts/deploy-vps.sh
 ```
+
+The remote deploy script now upgrades older VPS hosts to Node.js 24.x before reinstalling dependencies.
 
 If you are moving an existing host off SQLite, use [docs/postgres-cutover.md](docs/postgres-cutover.md) before you change the production `DATABASE_URL`.
 

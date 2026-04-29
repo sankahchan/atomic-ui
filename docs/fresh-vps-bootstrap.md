@@ -7,6 +7,7 @@ Use this when you want a brand-new VPS to come up with the same install path eve
 - connects to a fresh VPS over SSH
 - installs the minimal system packages needed to run the installer
 - downloads `install.sh` from the GitHub ref you choose
+- upgrades the VPS runtime to Node.js 24.x through the normal installer path
 - runs the normal Atomic-UI installer with your panel/share domain settings
 - applies the Prisma schema through the repo's non-interactive safety wrapper so fresh installs do not stall on a confirmation prompt
 - verifies that `atomic-ui.service` is running
@@ -15,6 +16,7 @@ Use this when you want a brand-new VPS to come up with the same install path eve
 It is intended for **first-time installs** on a clean VPS.
 
 For updates on an existing server, use `scripts/deploy-vps.sh` instead.
+That deploy wrapper also upgrades existing hosts to Node.js 24.x before reinstalling dependencies.
 For turning a fresh server into a restored copy of an existing production server, continue with [new-server-from-production-backup.md](new-server-from-production-backup.md) after bootstrap.
 
 ## Before you run it

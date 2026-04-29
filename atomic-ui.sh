@@ -299,14 +299,14 @@ install_nodejs() {
 
     if command -v node &> /dev/null; then
         NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-        if [ "$NODE_VERSION" -ge 18 ]; then
+        if [ "$NODE_VERSION" -ge 24 ]; then
             print_success "Node.js $(node -v) already installed"
             return 0
         fi
     fi
 
-    print_step "Installing Node.js 20.x..."
-    if ! curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; then
+    print_step "Installing Node.js 24.x..."
+    if ! curl -fsSL https://deb.nodesource.com/setup_24.x | bash -; then
         print_error "Failed to setup Node.js repository"
         return 1
     fi

@@ -52,6 +52,7 @@ You need:
 ## Important rule
 
 Fresh VPS installs through `install.sh` and `scripts/bootstrap-vps.sh` now default to Postgres.
+Those paths also upgrade the host runtime to Node.js 24.x, which is now the supported baseline for direct VPS installs and restores.
 
 A Postgres `.postgres.zip`, `.dump`, or `.sql` backup can only be restored onto a server that is also configured with a Postgres `DATABASE_URL`.
 
