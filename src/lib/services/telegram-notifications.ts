@@ -479,6 +479,7 @@ export async function handleInboxCommand(input: {
       ...premiumSupportUpdates.map((request) => {
         const latestReply = request.replies?.[request.replies.length - 1] || null;
         const replyStateLabel = formatTelegramReplyStateLabel({
+          status: request.status,
           latestReplySenderType: latestReply?.senderType || null,
           followUpPending: request.followUpPending,
           locale: input.locale,

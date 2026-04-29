@@ -17,6 +17,7 @@ import {
   buildTelegramTrialExpiringReminderMessage,
 } from '@/lib/services/telegram-reminders';
 import {
+  buildTelegramSupportReplyClosedMessage,
   buildTelegramSupportReplySubmittedMessage,
   buildTelegramSupportStatusSummaryMessage,
   buildTelegramSupportThreadStartMessage,
@@ -209,6 +210,7 @@ test('telegram premium prompts and order outcomes stay compact and HTML-safe', (
     ui.premiumSupportRequestPending('PRM-123'),
     ui.premiumFollowUpPrompt('PRM-123', 'Onn'),
     ui.premiumFollowUpSubmitted('PRM-123'),
+    ui.premiumFollowUpNotAllowed,
     ui.orderRejected('ORD-123'),
     ui.orderApproved('ORD-123'),
     ui.receiptFooter,
@@ -222,7 +224,10 @@ test('telegram premium prompts and order outcomes stay compact and HTML-safe', (
   assert.doesNotMatch(ui.premiumRegionPrompt('Onn', 'SG, JP, US'), /manual review/);
   assert.doesNotMatch(ui.premiumRegionRequestSubmitted('Onn', 'SG'), /follow up/);
   assert.doesNotMatch(ui.premiumRouteIssueSubmitted('Onn'), /has been sent to the admin/);
+  assert.doesNotMatch(ui.premiumFollowUpPrompt('PRM-123', 'Onn'), /Send your update now/i);
   assert.doesNotMatch(ui.premiumFollowUpSubmitted('PRM-123'), /has been sent to the admin/);
+  assert.doesNotMatch(ui.premiumFollowUpNotAllowed, /no longer open/i);
+  assert.match(ui.premiumFollowUpSubmitted('PRM-123'), /Wait here for the update\./);
   assert.doesNotMatch(ui.orderRejected('ORD-123'), /please contact the admin/i);
   assert.doesNotMatch(ui.receiptFooter, /client URL/i);
 });
@@ -307,18 +312,26 @@ test('telegram support intake messages stay compact and HTML-safe', () => {
     threadCode: 'SUP-123',
     locale: 'en',
   });
+  const closed = buildTelegramSupportReplyClosedMessage('en');
 
-  for (const sample of [start, submitted]) {
+  for (const sample of [start, submitted, closed]) {
     assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
     assert.doesNotMatch(sample, /https?:\/\//);
   }
 
   assert.ok(start.split('\n').length <= 9);
   assert.ok(submitted.split('\n').length <= 2);
+  assert.ok(closed.split('\n').length <= 1);
   assert.doesNotMatch(start, /\bSLA\b/);
   assert.doesNotMatch(start, /\bAge\b/);
+  assert.doesNotMatch(start, /After you send it/i);
   assert.doesNotMatch(submitted, /support queue/i);
   assert.doesNotMatch(submitted, /as soon as it is available/i);
+  assert.doesNotMatch(submitted, /Wait here for the admin reply/i);
+  assert.doesNotMatch(closed, /can no longer accept replies/i);
+  assert.match(start, /Admin will reply in this chat\./);
+  assert.match(submitted, /Admin will reply here\./);
+  assert.match(closed, /This thread is closed\./);
 });
 
 test('support hub copy avoids awkward legacy wording', () => {
