@@ -176,6 +176,9 @@ export function buildTelegramSupportHubMessage(input: {
   supportLinkConfigured?: boolean;
 }) {
   const isMyanmar = input.locale === 'my';
+  const quickRouteLines = isMyanmar
+    ? ['🧾 Order • proof, ငွေပေး', '🔑 Key • renew, usage', '📬 Inbox • reply, premium']
+    : ['🧾 Order • proof, payment', '🔑 Key • renew, usage', '📬 Inbox • replies, premium'];
   const stats = [
     isMyanmar ? `${input.openThreadCount} ခု ဖွင့်ထား` : `${input.openThreadCount} open`,
     isMyanmar ? `${input.recentThreadCount} ခု recent` : `${input.recentThreadCount} recent`,
@@ -220,11 +223,7 @@ export function buildTelegramSupportHubMessage(input: {
   cards.push(
     buildTelegramCommerceCard(
       isMyanmar ? '🧭 <b>အမြန်လမ်းညွှန်</b>' : '🧭 <b>Quick routes</b>',
-      [
-        '🧾 Order / payment • screenshot, review',
-        '🔑 Key / usage • renew, share page',
-        '📬 Inbox / premium • reply, route issue',
-      ],
+      quickRouteLines,
     ),
   );
 
@@ -586,9 +585,9 @@ export function buildTelegramSupportThreadStatusMessage(input: {
   const latestReply = input.thread.replies[input.thread.replies.length - 1] || null;
   const snapshotLines = [
     `${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))} • ${escapeHtml(state.label)}`,
-    `${input.locale === 'my' ? 'SLA' : 'SLA'}: <b>${escapeHtml(
+    `${input.locale === 'my' ? 'SLA' : 'SLA'} <b>${escapeHtml(
       getTelegramSupportThreadSlaLabel({ thread: input.thread, locale: input.locale }),
-    )}</b> • ${input.locale === 'my' ? 'ကြာချိန်' : 'Age'}: <b>${escapeHtml(
+    )}</b> • ${input.locale === 'my' ? 'ကြာချိန်' : 'Age'} <b>${escapeHtml(
       formatTelegramSupportRelativeAge(input.thread.updatedAt || input.thread.createdAt, input.locale),
     )}</b>`,
     input.thread.assignedAdminName
@@ -606,7 +605,7 @@ export function buildTelegramSupportThreadStatusMessage(input: {
 
   const cards = [
     buildTelegramCommerceCard(
-      input.locale === 'my' ? '🧵 <b>Thread snapshot</b>' : '🧵 <b>Thread snapshot</b>',
+      input.locale === 'my' ? '🧵 <b>Thread အနှစ်ချုပ်</b>' : '🧵 <b>Thread snapshot</b>',
       snapshotLines,
     ),
   ];
@@ -635,7 +634,7 @@ export function buildTelegramSupportThreadStatusMessage(input: {
 
     cards.push(
       buildTelegramCommerceCard(
-        input.locale === 'my' ? '💬 <b>Latest reply</b>' : '💬 <b>Latest reply</b>',
+        input.locale === 'my' ? '💬 <b>နောက်ဆုံး reply</b>' : '💬 <b>Last reply</b>',
         latestReplyLines,
       ),
     );
