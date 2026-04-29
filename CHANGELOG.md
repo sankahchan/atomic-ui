@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.10 - 2026-04-29
+
+### Changed
+
+- Polished Telegram customer support and premium reply-thread flows so draft, sent, reopen, and follow-up messages read more cleanly on mobile.
+- Normalized customer reply-state labels across support and premium detail cards with clearer `Reply`, `Last reply`, and `Admin reviewing` wording.
+
+### Fixed
+
+- Fixed premium pending-review support threads showing contradictory reply badges such as `Waiting for you` while the request was still under admin review.
+- Revalidated the deployed production Telegram webhook, support-thread detail card, and premium pending-review status wording after shipping the reply-thread polish.
+
 ## v1.2.9 - 2026-04-29
 
 ### Changed
