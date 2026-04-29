@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.11 - 2026-04-30
+
+### Changed
+
+- Raised the direct-deploy runtime baseline to Node.js 24 across the installer, VPS deploy script, CI, Docker, and local development metadata so fresh installs and existing hosts converge on one supported runtime.
+- Batched safe maintenance dependency updates for `autoprefixer`, `react-hook-form`, `nodemailer`, `@types/nodemailer`, `geoip-lite`, and `zustand`.
+
+### Fixed
+
+- Fixed the remaining production/runtime mismatch where direct VPS hosts could stay on Node 20 even though the dependency set had already advanced to packages expecting Node 24.
+- Hardened the Playwright admin smoke test around access-key creation so the release line does not fail on a brittle dialog-text assertion.
+
 ## v1.2.10 - 2026-04-29
 
 ### Changed
