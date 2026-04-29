@@ -286,9 +286,9 @@ if [ "$SWAP_MB" -lt 512 ] && [ "$TOTAL_RAM_MB" -lt 2048 ]; then
 fi
 
 # Install Node.js if needed
-if ! command -v node &> /dev/null || [ "$(node -v | cut -d'v' -f2 | cut -d'.' -f1)" -lt 18 ]; then
-    echo -e "${BLUE}[*]${NC} Installing Node.js 20.x..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - > /dev/null 2>&1
+if ! command -v node &> /dev/null || [ "$(node -v | cut -d'v' -f2 | cut -d'.' -f1)" -lt 24 ]; then
+    echo -e "${BLUE}[*]${NC} Installing Node.js 24.x..."
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - > /dev/null 2>&1
     apt-get install -y -qq nodejs > /dev/null
 fi
 echo -e "${GREEN}[✓]${NC} Node.js $(node -v) ready"

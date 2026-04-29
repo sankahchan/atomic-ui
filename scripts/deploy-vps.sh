@@ -46,7 +46,30 @@ fi
   "APP_DIR='${DEPLOY_PATH}' SERVICE_NAME='${DEPLOY_SERVICE}' BRANCH='${DEPLOY_BRANCH}' NODE_HEAP_MB='${NODE_HEAP_MB}' PORT_FALLBACK='${DEPLOY_PORT_FALLBACK}' PANEL_PATH_FALLBACK='${DEPLOY_PANEL_PATH_FALLBACK}' bash -s" <<'REMOTE'
 set -euo pipefail
 
+ensure_nodejs_24() {
+  local node_major=""
+
+  if command -v node >/dev/null 2>&1; then
+    node_major="$(node -v | cut -d'v' -f2 | cut -d'.' -f1)"
+    if [[ "${node_major}" -ge 24 ]]; then
+      echo "Node.js $(node -v) already satisfies the runtime baseline"
+      return
+    fi
+
+    echo "Upgrading Node.js from $(node -v) to 24.x..."
+  else
+    echo "Installing Node.js 24.x..."
+  fi
+
+  apt-get update -qq
+  apt-get install -y -qq ca-certificates curl gnupg >/dev/null
+  curl -fsSL https://deb.nodesource.com/setup_24.x | bash - >/dev/null 2>&1
+  apt-get install -y -qq nodejs >/dev/null
+  echo "Node.js $(node -v) ready"
+}
+
 cd "${APP_DIR}"
+ensure_nodejs_24
 if ! command -v pg_restore >/dev/null 2>&1 || ! command -v pg_dump >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
   apt-get update -qq
   apt-get install -y -qq openssl postgresql-client >/dev/null

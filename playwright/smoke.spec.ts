@@ -34,12 +34,14 @@ test('admin smoke journeys stay functional', async ({ page }) => {
   });
 
   await test.step('access key creation works from the panel', async () => {
-    const keyName = 'Playwright Smoke Key';
+    const keyName = `Playwright Smoke Key ${Date.now()}`;
     await page.goto('/dashboard/keys');
     await page.getByTestId('create-access-key').first().click();
     await page.locator('#name').fill(keyName);
     await page.getByTestId('create-access-key-submit').click();
-    await expect(page.getByRole('dialog').getByText(keyName)).toBeVisible();
+    const createdDialog = page.getByRole('dialog').filter({ hasText: keyName }).first();
+    await expect(createdDialog.getByText('Access key created')).toBeVisible({ timeout: 15_000 });
+    await expect(createdDialog.getByText(keyName, { exact: true })).toBeVisible({ timeout: 15_000 });
   });
 
   await test.step('support thread claim and reply works', async () => {

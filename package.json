@@ -4,6 +4,9 @@
   "description": "Advanced Outline VPN Management Panel - Built for Myanmar",
   "author": "sankahchan",
   "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/sankahchan/atomic-ui"
