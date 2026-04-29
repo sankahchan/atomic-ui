@@ -27,21 +27,21 @@ export function buildTelegramInboxTitle(mode: TelegramInboxMode, locale: Support
   const isMyanmar = locale === 'my';
   switch (mode) {
     case 'UNREAD':
-      return isMyanmar ? '📬 <b>မဖတ်ရသေးသော update များ</b>' : '📬 <b>Your unread updates</b>';
+      return isMyanmar ? '📬 <b>မဖတ်ရသေးသော update များ</b>' : '📬 <b>Unread updates</b>';
     case 'PINNED':
-      return isMyanmar ? '📌 <b>Pin လုပ်ထားသော update များ</b>' : '📌 <b>Your pinned updates</b>';
+      return isMyanmar ? '📌 <b>Pin လုပ်ထားသော update များ</b>' : '📌 <b>Pinned updates</b>';
     case 'ORDERS':
-      return isMyanmar ? '🧾 <b>Order update များ</b>' : '🧾 <b>Your order updates</b>';
+      return isMyanmar ? '🧾 <b>Order update များ</b>' : '🧾 <b>Order updates</b>';
     case 'SUPPORT':
-      return isMyanmar ? '🛟 <b>အကူအညီ အဖြေများ</b>' : '🛟 <b>Your support replies</b>';
+      return isMyanmar ? '🛟 <b>အကူအညီ အဖြေများ</b>' : '🛟 <b>Support replies</b>';
     case 'REFUNDS':
-      return isMyanmar ? '💸 <b>Refund update များ</b>' : '💸 <b>Your refund updates</b>';
+      return isMyanmar ? '💸 <b>Refund update များ</b>' : '💸 <b>Refund updates</b>';
     case 'ANNOUNCEMENTS':
-      return isMyanmar ? '📣 <b>Notice များ</b>' : '📣 <b>Your notices</b>';
+      return isMyanmar ? '📣 <b>Notice များ</b>' : '📣 <b>Notices</b>';
     case 'PREMIUM':
-      return isMyanmar ? '💎 <b>Premium update များ</b>' : '💎 <b>Your premium updates</b>';
+      return isMyanmar ? '💎 <b>Premium update များ</b>' : '💎 <b>Premium updates</b>';
     default:
-      return isMyanmar ? '📬 <b>သင့် inbox update များ</b>' : '📬 <b>Your inbox updates</b>';
+      return isMyanmar ? '📬 <b>သင့် inbox update များ</b>' : '📬 <b>Inbox updates</b>';
   }
 }
 

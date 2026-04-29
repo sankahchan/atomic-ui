@@ -519,6 +519,7 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   request: TelegramPremiumSupportRequestForUser;
 }) {
   const ui = getTelegramUi(input.locale);
+  const isMyanmar = input.locale === 'my';
   const { request } = input;
   const poolSummary = formatTelegramDynamicPoolSummary(request.dynamicAccessKey, ui);
   const latestReply = request.replies?.[request.replies.length - 1] || null;
@@ -547,12 +548,10 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   ].filter(Boolean) as string[];
 
   const threadMetaLines = [
-    `${ui.premiumRequestType}: <b>${escapeHtml(
-      formatTelegramPremiumSupportTypeLabel(request.requestType, ui),
-    )}</b> • ${ui.statusLineLabel}: <b>${escapeHtml(
+    `<b>${escapeHtml(formatTelegramPremiumSupportTypeLabel(request.requestType, ui))}</b> • <b>${escapeHtml(
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
-    `${ui.premiumThreadStatusLabel}: <b>${escapeHtml(currentState)}</b> • ${escapeHtml(followUpIndicator)}`,
+    `${escapeHtml(currentState)} • ${escapeHtml(followUpIndicator)}`,
   ];
 
   if (request.appliedPinServerName) {
@@ -567,11 +566,11 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
 
   const cards = [
     buildTelegramCommerceCard(
-      '🧾 <b>Request snapshot</b>',
+      isMyanmar ? '🧾 <b>Request အနှစ်ချုပ်</b>' : '🧾 <b>Request snapshot</b>',
       threadMetaLines,
     ),
     buildTelegramCommerceCard(
-      '🌍 <b>Route snapshot</b>',
+      isMyanmar ? '🌍 <b>Route အနှစ်ချုပ်</b>' : '🌍 <b>Route snapshot</b>',
       routeSnapshotLines,
     ),
   ];
@@ -579,7 +578,7 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   if (request.customerMessage?.trim()) {
     cards.push(
       buildTelegramCommerceCard(
-        '✍️ <b>Your note</b>',
+        isMyanmar ? '✍️ <b>သင့်မှတ်စု</b>' : '✍️ <b>Your note</b>',
         [escapeHtml(request.customerMessage.trim())],
       ),
     );
@@ -592,7 +591,7 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
     const replyPreview = replyMessage.length > 120 ? `${replyMessage.slice(0, 117)}...` : replyMessage;
     cards.push(
       buildTelegramCommerceCard(
-        '💬 <b>Latest reply</b>',
+        isMyanmar ? '💬 <b>နောက်ဆုံး reply</b>' : '💬 <b>Last reply</b>',
         [
           `${escapeHtml(replySenderLabel)} • ${escapeHtml(
             formatTelegramDateTime(latestReply.createdAt, input.locale),
@@ -768,6 +767,7 @@ export function buildTelegramPremiumDetailMessage(input: {
   item: TelegramPremiumHubItem;
 }) {
   const ui = getTelegramUi(input.locale);
+  const isMyanmar = input.locale === 'my';
   const detailLines = [
     `${ui.statusLineLabel}: ${escapeHtml(input.item.summaryLine)}`,
     `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(input.item.currentRouteLabel)}`,
@@ -781,15 +781,15 @@ export function buildTelegramPremiumDetailMessage(input: {
   ].filter(Boolean) as string[];
 
   return buildTelegramCommerceMessage({
-    title: '💎 <b>Premium key detail</b>',
+    title: isMyanmar ? '💎 <b>Premium key အသေးစိတ်</b>' : '💎 <b>Premium key detail</b>',
     statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
     intro:
-      input.locale === 'my'
+      isMyanmar
         ? 'Open, region, issue, status ကို အောက်က button များဖြင့် ဆက်လုပ်ပါ။'
         : 'Use the buttons below for open, region, issue, or status.',
     cards: [
       buildTelegramCommerceCard(
-        '💎 <b>Premium summary</b>',
+        isMyanmar ? '💎 <b>Premium အနှစ်ချုပ်</b>' : '💎 <b>Premium summary</b>',
         detailLines,
       ),
     ],
@@ -842,6 +842,7 @@ export function buildTelegramPremiumRegionDetailMessage(input: {
   total: number;
 }) {
   const ui = getTelegramUi(input.locale);
+  const isMyanmar = input.locale === 'my';
   const currentFallback = getPremiumCurrentFallbackRegion(input.analysis);
   const currentRouteLabel = input.analysis.currentServer
     ? `${input.analysis.currentServer.name}${input.analysis.currentServer.countryCode ? ` ${getFlagEmoji(input.analysis.currentServer.countryCode)}` : ''}`
@@ -866,11 +867,13 @@ export function buildTelegramPremiumRegionDetailMessage(input: {
         });
 
   return buildTelegramCommerceMessage({
-    title: `🌍 <b>Region status ${input.index}/${input.total}</b>`,
+    title: isMyanmar
+      ? `🌍 <b>Region အခြေအနေ ${input.index}/${input.total}</b>`
+      : `🌍 <b>Region status ${input.index}/${input.total}</b>`,
     statsLine: `<b>${escapeHtml(input.key.name)}</b> • ${escapeHtml(formatPremiumOverallStatusLine(input.analysis, input.locale))}`,
     cards: [
       buildTelegramCommerceCard(
-        '🌍 <b>Routing snapshot</b>',
+        isMyanmar ? '🌍 <b>Route အနှစ်ချုပ်</b>' : '🌍 <b>Routing snapshot</b>',
         [
           `${ui.premiumRegionPreferredLabel}: ${escapeHtml(preferredRegionsLabel)}`,
           `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(currentRouteLabel)}${currentFallback ? ` • ${ui.premiumRegionCurrentFallbackLabel}: ${escapeHtml(currentFallback)}` : ''}`,
@@ -878,7 +881,7 @@ export function buildTelegramPremiumRegionDetailMessage(input: {
         ],
       ),
       buildTelegramCommerceCard(
-        '🩺 <b>Health snapshot</b>',
+        isMyanmar ? '🩺 <b>Health အနှစ်ချုပ်</b>' : '🩺 <b>Health snapshot</b>',
         regionLines.map((line) => escapeHtml(line)),
       ),
     ],
