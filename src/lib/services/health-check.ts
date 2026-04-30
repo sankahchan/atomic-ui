@@ -27,7 +27,38 @@ export interface HealthCheckResult {
     error?: string;
 }
 
-export const ADMIN_SLOW_ALERT_MIN_CONSECUTIVE = 2;
+export const ADMIN_SLOW_ALERT_MIN_CONSECUTIVE = 3;
+
+export function resolveAdminSlowAlertMinConsecutive(input: {
+    slowAutoDrainEnabled?: boolean | null;
+    slowAutoDrainThreshold?: number | null;
+    slowUserNotifyEnabled?: boolean | null;
+    slowUserNotifyThreshold?: number | null;
+}) {
+    const candidates: number[] = [];
+
+    if (
+        input.slowAutoDrainEnabled !== false &&
+        typeof input.slowAutoDrainThreshold === 'number' &&
+        input.slowAutoDrainThreshold > 0
+    ) {
+        candidates.push(input.slowAutoDrainThreshold);
+    }
+
+    if (
+        input.slowUserNotifyEnabled !== false &&
+        typeof input.slowUserNotifyThreshold === 'number' &&
+        input.slowUserNotifyThreshold > 0
+    ) {
+        candidates.push(input.slowUserNotifyThreshold);
+    }
+
+    if (candidates.length === 0) {
+        return ADMIN_SLOW_ALERT_MIN_CONSECUTIVE;
+    }
+
+    return Math.max(ADMIN_SLOW_ALERT_MIN_CONSECUTIVE, Math.min(...candidates));
+}
 
 export function buildSlowAutoMigrationBlockedAlertMessage(input: {
     serverName: string;
@@ -84,13 +115,19 @@ export function shouldSendAdminSlowAlert(input: {
     currentSlowConsecutiveCount: number;
     lastNotifiedAt: Date | null;
     notifyCooldownMins: number | null | undefined;
+    minConsecutive?: number;
     now?: number;
 }): boolean {
-    if (input.currentSlowConsecutiveCount < ADMIN_SLOW_ALERT_MIN_CONSECUTIVE) {
+    const minConsecutive = Math.max(
+        ADMIN_SLOW_ALERT_MIN_CONSECUTIVE,
+        input.minConsecutive ?? ADMIN_SLOW_ALERT_MIN_CONSECUTIVE,
+    );
+
+    if (input.currentSlowConsecutiveCount < minConsecutive) {
         return false;
     }
 
-    if ((input.previousSlowConsecutiveCount ?? 0) >= ADMIN_SLOW_ALERT_MIN_CONSECUTIVE) {
+    if ((input.previousSlowConsecutiveCount ?? 0) >= minConsecutive) {
         return false;
     }
 
@@ -467,6 +504,12 @@ export async function runHealthChecks(): Promise<{
             const consecutiveSlowCount = result.status === 'SLOW'
                 ? previousSlowConsecutiveCount + 1
                 : 0;
+            const adminSlowAlertMinConsecutive = resolveAdminSlowAlertMinConsecutive({
+                slowAutoDrainEnabled: server.healthCheck.slowAutoDrainEnabled,
+                slowAutoDrainThreshold: server.healthCheck.slowAutoDrainThreshold,
+                slowUserNotifyEnabled: server.healthCheck.slowUserNotifyEnabled,
+                slowUserNotifyThreshold: server.healthCheck.slowUserNotifyThreshold,
+            });
 
             await db.healthCheck.update({
                 where: { id: server.healthCheck.id },
@@ -498,6 +541,7 @@ export async function runHealthChecks(): Promise<{
                     currentSlowConsecutiveCount: consecutiveSlowCount,
                     lastNotifiedAt: server.healthCheck.lastNotifiedAt,
                     notifyCooldownMins: server.healthCheck.notifyCooldownMins,
+                    minConsecutive: adminSlowAlertMinConsecutive,
                 })
             ) {
                 await sendAdminAlert(
