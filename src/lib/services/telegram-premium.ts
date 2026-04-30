@@ -610,12 +610,12 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
         : 'Wait for admin review. More detail may be requested.'
       : currentState === ui.premiumAwaitingYourReply
         ? input.locale === 'my'
-          ? 'Admin အဖြေ ရှိပါသည်။ Thread ကို ဆက်ရန် Reply ကို နှိပ်ပါ။'
-          : 'The admin replied. Tap Reply to continue.'
+          ? 'Admin အဖြေ ရှိပါသည်။ Reply ဖြင့် ဆက်ပါ။'
+          : 'Admin replied. Tap Reply.'
         : currentState === ui.premiumAwaitingAdminReply
           ? input.locale === 'my'
-            ? 'သင့်နောက်ဆုံး reply ကို Admin စစ်နေပါသည်။'
-            : 'Admin is reviewing your latest reply.'
+            ? 'Admin က သင့် reply ကို စစ်နေပါသည်။'
+            : 'Admin is reviewing your reply.'
           : ui.premiumStatusReplyHint;
 
   return buildTelegramCommerceMessage({

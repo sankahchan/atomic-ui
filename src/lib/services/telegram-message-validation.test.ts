@@ -6,6 +6,10 @@ import {
   buildTelegramHelpMessage,
 } from '@/lib/services/telegram-admin';
 import {
+  buildTelegramAdminDirectMessagePromptMessage,
+  buildTelegramAdminSupportReplyPromptMessage,
+} from '@/lib/services/telegram-admin-key-delivery';
+import {
   buildTelegramRefundQueueCardKeyboard,
   buildTelegramRefundQueueDetailMessage,
   buildTelegramRefundQueueCardMessage,
@@ -241,9 +245,38 @@ test('telegram premium prompts and order outcomes stay compact and HTML-safe', (
   assert.doesNotMatch(ui.premiumFollowUpPrompt('PRM-123', 'Onn'), /Send your update now/i);
   assert.doesNotMatch(ui.premiumFollowUpSubmitted('PRM-123'), /has been sent to the admin/);
   assert.doesNotMatch(ui.premiumFollowUpNotAllowed, /no longer open/i);
-  assert.match(ui.premiumFollowUpSubmitted('PRM-123'), /Wait here for the update\./);
+  assert.match(ui.premiumFollowUpSubmitted('PRM-123'), /Updates stay in this chat\./);
+  assert.doesNotMatch(ui.premiumFollowUpPrompt('PRM-123', 'Onn'), /Send your reply now/i);
   assert.doesNotMatch(ui.orderRejected('ORD-123'), /please contact the admin/i);
   assert.doesNotMatch(ui.receiptFooter, /client URL/i);
+});
+
+test('telegram admin composer prompts stay compact and html-safe', () => {
+  const supportPrompt = buildTelegramAdminSupportReplyPromptMessage({
+    locale: 'en',
+    recipientLabel: '@customer_one',
+  });
+  const directPrompt = buildTelegramAdminDirectMessagePromptMessage({
+    locale: 'en',
+    recipientLabel: 'Onn',
+  });
+  const myanmarPrompt = buildTelegramAdminSupportReplyPromptMessage({
+    locale: 'my',
+    recipientLabel: '@customer_one',
+  });
+
+  for (const sample of [supportPrompt, directPrompt, myanmarPrompt]) {
+    assert.deepEqual(validateTelegramHtmlMessage(sample), { valid: true, invalidTags: [] });
+    assertTelegramMessageBudget(sample, { maxLines: 3, maxChars: 120 });
+  }
+
+  assert.match(supportPrompt, /Support reply/);
+  assert.match(directPrompt, /Direct message/);
+  assert.doesNotMatch(supportPrompt, /Recipient:/);
+  assert.doesNotMatch(supportPrompt, /reply now/i);
+  assert.doesNotMatch(directPrompt, /Send the text, photo, or document now/i);
+  assert.match(supportPrompt, /\/cancel/);
+  assert.match(myanmarPrompt, /\/cancel/);
 });
 
 test('telegram promo reminder messages stay compact and keep links in buttons', () => {

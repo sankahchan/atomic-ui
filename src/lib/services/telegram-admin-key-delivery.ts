@@ -11,6 +11,36 @@ import {
 } from '@/lib/services/telegram-admin-key-flow-state';
 import { escapeHtml } from '@/lib/services/telegram-ui';
 
+export function buildTelegramAdminSupportReplyPromptMessage(input: {
+  locale: SupportedLocale;
+  recipientLabel: string;
+}) {
+  return [
+    input.locale === 'my'
+      ? '💬 <b>Support reply</b>'
+      : '💬 <b>Support reply</b>',
+    `${input.locale === 'my' ? 'To' : 'To'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
+    input.locale === 'my'
+      ? 'Text, photo, document ပို့နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။'
+      : 'Send text, photo, or document. Use /cancel to stop.',
+  ].join('\n');
+}
+
+export function buildTelegramAdminDirectMessagePromptMessage(input: {
+  locale: SupportedLocale;
+  recipientLabel: string;
+}) {
+  return [
+    input.locale === 'my'
+      ? '💬 <b>Direct message</b>'
+      : '💬 <b>Direct message</b>',
+    `${input.locale === 'my' ? 'To' : 'To'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
+    input.locale === 'my'
+      ? 'Text, photo, document ပို့နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။'
+      : 'Send text, photo, or document. Use /cancel to stop.',
+  ].join('\n');
+}
+
 export async function startTelegramAdminSupportReplyFlow(input: {
   telegramUserId: number;
   chatId: number;
@@ -33,16 +63,10 @@ export async function startTelegramAdminSupportReplyFlow(input: {
   await input.deps.sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my'
-        ? '💬 <b>Reply to support thread</b>'
-        : '💬 <b>Reply to support thread</b>',
-      '',
-      `${input.locale === 'my' ? 'Recipient' : 'Recipient'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
-      input.locale === 'my'
-        ? 'ယခု text, photo, သို့မဟုတ် document ကို ပို့နိုင်ပါသည်။'
-        : 'Send the text, photo, or document reply now.',
-    ].join('\n'),
+    buildTelegramAdminSupportReplyPromptMessage({
+      locale: input.locale,
+      recipientLabel: input.recipientLabel,
+    }),
     {
       replyMarkup: buildCancelKeyboard(input.locale),
     },
@@ -75,16 +99,10 @@ export async function startTelegramAdminDirectMessageFlow(input: {
   await input.deps.sendTelegramMessage(
     input.botToken,
     input.chatId,
-    [
-      input.locale === 'my'
-        ? '💬 <b>Message user</b>'
-        : '💬 <b>Message user</b>',
-      '',
-      `${input.locale === 'my' ? 'Recipient' : 'Recipient'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
-      input.locale === 'my'
-        ? 'ယခု text, photo, သို့မဟုတ် document ကို ပို့နိုင်ပါသည်။'
-        : 'Send the text, photo, or document now.',
-    ].join('\n'),
+    buildTelegramAdminDirectMessagePromptMessage({
+      locale: input.locale,
+      recipientLabel: input.recipientLabel,
+    }),
     {
       replyMarkup: buildCancelKeyboard(input.locale),
     },

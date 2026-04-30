@@ -64,8 +64,8 @@ export async function sendTelegramSupportThreadAlertToAdmins(input: {
     }).map((line) => escapeHtml(line)),
     '',
     input.locale === 'my'
-      ? 'Use /supportqueue to open the live queue.'
-      : 'Use /supportqueue to open the live queue.',
+      ? 'Reply ပို့ရန် /supportqueue ကို ဖွင့်ပါ။'
+      : 'Open /supportqueue to reply.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -183,8 +183,8 @@ export async function runTelegramSupportSlaAlertCycle() {
       }).map((line) => escapeHtml(line)),
       '',
       locale === 'my'
-        ? 'Use /supportqueue to open the live queue and respond immediately.'
-        : 'Use /supportqueue to open the live queue and respond immediately.',
+        ? 'အခု reply ပို့ရန် /supportqueue ကို ဖွင့်ပါ။'
+        : 'Open /supportqueue now.',
     ]
       .filter(Boolean)
       .join('\n');
