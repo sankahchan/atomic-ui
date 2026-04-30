@@ -26,6 +26,28 @@ export interface HealthCheckResult {
     error?: string;
 }
 
+export const ADMIN_SLOW_ALERT_MIN_CONSECUTIVE = 2;
+
+export function shouldSendAdminSlowAlert(input: {
+    previousSlowConsecutiveCount: number | null | undefined;
+    currentSlowConsecutiveCount: number;
+    lastNotifiedAt: Date | null;
+    notifyCooldownMins: number | null | undefined;
+    now?: number;
+}): boolean {
+    if (input.currentSlowConsecutiveCount < ADMIN_SLOW_ALERT_MIN_CONSECUTIVE) {
+        return false;
+    }
+
+    if ((input.previousSlowConsecutiveCount ?? 0) >= ADMIN_SLOW_ALERT_MIN_CONSECUTIVE) {
+        return false;
+    }
+
+    const cooldownMs = Math.max(15, input.notifyCooldownMins ?? 30) * 60_000;
+    const now = input.now ?? Date.now();
+    return !input.lastNotifiedAt || now - input.lastNotifiedAt.getTime() >= cooldownMs;
+}
+
 /**
  * Check the health of a single server
  */
@@ -375,11 +397,11 @@ export async function runHealthChecks(): Promise<{
         // Update the health check record
         if (server.healthCheck) {
             const wasDown = server.healthCheck.lastStatus === 'DOWN';
-            const wasSlow = server.healthCheck.lastStatus === 'SLOW';
             const isNowDown = result.status === 'DOWN';
             const thresholdMs = server.healthCheck.latencyThresholdMs ?? 500;
+            const previousSlowConsecutiveCount = server.healthCheck.slowConsecutiveCount ?? 0;
             const consecutiveSlowCount = result.status === 'SLOW'
-                ? (server.healthCheck.slowConsecutiveCount ?? 0) + 1
+                ? previousSlowConsecutiveCount + 1
                 : 0;
 
             await db.healthCheck.update({
@@ -405,10 +427,25 @@ export async function runHealthChecks(): Promise<{
                 await sendAdminAlert(statusMsg);
             }
 
-            if (!wasSlow && result.status === 'SLOW') {
+            if (
+                result.status === 'SLOW' &&
+                shouldSendAdminSlowAlert({
+                    previousSlowConsecutiveCount,
+                    currentSlowConsecutiveCount: consecutiveSlowCount,
+                    lastNotifiedAt: server.healthCheck.lastNotifiedAt,
+                    notifyCooldownMins: server.healthCheck.notifyCooldownMins,
+                })
+            ) {
                 await sendAdminAlert(
-                    `🟡 <b>Server slow</b>\n\n<b>${server.name}</b> is responding with high latency.\nLatency: <b>${result.latencyMs ?? '-'}ms</b> (threshold <b>${thresholdMs}ms</b>)`,
+                    `🟡 <b>Server slow</b>\n\n<b>${server.name}</b> stayed slow for <b>${consecutiveSlowCount}</b> checks.\nLatency: <b>${result.latencyMs ?? '-'}ms</b> (threshold <b>${thresholdMs}ms</b>)`,
                 );
+
+                await db.healthCheck.update({
+                    where: { id: server.healthCheck.id },
+                    data: {
+                        lastNotifiedAt: new Date(),
+                    },
+                });
             }
 
             if (isNowDown) {
