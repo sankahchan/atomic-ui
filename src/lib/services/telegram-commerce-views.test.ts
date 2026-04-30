@@ -520,6 +520,8 @@ test('renew summary stays compact and removes repeated key-type copy', () => {
   assert.doesNotMatch(message, /Normal access key/);
   assert.doesNotMatch(message, /Premium dynamic key/);
   assert.doesNotMatch(message, /Preferred server:/);
+  assert.match(message, /2 keys • 1 standard • 1 premium/);
+  assert.doesNotMatch(message, /key\(s\)/);
   assert.match(message, /Status: <b>ACTIVE<\/b>/);
   assert.match(message, /73 day\(s\) left \(6\/29\/2026\) • SG-2/);
   assert.ok(message.split('\n').length < 18);

@@ -61,7 +61,7 @@ import {
   validateTelegramHtmlMessage,
 } from '@/lib/services/telegram-message-validation';
 import { getCommandKeyboard, parseTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
-import { getTelegramUi } from '@/lib/services/telegram-ui';
+import { formatTelegramCountLabel, getTelegramUi } from '@/lib/services/telegram-ui';
 
 function assertTelegramMessageBudget(
   message: string,
@@ -116,6 +116,20 @@ test('telegram HTML sanitizer escapes unsupported placeholder tags but keeps sup
   assert.equal(sanitized.changed, true);
   assert.deepEqual(sanitized.invalidTags, ['order-code']);
   assert.equal(sanitized.text, 'Usage: <b>/order</b> &lt;order-code&gt;');
+});
+
+test('telegram count labels and customer status copy avoid raw (s) wording', () => {
+  const ui = getTelegramUi('en');
+
+  assert.equal(formatTelegramCountLabel(1, 'en', 'key'), '1 key');
+  assert.equal(formatTelegramCountLabel(2, 'en', 'key'), '2 keys');
+  assert.equal(formatTelegramCountLabel(2, 'en', 'share page'), '2 share pages');
+  assert.match(ui.emailLinked(2), /Linked 2 keys to this Telegram account/);
+  assert.match(ui.subSent(2), /Sent 2 share pages to this chat/);
+  assert.match(ui.renewSent(2), /Renewal request sent for 2 keys/);
+  assert.doesNotMatch(ui.emailLinked(2), /key\(s\)/);
+  assert.doesNotMatch(ui.subSent(2), /share page\(s\)/);
+  assert.doesNotMatch(ui.renewSent(2), /key\(s\)/);
 });
 
 test('telegram UTF-8 normalizer strips lone surrogates and control bytes', () => {

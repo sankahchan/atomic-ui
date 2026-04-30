@@ -34,6 +34,7 @@ import {
 import {
   escapeHtml,
   formatExpirationSummary,
+  formatTelegramCountLabel,
   formatTelegramServerChoiceLabel,
   getFlagEmoji,
   getTelegramUi,
@@ -671,7 +672,7 @@ export function buildTelegramRenewSummaryMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: ui.renewTargetPrompt(input.orderCode),
-    statsLine: `${input.keys.length} key(s) • ${accessCount} standard • ${premiumCount} premium`,
+    statsLine: `${formatTelegramCountLabel(input.keys.length, input.locale, 'key')} • ${accessCount} standard • ${premiumCount} premium`,
     intro:
       input.locale === 'my'
         ? 'သက်တမ်းတိုးလိုသော key ကို အောက်တွင် ရွေးပါ။'
