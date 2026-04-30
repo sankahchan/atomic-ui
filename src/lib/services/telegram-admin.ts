@@ -28,7 +28,7 @@ import {
 } from '@/lib/services/telegram-ui';
 import { ensureBackupDirectory } from '@/lib/backup-storage';
 import { createRuntimeBackup } from '@/lib/services/runtime-backup';
-import { formatBytes } from '@/lib/utils';
+import { formatBytes, formatCountLabel } from '@/lib/utils';
 
 export {
   resolveTelegramAdminActor,
@@ -384,7 +384,7 @@ export async function handleServerDownCommand(argsText: string, locale: Supporte
 
   return locale === 'my'
     ? `🚨 <b>${escapeHtml(resolved.server.name)}</b> အတွက် downtime notice ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။`
-    : `🚨 Sent a downtime notice for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentCount} Telegram user(s).`;
+    : `🚨 Sent a downtime notice for <b>${escapeHtml(resolved.server.name)}</b> to ${formatCountLabel(result.sentCount, 'Telegram user')}.`;
 }
 
 export async function handleMaintenanceCommand(argsText: string, locale: SupportedLocale) {
@@ -447,7 +447,7 @@ export async function handleMaintenanceCommand(argsText: string, locale: Support
 
   return locale === 'my'
     ? `🛠️ <b>${escapeHtml(resolved.server.name)}</b> အတွက် maintenance notice ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။`
-    : `🛠️ Sent a maintenance notice for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentCount} Telegram user(s).`;
+    : `🛠️ Sent a maintenance notice for <b>${escapeHtml(resolved.server.name)}</b> to ${formatCountLabel(result.sentCount, 'Telegram user')}.`;
 }
 
 export async function handleServerUpdateCommand(argsText: string, locale: SupportedLocale) {
@@ -483,7 +483,7 @@ export async function handleServerUpdateCommand(argsText: string, locale: Suppor
 
   return locale === 'my'
     ? `📣 <b>${escapeHtml(resolved.server.name)}</b> အတွက် follow-up update ကို user ${result.sentToTelegramUsers} ယောက်ထံ ပို့ပြီးပါပြီ။`
-    : `📣 Sent an outage follow-up for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
+    : `📣 Sent an outage follow-up for <b>${escapeHtml(resolved.server.name)}</b> to ${formatCountLabel(result.sentToTelegramUsers, 'Telegram user')}.`;
 }
 
 export async function handleServerRecoveredCommand(argsText: string, locale: SupportedLocale) {
@@ -530,7 +530,7 @@ export async function handleServerRecoveredCommand(argsText: string, locale: Sup
 
   return locale === 'my'
     ? `✅ <b>${escapeHtml(resolved.server.name)}</b> အတွက် recovery update ကို user ${result.sentToTelegramUsers} ယောက်ထံ ပို့ပြီးပါပြီ။`
-    : `✅ Sent a recovery update for <b>${escapeHtml(resolved.server.name)}</b> to ${result.sentToTelegramUsers} Telegram user(s).`;
+    : `✅ Sent a recovery update for <b>${escapeHtml(resolved.server.name)}</b> to ${formatCountLabel(result.sentToTelegramUsers, 'Telegram user')}.`;
 }
 
 export function buildTelegramAdminHomeKeyboard(input: {
