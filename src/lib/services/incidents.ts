@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { formatCountLabel } from '@/lib/utils';
 
 const INCIDENT_ALERT_EVENTS = [
   'SERVER_DOWN',
@@ -80,11 +81,11 @@ function getSeverityFromEvent(event: string): IncidentSeverity {
 
 function buildIncidentSummary(status: string, serverName: string, keyCount: number) {
   if (status === 'DOWN') {
-    return `${serverName} is currently unreachable. ${keyCount} key(s) could be affected.`;
+    return `${serverName} is currently unreachable. ${formatCountLabel(keyCount, 'key')} could be affected.`;
   }
 
   if (status === 'SLOW') {
-    return `${serverName} is responding slowly. ${keyCount} key(s) may experience degraded performance.`;
+    return `${serverName} is responding slowly. ${formatCountLabel(keyCount, 'key')} may experience degraded performance.`;
   }
 
   return `${serverName} is being monitored.`;

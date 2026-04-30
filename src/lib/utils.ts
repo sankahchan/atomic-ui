@@ -121,6 +121,11 @@ export function formatBytes(bytes: number | bigint, decimals = 2): string {
   return `${value.toFixed(decimals)} ${sizes[i]}`;
 }
 
+export function formatCountLabel(count: number, singular: string, plural?: string): string {
+  const pluralLabel = plural || `${singular}s`;
+  return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
 /**
  * Parse a human-readable byte string to a number.
  * Accepts strings like "1.5 GB", "256MB", "1024".

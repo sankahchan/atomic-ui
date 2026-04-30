@@ -10,6 +10,7 @@ import {
   type TelegramAnnouncementType,
 } from '@/lib/services/telegram-announcements';
 import { escapeHtml, formatTelegramDateTime } from '@/lib/services/telegram-ui';
+import { formatCountLabel } from '@/lib/utils';
 
 function resolveTelegramAnnouncementAudienceToken(value?: string | null): TelegramAnnouncementAudience | null {
   switch ((value || '').trim().toLowerCase()) {
@@ -551,7 +552,7 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
 
   return locale === 'my'
     ? `📣 Announcement ကို user ${result.sentCount} ယောက်ထံ ပို့ပြီးပါပြီ။${result.failedCount > 0 ? ` • failed ${result.failedCount}` : ''}`
-    : `📣 Sent the announcement to ${result.sentCount} user(s).${result.failedCount > 0 ? ` Failed: ${result.failedCount}.` : ''}`;
+    : `📣 Sent the announcement to ${formatCountLabel(result.sentCount, 'user')}.${result.failedCount > 0 ? ` Failed: ${result.failedCount}.` : ''}`;
 }
 
 export async function handleAnnounceUserCommand(

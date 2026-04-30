@@ -4,6 +4,7 @@ import { generateReportData } from '@/lib/services/report-generator';
 import { enqueueNotificationsForChannels } from '@/lib/services/notification-queue';
 import { writeAuditLog } from '@/lib/audit';
 import { logger } from '@/lib/logger';
+import { formatCountLabel } from '@/lib/utils';
 
 const SCHEDULED_REPORTS_SETTING_KEY = 'scheduled_reports';
 const DEFAULT_WEEKDAY = 1;
@@ -209,7 +210,7 @@ function buildTemplateVariables({
           ? 'Revenue: Not configured'
           : '',
     usage_line: config.includeUsage
-      ? `Usage: ${formatBytes(totalTrafficBytes)} across ${activeKeys} active key(s)`
+      ? `Usage: ${formatBytes(totalTrafficBytes)} across ${formatCountLabel(activeKeys, 'active key')}`
       : '',
     expirations_line: config.includeExpirations
       ? `Expirations: ${expiringSoon} expiring soon, ${expiredKeys} already expired`

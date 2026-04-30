@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger';
 import { getTelegramConfig, sendTelegramMessage } from '@/lib/services/telegram-bot';
 import { getMigrationPreview, migrateKeys } from '@/lib/services/server-migration';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
-import { generateRandomString } from '@/lib/utils';
+import { formatCountLabel, generateRandomString } from '@/lib/utils';
 
 const DEFAULT_OUTAGE_GRACE_HOURS = 3;
 const prisma = db as any;
@@ -231,7 +231,7 @@ async function linkPremiumSupportRequestsToIncident(input: {
     await appendOutageIncidentUpdate({
       incidentId: input.incidentId,
       updateType: 'LINKED_PREMIUM_REQUESTS',
-      title: `Linked ${updatedRequestIds.size} premium request(s)`,
+      title: `Linked ${formatCountLabel(updatedRequestIds.size, 'premium request')}`,
       message:
         requests
           .filter((request) => updatedRequestIds.has(request.id))
@@ -297,7 +297,7 @@ async function upsertOutageState(input: {
           : input.cause === 'HEALTH_SLOW'
             ? 'Degraded performance detected'
             : 'Outage detected',
-      message: `${affectedKeys.length} active or pending key(s) are affected.`,
+      message: `Affected right now: ${formatCountLabel(affectedKeys.length, 'active or pending key')}.`,
     });
 
     const state = await prisma.serverOutageState.upsert({
@@ -384,7 +384,7 @@ async function upsertOutageState(input: {
           : input.cause === 'HEALTH_SLOW'
             ? 'Degraded performance detected'
             : 'Outage detected',
-      message: `${affectedKeys.length} active or pending key(s) are affected.`,
+      message: `Affected right now: ${formatCountLabel(affectedKeys.length, 'active or pending key')}.`,
     });
   } else {
     await prisma.serverOutageIncident.update({
@@ -837,7 +837,7 @@ export async function executeServerOutageReplacement(input: {
       incidentId: outageState.incidentId,
       updateType: 'MIGRATION_TRIGGERED',
       title: 'Bulk replacement started',
-      message: `${allEligibleKeyIds.length} affected key(s) will move from ${sourceServer.name} to ${targetServer.name}.`,
+      message: `Planned move: ${formatCountLabel(allEligibleKeyIds.length, 'affected key')} from ${sourceServer.name} to ${targetServer.name}.`,
     });
   }
 
@@ -920,7 +920,7 @@ export async function executeServerOutageReplacement(input: {
       recoveredAt: failedKeyIds.length === 0 ? new Date() : null,
       lastError:
         failedKeyIds.length > 0
-          ? `Migration incomplete: ${failedKeyIds.length} key(s) still need attention.`
+          ? `Migration incomplete. Remaining: ${formatCountLabel(failedKeyIds.length, 'key')}.`
           : null,
     },
   });
@@ -952,7 +952,7 @@ export async function executeServerOutageReplacement(input: {
             : '[]',
         lastError:
           failedKeyIds.length > 0
-            ? `Migration incomplete: ${failedKeyIds.length} key(s) still need attention.`
+            ? `Migration incomplete. Remaining: ${formatCountLabel(failedKeyIds.length, 'key')}.`
             : null,
       },
     });
@@ -963,8 +963,8 @@ export async function executeServerOutageReplacement(input: {
         failedKeyIds.length === 0 ? 'Bulk replacement completed' : 'Bulk replacement incomplete',
       message:
         failedKeyIds.length === 0
-          ? `${result.migrated} key(s) were moved to ${targetServer.name}.`
-          : `${result.migrated} key(s) moved successfully, ${failedKeyIds.length} still need attention.`,
+          ? `Moved to ${targetServer.name}: ${formatCountLabel(result.migrated, 'key')}.`
+          : `Moved successfully: ${formatCountLabel(result.migrated, 'key')}. Remaining: ${formatCountLabel(failedKeyIds.length, 'key')}.`,
       visibleToUsers: recoveryNotifications > 0,
       sentToTelegramUsers: recoveryNotifications,
     });

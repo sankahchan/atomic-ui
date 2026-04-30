@@ -4,6 +4,7 @@ import { hashPassword } from '@/lib/auth';
 import { createOutlineClient, parseOutlineConfig } from '@/lib/outline-api';
 import { validateProductionEnvironment } from '@/lib/services/production-validation';
 import { syncIncidentState } from '@/lib/services/incidents';
+import { formatCountLabel } from '@/lib/utils';
 
 type StepStatus = 'complete' | 'attention' | 'warning' | 'pending';
 type PostInstallCheckStatus = 'pass' | 'warn' | 'fail';
@@ -298,7 +299,7 @@ export async function getOnboardingReadiness() {
       href: '/dashboard/migration',
       actionLabel: 'Open migration',
       summary: hasImportedInventory
-        ? `${accessKeyCount} key(s) and ${userCount} user(s) detected`
+        ? `${formatCountLabel(accessKeyCount, 'key')} and ${formatCountLabel(userCount, 'user')} detected`
         : 'No imported inventory detected yet',
     },
     {
