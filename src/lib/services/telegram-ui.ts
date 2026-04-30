@@ -122,12 +122,12 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumReplyToRequest: isMyanmar ? 'Reply ပို့ရန်' : 'Reply',
     premiumFollowUpPrompt: (requestCode: string, keyName: string) =>
       isMyanmar
-        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် reply ကို ယခုပို့ပါ။\nRoute, region သို့မဟုတ် error detail ကို ထည့်နိုင်ပါသည်။\nမပို့တော့လိုပါက /cancel ကို သုံးပါ။`
-        : `✍️ Send your reply now for <b>${requestCode}</b> (${keyName}).\nAdd route, region, or error detail.\nUse /cancel to stop.`,
+        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် reply ကို ပို့ပါ။\nRoute, region, error detail ကို ထည့်နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။`
+        : `✍️ Reply for <b>${requestCode}</b> (${keyName}).\nAdd route, region, or error detail. Use /cancel to stop.`,
     premiumFollowUpSubmitted: (requestCode: string) =>
       isMyanmar
-        ? `📨 <b>${requestCode}</b> အတွက် reply ကို ပို့ပြီးပါပြီ။\nဒီ chat မှာ update ကို စောင့်ပါ။`
-        : `📨 Reply sent for <b>${requestCode}</b>.\nWait here for the update.`,
+        ? `📨 <b>${requestCode}</b> အတွက် reply ကို ပို့ပြီးပါပြီ။\nUpdate ကို ဒီ chat မှာ စောင့်ပါ။`
+        : `📨 Reply sent for <b>${requestCode}</b>.\nUpdates stay in this chat.`,
     premiumFollowUpCancelled: isMyanmar
       ? 'Premium request နောက်ဆက်တွဲ message ကို ပယ်ဖျက်ပြီးပါပြီ။'
       : 'Cancelled the premium follow-up message.',
@@ -261,8 +261,8 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumAwaitingAdminReply: isMyanmar ? 'Admin စစ်နေ' : 'Admin reviewing',
     premiumAwaitingYourReply: isMyanmar ? 'Reply လိုအပ်' : 'Reply needed',
     premiumStatusReplyHint: isMyanmar
-      ? 'Thread ကို ဆက်ရန် Reply ကို နှိပ်ပါ။'
-      : 'Tap Reply to continue this thread.',
+      ? 'အသေးစိတ်ထည့်ရန် Reply ကို နှိပ်ပါ။'
+      : 'Tap Reply to add detail.',
     premiumStatusUpdatedLabel: isMyanmar ? 'နောက်ဆုံး update' : 'Updated',
     premiumResponseTimeLabel: isMyanmar ? 'ပထမအဖြေ' : 'First response',
     premiumResolutionTimeLabel: isMyanmar ? 'ဖြေရှင်းပြီး' : 'Resolved',
