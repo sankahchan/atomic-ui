@@ -11,6 +11,7 @@ import { createOutlineClient } from '@/lib/outline-api';
 import { writeAuditLog } from '@/lib/audit';
 import { sendAdminAlert } from '@/lib/services/telegram-bot';
 import { sendServerIssueNoticeToTelegram } from '@/lib/services/telegram-runtime';
+import { escapeHtml } from '@/lib/services/telegram-ui';
 import {
   executeServerOutageReplacement,
   markServerOutageDetected,
@@ -27,6 +28,56 @@ export interface HealthCheckResult {
 }
 
 export const ADMIN_SLOW_ALERT_MIN_CONSECUTIVE = 2;
+
+export function buildSlowAutoMigrationBlockedAlertMessage(input: {
+    serverName: string;
+    consecutiveSlowCount: number;
+}) {
+    return [
+        '🟠 <b>Slow migration blocked</b>',
+        `<b>${escapeHtml(input.serverName)}</b> • ${input.consecutiveSlowCount} slow checks`,
+        'No healthy fallback target is available.',
+    ].join('\n');
+}
+
+export function buildSlowAutoMigrationStartedAlertMessage(input: {
+    sourceServerName: string;
+    targetServerName: string;
+    consecutiveSlowCount: number;
+    latencyMs: number;
+    thresholdMs: number;
+}) {
+    return [
+        '🟠 <b>Slow migration started</b>',
+        `<b>${escapeHtml(input.sourceServerName)}</b> to <b>${escapeHtml(input.targetServerName)}</b>`,
+        `${input.consecutiveSlowCount} slow checks • <b>${input.latencyMs}ms</b> / ${input.thresholdMs}ms threshold`,
+    ].join('\n');
+}
+
+export function buildSlowAutoMigrationFailedAlertMessage(input: {
+    serverName: string;
+    consecutiveSlowCount: number;
+    error: string;
+}) {
+    return [
+        '🔴 <b>Slow migration failed</b>',
+        `<b>${escapeHtml(input.serverName)}</b> • ${input.consecutiveSlowCount} slow checks`,
+        `Error: <b>${escapeHtml(input.error || 'Unknown error')}</b>`,
+    ].join('\n');
+}
+
+export function buildServerSlowAdminAlertMessage(input: {
+    serverName: string;
+    consecutiveSlowCount: number;
+    latencyMs: number | null | undefined;
+    thresholdMs: number;
+}) {
+    return [
+        '🟡 <b>Server slow</b>',
+        `<b>${escapeHtml(input.serverName)}</b> • ${input.consecutiveSlowCount} slow checks`,
+        `Latency: <b>${input.latencyMs ?? '-'}ms</b> / ${input.thresholdMs}ms threshold`,
+    ].join('\n');
+}
 
 export function shouldSendAdminSlowAlert(input: {
     previousSlowConsecutiveCount: number | null | undefined;
@@ -221,7 +272,7 @@ async function maybeNotifyUsersAboutSlowServer(input: {
         chatIds,
         serverName: input.server.name,
         noticeType: 'ISSUE',
-        message: `We detected sustained high latency on this server (${input.latencyMs}ms). Please wait about 2 to 3 hours while we stabilize the route or prepare a replacement if needed.`,
+        message: `High latency detected: ${input.latencyMs}ms. We are stabilizing the route or preparing a replacement.`,
     });
 
     if (result.sentCount > 0) {
@@ -289,7 +340,10 @@ async function maybeAutoMigrateSlowServer(input: {
         if (!fallback.selected) {
             if (input.consecutiveSlowCount === input.server.healthCheck.slowAutoMigrateThreshold) {
                 await sendAdminAlert(
-                    `🟠 <b>Slow auto-migration blocked</b>\n\n<b>${input.server.name}</b> stayed slow for ${input.consecutiveSlowCount} checks, but no healthy fallback target is currently available.`,
+                    buildSlowAutoMigrationBlockedAlertMessage({
+                        serverName: input.server.name,
+                        consecutiveSlowCount: input.consecutiveSlowCount,
+                    }),
                 );
             }
             return false;
@@ -321,7 +375,13 @@ async function maybeAutoMigrateSlowServer(input: {
         });
 
         await sendAdminAlert(
-            `🟠 <b>Slow auto-migration started</b>\n\n<b>${input.server.name}</b> stayed slow for ${input.consecutiveSlowCount} checks and is being drained to <b>${fallback.selected.serverName}</b>.\nLatency: <b>${input.latencyMs}ms</b> (threshold <b>${input.thresholdMs}ms</b>)`,
+            buildSlowAutoMigrationStartedAlertMessage({
+                sourceServerName: input.server.name,
+                targetServerName: fallback.selected.serverName,
+                consecutiveSlowCount: input.consecutiveSlowCount,
+                latencyMs: input.latencyMs,
+                thresholdMs: input.thresholdMs,
+            }),
         );
 
         return true;
@@ -332,7 +392,11 @@ async function maybeAutoMigrateSlowServer(input: {
             error: error instanceof Error ? error.message : String(error),
         });
         await sendAdminAlert(
-            `🔴 <b>Slow auto-migration failed</b>\n\n<b>${input.server.name}</b> reached the auto-migration threshold, but the migration could not complete.\nError: <b>${error instanceof Error ? error.message : 'Unknown error'}</b>`,
+            buildSlowAutoMigrationFailedAlertMessage({
+                serverName: input.server.name,
+                consecutiveSlowCount: input.consecutiveSlowCount,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            }),
         );
         return false;
     }
@@ -437,7 +501,12 @@ export async function runHealthChecks(): Promise<{
                 })
             ) {
                 await sendAdminAlert(
-                    `🟡 <b>Server slow</b>\n\n<b>${server.name}</b> stayed slow for <b>${consecutiveSlowCount}</b> checks.\nLatency: <b>${result.latencyMs ?? '-'}ms</b> (threshold <b>${thresholdMs}ms</b>)`,
+                    buildServerSlowAdminAlertMessage({
+                        serverName: server.name,
+                        consecutiveSlowCount,
+                        latencyMs: result.latencyMs,
+                        thresholdMs,
+                    }),
                 );
 
                 await db.healthCheck.update({
