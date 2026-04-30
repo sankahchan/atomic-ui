@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.12 - 2026-04-30
+
+### Fixed
+
+- Suppressed Telegram admin `Server slow` alerts for isolated one-sample latency spikes so the bot now waits for a short sustained slow streak before notifying.
+- Aligned Telegram slow-alert behavior with the web panel’s live health view, which already reflected the latest recovered latency instead of older transient spikes.
+
 ## v1.2.11 - 2026-04-30
 
 ### Changed
