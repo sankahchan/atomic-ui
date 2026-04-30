@@ -7,6 +7,7 @@ import {
   buildSlowAutoMigrationBlockedAlertMessage,
   buildSlowAutoMigrationFailedAlertMessage,
   buildSlowAutoMigrationStartedAlertMessage,
+  resolveAdminSlowAlertMinConsecutive,
   shouldSendAdminSlowAlert,
 } from './health-check';
 import { validateTelegramHtmlMessage } from './telegram-message-validation';
@@ -23,12 +24,25 @@ test('slow admin alerts do not fire on the first slow sample', () => {
   );
 });
 
-test('slow admin alerts fire when the slow streak reaches the sustained threshold', () => {
-  assert.equal(ADMIN_SLOW_ALERT_MIN_CONSECUTIVE, 2);
+test('slow admin alerts wait for the policy-aligned threshold', () => {
+  assert.equal(ADMIN_SLOW_ALERT_MIN_CONSECUTIVE, 3);
   assert.equal(
     shouldSendAdminSlowAlert({
       previousSlowConsecutiveCount: 1,
       currentSlowConsecutiveCount: 2,
+      lastNotifiedAt: null,
+      notifyCooldownMins: 30,
+    }),
+    false,
+  );
+});
+
+test('slow admin alerts fire when the slow streak reaches the sustained threshold', () => {
+  assert.equal(ADMIN_SLOW_ALERT_MIN_CONSECUTIVE, 3);
+  assert.equal(
+    shouldSendAdminSlowAlert({
+      previousSlowConsecutiveCount: 2,
+      currentSlowConsecutiveCount: 3,
       lastNotifiedAt: null,
       notifyCooldownMins: 30,
     }),
@@ -41,8 +55,8 @@ test('slow admin alerts respect the notification cooldown between separate incid
 
   assert.equal(
     shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 1,
-      currentSlowConsecutiveCount: 2,
+      previousSlowConsecutiveCount: 2,
+      currentSlowConsecutiveCount: 3,
       lastNotifiedAt: new Date(now.getTime() - 10 * 60_000),
       notifyCooldownMins: 30,
       now: now.getTime(),
@@ -52,8 +66,8 @@ test('slow admin alerts respect the notification cooldown between separate incid
 
   assert.equal(
     shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 1,
-      currentSlowConsecutiveCount: 2,
+      previousSlowConsecutiveCount: 2,
+      currentSlowConsecutiveCount: 3,
       lastNotifiedAt: new Date(now.getTime() - 45 * 60_000),
       notifyCooldownMins: 30,
       now: now.getTime(),
@@ -65,8 +79,8 @@ test('slow admin alerts respect the notification cooldown between separate incid
 test('slow admin alerts do not repeat while the same slow streak is still in progress', () => {
   assert.equal(
     shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 2,
-      currentSlowConsecutiveCount: 3,
+      previousSlowConsecutiveCount: 3,
+      currentSlowConsecutiveCount: 4,
       lastNotifiedAt: null,
       notifyCooldownMins: 30,
     }),
@@ -74,11 +88,33 @@ test('slow admin alerts do not repeat while the same slow streak is still in pro
   );
 });
 
+test('admin slow alert threshold follows stricter slow policy settings', () => {
+  assert.equal(
+    resolveAdminSlowAlertMinConsecutive({
+      slowAutoDrainEnabled: true,
+      slowAutoDrainThreshold: 5,
+      slowUserNotifyEnabled: true,
+      slowUserNotifyThreshold: 4,
+    }),
+    4,
+  );
+
+  assert.equal(
+    resolveAdminSlowAlertMinConsecutive({
+      slowAutoDrainEnabled: false,
+      slowAutoDrainThreshold: 2,
+      slowUserNotifyEnabled: false,
+      slowUserNotifyThreshold: 2,
+    }),
+    3,
+  );
+});
+
 test('slow admin alert messages stay compact and html-safe', () => {
   const messages = [
     buildServerSlowAdminAlertMessage({
       serverName: 'SG <primary>',
-      consecutiveSlowCount: 2,
+      consecutiveSlowCount: 3,
       latencyMs: 650,
       thresholdMs: 500,
     }),
