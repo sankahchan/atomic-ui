@@ -3,12 +3,13 @@ import { logger } from '@/lib/logger';
 import { getTelegramConfig, sendTelegramMessage } from '@/lib/services/telegram-bot';
 import { getMigrationPreview, migrateKeys } from '@/lib/services/server-migration';
 import { canAssignKeysToServer } from '@/lib/services/server-lifecycle';
+import { escapeHtml } from '@/lib/services/telegram-ui';
 import { formatCountLabel, generateRandomString } from '@/lib/utils';
 
 const DEFAULT_OUTAGE_GRACE_HOURS = 3;
 const prisma = db as any;
 
-type ServerOutageCause = 'HEALTH_DOWN' | 'HEALTH_SLOW' | 'MANUAL_OUTAGE';
+export type ServerOutageCause = 'HEALTH_DOWN' | 'HEALTH_SLOW' | 'MANUAL_OUTAGE';
 
 type AffectedKeySnapshot = {
   id: string;
@@ -483,116 +484,112 @@ export async function markServerOutageRecovered(serverId: string) {
   });
 }
 
-function buildOutageAlertMessage(input: {
+function formatOutageKeyList(keyNames: string[]) {
+  const listedKeys = keyNames.slice(0, 5).map((keyName) => escapeHtml(keyName));
+  if (listedKeys.length === 0) {
+    return '<b>none linked</b>';
+  }
+  const moreCount = Math.max(0, keyNames.length - listedKeys.length);
+  return `<b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`;
+}
+
+export function buildOutageAlertMessage(input: {
   cause: ServerOutageCause;
   serverName: string;
   keyNames: string[];
   gracePeriodHours: number;
   supportLink?: string | null;
 }) {
-  const listedKeys = input.keyNames.slice(0, 5);
-  const moreCount = Math.max(0, input.keyNames.length - listedKeys.length);
+  const affectedKeys = formatOutageKeyList(input.keyNames);
+  const serverName = escapeHtml(input.serverName);
   const lines = input.cause === 'MANUAL_OUTAGE'
     ? [
         '🛠️ <b>Planned maintenance notice</b>',
-        '',
-        `We are performing maintenance for the server currently serving your VPN access: <b>${input.serverName}</b>.`,
-        `Please wait about <b>${input.gracePeriodHours} hour(s)</b> while we prepare a replacement or complete the maintenance.`,
-        '',
-        `Affected keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
-        'You do not need to buy a new key right now.',
-        'We will send you another message once the replacement or recovery is ready.',
+        `Server: <b>${serverName}</b>`,
+        `Wait about <b>${input.gracePeriodHours}h</b> while we finish maintenance or prepare a replacement.`,
+        `Keys: ${affectedKeys}`,
+        'No new key needed. We will update you here.',
       ]
     : input.cause === 'HEALTH_SLOW'
       ? [
           '⚠️ <b>Server performance issue</b>',
-          '',
-          `The server currently serving your VPN access is responding too slowly: <b>${input.serverName}</b>.`,
-          `Please wait about <b>${input.gracePeriodHours} hour(s)</b> while we prepare a better route or replacement.`,
-          '',
-          `Affected keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
-          'You do not need to buy a new key right now.',
-          'We will send you another message once the replacement is ready.',
+          `Server: <b>${serverName}</b>`,
+          `Wait about <b>${input.gracePeriodHours}h</b> while we prepare a better route or replacement.`,
+          `Keys: ${affectedKeys}`,
+          'No new key needed. We will update you here.',
         ]
     : [
         '🚨 <b>Server issue notice</b>',
-        '',
-        `One of the servers currently serving your VPN access is unavailable: <b>${input.serverName}</b>.`,
-        `Please wait about <b>${input.gracePeriodHours} hour(s)</b> while we prepare a replacement.`,
-        '',
-        `Affected keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
-        'You do not need to buy a new key right now.',
-        'We will send you another message once the replacement is ready.',
+        `Server: <b>${serverName}</b>`,
+        `Wait about <b>${input.gracePeriodHours}h</b> while we prepare a replacement.`,
+        `Keys: ${affectedKeys}`,
+        'No new key needed. We will update you here.',
       ];
 
   if (input.supportLink) {
-    lines.push('', `Support: ${input.supportLink}`);
+    lines.push('', `Support: ${escapeHtml(input.supportLink)}`);
   }
 
   return lines.join('\n');
 }
 
-function buildOutageRecoveryMessage(input: {
+export function buildOutageRecoveryMessage(input: {
   targetServerName: string;
   keyNames: string[];
   supportLink?: string | null;
 }) {
-  const listedKeys = input.keyNames.slice(0, 5);
-  const moreCount = Math.max(0, input.keyNames.length - listedKeys.length);
+  const updatedKeys = formatOutageKeyList(input.keyNames);
   const lines = [
     '✅ <b>Server replacement completed</b>',
-    '',
-    `We moved your VPN access to a new server: <b>${input.targetServerName}</b>.`,
-    `Updated keys: <b>${listedKeys.join(', ')}</b>${moreCount > 0 ? ` (+${moreCount} more)` : ''}`,
-    'Your expiry date and traffic usage stay the same as before.',
-    'If you imported your key manually a long time ago, use /mykeys or /sub to refresh the setup details.',
+    `New server: <b>${escapeHtml(input.targetServerName)}</b>`,
+    `Keys: ${updatedKeys}`,
+    'Expiry and traffic usage stay the same.',
+    'Use /mykeys or /sub if you need fresh setup details.',
   ];
 
   if (input.supportLink) {
-    lines.push('', `Support: ${input.supportLink}`);
+    lines.push('', `Support: ${escapeHtml(input.supportLink)}`);
   }
 
   return lines.join('\n');
 }
 
-function buildOutageFollowUpMessage(input: {
+export function buildOutageFollowUpMessage(input: {
   cause: ServerOutageCause;
   serverName: string;
   message: string;
   supportLink?: string | null;
   markRecovered?: boolean;
 }) {
+  const serverName = escapeHtml(input.serverName);
+  const message = escapeHtml(input.message.trim());
   const lines = input.markRecovered
     ? [
         '✅ <b>Server issue resolved</b>',
-        '',
-        `The issue affecting <b>${input.serverName}</b> has been resolved earlier than expected.`,
-        input.message,
-        'You can try using your key again now.',
+        `Server: <b>${serverName}</b>`,
+        message,
+        'You can try your key again now.',
       ]
     : input.cause === 'MANUAL_OUTAGE'
       ? [
           '🛠️ <b>Maintenance update</b>',
-          '',
-          `We are still working on the planned maintenance affecting <b>${input.serverName}</b>.`,
-          input.message,
+          `Server: <b>${serverName}</b>`,
+          message,
         ]
       : input.cause === 'HEALTH_SLOW'
         ? [
             '⚠️ <b>Performance issue update</b>',
-            '',
-            `We are still working on the degraded performance affecting <b>${input.serverName}</b>.`,
-            input.message,
+            `Server: <b>${serverName}</b>`,
+            message,
           ]
       : [
           '🛠️ <b>Maintenance update</b>',
-          '',
-          `We are still working on the issue affecting <b>${input.serverName}</b>.`,
-          input.message,
+          `Server: <b>${serverName}</b>`,
+          message,
         ];
 
   if (input.supportLink) {
-    lines.push('', `Support: ${input.supportLink}`);
+    lines.push('', `Support: ${escapeHtml(input.supportLink)}`);
   }
 
   return lines.join('\n');

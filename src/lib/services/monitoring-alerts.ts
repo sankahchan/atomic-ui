@@ -11,6 +11,7 @@ import {
   getTelegramConfig,
   sendTelegramMessageDetailed,
 } from '@/lib/services/telegram-runtime';
+import { formatCountLabel } from '@/lib/utils';
 
 export const MONITOR_BACKUP_VERIFICATION_FAILED_EVENT_PREFIX = 'MONITOR_BACKUP_VERIFICATION_FAILED';
 export const MONITOR_TELEGRAM_WEBHOOK_HEALTH_EVENT_PREFIX = 'MONITOR_TELEGRAM_WEBHOOK_HEALTH';
@@ -81,6 +82,21 @@ function formatDurationMinutes(totalMinutes: number, locale: SupportedLocale) {
   return locale === 'my'
     ? `${hours} နာရီ ${minutes} မိနစ်`
     : `${hours}h ${minutes}m`;
+}
+
+function compactWebhookUrl(value: string | null | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const path = parsed.pathname.replace(/\/api\/telegram\/webhook\/?$/, '') || '/';
+    return `${parsed.host}${path === '/' ? '' : path}`;
+  } catch {
+    return trimmed.length > 90 ? `${trimmed.slice(0, 87)}...` : trimmed;
+  }
 }
 
 function buildMonitoringEventKey(prefix: string, fingerprint: string) {
@@ -267,35 +283,30 @@ export function buildBackupVerificationFailureAlertMessage(input: {
     isMyanmar
       ? '🚨 <b>Backup verification failed</b>'
       : '🚨 <b>Backup verification failed</b>',
-    '',
     isMyanmar
-      ? `နောက်ဆုံး verify လုပ်ထားသော backup ${input.failures.length} ခုတွင် failure တွေတွေ့ရှိထားပါသည်။`
-      : `The latest backup verification run found ${input.failures.length} failed backup(s).`,
+      ? `${input.failures.length} ခု backup verify မအောင်မြင်ပါ။`
+      : `${formatCountLabel(input.failures.length, 'backup')} failed verification.`,
   ];
 
   for (const failure of input.failures.slice(0, 3)) {
     lines.push(
-      '',
       `📦 <b>${escapeHtml(failure.filename)}</b>`,
-      `${isMyanmar ? 'Restore ready' : 'Restore ready'}: <b>${failure.restoreReady ? (isMyanmar ? 'Yes' : 'Yes') : (isMyanmar ? 'No' : 'No')}</b>`,
-      `${isMyanmar ? 'Checked at' : 'Checked at'}: <b>${escapeHtml(formatTelegramDateTime(failure.verifiedAt || new Date(), input.locale))}</b>`,
+      `${isMyanmar ? 'Ready' : 'Ready'}: <b>${failure.restoreReady ? (isMyanmar ? 'Yes' : 'Yes') : (isMyanmar ? 'No' : 'No')}</b> • ${escapeHtml(formatTelegramDateTime(failure.verifiedAt || new Date(), input.locale))}`,
       `${isMyanmar ? 'Error' : 'Error'}: ${escapeHtml(failure.error || (isMyanmar ? 'Unknown verification failure' : 'Unknown verification failure'))}`,
     );
   }
 
   if (input.failures.length > 3) {
     lines.push(
-      '',
       isMyanmar
         ? `နောက်ထပ် ${input.failures.length - 3} ခုကို dashboard ၏ Backup & Restore တွင် စစ်နိုင်ပါသည်။`
-        : `Check the remaining ${input.failures.length - 3} failure(s) in the Backup & Restore dashboard.`,
+        : `+${input.failures.length - 3} more in Backup & Restore.`,
     );
   } else {
     lines.push(
-      '',
       isMyanmar
         ? 'Backup & Restore dashboard ထဲတွင် failure detail ကို စစ်ဆေးပါ။'
-        : 'Open the Backup & Restore dashboard to inspect the failed verification details.',
+        : 'Open Backup and Restore for details.',
     );
   }
 
@@ -311,30 +322,30 @@ export function buildTelegramWebhookHealthAlertMessage(input: {
     isMyanmar
       ? '🚨 <b>Telegram webhook health issue</b>'
       : '🚨 <b>Telegram webhook health issue</b>',
-    '',
     `${isMyanmar ? 'Issue' : 'Issue'}: <b>${escapeHtml(input.issue.summary || (isMyanmar ? 'Unknown issue' : 'Unknown issue'))}</b>`,
-    `${isMyanmar ? 'Expected URL' : 'Expected URL'}: <code>${escapeHtml(input.issue.expectedWebhookUrl || (isMyanmar ? 'Not configured' : 'Not configured'))}</code>`,
-    `${isMyanmar ? 'Current URL' : 'Current URL'}: <code>${escapeHtml(input.issue.currentWebhookUrl || (isMyanmar ? 'Not set' : 'Not set'))}</code>`,
+    `${isMyanmar ? 'Expected' : 'Expected'}: <code>${escapeHtml(compactWebhookUrl(input.issue.expectedWebhookUrl, isMyanmar ? 'Not configured' : 'Not configured'))}</code>`,
+    `${isMyanmar ? 'Current' : 'Current'}: <code>${escapeHtml(compactWebhookUrl(input.issue.currentWebhookUrl, isMyanmar ? 'Not set' : 'Not set'))}</code>`,
     `${isMyanmar ? 'Pending updates' : 'Pending updates'}: <b>${escapeHtml(String(input.issue.pendingUpdateCount))}</b>`,
   ];
 
-  if (input.issue.lastErrorMessage) {
+  if (input.issue.lastErrorMessage || input.issue.lastErrorAt) {
+    const lastErrorParts = [
+      input.issue.lastErrorMessage
+        ? escapeHtml(input.issue.lastErrorMessage)
+        : (isMyanmar ? 'Unknown delivery error' : 'Unknown delivery error'),
+      input.issue.lastErrorAt
+        ? escapeHtml(formatTelegramDateTime(input.issue.lastErrorAt, input.locale))
+        : null,
+    ].filter(Boolean);
     lines.push(
-      `${isMyanmar ? 'Last error' : 'Last error'}: ${escapeHtml(input.issue.lastErrorMessage)}`,
-    );
-  }
-
-  if (input.issue.lastErrorAt) {
-    lines.push(
-      `${isMyanmar ? 'Last error at' : 'Last error at'}: <b>${escapeHtml(formatTelegramDateTime(input.issue.lastErrorAt, input.locale))}</b>`,
+      `${isMyanmar ? 'Last error' : 'Last error'}: ${lastErrorParts.join(' • ')}`,
     );
   }
 
   lines.push(
-    '',
     isMyanmar
       ? 'Notifications workspace ထဲတွင် webhook status ကို စစ်ပြီး လိုအပ်ပါက webhook ကို reset လုပ်ပါ။'
-      : 'Check the Notifications workspace and reset the webhook if the public URL or HTTPS setup changed.',
+      : 'Open Notifications and reset the webhook if URL or HTTPS changed.',
   );
 
   return lines.join('\n');
@@ -356,7 +367,6 @@ export function buildAdminQueueHealthAlertMessage(input: {
     isMyanmar
       ? '🚨 <b>Admin queue aging</b>'
       : '🚨 <b>Admin queue aging</b>',
-    '',
   ];
 
   if (input.supportOverdueCount > 0) {
@@ -385,10 +395,9 @@ export function buildAdminQueueHealthAlertMessage(input: {
   }
 
   lines.push(
-    '',
     isMyanmar
       ? `Review queue ကို ${input.reviewThresholdHours} နာရီထက် ပိုစောင့်နေသော item များအတွက် alert ပို့ထားပါသည်။`
-      : `This alert fires when review items wait longer than ${input.reviewThresholdHours} hour(s) or support first-response SLA is overdue.`,
+      : `Threshold: ${input.reviewThresholdHours}h review wait or overdue support response.`,
   );
 
   return lines.join('\n');

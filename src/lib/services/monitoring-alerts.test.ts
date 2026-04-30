@@ -7,6 +7,7 @@ import {
   buildTelegramWebhookHealthAlertMessage,
   resolveTelegramWebhookMonitorIssue,
 } from './monitoring-alerts';
+import { validateTelegramHtmlMessage } from './telegram-message-validation';
 
 test('resolveTelegramWebhookMonitorIssue returns healthy when webhook matches and has no errors', () => {
   const result = resolveTelegramWebhookMonitorIssue({
@@ -79,7 +80,11 @@ test('buildBackupVerificationFailureAlertMessage lists failed backups succinctly
   assert.match(message, /Backup verification failed/);
   assert.match(message, /backup-1\.postgres\.zip/);
   assert.match(message, /pg_restore failed while inspecting the dump\./);
-  assert.match(message, /Backup & Restore dashboard/);
+  assert.match(message, /Open Backup and Restore for details\./);
+  assert.doesNotMatch(message, /failed backup\(s\)/);
+  assert.doesNotMatch(message, /Restore ready/);
+  assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+  assert.ok(message.split('\n').length <= 6);
 });
 
 test('buildTelegramWebhookHealthAlertMessage includes issue summary and URLs', () => {
@@ -103,6 +108,10 @@ test('buildTelegramWebhookHealthAlertMessage includes issue summary and URLs', (
   assert.match(message, /wrong\.example\.com/);
   assert.match(message, /example\.com\/panel/);
   assert.match(message, /Pending updates: <b>7<\/b>/);
+  assert.doesNotMatch(message, /api\/telegram\/webhook/);
+  assert.doesNotMatch(message, /public URL or HTTPS setup changed/);
+  assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+  assert.ok(message.split('\n').length <= 7);
 });
 
 test('buildAdminQueueHealthAlertMessage summarizes support and review backlog', () => {
@@ -124,5 +133,8 @@ test('buildAdminQueueHealthAlertMessage summarizes support and review backlog', 
   assert.match(message, /Review pending: <b>5<\/b>/);
   assert.match(message, /Unclaimed: <b>3<\/b>/);
   assert.match(message, /ORD-201, ORD-202/);
-  assert.match(message, /12 hour\(s\)/);
+  assert.match(message, /Threshold: 12h/);
+  assert.doesNotMatch(message, /This alert fires/);
+  assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
+  assert.ok(message.split('\n').length <= 7);
 });
