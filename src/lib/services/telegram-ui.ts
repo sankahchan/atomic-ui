@@ -21,6 +21,21 @@ export function getFlagEmoji(countryCode: string) {
   return String.fromCodePoint(...codePoints);
 }
 
+export function formatTelegramCountLabel(
+  count: number,
+  locale: SupportedLocale,
+  singular: string,
+  plural?: string,
+  myanmarLabel?: string,
+) {
+  if (locale === 'my') {
+    return `${count} ခု ${myanmarLabel || plural || singular}`;
+  }
+
+  const pluralLabel = plural || `${singular}s`;
+  return `${count} ${count === 1 ? singular : pluralLabel}`;
+}
+
 export function getTelegramUi(locale: SupportedLocale) {
   const isMyanmar = locale === 'my';
 
@@ -344,7 +359,9 @@ export function getTelegramUi(locale: SupportedLocale) {
         : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick menu</b>\n• 🛒 /buy - new order\n• 🗂 /mykeys - linked keys\n• 🧾 /orders - recent orders\n• 🛟 /support - help center\n\n<b>More</b>\n• 📬 /inbox - updates and replies\n• 🎁 /trial - free trial\n• 🌐 /language - switch language\n\nUse the keyboard below for the fastest path.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
-    emailLinked: (count: number) => isMyanmar ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။` : `✅ Linked ${count} key(s) to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
+    emailLinked: (count: number) => isMyanmar
+      ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။`
+      : `✅ Linked ${formatTelegramCountLabel(count, locale, 'key')} to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
     keyNotFoundDefault: DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES[locale],
     usageTitle: isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု</b>\n\n' : '📊 <b>Your VPN Usage</b>\n\n',
     myKeysEmpty: isMyanmar
@@ -362,7 +379,9 @@ export function getTelegramUi(locale: SupportedLocale) {
     myKeysPremiumStatus: isMyanmar ? 'Support အခြေအနေ' : 'Support status',
     myKeysOpenSupport: isMyanmar ? 'Support' : 'Support',
     subEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော active key မရှိပါ။' : '❌ No active keys are linked to this Telegram account.',
-    subSent: (count: number) => isMyanmar ? `📎 Share page ${count} ခုကို ဤ chat သို့ ပို့ပြီးပါပြီ။` : `📎 Sent ${count} share page(s) to this chat.`,
+    subSent: (count: number) => isMyanmar
+      ? `📎 Share page ${count} ခုကို ဤ chat သို့ ပို့ပြီးပါပြီ။`
+      : `📎 Sent ${formatTelegramCountLabel(count, locale, 'share page')} to this chat.`,
     noSupportLink: isMyanmar ? 'ℹ️ လက်ရှိ support link မသတ်မှတ်ရသေးပါ။' : 'ℹ️ No support link is configured right now.',
     supportLabel: isMyanmar ? '🛟 အကူအညီ' : '🛟 Support',
     supportHubTitle: isMyanmar ? '🛟 <b>အကူအညီ စင်တာ</b>' : '🛟 <b>Support center</b>',
@@ -463,7 +482,9 @@ export function getTelegramUi(locale: SupportedLocale) {
       ? 'ဤ key ကို ပြန်လည်စစ်ဆေးရန် admin/support ကို ဆက်သွယ်ပေးပါ။'
       : 'Please contact admin/support for follow-up on this key.',
     renewNoMatch: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော linked key မရှိပါ။` : `❌ No linked key matched "${query}".`,
-    renewSent: (count: number) => isMyanmar ? `✅ Key ${count} ခုအတွက် သက်တမ်းတိုးရန် တောင်းဆိုချက် ပို့ပြီးပါပြီ။ Administrator ကို အသိပေးထားပါသည်။` : `✅ Renewal request sent for ${count} key(s). An administrator has been notified.`,
+    renewSent: (count: number) => isMyanmar
+      ? `✅ Key ${count} ခုအတွက် သက်တမ်းတိုးရန် တောင်းဆိုချက် ပို့ပြီးပါပြီ။ Administrator ကို အသိပေးထားပါသည်။`
+      : `✅ Renewal request sent for ${formatTelegramCountLabel(count, locale, 'key')}. An administrator has been notified.`,
     buyDisabled: isMyanmar ? 'ℹ️ ယခုအချိန်တွင် Telegram မှ key အသစ် မမှာယူနိုင်သေးပါ။' : 'ℹ️ New key orders are not available through Telegram right now.',
     buyStandardSummary: isMyanmar
       ? '🔑 <b>Standard key</b>\nပုံမှန်အသုံးပြုမှုအတွက် သင့်တော်ပြီး စျေးနှုန်းသက်သာသော option ဖြစ်ပါသည်။ ပုံမှန်အားဖြင့် ရွေးထားသော server တစ်ခုအပေါ် အခြေခံပါသည်။'
