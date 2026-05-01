@@ -180,6 +180,7 @@ function EditDAKDialog({
     telegramId: string | null;
     notes: string | null;
     dataLimitBytes: bigint | null;
+    maxDevices: number | null;
     durationDays: number | null;
     expiresAt: Date | null;
     loadBalancerAlgorithm: string;
@@ -211,6 +212,7 @@ function EditDAKDialog({
     dataLimitGB: dakData.dataLimitBytes
       ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
       : '',
+    maxDevices: dakData.maxDevices?.toString() || '',
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
     loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -240,6 +242,7 @@ function EditDAKDialog({
       dataLimitGB: dakData.dataLimitBytes
         ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
         : '',
+      maxDevices: dakData.maxDevices?.toString() || '',
       durationDays: dakData.durationDays?.toString() || '',
       expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
       loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -298,6 +301,7 @@ function EditDAKDialog({
       telegramId: formData.telegramId || undefined,
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
+      maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : null,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
@@ -378,6 +382,22 @@ function EditDAKDialog({
                     min="0"
                     step="0.5"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+                  <Input
+                    id="editMaxDevices"
+                    type="number"
+                    min="1"
+                    max="20"
+                    placeholder="Leave blank for no limit"
+                    value={formData.maxDevices}
+                    onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Uses recent IP and user-agent activity as an estimate. Dynamic keys warn first, then disable automatically if sharing stays above the limit.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -2733,6 +2753,7 @@ function DynamicKeyTemplateCard({
     type: 'SELF_MANAGED' | 'MANUAL';
     notes: string | null;
     dataLimitBytes: bigint | null;
+    maxDevices: number | null;
     durationDays: number | null;
     method: string | null;
     serverTagIds: string[];
@@ -2844,6 +2865,7 @@ function DynamicKeyTemplateCard({
       type: dak.type,
       notes: dak.notes || undefined,
       dataLimitGB: dak.dataLimitBytes ? Number(dak.dataLimitBytes) / (1024 * 1024 * 1024) : undefined,
+      maxDevices: dak.maxDevices ?? undefined,
       durationDays: dak.durationDays ?? undefined,
       method: (dak.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm') || 'chacha20-ietf-poly1305',
       serverTagIds: dak.serverTagIds,
@@ -4093,6 +4115,7 @@ export default function DynamicKeyDetailPage() {
                   type: dak.type,
                   notes: dak.notes ?? null,
                   dataLimitBytes: dak.dataLimitBytes,
+                  maxDevices: dak.maxDevices ?? null,
                   durationDays: dak.durationDays ?? null,
                   method: dak.method ?? null,
                   serverTagIds: dak.serverTagIds,
@@ -4329,6 +4352,7 @@ export default function DynamicKeyDetailPage() {
             telegramId: dak.telegramId ?? null,
             notes: dak.notes ?? null,
             dataLimitBytes: dak.dataLimitBytes,
+            maxDevices: dak.maxDevices ?? null,
             durationDays: dak.durationDays ?? null,
             expiresAt: dak.expiresAt ?? null,
             loadBalancerAlgorithm: dak.loadBalancerAlgorithm ?? 'IP_HASH',
@@ -4516,7 +4540,7 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Stats */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className={cn('grid grid-cols-1 gap-4', data?.maxDevices ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
           <div className="ops-inline-stat text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
               {(data?.activeCount || 0) > 0 ? (
@@ -4532,6 +4556,12 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
             <div className="text-2xl font-bold">{data?.peakDevices || 0}</div>
             <p className="text-xs text-muted-foreground">Peak Devices</p>
           </div>
+          {data?.maxDevices ? (
+            <div className="ops-inline-stat text-center">
+              <div className="text-2xl font-bold">{data.maxDevices}</div>
+              <p className="text-xs text-muted-foreground">Configured Limit</p>
+            </div>
+          ) : null}
         </div>
 
         {/* Recent Sessions */}

@@ -43,7 +43,7 @@ import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
 import { runServerOutageCycle } from '@/lib/services/server-outage';
-import { runAccessKeyDeviceLimitCycle } from '@/lib/services/device-limits';
+import { runAccessKeyDeviceLimitCycle, runDynamicKeyDeviceLimitCycle } from '@/lib/services/device-limits';
 import {
     getSchedulerJobExecutionGate,
     hydratePausedSchedulerJobState,
@@ -195,11 +195,23 @@ export function initScheduler() {
                 SCHEDULER_JOB_DEFINITIONS.deviceLimits,
                 'SCHEDULED',
                 async () => {
-                    const result = await runAccessKeyDeviceLimitCycle();
+                    const [accessResult, dynamicResult] = await Promise.all([
+                        runAccessKeyDeviceLimitCycle(),
+                        runDynamicKeyDeviceLimitCycle(),
+                    ]);
+                    const result = {
+                        scanned: accessResult.scanned + dynamicResult.scanned,
+                        warned: accessResult.warned + dynamicResult.warned,
+                        disabled: accessResult.disabled + dynamicResult.disabled,
+                        cleared: accessResult.cleared + dynamicResult.cleared,
+                        errors: [...accessResult.errors, ...dynamicResult.errors],
+                    };
                     return {
                         value: result,
                         summary: `${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared`,
                         resultPreview: {
+                            accessScanned: accessResult.scanned,
+                            dynamicScanned: dynamicResult.scanned,
                             warned: result.warned,
                             disabled: result.disabled,
                             cleared: result.cleared,
@@ -723,11 +735,30 @@ export function initScheduler() {
                 SCHEDULER_JOB_DEFINITIONS.deviceLimits,
                 'STARTUP',
                 async () => {
-                    const result = await runAccessKeyDeviceLimitCycle();
+                    const [accessResult, dynamicResult] = await Promise.all([
+                        runAccessKeyDeviceLimitCycle(),
+                        runDynamicKeyDeviceLimitCycle(),
+                    ]);
+                    const result = {
+                        scanned: accessResult.scanned + dynamicResult.scanned,
+                        warned: accessResult.warned + dynamicResult.warned,
+                        disabled: accessResult.disabled + dynamicResult.disabled,
+                        cleared: accessResult.cleared + dynamicResult.cleared,
+                        errors: [...accessResult.errors, ...dynamicResult.errors],
+                        access: accessResult,
+                        dynamic: dynamicResult,
+                    };
                     return {
                         value: result,
                         summary: `${result.warned} warned, ${result.disabled} disabled, ${result.cleared} cleared`,
-                        resultPreview: result,
+                        resultPreview: {
+                            accessScanned: accessResult.scanned,
+                            dynamicScanned: dynamicResult.scanned,
+                            warned: result.warned,
+                            disabled: result.disabled,
+                            cleared: result.cleared,
+                            errors: result.errors.length,
+                        },
                     };
                 },
             );

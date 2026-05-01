@@ -5,12 +5,13 @@ import { type RecipientTarget } from '@/lib/services/telegram-admin-key-recipien
 
 export type AccessCreateDraft = {
   kind: 'create_access';
-  step: 'recipient' | 'name' | 'server' | 'quota_custom' | 'expiry_date' | 'confirm';
+  step: 'recipient' | 'name' | 'server' | 'quota_custom' | 'device_limit_custom' | 'expiry_date' | 'confirm';
   recipient: RecipientTarget | null;
   name: string | null;
   assignmentMode: 'AUTO' | 'MANUAL';
   serverId: string | null;
   dataLimitGB: number | null;
+  maxDevices: number | null;
   expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
   durationDays: number | null;
   expiresAt: string | null;
@@ -18,11 +19,12 @@ export type AccessCreateDraft = {
 
 export type DynamicCreateDraft = {
   kind: 'create_dynamic';
-  step: 'recipient' | 'name' | 'type' | 'quota_custom' | 'expiry_date' | 'confirm';
+  step: 'recipient' | 'name' | 'type' | 'quota_custom' | 'device_limit_custom' | 'expiry_date' | 'confirm';
   recipient: RecipientTarget | null;
   name: string | null;
   keyType: 'SELF_MANAGED' | 'MANUAL';
   dataLimitGB: number | null;
+  maxDevices: number | null;
   expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION';
   durationDays: number | null;
   expiresAt: string | null;

@@ -82,6 +82,21 @@ test('deriveDeviceLimitStage returns warned before auto-disable deadline', () =>
   assert.equal(stage.stage, 'WARNED');
 });
 
+test('deriveDeviceLimitStage returns warned as soon as an over-limit estimate appears', () => {
+  const stage = deriveDeviceLimitStage({
+    status: 'ACTIVE',
+    maxDevices: 1,
+    observedDevices: 2,
+    deviceLimitExceededAt: null,
+    deviceLimitWarningSentAt: null,
+    deviceLimitSuppressedUntil: null,
+    deviceLimitAutoDisabledAt: null,
+  });
+
+  assert.equal(stage.overLimit, true);
+  assert.equal(stage.stage, 'WARNED');
+});
+
 test('deriveDeviceLimitStage returns suppressed when enforcement is paused', () => {
   const now = new Date('2026-04-04T01:00:00.000Z');
 
@@ -98,4 +113,23 @@ test('deriveDeviceLimitStage returns suppressed when enforcement is paused', () 
 
   assert.equal(stage.stage, 'SUPPRESSED');
   assert.equal(stage.disableAt, null);
+});
+
+test('deriveDeviceLimitStage returns disabled after an automatic device-limit shutdown', () => {
+  const now = new Date('2026-04-04T01:00:00.000Z');
+  const disabledAt = new Date(now.getTime() - 30_000);
+
+  const stage = deriveDeviceLimitStage({
+    status: 'DISABLED',
+    maxDevices: 1,
+    observedDevices: 0,
+    deviceLimitExceededAt: disabledAt,
+    deviceLimitWarningSentAt: disabledAt,
+    deviceLimitSuppressedUntil: null,
+    deviceLimitAutoDisabledAt: disabledAt,
+    now,
+  });
+
+  assert.equal(stage.stage, 'DISABLED');
+  assert.equal(stage.autoDisabledAt, disabledAt);
 });

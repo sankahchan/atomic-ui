@@ -843,6 +843,14 @@ model DynamicAccessKey {
   status        String    @default("ACTIVE") // Same values as AccessKey
   firstUsedAt   DateTime?
   lastTrafficAt DateTime?
+  estimatedDevices Int @default(0)
+  peakDevices      Int @default(0)
+  maxDevices       Int?
+  deviceLimitExceededAt         DateTime?
+  deviceLimitWarningSentAt      DateTime?
+  deviceLimitLastObservedDevices Int?
+  deviceLimitSuppressedUntil    DateTime?
+  deviceLimitAutoDisabledAt     DateTime?
   lastWarningSentAt DateTime?
   expirationWarningStage String?
 
@@ -944,6 +952,7 @@ model DynamicKeyTemplate {
   type        String @default("SELF_MANAGED")
   notes       String?
   dataLimitBytes BigInt?
+  maxDevices  Int?
   dataLimitResetStrategy String @default("NEVER")
   expirationType String @default("NEVER")
   durationDays Int?

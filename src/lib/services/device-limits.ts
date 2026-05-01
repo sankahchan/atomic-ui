@@ -2,14 +2,14 @@ import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
 import { logger } from '@/lib/logger';
 import { createOutlineClient } from '@/lib/outline-api';
-import { sendAdminAlert } from '@/lib/services/telegram-runtime';
+import { getTelegramConfig, sendAdminAlert, sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { sendAccessKeySupportMessage } from '@/lib/services/telegram-bot';
 
 export const DEVICE_LIMIT_ACTIVITY_WINDOW_MS = 30 * 60 * 1000;
 export const DEVICE_LIMIT_DISABLE_DELAY_MS = 15 * 60 * 1000;
 
 type DeviceLimitSourceEvent = {
-  accessKeyId: string | null;
+  scopeId: string | null;
   ip: string | null;
   userAgent: string | null;
   platform: string | null;
@@ -27,6 +27,18 @@ export type DeviceLimitStage = 'OK' | 'WARNED' | 'PENDING_DISABLE' | 'SUPPRESSED
 
 export type DeviceLimitSnapshot = {
   accessKeyId: string;
+  maxDevices: number | null;
+  observedDevices: number;
+  overLimit: boolean;
+  stage: DeviceLimitStage;
+  disableAt: Date | null;
+  suppressedUntil: Date | null;
+  autoDisabledAt: Date | null;
+  evidence: DeviceLimitEvidence[];
+};
+
+export type DynamicDeviceLimitSnapshot = {
+  dynamicAccessKeyId: string;
   maxDevices: number | null;
   observedDevices: number;
   overLimit: boolean;
@@ -66,6 +78,42 @@ type EnforcementAccessKey = SnapshotAccessKey & {
   };
 };
 
+type SnapshotDynamicKey = {
+  id: string;
+  maxDevices: number | null;
+  status: string;
+  deviceLimitExceededAt: Date | null;
+  deviceLimitWarningSentAt: Date | null;
+  deviceLimitSuppressedUntil: Date | null;
+  deviceLimitAutoDisabledAt: Date | null;
+};
+
+type EnforcementDynamicKey = SnapshotDynamicKey & {
+  name: string;
+  email: string | null;
+  telegramId: string | null;
+  userId: string | null;
+  estimatedDevices: number;
+  peakDevices: number;
+  deviceLimitLastObservedDevices: number | null;
+  accessKeys: Array<{
+    id: string;
+    outlineKeyId: string;
+    status: string;
+    disabledOutlineKeyId: string | null;
+    estimatedDevices: number;
+    server: {
+      id: string;
+      name: string;
+      apiUrl: string;
+      apiCertSha256: string;
+    };
+  }>;
+  user: {
+    telegramChatId: string | null;
+  } | null;
+};
+
 function normalizeUserAgent(userAgent: string | null | undefined) {
   return userAgent?.trim().toLowerCase() || 'unknown-agent';
 }
@@ -74,15 +122,15 @@ export function buildDeviceFingerprint(ip: string | null | undefined, userAgent:
   return `${ip?.trim() || 'unknown-ip'}::${normalizeUserAgent(userAgent)}`;
 }
 
-export function buildDeviceEvidenceMap(events: DeviceLimitSourceEvent[]) {
+function buildScopedDeviceEvidenceMap(events: DeviceLimitSourceEvent[]) {
   const evidenceByKey = new Map<string, Map<string, DeviceLimitEvidence>>();
 
   for (const event of events) {
-    if (!event.accessKeyId || !event.ip) {
+    if (!event.scopeId || !event.ip) {
       continue;
     }
 
-    const keyEvidence = evidenceByKey.get(event.accessKeyId) ?? new Map<string, DeviceLimitEvidence>();
+    const keyEvidence = evidenceByKey.get(event.scopeId) ?? new Map<string, DeviceLimitEvidence>();
     const fingerprint = buildDeviceFingerprint(event.ip, event.userAgent);
     const existing = keyEvidence.get(fingerprint);
 
@@ -95,10 +143,22 @@ export function buildDeviceEvidenceMap(events: DeviceLimitSourceEvent[]) {
       });
     }
 
-    evidenceByKey.set(event.accessKeyId, keyEvidence);
+    evidenceByKey.set(event.scopeId, keyEvidence);
   }
 
   return evidenceByKey;
+}
+
+export function buildDeviceEvidenceMap(events: Array<Omit<DeviceLimitSourceEvent, 'scopeId'> & { accessKeyId: string | null }>) {
+  return buildScopedDeviceEvidenceMap(
+    events.map((event) => ({
+      scopeId: event.accessKeyId,
+      ip: event.ip,
+      userAgent: event.userAgent,
+      platform: event.platform,
+      createdAt: event.createdAt,
+    })),
+  );
 }
 
 export function deriveDeviceLimitStage(input: {
@@ -212,6 +272,125 @@ export async function getAccessKeyDeviceLimitSnapshots(input: {
 
     result.set(key.id, {
       accessKeyId: key.id,
+      maxDevices: key.maxDevices,
+      observedDevices,
+      overLimit: state.overLimit,
+      stage: state.stage,
+      disableAt: state.disableAt,
+      suppressedUntil: state.suppressedUntil,
+      autoDisabledAt: state.autoDisabledAt,
+      evidence: input.includeEvidence ? evidence : [],
+    });
+  }
+
+  return result;
+}
+
+export async function getDynamicKeyDeviceLimitSnapshots(input: {
+  dynamicKeys: SnapshotDynamicKey[];
+  now?: Date;
+  includeEvidence?: boolean;
+}) {
+  const now = input.now ?? new Date();
+  const dynamicKeyIds = input.dynamicKeys.map((key) => key.id);
+
+  if (dynamicKeyIds.length === 0) {
+    return new Map<string, DynamicDeviceLimitSnapshot>();
+  }
+
+  const cutoff = new Date(now.getTime() - DEVICE_LIMIT_ACTIVITY_WINDOW_MS);
+  const childKeys = await db.accessKey.findMany({
+    where: {
+      dynamicKeyId: { in: dynamicKeyIds },
+    },
+    select: {
+      id: true,
+      dynamicKeyId: true,
+    },
+  });
+  const childKeyIds = childKeys.map((key) => key.id);
+
+  const [activeSessionCounts, subscriptionEvents] = await Promise.all([
+    childKeyIds.length === 0
+      ? Promise.resolve([])
+      : db.connectionSession.groupBy({
+          by: ['accessKeyId'],
+          where: {
+            accessKeyId: { in: childKeyIds },
+            isActive: true,
+          },
+          _count: {
+            accessKeyId: true,
+          },
+        }),
+    db.subscriptionPageEvent.findMany({
+      where: {
+        dynamicAccessKeyId: { in: dynamicKeyIds },
+        createdAt: { gte: cutoff },
+        ip: { not: null },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        dynamicAccessKeyId: true,
+        ip: true,
+        userAgent: true,
+        platform: true,
+        createdAt: true,
+      },
+    }),
+  ]);
+
+  const sessionCountsByDynamicKey = new Map<string, number>();
+  if (activeSessionCounts.length > 0) {
+    const dynamicKeyByChildId = new Map(
+      childKeys
+        .filter((key) => key.dynamicKeyId)
+        .map((key) => [key.id, key.dynamicKeyId as string]),
+    );
+
+    for (const row of activeSessionCounts) {
+      const dynamicKeyId = dynamicKeyByChildId.get(row.accessKeyId);
+      if (!dynamicKeyId) {
+        continue;
+      }
+
+      sessionCountsByDynamicKey.set(
+        dynamicKeyId,
+        (sessionCountsByDynamicKey.get(dynamicKeyId) ?? 0) + row._count.accessKeyId,
+      );
+    }
+  }
+
+  const evidenceByDynamicKey = buildScopedDeviceEvidenceMap(
+    subscriptionEvents.map((event) => ({
+      scopeId: event.dynamicAccessKeyId,
+      ip: event.ip,
+      userAgent: event.userAgent,
+      platform: event.platform,
+      createdAt: event.createdAt,
+    })),
+  );
+  const result = new Map<string, DynamicDeviceLimitSnapshot>();
+
+  for (const key of input.dynamicKeys) {
+    const evidence = Array.from(evidenceByDynamicKey.get(key.id)?.values() ?? []).sort(
+      (left, right) => right.lastSeenAt.getTime() - left.lastSeenAt.getTime(),
+    );
+    const activeSessionCount = sessionCountsByDynamicKey.get(key.id) ?? 0;
+    const observedDevices = Math.max(evidence.length, activeSessionCount > 0 ? 1 : 0);
+    const state = deriveDeviceLimitStage({
+      status: key.status,
+      maxDevices: key.maxDevices,
+      observedDevices,
+      deviceLimitExceededAt: key.deviceLimitExceededAt,
+      deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+      deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+      deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
+      now,
+    });
+
+    result.set(key.id, {
+      dynamicAccessKeyId: key.id,
       maxDevices: key.maxDevices,
       observedDevices,
       overLimit: state.overLimit,
@@ -361,6 +540,180 @@ async function disableKeyForDeviceLimit(input: {
   });
 
   await sendDeviceLimitDisabledNotifications({
+    key: input.key,
+    observedDevices: input.observedDevices,
+  });
+}
+
+async function sendDynamicDeviceLimitCustomerNotice(input: {
+  key: EnforcementDynamicKey;
+  title: string;
+  body: string;
+}) {
+  const chatId = input.key.user?.telegramChatId || input.key.telegramId;
+  if (!chatId) {
+    return;
+  }
+
+  const config = await getTelegramConfig();
+  if (!config?.botToken) {
+    return;
+  }
+
+  const message = [input.title, '', input.body].join('\n');
+
+  try {
+    await sendTelegramMessage(config.botToken, chatId, message);
+  } catch (error) {
+    logger.warn('Failed to send dynamic device-limit notice to key owner', error);
+  }
+}
+
+async function sendDynamicDeviceLimitWarningNotifications(input: {
+  key: EnforcementDynamicKey;
+  observedDevices: number;
+}) {
+  await sendDynamicDeviceLimitCustomerNotice({
+    key: input.key,
+    title: '📵 <b>Device limit warning</b>',
+    body: `We estimated that this dynamic key is active on more devices than allowed.\n\nLimit: ${input.key.maxDevices} device(s)\nCurrent estimate: ${input.observedDevices} device(s)\nWindow: recent activity from the last 30 minutes\n\nDisconnect older devices first. If the estimate stays above the limit for about 15 minutes, this dynamic key will disable automatically.`,
+  });
+
+  try {
+    await sendAdminAlert(
+      [
+        '📵 <b>Dynamic device limit warning</b>',
+        '',
+        `💎 Key: <b>${input.key.name}</b>`,
+        input.key.email ? `📧 Email: ${input.key.email}` : null,
+        `📎 Attached keys: <b>${input.key.accessKeys.length}</b>`,
+        `📊 Estimated devices: <b>${input.observedDevices}</b>`,
+        `🚦 Limit: <b>${input.key.maxDevices}</b>`,
+        '🕒 Window: <b>last 30 minutes</b>',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  } catch (error) {
+    logger.warn('Failed to send dynamic device-limit warning admin alert', error);
+  }
+}
+
+async function sendDynamicDeviceLimitDisabledNotifications(input: {
+  key: EnforcementDynamicKey;
+  observedDevices: number;
+}) {
+  await sendDynamicDeviceLimitCustomerNotice({
+    key: input.key,
+    title: '⛔ <b>Dynamic key disabled</b>',
+    body: `This dynamic key was disabled because the recent device estimate stayed above the allowed limit.\n\nLimit: ${input.key.maxDevices} device(s)\nCurrent estimate: ${input.observedDevices} device(s)\nWindow: recent activity from the last 30 minutes\n\nContact support if this looks wrong and we can review it.`,
+  });
+
+  try {
+    await sendAdminAlert(
+      [
+        '⛔ <b>Dynamic device limit auto-disabled</b>',
+        '',
+        `💎 Key: <b>${input.key.name}</b>`,
+        input.key.email ? `📧 Email: ${input.key.email}` : null,
+        `📎 Attached keys: <b>${input.key.accessKeys.length}</b>`,
+        `📊 Estimated devices: <b>${input.observedDevices}</b>`,
+        `🚦 Limit: <b>${input.key.maxDevices}</b>`,
+        '🕒 Window: <b>last 30 minutes</b>',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  } catch (error) {
+    logger.warn('Failed to send dynamic device-limit disabled admin alert', error);
+  }
+}
+
+async function disableDynamicKeyForDeviceLimit(input: {
+  key: EnforcementDynamicKey;
+  observedDevices: number;
+  now: Date;
+}) {
+  for (const accessKey of input.key.accessKeys) {
+    const outlineKeyId = accessKey.outlineKeyId || accessKey.disabledOutlineKeyId;
+    if (outlineKeyId) {
+      const client = createOutlineClient(accessKey.server.apiUrl, accessKey.server.apiCertSha256);
+      try {
+        await client.deleteAccessKey(outlineKeyId);
+      } catch (error) {
+        logger.error(`Failed to delete dynamic child key ${outlineKeyId} for device-limit enforcement`, error);
+      }
+    }
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.dynamicAccessKey.update({
+      where: { id: input.key.id },
+      data: {
+        status: 'DISABLED',
+        estimatedDevices: 0,
+        deviceLimitLastObservedDevices: input.observedDevices,
+        deviceLimitAutoDisabledAt: input.now,
+      },
+    });
+
+    if (input.key.accessKeys.length > 0) {
+      await tx.accessKey.updateMany({
+        where: {
+          dynamicKeyId: input.key.id,
+          status: { not: 'DISABLED' },
+        },
+        data: {
+          status: 'DISABLED',
+          disabledAt: input.now,
+          estimatedDevices: 0,
+        },
+      });
+
+      for (const accessKey of input.key.accessKeys) {
+        await tx.accessKey.update({
+          where: { id: accessKey.id },
+          data: {
+            disabledOutlineKeyId: accessKey.outlineKeyId || accessKey.disabledOutlineKeyId,
+          },
+        });
+      }
+
+      await tx.connectionSession.updateMany({
+        where: {
+          accessKeyId: { in: input.key.accessKeys.map((accessKey) => accessKey.id) },
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+          endedAt: input.now,
+          endedReason: 'KEY_DISABLED',
+        },
+      });
+    }
+
+    await tx.notificationLog.create({
+      data: {
+        event: 'DYNAMIC_DEVICE_LIMIT_DISABLED',
+        message: `Dynamic key device limit exceeded: ${input.observedDevices}/${input.key.maxDevices}`,
+        status: 'SUCCESS',
+      },
+    });
+  });
+
+  await writeAuditLog({
+    action: 'DYNAMIC_ACCESS_KEY_DEVICE_LIMIT_DISABLED',
+    entity: 'DYNAMIC_ACCESS_KEY',
+    entityId: input.key.id,
+    details: {
+      observedDevices: input.observedDevices,
+      maxDevices: input.key.maxDevices,
+      attachedKeyCount: input.key.accessKeys.length,
+      scheduler: true,
+    },
+  });
+
+  await sendDynamicDeviceLimitDisabledNotifications({
     key: input.key,
     observedDevices: input.observedDevices,
   });
@@ -542,6 +895,214 @@ export async function runAccessKeyDeviceLimitCycle(now = new Date()) {
 
   return {
     scanned: keys.length,
+    warned,
+    disabled,
+    cleared,
+    errors,
+  };
+}
+
+export async function runDynamicKeyDeviceLimitCycle(now = new Date()) {
+  const dynamicKeys = await db.dynamicAccessKey.findMany({
+    where: {
+      maxDevices: { not: null },
+      status: 'ACTIVE',
+    },
+    include: {
+      user: {
+        select: {
+          telegramChatId: true,
+        },
+      },
+      accessKeys: {
+        select: {
+          id: true,
+          outlineKeyId: true,
+          status: true,
+          disabledOutlineKeyId: true,
+          estimatedDevices: true,
+          server: {
+            select: {
+              id: true,
+              name: true,
+              apiUrl: true,
+              apiCertSha256: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (dynamicKeys.length === 0) {
+    return {
+      scanned: 0,
+      warned: 0,
+      disabled: 0,
+      cleared: 0,
+      errors: [] as string[],
+    };
+  }
+
+  const snapshots = await getDynamicKeyDeviceLimitSnapshots({
+    dynamicKeys: dynamicKeys.map((key) => ({
+      id: key.id,
+      maxDevices: key.maxDevices,
+      status: key.status,
+      deviceLimitExceededAt: key.deviceLimitExceededAt,
+      deviceLimitWarningSentAt: key.deviceLimitWarningSentAt,
+      deviceLimitSuppressedUntil: key.deviceLimitSuppressedUntil,
+      deviceLimitAutoDisabledAt: key.deviceLimitAutoDisabledAt,
+    })),
+    now,
+  });
+
+  let warned = 0;
+  let disabled = 0;
+  let cleared = 0;
+  const errors: string[] = [];
+
+  for (const key of dynamicKeys) {
+    const snapshot = snapshots.get(key.id);
+    if (!snapshot || key.maxDevices == null) {
+      continue;
+    }
+
+    const nextPeakDevices = Math.max(key.peakDevices || 0, snapshot.observedDevices);
+    const isSuppressed = Boolean(key.deviceLimitSuppressedUntil && key.deviceLimitSuppressedUntil > now);
+    const shouldClearState =
+      !snapshot.overLimit &&
+      (key.deviceLimitExceededAt ||
+        key.deviceLimitWarningSentAt ||
+        key.deviceLimitLastObservedDevices !== snapshot.observedDevices ||
+        nextPeakDevices !== (key.peakDevices || 0));
+
+    if (isSuppressed) {
+      if (
+        key.deviceLimitExceededAt ||
+        key.deviceLimitWarningSentAt ||
+        key.deviceLimitLastObservedDevices !== snapshot.observedDevices ||
+        nextPeakDevices !== (key.peakDevices || 0)
+      ) {
+        await db.dynamicAccessKey.update({
+          where: { id: key.id },
+          data: {
+            deviceLimitExceededAt: null,
+            deviceLimitWarningSentAt: null,
+            deviceLimitLastObservedDevices: snapshot.observedDevices,
+            estimatedDevices: snapshot.observedDevices,
+            peakDevices: nextPeakDevices,
+          },
+        });
+      }
+      continue;
+    }
+
+    if (shouldClearState) {
+      await db.dynamicAccessKey.update({
+        where: { id: key.id },
+        data: {
+          deviceLimitExceededAt: null,
+          deviceLimitWarningSentAt: null,
+          deviceLimitLastObservedDevices: snapshot.observedDevices,
+          estimatedDevices: snapshot.observedDevices,
+          peakDevices: nextPeakDevices,
+        },
+      });
+      cleared += 1;
+      continue;
+    }
+
+    if (!snapshot.overLimit) {
+      if (
+        nextPeakDevices !== (key.peakDevices || 0) ||
+        key.deviceLimitLastObservedDevices !== snapshot.observedDevices ||
+        key.estimatedDevices !== snapshot.observedDevices
+      ) {
+        await db.dynamicAccessKey.update({
+          where: { id: key.id },
+          data: {
+            estimatedDevices: snapshot.observedDevices,
+            deviceLimitLastObservedDevices: snapshot.observedDevices,
+            peakDevices: nextPeakDevices,
+          },
+        });
+      }
+      continue;
+    }
+
+    try {
+      if (!key.deviceLimitExceededAt) {
+        await db.dynamicAccessKey.update({
+          where: { id: key.id },
+          data: {
+            estimatedDevices: snapshot.observedDevices,
+            deviceLimitExceededAt: now,
+            deviceLimitWarningSentAt: now,
+            deviceLimitLastObservedDevices: snapshot.observedDevices,
+            peakDevices: nextPeakDevices,
+          },
+        });
+
+        await db.notificationLog.create({
+          data: {
+            event: 'DYNAMIC_DEVICE_LIMIT_WARNING',
+            message: `Dynamic key device limit warning: ${snapshot.observedDevices}/${key.maxDevices}`,
+            status: 'SUCCESS',
+          },
+        });
+
+        await writeAuditLog({
+          action: 'DYNAMIC_ACCESS_KEY_DEVICE_LIMIT_WARNED',
+          entity: 'DYNAMIC_ACCESS_KEY',
+          entityId: key.id,
+          details: {
+            observedDevices: snapshot.observedDevices,
+            maxDevices: key.maxDevices,
+            attachedKeyCount: key.accessKeys.length,
+            scheduler: true,
+          },
+        });
+
+        await sendDynamicDeviceLimitWarningNotifications({
+          key,
+          observedDevices: snapshot.observedDevices,
+        });
+
+        warned += 1;
+        continue;
+      }
+
+      await db.dynamicAccessKey.update({
+        where: { id: key.id },
+        data: {
+          estimatedDevices: snapshot.observedDevices,
+          deviceLimitLastObservedDevices: snapshot.observedDevices,
+          peakDevices: nextPeakDevices,
+        },
+      });
+
+      const disableAt = new Date(key.deviceLimitExceededAt.getTime() + DEVICE_LIMIT_DISABLE_DELAY_MS);
+      if (disableAt <= now) {
+        await disableDynamicKeyForDeviceLimit({
+          key,
+          observedDevices: snapshot.observedDevices,
+          now,
+        });
+        disabled += 1;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${key.id}: ${message}`);
+      logger.error('Dynamic device limit enforcement failed', {
+        dynamicAccessKeyId: key.id,
+        error: message,
+      });
+    }
+  }
+
+  return {
+    scanned: dynamicKeys.length,
     warned,
     disabled,
     cleared,
