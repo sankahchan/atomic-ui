@@ -159,8 +159,12 @@ test('telegram help message stays valid HTML for user and admin variants', () =>
   assert.deepEqual(validateTelegramHtmlMessage(userHelp), { valid: true, invalidTags: [] });
   assert.deepEqual(validateTelegramHtmlMessage(adminHelp), { valid: true, invalidTags: [] });
   assert.match(userHelp, /Quick command guide/);
+  assert.match(userHelp, /Use the keyboard below/);
   assert.doesNotMatch(userHelp, /Available Commands/);
   assert.match(adminHelp, /Admin commands/);
+  assert.match(adminHelp, /supportqueue/i);
+  assert.ok(userHelp.split('\n').length <= 14);
+  assert.ok(adminHelp.split('\n').length <= 22);
 });
 
 test('telegram usage and status hint strings stay HTML-safe', () => {
@@ -393,7 +397,9 @@ test('myanmar help copy stays localized and html-safe', () => {
   assert.deepEqual(validateTelegramHtmlMessage(help), { valid: true, invalidTags: [] });
   assert.match(help, /အမြန် command guide/);
   assert.match(help, /Admin command များ/);
+  assert.match(help, /keyboard/);
   assert.doesNotMatch(help, /Quick command guide/);
+  assert.ok(help.split('\n').length <= 22);
 });
 
 test('myanmar inbox copy avoids english fallback text', () => {
