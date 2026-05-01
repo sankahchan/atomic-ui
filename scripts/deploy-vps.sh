@@ -96,6 +96,26 @@ ensure_env_secret() {
 
 ensure_env_secret "SETTINGS_ENCRYPTION_KEY"
 
+resolve_database_engine() {
+  local value=""
+
+  if [[ -f .env ]]; then
+    value="$(grep -E '^DATABASE_URL=' .env | tail -n 1 | cut -d '=' -f2- | sed -E 's/^["'\'']?|["'\'']?$//g' || true)"
+  fi
+
+  case "${value}" in
+    file:*)
+      echo "sqlite"
+      ;;
+    postgres://*|postgresql://*|prisma+postgres://*)
+      echo "postgres"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
 restart_service() {
   systemctl start "${SERVICE_NAME}" >/dev/null 2>&1 || true
 }
@@ -103,9 +123,13 @@ restart_service() {
 trap restart_service ERR
 
 systemctl stop "${SERVICE_NAME}"
-if find prisma/migrations -mindepth 1 -maxdepth 1 -type d | grep -q .; then
+DATABASE_ENGINE="$(resolve_database_engine)"
+if [[ "${DATABASE_ENGINE}" == "sqlite" ]] && find prisma/migrations -mindepth 1 -maxdepth 1 -type d | grep -q .; then
   npm run db:migrate
 else
+  if [[ "${DATABASE_ENGINE}" == "postgres" ]] && find prisma/migrations -mindepth 1 -maxdepth 1 -type d | grep -q .; then
+    echo "Postgres runtime detected; skipping SQLite migration history and using safe Prisma db push."
+  fi
   node scripts/prisma-safe-db-push.js
 fi
 sh scripts/prisma-command.sh generate

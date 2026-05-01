@@ -576,20 +576,28 @@ prepare_sqlite_database_file() {
     esac
 }
 
-if find prisma/migrations -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -q .; then
-    echo -e "${BLUE}[*]${NC} Applying Prisma migrations..."
-    prepare_sqlite_database_file
-    if ! npm run db:migrate 2>&1; then
-        echo -e "${RED}[✗]${NC} Prisma migrate deploy failed"
-        exit 1
+run_database_schema_update() {
+    if [ "${INSTALL_DATABASE_ENGINE}" = "sqlite" ] && find prisma/migrations -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -q .; then
+        echo -e "${BLUE}[*]${NC} Applying Prisma migrations..."
+        prepare_sqlite_database_file
+        if ! npm run db:migrate 2>&1; then
+            echo -e "${RED}[✗]${NC} Prisma migrate deploy failed"
+            exit 1
+        fi
+        return
     fi
-else
+
     echo -e "${BLUE}[*]${NC} Pushing database schema..."
+    if [ "${INSTALL_DATABASE_ENGINE}" = "postgres" ] && find prisma/migrations -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -q .; then
+        echo -e "${BLUE}[*]${NC} Postgres runtime detected; using safe Prisma db push instead of SQLite migration history..."
+    fi
     if ! node scripts/prisma-safe-db-push.js 2>&1; then
         echo -e "${RED}[✗]${NC} Prisma db push failed"
         exit 1
     fi
-fi
+}
+
+run_database_schema_update
 
 echo -e "${BLUE}[*]${NC} Running initial setup..."
 if ! npm run setup 2>&1; then
