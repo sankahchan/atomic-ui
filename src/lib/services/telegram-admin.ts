@@ -873,80 +873,38 @@ export function buildTelegramHelpMessage(input: {
     ? `📚 <b>အမြန် command guide</b>
 
 <b>စတင်ရန်</b>
-/buy - order အသစ် စတင်မည်
-/mykeys - key နှင့် renew ကို စစ်မည်
-/orders - မကြာသေးသော order များကို ကြည့်မည်
-/support - အကူအညီ စင်တာကို ဖွင့်မည်
+<code>/buy</code>, <code>/mykeys</code>, <code>/orders</code>, <code>/support</code>
 
 <b>Update များ</b>
-/inbox - notice, refund, reply များကို ကြည့်မည်
-/notifications - alert preference များကို ပြောင်းမည်
-/premium - premium စင်တာကို ဖွင့်မည်
-/supportstatus - support thread summary ကို ကြည့်မည်
+<code>/inbox</code>, <code>/premium</code>, <code>/notifications</code>
 
 <b>နောက်ထပ် tool များ</b>
-/renew - renew ကို တိုက်ရိုက် စတင်မည်
-<code>/order ORDER-CODE</code> - order တစ်ခုကို အသေးစိတ်ကြည့်မည်
-/usage - usage နှင့် setup info ရယူမည်
-/sub - share page နှင့် sub link များ ရယူမည်
-/offers - active promo များကို ကြည့်မည်
-/trial - free trial ရယူမည်
-/server - server change request စတင်မည်
-/refund - refund လုပ်နိုင်သော order များကို ကြည့်မည်
-/language - ဘာသာစကား ပြောင်းမည်
-/cancel - လက်ရှိ flow ကို ပယ်ဖျက်မည်
-/start - start menu ကို ပြန်ဖွင့်မည်
-
-Tip: <code>/inbox orders|support|refunds|announcements|premium</code> ဖြင့် category တစ်ခုချင်း ကြည့်နိုင်ပါသည်။`
+အောက်က keyboard ဖြင့် renew, offers, links, language နှင့် cancel ကို ဆက်သုံးနိုင်ပါသည်။
+<code>/order ORDER-CODE</code> သို့မဟုတ် <code>/inbox orders|support|refunds|announcements|premium</code> ကို သုံးပါ။
+Extra: <code>/server</code>, <code>/refund</code>, <code>/gift</code>, <code>/referral</code>`
     : `📚 <b>Quick command guide</b>
 
 <b>Start here</b>
-/buy - Start a new order
-/mykeys - See your keys and renew buttons
-/orders - Show your recent orders
-/support - Open the help center
+<code>/buy</code>, <code>/mykeys</code>, <code>/orders</code>, <code>/support</code>
 
-<b>Updates</b>
-/inbox - Notices, refunds, and replies
-/notifications - Manage alert preferences
-/premium - Open the premium center
-/supportstatus - Show your support thread summary
+<b>Stay updated</b>
+<code>/inbox</code>, <code>/premium</code>, <code>/notifications</code>
 
-<b>More tools</b>
-/renew - Start a renewal directly
-<code>/order ORDER-CODE</code> - Show one order in detail
-/usage - Fetch usage and setup info
-/sub - Receive your share pages and sub links
-/offers - Show active promos
-/trial - Claim the free trial
-/server - Start a server-change request
-/refund - Show refund-eligible orders
-/language - Change the bot language
-/cancel - Cancel the current flow
-/start - Re-open the start menu
-
-Tip: <code>/inbox orders|support|refunds|announcements|premium</code> narrows the inbox to one category.`;
+<b>Need something else?</b>
+Use the keyboard below for renew, offers, links, language, and cancel.
+Try <code>/order ORDER-CODE</code> or <code>/inbox orders|support|refunds|announcements|premium</code>.
+Extras: <code>/server</code>, <code>/refund</code>, <code>/gift</code>, <code>/referral</code>.`;
 
   if (input.isAdmin) {
     message += isMyanmar
       ? `\n\n<b>Admin command များ</b>
-/admin - admin hub
-/reviewqueue - pending review queue
-/createkey, /createdynamic - key ဖန်တီးရန်
-/managekey, /managedynamic - key စီမံရန်
-/announcements, /announce, /announceuser - announcement tools
-/supportqueue, /supportthreads - support queue များ
-/finance, /refunds, /claimrefund, /reassignrefund - finance နှင့် refund
-/status, /expiring, /find, /sysinfo, /backup - ops shortcut များ`
+<code>/admin</code>, <code>/reviewqueue</code>, <code>/supportqueue</code>
+<code>/createkey</code>, <code>/status</code>, <code>/backup</code>
+အောက်က keyboard ဖြင့် find, finance, refund, announcement နှင့် key tool များကို ဆက်သုံးနိုင်ပါသည်။`
       : `\n\n<b>Admin commands</b>
-/admin - Admin hub
-/reviewqueue - Pending review queue
-/createkey, /createdynamic - Key creation
-/managekey, /managedynamic - Key management
-/announcements, /announce, /announceuser - Broadcast tools
-/supportqueue, /supportthreads - Support queues
-/finance, /refunds, /claimrefund, /reassignrefund - Finance and refunds
-/status, /expiring, /find, /sysinfo, /backup - Ops shortcuts`;
+<code>/admin</code>, <code>/reviewqueue</code>, <code>/supportqueue</code>
+<code>/createkey</code>, <code>/status</code>, <code>/backup</code>
+Use the keyboard below for find, finance, refunds, broadcasts, and more key tools.`;
   }
 
   message += isMyanmar
