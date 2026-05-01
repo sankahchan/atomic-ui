@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.13 - 2026-05-01
+
+### Changed
+
+- Compacted Telegram `/help` for both customer and admin chats so the command guide stays mobile-friendly and points users toward the reply keyboard instead of a long command wall.
+- Hardened the generated `atomic-ui.service` unit with a shorter stop timeout and mixed kill mode so direct VPS deploys stop the old process cleanly instead of hanging on long shutdowns.
+
+### Fixed
+
+- Restricted Telegram admin server-health notices to real availability changes only, so admins now receive `DOWN` and recovery `UP` alerts without the earlier slow-latency noise.
+- Revalidated the production `Malaysia`, `SG`, and `SG-2` server fleet after the Telegram alert cleanup and service-stop hardening release work.
+
 ## v1.2.12 - 2026-04-30
 
 ### Fixed
