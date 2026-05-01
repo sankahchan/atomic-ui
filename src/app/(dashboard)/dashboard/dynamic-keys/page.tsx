@@ -193,6 +193,14 @@ type DAKData = {
   publicSlug?: string | null;
   dataLimitBytes: bigint | null;
   usedBytes: bigint;
+  estimatedDevices?: number | null;
+  peakDevices?: number | null;
+  maxDevices?: number | null;
+  deviceLimitObservedDevices?: number | null;
+  deviceLimitOverLimit?: boolean;
+  deviceLimitEnforcementStage?: string | null;
+  deviceLimitSuppressedUntil?: Date | string | null;
+  deviceLimitAutoDisabledAt?: Date | string | null;
   attachedKeysCount: number;
   serverTagIds: string[];
   prefix: string | null;
@@ -254,6 +262,7 @@ function CreateDAKDialog({
     telegramId: string;
     notes: string;
     dataLimitGB: string;
+    maxDevices: string;
     dataLimitResetStrategy: 'NEVER' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
     expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
     expiresAt: string;
@@ -286,6 +295,7 @@ function CreateDAKDialog({
     telegramId: '',
     notes: '',
     dataLimitGB: '',
+    maxDevices: '',
     dataLimitResetStrategy: 'NEVER',
     expirationType: 'NEVER',
     expiresAt: '',
@@ -375,6 +385,7 @@ function CreateDAKDialog({
       telegramId: '',
       notes: '',
       dataLimitGB: '',
+      maxDevices: '',
       dataLimitResetStrategy: 'NEVER',
       expirationType: 'NEVER',
       expiresAt: '',
@@ -423,6 +434,7 @@ function CreateDAKDialog({
         type: template.type,
         notes: template.notes || current.notes,
         dataLimitGB: template.dataLimitGB ? String(template.dataLimitGB) : '',
+        maxDevices: template.maxDevices?.toString() || '',
         dataLimitResetStrategy: template.dataLimitResetStrategy as typeof current.dataLimitResetStrategy,
         expirationType: template.expirationType as typeof current.expirationType,
         durationDays: template.durationDays ? String(template.durationDays) : '',
@@ -560,6 +572,7 @@ function CreateDAKDialog({
       telegramId: formData.telegramId || undefined,
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
+      maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : undefined,
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       expirationType: formData.expirationType,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
@@ -1016,6 +1029,22 @@ function CreateDAKDialog({
             />
             <p className="text-xs text-muted-foreground">
               {t('dynamic_keys.dialog.data_limit_help')}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="dakMaxDevices">Max devices (estimated)</Label>
+            <Input
+              id="dakMaxDevices"
+              type="number"
+              min="1"
+              max="20"
+              placeholder="Leave blank for no limit"
+              value={formData.maxDevices}
+              onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Use an estimated-device cap to slow down key sharing. Dynamic keys warn first, then disable the route if recent usage stays above the limit.
             </p>
           </div>
 
@@ -1657,6 +1686,7 @@ function EditDAKDialog({
     dataLimitGB: dakData.dataLimitBytes
       ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
       : '',
+    maxDevices: dakData.maxDevices?.toString() || '',
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
     loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -1686,6 +1716,7 @@ function EditDAKDialog({
       dataLimitGB: dakData.dataLimitBytes
         ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
         : '',
+      maxDevices: dakData.maxDevices?.toString() || '',
       durationDays: dakData.durationDays?.toString() || '',
       expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
       loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -1744,6 +1775,7 @@ function EditDAKDialog({
       telegramId: formData.telegramId || undefined,
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
+      maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : null,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm,
@@ -1824,6 +1856,22 @@ function EditDAKDialog({
                     min="0"
                     step="0.5"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+                  <Input
+                    id="editMaxDevices"
+                    type="number"
+                    min="1"
+                    max="20"
+                    placeholder="Leave blank for no limit"
+                    value={formData.maxDevices}
+                    onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave this empty to allow unlimited devices. When set, the dynamic route warns first and then disables if sharing stays above the estimated limit.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -2030,6 +2078,9 @@ function DAKRow({
   const usagePercent = dak.dataLimitBytes
     ? Number((dak.usedBytes * BigInt(100)) / dak.dataLimitBytes)
     : 0;
+  const deviceCount = dak.deviceLimitObservedDevices ?? dak.estimatedDevices ?? 0;
+  const deviceStage = dak.deviceLimitEnforcementStage;
+  const deviceOverLimit = dak.deviceLimitOverLimit ?? (dak.maxDevices != null && deviceCount > dak.maxDevices);
 
   return (
     <tr
@@ -2112,11 +2163,25 @@ function DAKRow({
 
       {/* Devices */}
       <td className="px-4 py-3 text-center">
-        <div className="flex items-center justify-center gap-1">
-          <Smartphone className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-sm font-medium">
-            {0 || 0}
-          </span>
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center justify-center gap-1">
+            <Smartphone className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-sm font-medium">
+              {dak.maxDevices ? `${deviceCount}/${dak.maxDevices}` : deviceCount}
+            </span>
+          </div>
+          {dak.maxDevices ? (
+            <span
+              className={cn(
+                'text-[10px]',
+                deviceOverLimit || deviceStage === 'DISABLED'
+                  ? 'text-amber-600 dark:text-amber-300'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {deviceStage && deviceStage !== 'OK' ? `${deviceStage.toLowerCase().replaceAll('_', ' ')} · ` : ''}estimated
+            </span>
+          ) : null}
         </div>
       </td>
 

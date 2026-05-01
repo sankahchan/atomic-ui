@@ -126,6 +126,43 @@ function buildQuotaKeyboard(locale: SupportedLocale, action = 'quota') {
   };
 }
 
+function buildDeviceLimitKeyboard(locale: SupportedLocale) {
+  const isMyanmar = locale === 'my';
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: isMyanmar ? '♾ No limit' : '♾ No limit',
+          callback_data: buildTelegramAdminKeyCallbackData('devices', 'unlimited'),
+        },
+        {
+          text: '1',
+          callback_data: buildTelegramAdminKeyCallbackData('devices', '1'),
+        },
+        {
+          text: '2',
+          callback_data: buildTelegramAdminKeyCallbackData('devices', '2'),
+        },
+      ],
+      [
+        {
+          text: '3',
+          callback_data: buildTelegramAdminKeyCallbackData('devices', '3'),
+        },
+        {
+          text: '5',
+          callback_data: buildTelegramAdminKeyCallbackData('devices', '5'),
+        },
+        {
+          text: isMyanmar ? '✍️ Custom' : '✍️ Custom',
+          callback_data: buildTelegramAdminKeyCallbackData('devices', 'custom'),
+        },
+      ],
+      buildCancelKeyboard(locale).inline_keyboard[0],
+    ],
+  };
+}
+
 function buildAddQuotaKeyboard(locale: SupportedLocale) {
   return {
     inline_keyboard: [
@@ -222,6 +259,22 @@ function buildManageExpiryKeyboard(locale: SupportedLocale) {
       buildCancelKeyboard(locale).inline_keyboard[0],
     ],
   };
+}
+
+function parseDeviceLimitInput(text: string) {
+  const parsed = Number.parseInt(text.trim(), 10);
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 20) {
+    return null;
+  }
+  return parsed;
+}
+
+function formatDraftDeviceLimit(maxDevices: number | null, locale: SupportedLocale) {
+  if (!maxDevices) {
+    return locale === 'my' ? 'No limit' : 'No limit';
+  }
+
+  return `${maxDevices} estimated device${maxDevices === 1 ? '' : 's'}`;
 }
 
 function renderServerChoiceLabel(server: {
@@ -777,6 +830,35 @@ async function promptQuota(input: {
   });
 }
 
+async function promptDeviceLimit(input: {
+  kind: 'create_access' | 'create_dynamic';
+  chatId: number;
+  botToken: string;
+  locale: SupportedLocale;
+  deps: TelegramAdminKeyDeps;
+}) {
+  const isMyanmar = input.locale === 'my';
+  const title =
+    input.kind === 'create_dynamic'
+      ? (isMyanmar ? '📱 <b>Set dynamic device limit</b>' : '📱 <b>Set dynamic device limit</b>')
+      : (isMyanmar ? '📱 <b>Set device limit</b>' : '📱 <b>Set device limit</b>');
+
+  await input.deps.sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    [
+      title,
+      '',
+      isMyanmar
+        ? 'Device sharing ကို လျှော့ချရန် estimated limit သတ်မှတ်ပါ။ Blank မလိုပါက No limit ကိုရွေးပါ။'
+        : 'Set an estimated device cap to reduce sharing. Choose No limit if you do not want one.',
+    ].join('\n'),
+    {
+      replyMarkup: buildDeviceLimitKeyboard(input.locale),
+    },
+  );
+}
+
 async function promptAddQuota(input: {
   chatId: number;
   botToken: string;
@@ -883,6 +965,7 @@ async function promptAccessCreateConfirm(input: {
             ? 'Unlimited'
             : 'Unlimited'
       }`,
+      `📱 ${escapeHtml(formatDraftDeviceLimit(input.draft.maxDevices, input.locale))}`,
       `⏳ ${escapeHtml(
         describeExpirationDraft(
           input.locale,
@@ -926,6 +1009,7 @@ async function promptDynamicCreateConfirm(input: {
             ? 'Unlimited'
             : 'Unlimited'
       }`,
+      `📱 ${escapeHtml(formatDraftDeviceLimit(input.draft.maxDevices, input.locale))}`,
       `⏳ ${escapeHtml(
         describeExpirationDraft(
           input.locale,
@@ -1054,6 +1138,8 @@ function formatAccessManageSummary(key: {
   id: string;
   name: string;
   status: string;
+  estimatedDevices?: number | null;
+  maxDevices?: number | null;
   server: {
     name: string;
     countryCode?: string | null;
@@ -1079,6 +1165,7 @@ function formatAccessManageSummary(key: {
         ? `${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
         : (locale === 'my' ? 'Unlimited' : 'Unlimited'),
     )}`,
+    key.maxDevices ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} estimated devices` : '',
     `⏳ ${escapeHtml(
       formatExpirationSummary(
         {
@@ -1103,6 +1190,8 @@ function formatDynamicManageSummary(key: {
   status: string;
   usedBytes: bigint;
   dataLimitBytes: bigint | null;
+  estimatedDevices?: number | null;
+  maxDevices?: number | null;
   expirationType: string;
   expiresAt: Date | null;
   durationDays: number | null;
@@ -1133,6 +1222,7 @@ function formatDynamicManageSummary(key: {
         ? `${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
         : (locale === 'my' ? 'Unlimited' : 'Unlimited'),
     )}`,
+    key.maxDevices ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} estimated devices` : '',
     `⏳ ${escapeHtml(
       formatExpirationSummary(
         {
@@ -1799,6 +1889,7 @@ async function createAccessKeyFromDraft(input: {
       dataLimitBytes: input.draft.dataLimitGB
         ? BigInt(Math.round(input.draft.dataLimitGB * 1024 * 1024 * 1024))
         : null,
+      maxDevices: input.draft.maxDevices,
       dataLimitResetStrategy: 'NEVER',
       expirationType: input.draft.expirationType,
       expiresAt: calculated.expiresAt,
@@ -1871,6 +1962,7 @@ async function createDynamicKeyFromDraft(input: {
       dataLimitBytes: input.draft.dataLimitGB
         ? BigInt(Math.round(input.draft.dataLimitGB * 1024 * 1024 * 1024))
         : null,
+      maxDevices: input.draft.maxDevices,
       dataLimitResetStrategy: 'NEVER',
       lastDataLimitReset: new Date(),
       usageOffset: BigInt(0),
@@ -2298,7 +2390,34 @@ export async function handleTelegramAdminKeyTextInput(input: {
       const nextFlow: AccessCreateDraft = {
         ...flow,
         dataLimitGB: gb,
-        step: 'confirm',
+      };
+      await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+      await promptDeviceLimit({
+        kind: 'create_access',
+        chatId: input.chatId,
+        botToken: input.botToken,
+        locale: input.locale,
+        deps: input.deps,
+      });
+      return true;
+    }
+
+    if (flow.step === 'device_limit_custom') {
+      const maxDevices = parseDeviceLimitInput(text);
+      if (!maxDevices) {
+        await input.deps.sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          input.locale === 'my'
+            ? '1 နှင့် 20 ကြား device limit number ကိုပို့ပါ။ ဥပမာ 2'
+            : 'Send a device limit between 1 and 20, for example 2.',
+        );
+        return true;
+      }
+
+      const nextFlow: AccessCreateDraft = {
+        ...flow,
+        maxDevices,
       };
       await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
       await promptCreateExpiry({
@@ -2408,6 +2527,34 @@ export async function handleTelegramAdminKeyTextInput(input: {
       const nextFlow: DynamicCreateDraft = {
         ...flow,
         dataLimitGB: gb,
+      };
+      await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+      await promptDeviceLimit({
+        kind: 'create_dynamic',
+        chatId: input.chatId,
+        botToken: input.botToken,
+        locale: input.locale,
+        deps: input.deps,
+      });
+      return true;
+    }
+
+    if (flow.step === 'device_limit_custom') {
+      const maxDevices = parseDeviceLimitInput(text);
+      if (!maxDevices) {
+        await input.deps.sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          input.locale === 'my'
+            ? '1 နှင့် 20 ကြား device limit number ကိုပို့ပါ။ ဥပမာ 2'
+            : 'Send a device limit between 1 and 20, for example 2.',
+        );
+        return true;
+      }
+
+      const nextFlow: DynamicCreateDraft = {
+        ...flow,
+        maxDevices,
       };
       await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
       await promptCreateExpiry({
@@ -3088,13 +3235,48 @@ export async function handleTelegramAdminKeyCallback(input: {
         dataLimitGB: input.primary === 'unlimited' ? null : parseGbInput(input.primary || '') ?? null,
       };
       await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
-      await promptCreateExpiry({
+      await promptDeviceLimit({
+        kind: 'create_access',
         chatId: input.chatId,
         botToken: input.botToken,
         locale: input.locale,
         deps: input.deps,
       });
       return { handled: true, callbackText: input.locale === 'my' ? 'Quota saved.' : 'Quota saved.' };
+    }
+
+    if (input.action === 'devices') {
+      if (input.primary === 'custom') {
+        const nextFlow: AccessCreateDraft = {
+          ...flow,
+          step: 'device_limit_custom',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await input.deps.sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          input.locale === 'my'
+            ? 'Device limit ကို 1 နှင့် 20 ကြား စာသားပို့ပါ။ ဥပမာ 2'
+            : 'Send the device limit as text between 1 and 20, for example 2.',
+          {
+            replyMarkup: buildCancelKeyboard(input.locale),
+          },
+        );
+        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting device limit.' : 'Awaiting device limit.' };
+      }
+
+      const nextFlow: AccessCreateDraft = {
+        ...flow,
+        maxDevices: input.primary === 'unlimited' ? null : parseDeviceLimitInput(input.primary || ''),
+      };
+      await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+      await promptCreateExpiry({
+        chatId: input.chatId,
+        botToken: input.botToken,
+        locale: input.locale,
+        deps: input.deps,
+      });
+      return { handled: true, callbackText: input.locale === 'my' ? 'Device limit saved.' : 'Device limit saved.' };
     }
 
     if (input.action === 'expiry') {
@@ -3243,13 +3425,48 @@ export async function handleTelegramAdminKeyCallback(input: {
         dataLimitGB: input.primary === 'unlimited' ? null : parseGbInput(input.primary || '') ?? null,
       };
       await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
-      await promptCreateExpiry({
+      await promptDeviceLimit({
+        kind: 'create_dynamic',
         chatId: input.chatId,
         botToken: input.botToken,
         locale: input.locale,
         deps: input.deps,
       });
       return { handled: true, callbackText: input.locale === 'my' ? 'Quota saved.' : 'Quota saved.' };
+    }
+
+    if (input.action === 'devices') {
+      if (input.primary === 'custom') {
+        const nextFlow: DynamicCreateDraft = {
+          ...flow,
+          step: 'device_limit_custom',
+        };
+        await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+        await input.deps.sendTelegramMessage(
+          input.botToken,
+          input.chatId,
+          input.locale === 'my'
+            ? 'Device limit ကို 1 နှင့် 20 ကြား စာသားပို့ပါ။ ဥပမာ 2'
+            : 'Send the device limit as text between 1 and 20, for example 2.',
+          {
+            replyMarkup: buildCancelKeyboard(input.locale),
+          },
+        );
+        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting device limit.' : 'Awaiting device limit.' };
+      }
+
+      const nextFlow: DynamicCreateDraft = {
+        ...flow,
+        maxDevices: input.primary === 'unlimited' ? null : parseDeviceLimitInput(input.primary || ''),
+      };
+      await savePendingAdminFlow(input.telegramUserId, input.chatId, nextFlow);
+      await promptCreateExpiry({
+        chatId: input.chatId,
+        botToken: input.botToken,
+        locale: input.locale,
+        deps: input.deps,
+      });
+      return { handled: true, callbackText: input.locale === 'my' ? 'Device limit saved.' : 'Device limit saved.' };
     }
 
     if (input.action === 'expiry') {

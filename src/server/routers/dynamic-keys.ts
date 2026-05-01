@@ -65,10 +65,49 @@ import {
   resetDynamicKeyBandwidthAlertState,
   sendManualDynamicKeyBandwidthAlert,
 } from '@/lib/services/bandwidth-alerts';
+import { deriveDeviceLimitStage } from '@/lib/services/device-limits';
 
 const routingWeightsSchema = z.record(z.number().positive()).optional();
 const sessionStickinessSchema = z.enum(['NONE', 'DRAIN']).default('DRAIN');
 const rotationTriggerSchema = z.enum(['SCHEDULED', 'USAGE', 'HEALTH', 'COMBINED']).default('SCHEDULED');
+
+function buildDynamicDeviceLimitState(
+  dak: {
+    status: string;
+    estimatedDevices: number | null;
+    peakDevices: number | null;
+    maxDevices: number | null;
+    deviceLimitLastObservedDevices: number | null;
+    deviceLimitExceededAt: Date | null;
+    deviceLimitWarningSentAt: Date | null;
+    deviceLimitSuppressedUntil: Date | null;
+    deviceLimitAutoDisabledAt: Date | null;
+  },
+  now = new Date(),
+) {
+  const observedDevices = dak.deviceLimitLastObservedDevices ?? dak.estimatedDevices ?? 0;
+  const stage = deriveDeviceLimitStage({
+    status: dak.status,
+    maxDevices: dak.maxDevices,
+    observedDevices,
+    deviceLimitExceededAt: dak.deviceLimitExceededAt,
+    deviceLimitWarningSentAt: dak.deviceLimitWarningSentAt,
+    deviceLimitSuppressedUntil: dak.deviceLimitSuppressedUntil,
+    deviceLimitAutoDisabledAt: dak.deviceLimitAutoDisabledAt,
+    now,
+  });
+
+  return {
+    estimatedDevices: dak.estimatedDevices ?? 0,
+    peakDevices: dak.peakDevices ?? 0,
+    maxDevices: dak.maxDevices,
+    deviceLimitObservedDevices: dak.deviceLimitLastObservedDevices,
+    deviceLimitOverLimit: stage.overLimit,
+    deviceLimitEnforcementStage: stage.stage,
+    deviceLimitSuppressedUntil: dak.deviceLimitSuppressedUntil,
+    deviceLimitAutoDisabledAt: dak.deviceLimitAutoDisabledAt,
+  };
+}
 
 /**
  * Schema for creating a new Dynamic Access Key
@@ -81,6 +120,7 @@ const createDAKSchema = z.object({
   userId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
+  maxDevices: z.number().int().min(1).max(20).optional().nullable(),
   dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).default('NEVER'),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
   expiresAt: z.date().optional().nullable(),
@@ -128,6 +168,7 @@ const updateDAKSchema = z.object({
   userId: z.string().optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
+  maxDevices: z.number().int().min(1).max(20).optional().nullable(),
   dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).optional(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).optional(),
   expiresAt: z.date().optional().nullable(),
@@ -175,6 +216,7 @@ const dynamicKeyTemplateSchema = z.object({
   type: z.enum(['SELF_MANAGED', 'MANUAL']).default('SELF_MANAGED'),
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
+  maxDevices: z.number().int().min(1).max(20).optional().nullable(),
   dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).default('NEVER'),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
   durationDays: z.number().int().positive().optional().nullable(),
@@ -440,6 +482,7 @@ export const dynamicKeysRouter = router({
         type: template.type as 'SELF_MANAGED' | 'MANUAL',
         notes: template.notes,
         dataLimitGB: template.dataLimitBytes ? Number(template.dataLimitBytes) / (1024 * 1024 * 1024) : null,
+        maxDevices: template.maxDevices,
         dataLimitResetStrategy: template.dataLimitResetStrategy,
         expirationType: template.expirationType,
         durationDays: template.durationDays,
@@ -487,6 +530,7 @@ export const dynamicKeysRouter = router({
           type: input.type,
           notes: input.notes,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
+          maxDevices: input.maxDevices ?? null,
           dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
           durationDays: input.durationDays,
@@ -529,6 +573,7 @@ export const dynamicKeysRouter = router({
           type: input.type,
           notes: input.notes,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
+          maxDevices: input.maxDevices ?? null,
           dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
           durationDays: input.durationDays,
@@ -602,6 +647,7 @@ export const dynamicKeysRouter = router({
           type: template.type,
           notes: template.notes,
           dataLimitBytes: template.dataLimitBytes,
+          maxDevices: template.maxDevices,
           dataLimitResetStrategy: template.dataLimitResetStrategy,
           expirationType: template.expirationType,
           durationDays: template.durationDays,
@@ -759,6 +805,7 @@ export const dynamicKeysRouter = router({
           dataLimitBytes: dak.dataLimitBytes,
           usedBytes: dak.usedBytes,
           usagePercent,
+          ...buildDynamicDeviceLimitState(dak, now),
           expiresAt: dak.expiresAt,
           daysRemaining,
           prefix: dak.prefix,
@@ -913,6 +960,7 @@ export const dynamicKeysRouter = router({
           },
         },
       });
+      const now = new Date();
 
       return {
         id: dak.id,
@@ -927,6 +975,7 @@ export const dynamicKeysRouter = router({
         publicSlug,
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
+        ...buildDynamicDeviceLimitState(dak, now),
         autoDisableOnLimit: dak.autoDisableOnLimit,
         quotaAlertThresholds: dak.quotaAlertThresholds,
         quotaAlertsSent: dak.quotaAlertsSent,
@@ -2325,6 +2374,7 @@ export const dynamicKeysRouter = router({
           dynamicUrl,
           publicSlug,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
+          maxDevices: input.maxDevices ?? null,
           dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
           expiresAt,
@@ -2367,6 +2417,7 @@ export const dynamicKeysRouter = router({
         publicSlug: dak.publicSlug,
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
+        ...buildDynamicDeviceLimitState(dak),
         expiresAt: dak.expiresAt,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
@@ -2402,6 +2453,7 @@ export const dynamicKeysRouter = router({
         id,
         serverTagIds,
         dataLimitGB,
+        maxDevices,
         dataLimitResetStrategy,
         email,
         telegramId,
@@ -2477,6 +2529,16 @@ export const dynamicKeysRouter = router({
         if (data.status === undefined && existing.status === 'DEPLETED') {
           updateData.status = 'ACTIVE';
           updateData.sharePageEnabled = sharePageEnabled ?? true;
+        }
+      }
+
+      if (maxDevices !== undefined) {
+        updateData.maxDevices = maxDevices;
+        if (maxDevices == null) {
+          updateData.deviceLimitExceededAt = null;
+          updateData.deviceLimitWarningSentAt = null;
+          updateData.deviceLimitSuppressedUntil = null;
+          updateData.deviceLimitAutoDisabledAt = null;
         }
       }
 
@@ -2713,6 +2775,7 @@ export const dynamicKeysRouter = router({
         publicSlug: dak.publicSlug,
         dataLimitBytes: dak.dataLimitBytes,
         usedBytes: dak.usedBytes,
+        ...buildDynamicDeviceLimitState(dak),
         expiresAt: dak.expiresAt,
         loadBalancerAlgorithm: dak.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
         serverTagIds: JSON.parse(dak.serverTagsJson || '[]') as string[],
@@ -3092,7 +3155,16 @@ export const dynamicKeysRouter = router({
       // Update the DAK status
       const updated = await db.dynamicAccessKey.update({
         where: { id: input.id },
-        data: { status: newStatus },
+        data: {
+          status: newStatus,
+          estimatedDevices: 0,
+          deviceLimitExceededAt: null,
+          deviceLimitWarningSentAt: null,
+          deviceLimitSuppressedUntil: null,
+          ...(isCurrentlyDisabled
+            ? { deviceLimitAutoDisabledAt: null }
+            : {}),
+        },
       });
 
       return {
@@ -3246,7 +3318,16 @@ export const dynamicKeysRouter = router({
           const newStatus = input.enable ? 'ACTIVE' : 'DISABLED';
           await db.dynamicAccessKey.update({
             where: { id: dakId },
-            data: { status: newStatus },
+            data: {
+              status: newStatus,
+              estimatedDevices: 0,
+              deviceLimitExceededAt: null,
+              deviceLimitWarningSentAt: null,
+              deviceLimitSuppressedUntil: null,
+              ...(input.enable
+                ? { deviceLimitAutoDisabledAt: null }
+                : {}),
+            },
           });
 
           results.success++;
@@ -3597,11 +3678,13 @@ export const dynamicKeysRouter = router({
         select: {
           id: true,
           userId: true,
+          estimatedDevices: true,
+          peakDevices: true,
+          maxDevices: true,
+          deviceLimitLastObservedDevices: true,
           accessKeys: {
             select: {
               id: true,
-              estimatedDevices: true,
-              peakDevices: true,
             },
           },
         },
@@ -3627,8 +3710,9 @@ export const dynamicKeysRouter = router({
 
       if (accessKeyIds.length === 0) {
         return {
-          estimatedDevices: 0,
-          peakDevices: 0,
+          estimatedDevices: dak.deviceLimitLastObservedDevices ?? dak.estimatedDevices,
+          peakDevices: dak.peakDevices,
+          maxDevices: dak.maxDevices,
           activeCount: 0,
           sessions: [],
         };
@@ -3658,14 +3742,6 @@ export const dynamicKeysRouter = router({
       });
 
       // Calculate aggregated stats
-      const totalEstimatedDevices = dak.accessKeys.reduce(
-        (sum, k) => sum + (k.estimatedDevices || 0),
-        0
-      );
-      const maxPeakDevices = dak.accessKeys.reduce(
-        (max, k) => Math.max(max, k.peakDevices || 0),
-        0
-      );
       const activeCount = sessions.filter((s) => s.isActive).length;
 
       // Calculate session durations
@@ -3718,8 +3794,9 @@ export const dynamicKeysRouter = router({
       const subscriberDevices = Array.from(uniqueDevicesMap.values());
 
       return {
-        estimatedDevices: totalEstimatedDevices,
-        peakDevices: maxPeakDevices,
+        estimatedDevices: dak.deviceLimitLastObservedDevices ?? dak.estimatedDevices,
+        peakDevices: dak.peakDevices,
+        maxDevices: dak.maxDevices,
         activeCount,
         sessions: sessionsWithDuration,
         subscriberDevices,
