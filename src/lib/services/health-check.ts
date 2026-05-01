@@ -27,113 +27,19 @@ export interface HealthCheckResult {
     error?: string;
 }
 
-export const ADMIN_SLOW_ALERT_MIN_CONSECUTIVE = 3;
-
-export function resolveAdminSlowAlertMinConsecutive(input: {
-    slowAutoDrainEnabled?: boolean | null;
-    slowAutoDrainThreshold?: number | null;
-    slowUserNotifyEnabled?: boolean | null;
-    slowUserNotifyThreshold?: number | null;
-}) {
-    const candidates: number[] = [];
-
-    if (
-        input.slowAutoDrainEnabled !== false &&
-        typeof input.slowAutoDrainThreshold === 'number' &&
-        input.slowAutoDrainThreshold > 0
-    ) {
-        candidates.push(input.slowAutoDrainThreshold);
-    }
-
-    if (
-        input.slowUserNotifyEnabled !== false &&
-        typeof input.slowUserNotifyThreshold === 'number' &&
-        input.slowUserNotifyThreshold > 0
-    ) {
-        candidates.push(input.slowUserNotifyThreshold);
-    }
-
-    if (candidates.length === 0) {
-        return ADMIN_SLOW_ALERT_MIN_CONSECUTIVE;
-    }
-
-    return Math.max(ADMIN_SLOW_ALERT_MIN_CONSECUTIVE, Math.min(...candidates));
-}
-
-export function buildSlowAutoMigrationBlockedAlertMessage(input: {
+export function buildServerAvailabilityAdminAlertMessage(input: {
     serverName: string;
-    consecutiveSlowCount: number;
+    status: 'UP' | 'DOWN';
 }) {
-    return [
-        '🟠 <b>Slow migration blocked</b>',
-        `<b>${escapeHtml(input.serverName)}</b> • ${input.consecutiveSlowCount} slow checks`,
-        'No healthy fallback target is available.',
-    ].join('\n');
+    const statusEmoji = input.status === 'DOWN' ? '🔴' : '🟢';
+    return `${statusEmoji} <b>Server Alert:</b> ${escapeHtml(input.serverName)} is now <b>${input.status}</b>`;
 }
 
-export function buildSlowAutoMigrationStartedAlertMessage(input: {
-    sourceServerName: string;
-    targetServerName: string;
-    consecutiveSlowCount: number;
-    latencyMs: number;
-    thresholdMs: number;
+export function shouldSendAdminAvailabilityAlert(input: {
+    previousStatus: string | null | undefined;
+    currentStatus: HealthCheckResult['status'];
 }) {
-    return [
-        '🟠 <b>Slow migration started</b>',
-        `<b>${escapeHtml(input.sourceServerName)}</b> to <b>${escapeHtml(input.targetServerName)}</b>`,
-        `${input.consecutiveSlowCount} slow checks • <b>${input.latencyMs}ms</b> / ${input.thresholdMs}ms threshold`,
-    ].join('\n');
-}
-
-export function buildSlowAutoMigrationFailedAlertMessage(input: {
-    serverName: string;
-    consecutiveSlowCount: number;
-    error: string;
-}) {
-    return [
-        '🔴 <b>Slow migration failed</b>',
-        `<b>${escapeHtml(input.serverName)}</b> • ${input.consecutiveSlowCount} slow checks`,
-        `Error: <b>${escapeHtml(input.error || 'Unknown error')}</b>`,
-    ].join('\n');
-}
-
-export function buildServerSlowAdminAlertMessage(input: {
-    serverName: string;
-    consecutiveSlowCount: number;
-    latencyMs: number | null | undefined;
-    thresholdMs: number;
-}) {
-    return [
-        '🟡 <b>Server slow</b>',
-        `<b>${escapeHtml(input.serverName)}</b> • ${input.consecutiveSlowCount} slow checks`,
-        `Latency: <b>${input.latencyMs ?? '-'}ms</b> / ${input.thresholdMs}ms threshold`,
-    ].join('\n');
-}
-
-export function shouldSendAdminSlowAlert(input: {
-    previousSlowConsecutiveCount: number | null | undefined;
-    currentSlowConsecutiveCount: number;
-    lastNotifiedAt: Date | null;
-    notifyCooldownMins: number | null | undefined;
-    minConsecutive?: number;
-    now?: number;
-}): boolean {
-    const minConsecutive = Math.max(
-        ADMIN_SLOW_ALERT_MIN_CONSECUTIVE,
-        input.minConsecutive ?? ADMIN_SLOW_ALERT_MIN_CONSECUTIVE,
-    );
-
-    if (input.currentSlowConsecutiveCount < minConsecutive) {
-        return false;
-    }
-
-    if ((input.previousSlowConsecutiveCount ?? 0) >= minConsecutive) {
-        return false;
-    }
-
-    const cooldownMs = Math.max(15, input.notifyCooldownMins ?? 30) * 60_000;
-    const now = input.now ?? Date.now();
-    return !input.lastNotifiedAt || now - input.lastNotifiedAt.getTime() >= cooldownMs;
+    return (input.previousStatus === 'DOWN') !== (input.currentStatus === 'DOWN');
 }
 
 /**
@@ -264,9 +170,13 @@ async function maybeAutoDrainSlowServer(input: {
         },
     });
 
-    await sendAdminAlert(
-        `🟡 <b>Server auto-drained</b>\n\n<b>${input.server.name}</b> was moved to <b>DRAINING</b> after ${input.consecutiveSlowCount} consecutive slow checks.\nLatency: <b>${input.latencyMs}ms</b> (threshold <b>${input.thresholdMs}ms</b>)`,
-    );
+    logger.warn('Server auto-drained after sustained slow health checks', {
+        serverId: input.server.id,
+        serverName: input.server.name,
+        consecutiveSlowCount: input.consecutiveSlowCount,
+        latencyMs: input.latencyMs,
+        thresholdMs: input.thresholdMs,
+    });
 
     return true;
 }
@@ -376,12 +286,11 @@ async function maybeAutoMigrateSlowServer(input: {
         const fallback = await recommendFallbackTargetForServer(input.server.id);
         if (!fallback.selected) {
             if (input.consecutiveSlowCount === input.server.healthCheck.slowAutoMigrateThreshold) {
-                await sendAdminAlert(
-                    buildSlowAutoMigrationBlockedAlertMessage({
-                        serverName: input.server.name,
-                        consecutiveSlowCount: input.consecutiveSlowCount,
-                    }),
-                );
+                logger.warn('Slow auto-migration blocked because no healthy fallback is available', {
+                    serverId: input.server.id,
+                    serverName: input.server.name,
+                    consecutiveSlowCount: input.consecutiveSlowCount,
+                });
             }
             return false;
         }
@@ -411,15 +320,15 @@ async function maybeAutoMigrateSlowServer(input: {
             },
         });
 
-        await sendAdminAlert(
-            buildSlowAutoMigrationStartedAlertMessage({
-                sourceServerName: input.server.name,
-                targetServerName: fallback.selected.serverName,
-                consecutiveSlowCount: input.consecutiveSlowCount,
-                latencyMs: input.latencyMs,
-                thresholdMs: input.thresholdMs,
-            }),
-        );
+        logger.warn('Slow auto-migration started', {
+            serverId: input.server.id,
+            serverName: input.server.name,
+            targetServerId: fallback.selected.serverId,
+            targetServerName: fallback.selected.serverName,
+            consecutiveSlowCount: input.consecutiveSlowCount,
+            latencyMs: input.latencyMs,
+            thresholdMs: input.thresholdMs,
+        });
 
         return true;
     } catch (error) {
@@ -428,13 +337,12 @@ async function maybeAutoMigrateSlowServer(input: {
             serverName: input.server.name,
             error: error instanceof Error ? error.message : String(error),
         });
-        await sendAdminAlert(
-            buildSlowAutoMigrationFailedAlertMessage({
-                serverName: input.server.name,
-                consecutiveSlowCount: input.consecutiveSlowCount,
-                error: error instanceof Error ? error.message : 'Unknown error',
-            }),
-        );
+        logger.error('Slow auto-migration failed', {
+            serverId: input.server.id,
+            serverName: input.server.name,
+            consecutiveSlowCount: input.consecutiveSlowCount,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return false;
     }
 }
@@ -504,12 +412,6 @@ export async function runHealthChecks(): Promise<{
             const consecutiveSlowCount = result.status === 'SLOW'
                 ? previousSlowConsecutiveCount + 1
                 : 0;
-            const adminSlowAlertMinConsecutive = resolveAdminSlowAlertMinConsecutive({
-                slowAutoDrainEnabled: server.healthCheck.slowAutoDrainEnabled,
-                slowAutoDrainThreshold: server.healthCheck.slowAutoDrainThreshold,
-                slowUserNotifyEnabled: server.healthCheck.slowUserNotifyEnabled,
-                slowUserNotifyThreshold: server.healthCheck.slowUserNotifyThreshold,
-            });
 
             await db.healthCheck.update({
                 where: { id: server.healthCheck.id },
@@ -525,40 +427,21 @@ export async function runHealthChecks(): Promise<{
                 },
             });
 
-            if (wasDown !== isNowDown) {
-                const statusEmoji = isNowDown ? '🔴' : '🟢';
-                const statusText = isNowDown ? 'DOWN' : 'UP';
-                const statusMsg = `${statusEmoji} <b>Server Alert:</b> ${server.name} is now <b>${statusText}</b>`;
-
-                logger.info(`Server alert state changed: ${server.name} is now ${statusText}`);
-                await sendAdminAlert(statusMsg);
-            }
-
             if (
-                result.status === 'SLOW' &&
-                shouldSendAdminSlowAlert({
-                    previousSlowConsecutiveCount,
-                    currentSlowConsecutiveCount: consecutiveSlowCount,
-                    lastNotifiedAt: server.healthCheck.lastNotifiedAt,
-                    notifyCooldownMins: server.healthCheck.notifyCooldownMins,
-                    minConsecutive: adminSlowAlertMinConsecutive,
+                shouldSendAdminAvailabilityAlert({
+                    previousStatus: server.healthCheck.lastStatus,
+                    currentStatus: result.status,
                 })
             ) {
+                const statusText = isNowDown ? 'DOWN' : 'UP';
+
+                logger.info(`Server alert state changed: ${server.name} is now ${statusText}`);
                 await sendAdminAlert(
-                    buildServerSlowAdminAlertMessage({
+                    buildServerAvailabilityAdminAlertMessage({
                         serverName: server.name,
-                        consecutiveSlowCount,
-                        latencyMs: result.latencyMs,
-                        thresholdMs,
+                        status: statusText,
                     }),
                 );
-
-                await db.healthCheck.update({
-                    where: { id: server.healthCheck.id },
-                    data: {
-                        lastNotifiedAt: new Date(),
-                    },
-                });
             }
 
             if (isNowDown) {

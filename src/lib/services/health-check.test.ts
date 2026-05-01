@@ -2,146 +2,86 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  ADMIN_SLOW_ALERT_MIN_CONSECUTIVE,
-  buildServerSlowAdminAlertMessage,
-  buildSlowAutoMigrationBlockedAlertMessage,
-  buildSlowAutoMigrationFailedAlertMessage,
-  buildSlowAutoMigrationStartedAlertMessage,
-  resolveAdminSlowAlertMinConsecutive,
-  shouldSendAdminSlowAlert,
+  buildServerAvailabilityAdminAlertMessage,
+  shouldSendAdminAvailabilityAlert,
 } from './health-check';
 import { validateTelegramHtmlMessage } from './telegram-message-validation';
 
-test('slow admin alerts do not fire on the first slow sample', () => {
+test('admin availability alerts fire only when a server enters DOWN state', () => {
   assert.equal(
-    shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 0,
-      currentSlowConsecutiveCount: 1,
-      lastNotifiedAt: null,
-      notifyCooldownMins: 30,
+    shouldSendAdminAvailabilityAlert({
+      previousStatus: 'UP',
+      currentStatus: 'DOWN',
     }),
-    false,
+    true,
   );
-});
 
-test('slow admin alerts wait for the policy-aligned threshold', () => {
-  assert.equal(ADMIN_SLOW_ALERT_MIN_CONSECUTIVE, 3);
   assert.equal(
-    shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 1,
-      currentSlowConsecutiveCount: 2,
-      lastNotifiedAt: null,
-      notifyCooldownMins: 30,
-    }),
-    false,
-  );
-});
-
-test('slow admin alerts fire when the slow streak reaches the sustained threshold', () => {
-  assert.equal(ADMIN_SLOW_ALERT_MIN_CONSECUTIVE, 3);
-  assert.equal(
-    shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 2,
-      currentSlowConsecutiveCount: 3,
-      lastNotifiedAt: null,
-      notifyCooldownMins: 30,
+    shouldSendAdminAvailabilityAlert({
+      previousStatus: 'SLOW',
+      currentStatus: 'DOWN',
     }),
     true,
   );
 });
 
-test('slow admin alerts respect the notification cooldown between separate incidents', () => {
-  const now = new Date('2026-04-30T03:00:00.000Z');
-
+test('admin availability alerts fire when a server recovers from DOWN to healthy or slow', () => {
   assert.equal(
-    shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 2,
-      currentSlowConsecutiveCount: 3,
-      lastNotifiedAt: new Date(now.getTime() - 10 * 60_000),
-      notifyCooldownMins: 30,
-      now: now.getTime(),
+    shouldSendAdminAvailabilityAlert({
+      previousStatus: 'DOWN',
+      currentStatus: 'UP',
     }),
-    false,
+    true,
   );
 
   assert.equal(
-    shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 2,
-      currentSlowConsecutiveCount: 3,
-      lastNotifiedAt: new Date(now.getTime() - 45 * 60_000),
-      notifyCooldownMins: 30,
-      now: now.getTime(),
+    shouldSendAdminAvailabilityAlert({
+      previousStatus: 'DOWN',
+      currentStatus: 'SLOW',
     }),
     true,
   );
 });
 
-test('slow admin alerts do not repeat while the same slow streak is still in progress', () => {
+test('admin availability alerts stay quiet for non-down transitions', () => {
   assert.equal(
-    shouldSendAdminSlowAlert({
-      previousSlowConsecutiveCount: 3,
-      currentSlowConsecutiveCount: 4,
-      lastNotifiedAt: null,
-      notifyCooldownMins: 30,
+    shouldSendAdminAvailabilityAlert({
+      previousStatus: 'UP',
+      currentStatus: 'SLOW',
+    }),
+    false,
+  );
+
+  assert.equal(
+    shouldSendAdminAvailabilityAlert({
+      previousStatus: 'SLOW',
+      currentStatus: 'UP',
+    }),
+    false,
+  );
+
+  assert.equal(
+    shouldSendAdminAvailabilityAlert({
+      previousStatus: undefined,
+      currentStatus: 'UP',
     }),
     false,
   );
 });
 
-test('admin slow alert threshold follows stricter slow policy settings', () => {
-  assert.equal(
-    resolveAdminSlowAlertMinConsecutive({
-      slowAutoDrainEnabled: true,
-      slowAutoDrainThreshold: 5,
-      slowUserNotifyEnabled: true,
-      slowUserNotifyThreshold: 4,
-    }),
-    4,
-  );
+test('admin availability alert message stays compact and html-safe', () => {
+  const down = buildServerAvailabilityAdminAlertMessage({
+    serverName: 'Malay <primary>',
+    status: 'DOWN',
+  });
+  const up = buildServerAvailabilityAdminAlertMessage({
+    serverName: 'Malay <primary>',
+    status: 'UP',
+  });
 
-  assert.equal(
-    resolveAdminSlowAlertMinConsecutive({
-      slowAutoDrainEnabled: false,
-      slowAutoDrainThreshold: 2,
-      slowUserNotifyEnabled: false,
-      slowUserNotifyThreshold: 2,
-    }),
-    3,
-  );
-});
-
-test('slow admin alert messages stay compact and html-safe', () => {
-  const messages = [
-    buildServerSlowAdminAlertMessage({
-      serverName: 'SG <primary>',
-      consecutiveSlowCount: 3,
-      latencyMs: 650,
-      thresholdMs: 500,
-    }),
-    buildSlowAutoMigrationBlockedAlertMessage({
-      serverName: 'SG <primary>',
-      consecutiveSlowCount: 4,
-    }),
-    buildSlowAutoMigrationStartedAlertMessage({
-      sourceServerName: 'SG <primary>',
-      targetServerName: 'MY & fallback',
-      consecutiveSlowCount: 4,
-      latencyMs: 900,
-      thresholdMs: 500,
-    }),
-    buildSlowAutoMigrationFailedAlertMessage({
-      serverName: 'SG <primary>',
-      consecutiveSlowCount: 4,
-      error: 'target <not found>',
-    }),
-  ];
-
-  for (const message of messages) {
+  for (const message of [down, up]) {
     assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
-    assert.ok(message.split('\n').length <= 3);
-    assert.doesNotMatch(message, /auto-migration/i);
-    assert.doesNotMatch(message, /currently available/i);
-    assert.doesNotMatch(message, /could not complete/i);
-    assert.match(message, /&lt;primary&gt;|MY &amp; fallback|target &lt;not found&gt;/);
+    assert.ok(message.split('\n').length <= 1);
+    assert.match(message, /Malay &lt;primary&gt;/);
   }
 });
