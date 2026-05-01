@@ -14,6 +14,7 @@ const baseUrl = `http://127.0.0.1:${appPort}`;
 const outlineUrl = `https://127.0.0.1:${outlinePort}`;
 const templateDbPath = path.join(repoRoot, 'prisma', 'data', 'atomic-ui.db');
 const templateSchemaPath = path.join(repoRoot, 'scripts', 'playwright-smoke-schema.sql');
+const migrationLockPath = path.join(repoRoot, 'prisma', 'migrations', 'migration_lock.toml');
 const smokeDbPath = path.join(repoRoot, 'prisma', 'data', 'playwright-smoke.db');
 const smokeAdminEmail = 'smoke-admin@example.com';
 const smokeAdminPassword = 'Admin123!';
@@ -249,7 +250,14 @@ async function resetAndSeedDatabase(outlineCertSha256: string) {
     fs.rmSync(shmPath, { force: true });
   }
 
-  if (fs.existsSync(templateDbPath)) {
+  if (fs.existsSync(migrationLockPath)) {
+    fs.writeFileSync(smokeDbPath, '');
+    execFileSync('sh', ['scripts/prisma-command.sh', 'migrate', 'deploy'], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: 'inherit',
+    });
+  } else if (fs.existsSync(templateDbPath)) {
     execFileSync('sqlite3', [templateDbPath, `.backup ${smokeDbPath}`], {
       cwd: repoRoot,
       stdio: 'ignore',
