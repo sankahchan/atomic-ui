@@ -190,7 +190,7 @@ export function initScheduler() {
             }
     });
 
-    scheduleManagedJob('*/5 * * * *', SCHEDULER_JOB_DEFINITIONS.deviceLimits, 'Device limit cycle failed', async () => {
+    scheduleManagedJob('* * * * *', SCHEDULER_JOB_DEFINITIONS.deviceLimits, 'Device limit cycle failed', async () => {
             const result = await runObservedSchedulerJob(
                 SCHEDULER_JOB_DEFINITIONS.deviceLimits,
                 'SCHEDULED',

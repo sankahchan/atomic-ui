@@ -36,6 +36,10 @@ import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
 import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
 import {
+  primeAccessKeyDeviceLimitObservation,
+  primeDynamicKeyDeviceLimitObservation,
+} from '@/lib/services/device-limits';
+import {
   DYNAMIC_ROUTING_EVENT_TYPES,
   recordDynamicRoutingEvent,
   recordDynamicRoutingEventOnce,
@@ -46,6 +50,10 @@ import {
   resolveDynamicPinState,
   selectDynamicAccessKeyForClient,
 } from '@/lib/services/dynamic-subscription-routing';
+import {
+  recordSubscriptionPageEvent,
+  SUBSCRIPTION_EVENT_TYPES,
+} from '@/lib/services/subscription-events';
 
 /**
  * Get client IP address from request headers
@@ -436,6 +444,11 @@ export async function handleSubscriptionRequest(
 
     // Get client IP for load balancing
     const clientIp = getClientIp(request);
+    const userAgent = request.headers.get('user-agent');
+    const platformHeader = request.headers.get('sec-ch-ua-platform');
+    const platform = request.nextUrl.searchParams.get('platform')
+      || (platformHeader ? platformHeader.replace(/"/g, '') : null);
+    const source = request.nextUrl.searchParams.get('source');
 
     // First, try to find a Dynamic Access Key by dynamicUrl
     const foundDynamicKey = await db.dynamicAccessKey.findFirst({
@@ -598,6 +611,22 @@ export async function handleSubscriptionRequest(
           },
         });
 
+        await recordSubscriptionPageEvent({
+          dynamicAccessKeyId: dynamicKey.id,
+          eventType: SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH,
+          source,
+          platform,
+          metadata: {
+            token,
+            shortPath: Boolean(dynamicKey.publicSlug),
+            responseFormat: 'outline-json',
+            routeMode: 'SELF_MANAGED',
+          },
+          ip: clientIp,
+          userAgent,
+        });
+        await primeDynamicKeyDeviceLimitObservation(dynamicKey.id);
+
         // Parse and return
         const parsed = parseSSUrl(selfManagedResult.accessUrl);
         if (!parsed) {
@@ -671,6 +700,24 @@ export async function handleSubscriptionRequest(
         },
         stickinessApplied: selection.stickinessApplied,
       });
+
+      await recordSubscriptionPageEvent({
+        dynamicAccessKeyId: dynamicKey.id,
+        eventType: SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH,
+        source,
+        platform,
+        metadata: {
+          token,
+          shortPath: Boolean(dynamicKey.publicSlug),
+          responseFormat: 'outline-json',
+          routeMode: 'MANUAL',
+          selectedAccessKeyId: selection.key.id,
+          selectedServerId: selection.key.server.id,
+        },
+        ip: clientIp,
+        userAgent,
+      });
+      await primeDynamicKeyDeviceLimitObservation(dynamicKey.id);
 
       const attachedKey = selection.key;
       const accessUrl = attachedKey.accessUrl as string;
@@ -748,6 +795,22 @@ export async function handleSubscriptionRequest(
     if (!accessKey.accessUrl) {
       return NextResponse.json({ error: 'No access URL available' }, { status: 404 });
     }
+
+    await recordSubscriptionPageEvent({
+      accessKeyId: accessKey.id,
+      eventType: SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH,
+      source,
+      platform,
+      metadata: {
+        token,
+        matchedBy: resolvedAccessKey?.matchedBy ?? 'subscriptionToken',
+        shortPath: Boolean(accessKey.publicSlug),
+        responseFormat: 'outline-json',
+      },
+      ip: clientIp,
+      userAgent,
+    });
+    await primeAccessKeyDeviceLimitObservation(accessKey.id);
 
     // Parse the access URL and return Outline-compatible JSON
     const parsed = parseSSUrl(accessKey.accessUrl);

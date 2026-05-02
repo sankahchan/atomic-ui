@@ -1044,7 +1044,7 @@ function CreateDAKDialog({
               onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Use an estimated-device cap to slow down key sharing. Dynamic keys warn first, then disable the route if recent usage stays above the limit.
+              Use an estimated-device cap to slow down key sharing. For the fastest enforcement, deliver the share page or Outline client URL instead of a copied raw ss:// link.
             </p>
           </div>
 
@@ -1870,7 +1870,7 @@ function EditDAKDialog({
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Leave this empty to allow unlimited devices. When set, the dynamic route warns first and then disables if sharing stays above the estimated limit.
+                    Leave this empty to allow unlimited devices. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
                   </p>
                 </div>
 

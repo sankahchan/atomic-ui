@@ -11,6 +11,10 @@ import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { buildDynamicOutlineUrl, buildSubscriptionClientUrl } from '@/lib/subscription-links';
 import { verifySharePagePassword } from '@/lib/share-page-protection';
 import {
+  primeAccessKeyDeviceLimitObservation,
+  primeDynamicKeyDeviceLimitObservation,
+} from '@/lib/services/device-limits';
+import {
   recordSubscriptionPageEvent,
   SUBSCRIPTION_EVENT_TYPES,
 } from '@/lib/services/subscription-events';
@@ -158,6 +162,7 @@ export async function GET(
           ip: clientIp,
           userAgent,
         });
+        await primeDynamicKeyDeviceLimitObservation(dak.id);
       }
 
       if (acceptHeader.includes('application/json')) {
@@ -295,6 +300,7 @@ export async function GET(
         ip: clientIp,
         userAgent,
       });
+      await primeAccessKeyDeviceLimitObservation(key.id);
     }
 
     // If client wants JSON (default for browsers/programmatic access)
