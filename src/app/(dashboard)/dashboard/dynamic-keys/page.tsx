@@ -196,6 +196,7 @@ type DAKData = {
   estimatedDevices?: number | null;
   peakDevices?: number | null;
   maxDevices?: number | null;
+  boundDeviceInstallsOnly?: boolean | null;
   deviceLimitObservedDevices?: number | null;
   deviceLimitOverLimit?: boolean;
   deviceLimitEnforcementStage?: string | null;
@@ -263,6 +264,7 @@ function CreateDAKDialog({
     notes: string;
     dataLimitGB: string;
     maxDevices: string;
+    boundDeviceInstallsOnly: boolean;
     dataLimitResetStrategy: 'NEVER' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
     expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
     expiresAt: string;
@@ -296,6 +298,7 @@ function CreateDAKDialog({
     notes: '',
     dataLimitGB: '',
     maxDevices: '',
+    boundDeviceInstallsOnly: true,
     dataLimitResetStrategy: 'NEVER',
     expirationType: 'NEVER',
     expiresAt: '',
@@ -386,6 +389,7 @@ function CreateDAKDialog({
       notes: '',
       dataLimitGB: '',
       maxDevices: '',
+      boundDeviceInstallsOnly: true,
       dataLimitResetStrategy: 'NEVER',
       expirationType: 'NEVER',
       expiresAt: '',
@@ -435,6 +439,7 @@ function CreateDAKDialog({
         notes: template.notes || current.notes,
         dataLimitGB: template.dataLimitGB ? String(template.dataLimitGB) : '',
         maxDevices: template.maxDevices?.toString() || '',
+        boundDeviceInstallsOnly: template.boundDeviceInstallsOnly ?? Boolean(template.maxDevices),
         dataLimitResetStrategy: template.dataLimitResetStrategy as typeof current.dataLimitResetStrategy,
         expirationType: template.expirationType as typeof current.expirationType,
         durationDays: template.durationDays ? String(template.durationDays) : '',
@@ -573,6 +578,7 @@ function CreateDAKDialog({
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : undefined,
+      boundDeviceInstallsOnly: formData.maxDevices ? formData.boundDeviceInstallsOnly : undefined,
       dataLimitResetStrategy: formData.dataLimitResetStrategy,
       expirationType: formData.expirationType,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
@@ -1046,6 +1052,19 @@ function CreateDAKDialog({
             <p className="text-xs text-muted-foreground">
               Use an estimated-device cap to slow down key sharing. For the fastest enforcement, deliver the share page or Outline client URL instead of a copied raw ss:// link.
             </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Require protected install flow</p>
+              <p className="text-xs text-muted-foreground">
+                Recommended. The share page and Outline client link stay usable, while the raw reusable config stays hidden from customers.
+              </p>
+            </div>
+            <Switch
+              checked={formData.boundDeviceInstallsOnly}
+              onCheckedChange={(checked) => setFormData({ ...formData, boundDeviceInstallsOnly: checked })}
+            />
           </div>
 
           {/* Data Limit Reset Strategy */}
@@ -1687,6 +1706,7 @@ function EditDAKDialog({
       ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
       : '',
     maxDevices: dakData.maxDevices?.toString() || '',
+    boundDeviceInstallsOnly: dakData.boundDeviceInstallsOnly ?? Boolean(dakData.maxDevices),
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
     loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -1717,6 +1737,7 @@ function EditDAKDialog({
         ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
         : '',
       maxDevices: dakData.maxDevices?.toString() || '',
+      boundDeviceInstallsOnly: dakData.boundDeviceInstallsOnly ?? Boolean(dakData.maxDevices),
       durationDays: dakData.durationDays?.toString() || '',
       expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
       loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -1776,6 +1797,7 @@ function EditDAKDialog({
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : null,
+      boundDeviceInstallsOnly: formData.maxDevices ? formData.boundDeviceInstallsOnly : false,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm,
@@ -1872,6 +1894,19 @@ function EditDAKDialog({
                   <p className="text-xs text-muted-foreground">
                     Leave this empty to allow unlimited devices. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
                   </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3 sm:col-span-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Require protected install flow</p>
+                    <p className="text-xs text-muted-foreground">
+                      Hide the reusable raw config from customer-facing install surfaces and keep installs on the share page or Outline client link.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.boundDeviceInstallsOnly}
+                    onCheckedChange={(checked) => setFormData({ ...formData, boundDeviceInstallsOnly: checked })}
+                  />
                 </div>
 
                 <div className="space-y-2">

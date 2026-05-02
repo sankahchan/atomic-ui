@@ -193,6 +193,7 @@ function EditKeyDialog({
     autoArchiveAfterDays: number;
     quotaAlertThresholds: string | null;
     maxDevices: number | null;
+    boundDeviceInstallsOnly: boolean | null;
     autoRenewPolicy: string | null;
     autoRenewDurationDays: number | null;
   };
@@ -215,6 +216,7 @@ function EditKeyDialog({
     autoArchiveAfterDays: String(keyData.autoArchiveAfterDays ?? 0),
     quotaAlertThresholds: keyData.quotaAlertThresholds || '80,90',
     maxDevices: keyData.maxDevices?.toString() || '',
+    boundDeviceInstallsOnly: keyData.boundDeviceInstallsOnly ?? Boolean(keyData.maxDevices),
     autoRenewPolicy: (keyData.autoRenewPolicy as 'NONE' | 'EXTEND_DURATION') || 'NONE',
     autoRenewDurationDays: keyData.autoRenewDurationDays?.toString() || '',
   });
@@ -264,6 +266,7 @@ function EditKeyDialog({
       autoArchiveAfterDays: Number.parseInt(formData.autoArchiveAfterDays || '0', 10) || 0,
       quotaAlertThresholds: formData.quotaAlertThresholds,
       maxDevices: formData.maxDevices ? Number.parseInt(formData.maxDevices, 10) : null,
+      boundDeviceInstallsOnly: formData.maxDevices ? formData.boundDeviceInstallsOnly : false,
       autoRenewPolicy: formData.autoRenewPolicy,
       autoRenewDurationDays:
         formData.autoRenewPolicy === 'EXTEND_DURATION' && formData.autoRenewDurationDays
@@ -357,6 +360,25 @@ function EditKeyDialog({
                   <p className="text-xs text-muted-foreground">
                     Uses recent client-link and app activity as an estimate. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
                   </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="editBoundDeviceInstallsOnly" className="text-sm font-medium">
+                      Require protected install flow
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Hide the reusable raw ss:// secret from customer-facing install screens and keep installs tied to the share page or Outline client URL when a device limit is set.
+                    </p>
+                  </div>
+                  <Switch
+                    id="editBoundDeviceInstallsOnly"
+                    checked={formData.boundDeviceInstallsOnly}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, boundDeviceInstallsOnly: checked })
+                    }
+                    disabled={!formData.maxDevices}
+                  />
                 </div>
 
                 {formData.dataLimitGB && (
@@ -3899,6 +3921,7 @@ export default function KeyDetailPage() {
             autoArchiveAfterDays: (key as any).autoArchiveAfterDays ?? 0,
             quotaAlertThresholds: (key as any).quotaAlertThresholds ?? '80,90',
             maxDevices: (key as any).maxDevices ?? null,
+            boundDeviceInstallsOnly: (key as any).boundDeviceInstallsOnly ?? Boolean((key as any).maxDevices),
             autoRenewPolicy: (key as any).autoRenewPolicy ?? 'NONE',
             autoRenewDurationDays: (key as any).autoRenewDurationDays ?? null,
           }}
@@ -4165,6 +4188,9 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
                 <p className="font-medium">Device limit</p>
                 <p className="text-xs text-muted-foreground">
                   Estimated devices: {data.deviceLimitObservedDevices ?? data.estimatedDevices ?? 0} / {data.maxDevices}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Protection mode: {data.boundDeviceInstallsOnly ? 'Protected installs only' : 'Raw config still allowed'}
                 </p>
               </div>
               <Badge

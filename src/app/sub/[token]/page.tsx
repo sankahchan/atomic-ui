@@ -77,6 +77,8 @@ import {
 type Platform = 'android' | 'ios' | 'windows';
 const LOCALE_STORAGE_KEY = 'atomic-ui-locale';
 const SHARE_PAGE_PASSWORD_KEY_PREFIX = 'atomic-share-password:';
+const DEVICE_INSTALL_STORAGE_KEY_PREFIX = 'atomic-device-install:';
+const DEVICE_INSTALL_QUERY_PARAM = 'device';
 
 interface ContactLink {
   type: 'telegram' | 'discord' | 'whatsapp' | 'phone' | 'email' | 'website' | 'facebook';
@@ -86,7 +88,7 @@ interface ContactLink {
 interface KeyData {
   id: string;
   name: string;
-  accessUrl: string;
+  accessUrl: string | null;
   outlineClientUrl?: string | null;
   status: string;
   server: {
@@ -104,6 +106,9 @@ interface KeyData {
   port: number | null;
   contactLinks: ContactLink[] | null;
   subscriptionWelcomeMessage: string | null;
+  boundDeviceInstallsOnly?: boolean;
+  maxDevices?: number | null;
+  claimedDevices?: number;
 }
 
 interface SettingsData {
@@ -348,6 +353,14 @@ export default function SubscriptionPage() {
       : 'Public access to this share page has expired. Contact the owner for a new link.',
     expiredAt: locale === 'my' ? 'သက်တမ်းကုန်ချိန်' : 'Expired at',
   }), [locale]);
+  const deviceLimitCopy = useMemo(() => ({
+    full: locale === 'my'
+      ? 'ဒီ key က ခွင့်ပြုထားတဲ့ device install limit ပြည့်သွားပါပြီ။ support ကို ဆက်သွယ်ပြီး reset လုပ်ခိုင်းပါ။'
+      : 'This key already reached its allowed device installs. Contact support to reset the device list.',
+    tokenMissing: locale === 'my'
+      ? 'ဒီ key ကို protected install link နဲ့ပဲ သုံးနိုင်ပါတယ်။ share page ကို ပြန်ဖွင့်ပြီး Outline app ကနေ install လုပ်ပါ။'
+      : 'This key requires the protected install flow. Re-open the share page and install through the Outline app.',
+  }), [locale]);
 
   const getSharePasswordStorageKey = useCallback(
     () => `${SHARE_PAGE_PASSWORD_KEY_PREFIX}${token}`,
@@ -372,6 +385,37 @@ export default function SubscriptionPage() {
     }
   }, [getSharePasswordStorageKey]);
 
+  const getDeviceInstallStorageKey = useCallback(
+    () => `${DEVICE_INSTALL_STORAGE_KEY_PREFIX}${token}`,
+    [token],
+  );
+
+  const getStoredDeviceInstallToken = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    return window.localStorage.getItem(getDeviceInstallStorageKey()) || '';
+  }, [getDeviceInstallStorageKey]);
+
+  const ensureDeviceInstallToken = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+
+    const existing = getStoredDeviceInstallToken();
+    if (existing) {
+      return existing;
+    }
+
+    const created =
+      typeof window.crypto?.randomUUID === 'function'
+        ? window.crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+    window.localStorage.setItem(getDeviceInstallStorageKey(), created);
+    return created;
+  }, [getDeviceInstallStorageKey, getStoredDeviceInstallToken]);
+
   const persistLocale = useCallback((nextLocale: SupportedLocale) => {
     setLocale(nextLocale);
     if (typeof window !== 'undefined') {
@@ -386,6 +430,18 @@ export default function SubscriptionPage() {
 
     persistLocale(nextLocale);
   }, [locale, persistLocale]);
+
+  const getPageLoadErrorMessage = useCallback((errorData: Record<string, unknown> | null | undefined) => {
+    if (errorData?.code === 'DEVICE_LIMIT_FULL') {
+      return deviceLimitCopy.full;
+    }
+
+    if (errorData?.code === 'DEVICE_TOKEN_REQUIRED') {
+      return deviceLimitCopy.tokenMissing;
+    }
+
+    return typeof errorData?.error === 'string' ? errorData.error : t('subscription.ui.load_failed');
+  }, [deviceLimitCopy.full, deviceLimitCopy.tokenMissing, t]);
 
   const formatLocalizedDate = useCallback(
     (value: string) =>
@@ -510,7 +566,10 @@ export default function SubscriptionPage() {
     async (options?: { password?: string; cache?: RequestCache }) => {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
       const password = options?.password ?? getStoredSharePassword();
-      const response = await fetch(`${basePath}/api/subscription/${token}?audience=page`, {
+      const requestUrl = new URL(`${basePath}/api/subscription/${token}`, window.location.origin);
+      requestUrl.searchParams.set('audience', 'page');
+      requestUrl.searchParams.set(DEVICE_INSTALL_QUERY_PARAM, ensureDeviceInstallToken());
+      const response = await fetch(requestUrl.pathname + requestUrl.search, {
         headers: {
           Accept: 'application/json',
           ...(password ? { 'x-share-page-password': password } : {}),
@@ -533,7 +592,7 @@ export default function SubscriptionPage() {
         password,
       };
     },
-    [getStoredSharePassword, token],
+    [ensureDeviceInstallToken, getStoredSharePassword, token],
   );
 
   const handleUnlockSharePage = useCallback(async () => {
@@ -561,7 +620,11 @@ export default function SubscriptionPage() {
 
         setPasswordRequired(true);
         setPageExpiredAt(result.error?.expiresAt || null);
-        setFeedback(shareGateCopy.wrongPassword);
+        setFeedback(
+          result.error?.code === 'PASSWORD_REQUIRED'
+            ? shareGateCopy.wrongPassword
+            : getPageLoadErrorMessage(result.error),
+        );
         return;
       }
 
@@ -590,10 +653,11 @@ export default function SubscriptionPage() {
         // Settings fetch failed, keep the existing defaults.
       }
 
-      if (data.accessUrl) {
+      const qrPayload = data.outlineClientUrl || data.accessUrl;
+      if (qrPayload) {
         const logoUrl = settingsData.branding?.logoUrl || ATOMIC_LOGO_SVG;
         const logoSize = settingsData.branding?.logoSize || 25;
-        await generateQRCode(data.accessUrl, logoUrl, logoSize);
+        await generateQRCode(qrPayload, logoUrl, logoSize);
       }
 
       setLastUpdatedAt(Date.now());
@@ -604,6 +668,7 @@ export default function SubscriptionPage() {
     fetchSubscriptionPageData,
     persistSharePassword,
     shareGateCopy.wrongPassword,
+    getPageLoadErrorMessage,
     sharePassword,
     token,
   ]);
@@ -631,7 +696,7 @@ export default function SubscriptionPage() {
             return;
           }
 
-          setError(result.error?.error || t('subscription.ui.load_failed'));
+          setError(getPageLoadErrorMessage(result.error));
           setLoading(false);
           return;
         }
@@ -666,10 +731,11 @@ export default function SubscriptionPage() {
         // Theme is resolved by the separate useEffect that watches keyData + systemPrefersDark
 
         // Generate QR code
-        if (data.accessUrl) {
+        const qrPayload = data.outlineClientUrl || data.accessUrl;
+        if (qrPayload) {
           const logoUrl = settingsData.branding?.logoUrl || ATOMIC_LOGO_SVG;
           const logoSize = settingsData.branding?.logoSize || 25;
-          await generateQRCode(data.accessUrl, logoUrl, logoSize);
+          await generateQRCode(qrPayload, logoUrl, logoSize);
         }
 
         if (result.password) {
@@ -684,7 +750,7 @@ export default function SubscriptionPage() {
     }
 
     fetchData();
-  }, [fetchSubscriptionPageData, langParam, locale, persistLocale, persistSharePassword, t, token]);
+  }, [fetchSubscriptionPageData, getPageLoadErrorMessage, langParam, locale, persistLocale, persistSharePassword, t, token]);
 
   // Update theme when keyData or system preference changes
   useEffect(() => {
@@ -874,12 +940,13 @@ export default function SubscriptionPage() {
   const handleAddToApp = (appId: string) => {
     const allApps = [...clientApps, ...(branding.customApps || [])];
     const app = allApps.find((a) => a.id === appId);
-    if (!app || !keyData?.accessUrl) return;
+    const installUrl = keyData?.outlineClientUrl || keyData?.accessUrl;
+    if (!app || !installUrl) return;
 
     const appAccessUrl =
       app.id === 'outline' && keyData.outlineClientUrl
         ? keyData.outlineClientUrl
-        : keyData.accessUrl;
+        : installUrl;
 
     let url: string;
     if ('urlScheme' in app && typeof app.urlScheme === 'function') {
@@ -910,10 +977,12 @@ export default function SubscriptionPage() {
       const data = result.data;
       setKeyData(data);
 
-      if (data.accessUrl && data.accessUrl !== keyData?.accessUrl) {
+      const qrPayload = data.outlineClientUrl || data.accessUrl;
+      const previousQrPayload = keyData?.outlineClientUrl || keyData?.accessUrl;
+      if (qrPayload && qrPayload !== previousQrPayload) {
         const logoUrl = branding.logoUrl || ATOMIC_LOGO_SVG;
         const logoSize = branding.logoSize || 25;
-        await generateQRCode(data.accessUrl, logoUrl, logoSize);
+        await generateQRCode(qrPayload, logoUrl, logoSize);
       }
 
       setLastUpdatedAt(Date.now());
@@ -1162,7 +1231,10 @@ export default function SubscriptionPage() {
   const showConnectionSummary = branding.showConnectionSummary ?? true;
   const showCompatibleApps = branding.showCompatibleApps ?? true;
   const showHelpContact = branding.showHelpContact ?? true;
-  const showManualSetupButton = branding.showManualSetupButton ?? true;
+  const protectedInstallOnly = Boolean(keyData.boundDeviceInstallsOnly && keyData.maxDevices);
+  const installUrl = keyData.outlineClientUrl || keyData.accessUrl || '';
+  const rawConnectionUrl = keyData.accessUrl;
+  const showManualSetupButton = (branding.showManualSetupButton ?? true) && Boolean(rawConnectionUrl);
   const statusTone = keyData.status === 'ACTIVE'
     ? { bg: `${theme.success}18`, color: theme.success, label: t('subscription.status.active') }
     : keyData.status === 'PENDING'
@@ -1242,7 +1314,8 @@ export default function SubscriptionPage() {
   const controlButtonSurface = hasImageBackground ? 'rgba(255,255,255,0.1)' : '#ffffff';
   const controlTextColor = hasImageBackground ? '#ffffff' : '#0f172a';
   const controlMutedColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : '#64748b';
-  const actionFieldText = keyData.accessUrl;
+  const actionFieldText = rawConnectionUrl || installUrl;
+  const actionFieldLabel = rawConnectionUrl ? t('subscription.hero.connection_url') : 'Protected install link';
   const qrDownloadFilename = buildDownloadFilename(keyData.name, 'qr', 'png');
   const configDownloadFilename = buildDownloadFilename(keyData.name, 'client-config', 'txt');
 
@@ -1262,12 +1335,12 @@ export default function SubscriptionPage() {
   };
 
   const handleDownloadConfig = () => {
-    if (!actionFieldText) {
+    if (!rawConnectionUrl) {
       setFeedback(t('subscription.ui.load_failed'));
       return;
     }
 
-    downloadTextFile(`${actionFieldText}\n`, configDownloadFilename);
+    downloadTextFile(`${rawConnectionUrl}\n`, configDownloadFilename);
     setFeedback(t('subscription.feedback.config_downloaded'));
     void trackSubscriptionEvent(
       SUBSCRIPTION_EVENT_TYPES.DOWNLOAD_CONFIG,
@@ -1603,7 +1676,7 @@ export default function SubscriptionPage() {
                         <div className="min-w-0 space-y-2">
                           <div className="flex min-w-0 items-center justify-between gap-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: controlMutedColor }}>
-                              {t('subscription.hero.connection_url')}
+                              {actionFieldLabel}
                             </p>
                             <button
                               onClick={() =>
@@ -1635,6 +1708,11 @@ export default function SubscriptionPage() {
                               {actionFieldText}
                             </p>
                           </div>
+                          {protectedInstallOnly && (
+                            <p className="text-xs leading-5" style={{ color: controlMutedColor }}>
+                              Protected install is on. Install through the Outline button or share page from this device. The raw reusable config is hidden to reduce key sharing.
+                            </p>
+                          )}
                         </div>
 
                         {primaryApp ? (
@@ -1688,18 +1766,20 @@ export default function SubscriptionPage() {
                             <span className="line-clamp-2 text-center">{t('subscription.hero.copy_url')}</span>
                           </button>
 
-                          <button
-                            onClick={handleDownloadConfig}
-                            className="inline-flex min-h-[2.85rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
-                            style={{
-                              backgroundColor: controlButtonSurface,
-                              color: controlTextColor,
-                              border: `1px solid ${controlBorder}`,
-                            }}
-                          >
-                            <Download className="h-4 w-4" />
-                            <span className="line-clamp-2 text-center">{t('subscription.hero.download_config')}</span>
-                          </button>
+                          {rawConnectionUrl && (
+                            <button
+                              onClick={handleDownloadConfig}
+                              className="inline-flex min-h-[2.85rem] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-[1rem] px-3 py-2.5 text-sm font-medium leading-tight"
+                              style={{
+                                backgroundColor: controlButtonSurface,
+                                color: controlTextColor,
+                                border: `1px solid ${controlBorder}`,
+                              }}
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="line-clamp-2 text-center">{t('subscription.hero.download_config')}</span>
+                            </button>
+                          )}
 
                           {showManualSetupButton ? (
                             <button
@@ -2267,7 +2347,7 @@ export default function SubscriptionPage() {
                       )}
                       <button
                         onClick={() =>
-                          copyToClipboard(keyData.accessUrl, t('subscription.hero.copy_connection_url_done'), {
+                          copyToClipboard(rawConnectionUrl || '', t('subscription.hero.copy_connection_url_done'), {
                             target: 'connection_url',
                             placement: 'manual_setup_primary',
                           })
@@ -2284,109 +2364,113 @@ export default function SubscriptionPage() {
                     </div>
                   </div>
 
-                  <div
-                    className="rounded-[1.35rem] border p-4"
-                    style={{
-                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                      borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>{t('subscription.manual.connection_url_title')}</p>
-                        <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
-                          {keyData.accessUrl}
-                        </p>
-                        <p className="mt-3 text-sm" style={{ color: mutedTextColor }}>
-                          {t('subscription.manual.connection_url_help')}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(keyData.accessUrl, t('subscription.hero.copy_connection_url_done'), {
-                            target: 'connection_url',
-                            placement: 'manual_setup_card',
-                          })
-                        }
-                        className="rounded-full p-2"
-                        style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                  {rawConnectionUrl && (
+                    <>
+                      <div
+                        className="rounded-[1.35rem] border p-4"
+                        style={{
+                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                          borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        }}
                       >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div
-                    className="rounded-[1.35rem] border p-4"
-                    style={{
-                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
-                      borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvancedManualSetup((prev) => !prev)}
-                      className="flex w-full items-center justify-between gap-4 text-left"
-                    >
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: primaryTextColor }}>{t('subscription.manual.advanced_title')}</p>
-                        <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
-                          {t('subscription.manual.advanced_desc')}
-                        </p>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 transition-transform ${showAdvancedManualSetup ? 'rotate-180' : ''}`}
-                        style={{ color: primaryTextColor }}
-                      />
-                    </button>
-
-                    {showAdvancedManualSetup && (
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div
-                          className="rounded-[1.1rem] border p-4"
-                          style={{
-                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
-                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                          }}
-                        >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.server')}</p>
-                          <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>
-                            {`${getCountryFlag(keyData.server.countryCode)} ${keyData.server.name}`.trim() || '-'}
-                          </p>
-                        </div>
-                        <div
-                          className="rounded-[1.1rem] border p-4"
-                          style={{
-                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
-                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                          }}
-                        >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.method')}</p>
-                          <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>{keyData.method || '-'}</p>
-                        </div>
-                        <div
-                          className="rounded-[1.1rem] border p-4"
-                          style={{
-                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
-                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                          }}
-                        >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.port')}</p>
-                          <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{keyData.port || '-'}</p>
-                        </div>
-                        <div
-                          className="rounded-[1.1rem] border p-4"
-                          style={{
-                            backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
-                            borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
-                          }}
-                        >
-                          <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.status')}</p>
-                          <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{statusTone.label}</p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium" style={{ color: primaryTextColor }}>{t('subscription.manual.connection_url_title')}</p>
+                            <p className="mt-2 text-sm leading-6 break-all font-mono" style={{ color: mutedTextColor }}>
+                              {rawConnectionUrl}
+                            </p>
+                            <p className="mt-3 text-sm" style={{ color: mutedTextColor }}>
+                              {t('subscription.manual.connection_url_help')}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() =>
+                              copyToClipboard(rawConnectionUrl, t('subscription.hero.copy_connection_url_done'), {
+                                target: 'connection_url',
+                                placement: 'manual_setup_card',
+                              })
+                            }
+                            className="rounded-full p-2"
+                            style={{ backgroundColor: theme.accent, color: theme.accentText }}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      <div
+                        className="rounded-[1.35rem] border p-4"
+                        style={{
+                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                          borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setShowAdvancedManualSetup((prev) => !prev)}
+                          className="flex w-full items-center justify-between gap-4 text-left"
+                        >
+                          <div>
+                            <p className="text-sm font-medium" style={{ color: primaryTextColor }}>{t('subscription.manual.advanced_title')}</p>
+                            <p className="mt-1 text-sm" style={{ color: mutedTextColor }}>
+                              {t('subscription.manual.advanced_desc')}
+                            </p>
+                          </div>
+                          <ChevronDown
+                            className={`h-4 w-4 shrink-0 transition-transform ${showAdvancedManualSetup ? 'rotate-180' : ''}`}
+                            style={{ color: primaryTextColor }}
+                          />
+                        </button>
+
+                        {showAdvancedManualSetup && (
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <div
+                              className="rounded-[1.1rem] border p-4"
+                              style={{
+                                backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                                borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                              }}
+                            >
+                              <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.server')}</p>
+                              <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>
+                                {`${getCountryFlag(keyData.server.countryCode)} ${keyData.server.name}`.trim() || '-'}
+                              </p>
+                            </div>
+                            <div
+                              className="rounded-[1.1rem] border p-4"
+                              style={{
+                                backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                                borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                              }}
+                            >
+                              <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.method')}</p>
+                              <p className="mt-2 text-sm font-medium break-all" style={{ color: primaryTextColor }}>{keyData.method || '-'}</p>
+                            </div>
+                            <div
+                              className="rounded-[1.1rem] border p-4"
+                              style={{
+                                backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                                borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                              }}
+                            >
+                              <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.port')}</p>
+                              <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{keyData.port || '-'}</p>
+                            </div>
+                            <div
+                              className="rounded-[1.1rem] border p-4"
+                              style={{
+                                backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.04)' : theme.bgCard,
+                                borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                              }}
+                            >
+                              <p className="text-xs uppercase tracking-[0.14em]" style={{ color: mutedTextColor }}>{t('subscription.manual.fields.status')}</p>
+                              <p className="mt-2 text-sm font-medium" style={{ color: primaryTextColor }}>{statusTone.label}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-4">

@@ -11,6 +11,15 @@ import { decorateOutlineAccessUrl } from '@/lib/outline-access-url';
 import { buildDynamicOutlineUrl, buildSubscriptionClientUrl } from '@/lib/subscription-links';
 import { verifySharePagePassword } from '@/lib/share-page-protection';
 import {
+  appendDeviceInstallToken,
+  claimAccessKeyDeviceInstall,
+  claimDynamicKeyDeviceInstall,
+  DEVICE_INSTALL_LIMIT_REACHED_CODE,
+  DEVICE_INSTALL_QUERY_PARAM,
+  DEVICE_INSTALL_TOKEN_REQUIRED_CODE,
+  shouldUseBoundDeviceInstalls,
+} from '@/lib/services/device-install-claims';
+import {
   primeAccessKeyDeviceLimitObservation,
   primeDynamicKeyDeviceLimitObservation,
 } from '@/lib/services/device-limits';
@@ -39,6 +48,27 @@ function getClientIp(request: NextRequest): string {
   return '127.0.0.1';
 }
 
+function buildDeviceInstallErrorResponse(input: {
+  code: typeof DEVICE_INSTALL_TOKEN_REQUIRED_CODE | typeof DEVICE_INSTALL_LIMIT_REACHED_CODE;
+  claimedDevices: number;
+  maxDevices: number;
+}) {
+  const message =
+    input.code === DEVICE_INSTALL_LIMIT_REACHED_CODE
+      ? 'This key already reached its allowed device installs. Ask support to reset the device list.'
+      : 'A protected install token is required for this key.';
+
+  return NextResponse.json(
+    {
+      error: message,
+      code: input.code,
+      claimedDevices: input.claimedDevices,
+      maxDevices: input.maxDevices,
+    },
+    { status: input.code === DEVICE_INSTALL_LIMIT_REACHED_CODE ? 409 : 400 },
+  );
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -50,6 +80,7 @@ export async function GET(
   const clientIp = getClientIp(request);
   const userAgent = request.headers.get('user-agent');
   const platformHeader = request.headers.get('sec-ch-ua-platform');
+  const deviceToken = request.nextUrl.searchParams.get(DEVICE_INSTALL_QUERY_PARAM);
   const platform = request.nextUrl.searchParams.get('platform')
     || (platformHeader ? platformHeader.replace(/"/g, '') : null);
 
@@ -141,11 +172,30 @@ export async function GET(
         );
       }
 
+      const useBoundDeviceInstalls = shouldUseBoundDeviceInstalls({
+        maxDevices: dak.maxDevices,
+        boundDeviceInstallsOnly: dak.boundDeviceInstallsOnly,
+      });
+      const deviceClaimResult = useBoundDeviceInstalls
+        ? await claimDynamicKeyDeviceInstall({
+            dynamicAccessKeyId: dak.id,
+            deviceToken,
+            maxDevices: dak.maxDevices!,
+            platform,
+            userAgent,
+            ip: clientIp,
+          })
+        : null;
+
+      if (deviceClaimResult && !deviceClaimResult.ok) {
+        return buildDeviceInstallErrorResponse(deviceClaimResult);
+      }
+
       const dynamicIdentifier = dak.publicSlug || dak.dynamicUrl || token;
-      const ssConfUrl = buildDynamicOutlineUrl(dynamicIdentifier, dak.name, {
+      const outlineClientUrl = appendDeviceInstallToken(buildDynamicOutlineUrl(dynamicIdentifier, dak.name, {
         origin: request.nextUrl.origin,
         shortPath: Boolean(dak.publicSlug),
-      });
+      }), deviceToken);
       const acceptHeader = request.headers.get('accept') || '';
 
       if (!isPageAudience) {
@@ -169,8 +219,8 @@ export async function GET(
         return NextResponse.json({
           id: dak.id,
           name: dak.name,
-          accessUrl: ssConfUrl,
-          outlineClientUrl: ssConfUrl,
+          accessUrl: useBoundDeviceInstalls ? null : outlineClientUrl,
+          outlineClientUrl,
           status: dak.status,
           server: {
             name: "Dynamic Backend",
@@ -188,6 +238,9 @@ export async function GET(
           contactLinks: dak.contactLinks ? JSON.parse(dak.contactLinks) : null,
           subscriptionWelcomeMessage: dak.subscriptionWelcomeMessage || null,
           sharePageEnabled: dak.sharePageEnabled,
+          boundDeviceInstallsOnly: useBoundDeviceInstalls,
+          maxDevices: dak.maxDevices,
+          claimedDevices: deviceClaimResult?.claimedDevices ?? 0,
           isDynamic: true,
         });
       }
@@ -276,12 +329,31 @@ export async function GET(
       );
     }
 
+    const useBoundDeviceInstalls = shouldUseBoundDeviceInstalls({
+      maxDevices: key.maxDevices,
+      boundDeviceInstallsOnly: key.boundDeviceInstallsOnly,
+    });
+    const deviceClaimResult = useBoundDeviceInstalls
+      ? await claimAccessKeyDeviceInstall({
+          accessKeyId: key.id,
+          deviceToken,
+          maxDevices: key.maxDevices!,
+          platform,
+          userAgent,
+          ip: clientIp,
+        })
+      : null;
+
+    if (deviceClaimResult && !deviceClaimResult.ok) {
+      return buildDeviceInstallErrorResponse(deviceClaimResult);
+    }
+
     const decoratedAccessUrl = decorateOutlineAccessUrl(key.accessUrl, key.name) || key.accessUrl;
     const outlineIdentifier = key.publicSlug || resolvedAccessKey?.subscriptionToken || token;
-    const outlineClientUrl = buildSubscriptionClientUrl(outlineIdentifier, key.name, {
+    const outlineClientUrl = appendDeviceInstallToken(buildSubscriptionClientUrl(outlineIdentifier, key.name, {
       origin: request.nextUrl.origin,
       shortPath: Boolean(key.publicSlug),
-    });
+    }), deviceToken);
 
     const acceptHeader = request.headers.get('accept') || '';
 
@@ -308,7 +380,7 @@ export async function GET(
       return NextResponse.json({
         id: key.id,
         name: key.name,
-        accessUrl: decoratedAccessUrl,
+        accessUrl: isPageAudience && useBoundDeviceInstalls ? null : decoratedAccessUrl,
         outlineClientUrl,
         status: key.status,
         server: {
@@ -330,6 +402,9 @@ export async function GET(
         clientLinkEnabled: key.clientLinkEnabled,
         telegramDeliveryEnabled: key.telegramDeliveryEnabled,
         sharePageAccessExpiresAt: key.sharePageAccessExpiresAt?.toISOString() || null,
+        boundDeviceInstallsOnly: useBoundDeviceInstalls,
+        maxDevices: key.maxDevices,
+        claimedDevices: deviceClaimResult?.claimedDevices ?? 0,
       });
     }
 
