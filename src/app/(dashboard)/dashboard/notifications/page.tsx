@@ -1362,6 +1362,12 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   ],
 };
 
+const DYNAMIC_ONLY_TELEGRAM_PLAN_CODES = new Set(
+  DEFAULT_TELEGRAM_SALES_SETTINGS.plans
+    .filter((plan) => plan.deliveryType === 'DYNAMIC_KEY')
+    .map((plan) => plan.code),
+);
+
 function getEventLabel(eventId: string, t: (key: string) => string) {
   const isTestEvent = eventId.startsWith('TEST_');
   const normalizedEventId = isTestEvent ? eventId.slice(5) : eventId;
@@ -4040,6 +4046,15 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     premiumTemplateOnlyHint: isMyanmar
       ? 'Premium plan များအတွက် self-managed dynamic template များကိုသာ ပြသပါမည်။'
       : 'Premium plans only show self-managed dynamic templates.',
+    accessKeySoftLimitHint: isMyanmar
+      ? 'Normal access-key delivery သည် soft-limit only ဖြစ်သည်။ Official flow တွင် raw config ကို ဖုံးထားနိုင်သော်လည်း copied ss:// secret ကို device အခြားတစ်ခုမှာ ပြန်သုံးနိုင်သေးသည်။ Stronger anti-sharing အတွက် dynamic delivery ကို အသုံးပြုပါ။'
+      : 'Normal access-key delivery is soft-limit only. You can hide the raw config on the official flow, but a copied ss:// secret can still be reused. Use dynamic delivery for stronger anti-sharing.',
+    dynamicDeliveryStrongHint: isMyanmar
+      ? 'Dynamic delivery သည် customers ကို managed share page / client-link flow ပေါ်တွင်ထားပေးသောကြောင့် stronger anti-sharing အတွက် အကြံပြုထားသော path ဖြစ်သည်။'
+      : 'Dynamic delivery keeps customers on the managed share-page / client-link flow and is the recommended path for stronger anti-sharing.',
+    dynamicDeliveryLockedHint: isMyanmar
+      ? 'ဤ built-in premium plan သည် dynamic delivery ပေါ်တွင်ပဲ ဆက်နေရမည်။ Anti-sharing လိုအပ်သော plan ကို normal access key သို့ downgrade မလုပ်ပါနှင့်။'
+      : 'This built-in premium plan stays on dynamic delivery. Do not downgrade an anti-sharing plan to a normal access key.',
     premiumPool: isMyanmar ? 'Premium pool' : 'Premium pool',
     stableLink: isMyanmar ? 'Stable link' : 'Stable link',
     autoFailover: isMyanmar ? 'Auto failover' : 'Auto failover',
@@ -6791,6 +6806,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                       <Label>{salesUi.deliveryType}</Label>
                       <Select
                         value={plan.deliveryType}
+                        disabled={DYNAMIC_ONLY_TELEGRAM_PLAN_CODES.has(plan.code)}
                         onValueChange={(value: 'ACCESS_KEY' | 'DYNAMIC_KEY') =>
                           updatePlan(plan.code, (current) => ({
                             ...current,
@@ -6808,6 +6824,13 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                           <SelectItem value="DYNAMIC_KEY">{salesUi.dynamicKeyDelivery}</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {DYNAMIC_ONLY_TELEGRAM_PLAN_CODES.has(plan.code)
+                          ? salesUi.dynamicDeliveryLockedHint
+                          : plan.deliveryType === 'DYNAMIC_KEY'
+                            ? salesUi.dynamicDeliveryStrongHint
+                            : salesUi.accessKeySoftLimitHint}
+                      </p>
                     </div>
                     <div className="space-y-2 lg:col-span-2">
                       <Label>{plan.deliveryType === 'DYNAMIC_KEY' ? salesUi.dynamicTemplate : salesUi.template}</Label>

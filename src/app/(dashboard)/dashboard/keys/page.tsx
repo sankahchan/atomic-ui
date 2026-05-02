@@ -140,6 +140,15 @@ const ENCRYPTION_METHODS = [
   { value: 'aes-256-gcm', label: 'AES-256-GCM' },
 ] as const;
 
+const ACCESS_KEY_SOFT_DEVICE_LIMIT_HINT =
+  'Counts managed-install and app activity as an estimate. The official share page can block extra installs, but a copied raw ss:// secret can still be reused. Use a dynamic key for stronger anti-sharing.';
+
+const ACCESS_KEY_PROTECTED_INSTALL_HINT =
+  'Hide the raw reusable ss:// secret on the official share page and client-link flow. This reduces casual sharing there, but it cannot hard-block a raw ss:// secret copied from an approved device.';
+
+const ACCESS_KEY_RAW_COPY_WARNING =
+  'Copying or exporting the raw access URL weakens device-limit protection because Outline will accept that ss:// secret on any device.';
+
 const CREATE_CONTACT_TYPES = [
   { value: 'telegram', label: 'Telegram', icon: '📱' },
   { value: 'discord', label: 'Discord', icon: '🎮' },
@@ -194,6 +203,8 @@ type CreatedKeySummary = {
   password: string | null;
   expiresAt: Date | string | null;
   dataLimitBytes: bigint | null;
+  maxDevices?: number | null;
+  boundDeviceInstallsOnly?: boolean | null;
   server: {
     id: string;
     name: string;
@@ -1223,7 +1234,7 @@ function CreateKeyDialog({
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="maxDevices">Max devices (estimated)</Label>
+            <Label htmlFor="maxDevices">Soft device limit (estimated)</Label>
             <Input
               id="maxDevices"
               type="number"
@@ -1234,15 +1245,15 @@ function CreateKeyDialog({
               onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Uses recent client-link and app activity as an estimate. For the fastest enforcement, deliver the share page or Outline client URL instead of a copied raw ss:// link.
+              {ACCESS_KEY_SOFT_DEVICE_LIMIT_HINT}
             </p>
           </div>
 
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium">Require protected install flow</p>
+              <p className="text-sm font-medium">Hide raw config on official install screens</p>
               <p className="text-xs text-muted-foreground">
-                Recommended. Customers install from the share page or Outline client link, and the raw reusable ss:// secret stays hidden.
+                {ACCESS_KEY_PROTECTED_INSTALL_HINT}
               </p>
             </div>
             <Switch
@@ -1852,7 +1863,11 @@ function CreatedKeySummaryDialog({
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label className="text-sm font-medium">{t('keys.dialog.created_access_url')}</Label>
-                <p className="text-xs text-muted-foreground">{t('keys.dialog.qr_desc')}</p>
+                <p className="text-xs text-muted-foreground">
+                  {createdKey.maxDevices && createdKey.boundDeviceInstallsOnly
+                    ? ACCESS_KEY_RAW_COPY_WARNING
+                    : t('keys.dialog.qr_desc')}
+                </p>
               </div>
               <div className="rounded-[1.2rem] border border-border/60 bg-background/70 p-3 font-mono text-xs leading-6 break-all dark:bg-[rgba(4,10,20,0.72)]">
                 {createdKey.accessUrl ?? '-'}
@@ -2008,7 +2023,9 @@ function QRCodeDialog({
         <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle>{t('keys.actions.show_qr')}: {keyName}</DialogTitle>
           <DialogDescription>
-            Scan this code in Outline or copy the raw access URL if you need to deliver the key manually.
+            {keyData?.maxDevices && keyData?.boundDeviceInstallsOnly
+              ? 'Scan this code or use the managed client link when you want device-limit protection to stay intact. Copying the raw access URL weakens that protection.'
+              : 'Scan this code in Outline or copy the raw access URL if you need to deliver the key manually.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -2602,7 +2619,7 @@ function EditKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editMaxDevices">Device guidance</Label>
+                  <Label htmlFor="editMaxDevices">Soft device limit (estimated)</Label>
                   <Input
                     id="editMaxDevices"
                     type="number"
@@ -2613,15 +2630,15 @@ function EditKeyDialog({
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Best enforcement happens when customers install from the share page or Outline client URL. A copied raw ss:// link is only catchable after later activity is observed.
+                    {ACCESS_KEY_SOFT_DEVICE_LIMIT_HINT}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3 sm:col-span-2">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Require protected install flow</p>
+                    <p className="text-sm font-medium">Hide raw config on official install screens</p>
                     <p className="text-xs text-muted-foreground">
-                      Hide the raw reusable ss:// secret from the customer-facing share page and force install through the share page or Outline client link.
+                      {ACCESS_KEY_PROTECTED_INSTALL_HINT}
                     </p>
                   </div>
                   <Switch

@@ -277,6 +277,22 @@ function formatDraftDeviceLimit(maxDevices: number | null, locale: SupportedLoca
   return `${maxDevices} estimated device${maxDevices === 1 ? '' : 's'}`;
 }
 
+function buildAccessDraftProtectionWarningLines(
+  maxDevices: number | null,
+  locale: SupportedLocale,
+) {
+  if (!maxDevices) {
+    return [] as string[];
+  }
+
+  return [
+    '',
+    locale === 'my'
+      ? '⚠️ Soft limit only: share page / client-link flow ကို ထိန်းနိုင်ပေမယ့် copied raw ss:// secret ကို device အခြားတစ်ခုမှာ ပြန်သုံးနိုင်သေးသည်။ Stronger anti-sharing အတွက် /createdynamic ကို အသုံးပြုပါ။'
+      : '⚠️ Soft limit only: the share page and client-link flow can be gated, but a copied raw ss:// secret can still be reused. Use /createdynamic for stronger anti-sharing.',
+  ];
+}
+
 function renderServerChoiceLabel(server: {
   name: string;
   countryCode?: string | null;
@@ -976,6 +992,7 @@ async function promptAccessCreateConfirm(input: {
       )}`,
       '',
       ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
+      ...buildAccessDraftProtectionWarningLines(input.draft.maxDevices, input.locale),
     ].join('\n'),
     {
       replyMarkup: buildCreateConfirmKeyboard(
