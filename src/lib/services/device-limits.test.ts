@@ -6,13 +6,29 @@ import {
   buildDeviceEvidenceMap,
   buildDeviceFingerprint,
   deriveDeviceLimitStage,
+  isDeviceLimitEvidenceEventType,
 } from '@/lib/services/device-limits';
+import { SUBSCRIPTION_EVENT_TYPES } from '@/lib/services/subscription-events';
 
 test('buildDeviceFingerprint normalizes user agent casing', () => {
   const a = buildDeviceFingerprint('1.2.3.4', 'Mozilla/5.0');
   const b = buildDeviceFingerprint('1.2.3.4', 'mozilla/5.0');
 
   assert.equal(a, b);
+});
+
+test('buildDeviceFingerprint distinguishes platforms for the same client ip and user agent', () => {
+  const ios = buildDeviceFingerprint('1.2.3.4', 'Outline/1.0', 'iOS');
+  const android = buildDeviceFingerprint('1.2.3.4', 'Outline/1.0', 'Android');
+
+  assert.notEqual(ios, android);
+});
+
+test('isDeviceLimitEvidenceEventType only accepts install and client activity signals', () => {
+  assert.equal(isDeviceLimitEvidenceEventType(SUBSCRIPTION_EVENT_TYPES.CLIENT_FETCH), true);
+  assert.equal(isDeviceLimitEvidenceEventType(SUBSCRIPTION_EVENT_TYPES.OPEN_APP), true);
+  assert.equal(isDeviceLimitEvidenceEventType(SUBSCRIPTION_EVENT_TYPES.TELEGRAM_CONNECTED), true);
+  assert.equal(isDeviceLimitEvidenceEventType(SUBSCRIPTION_EVENT_TYPES.PAGE_VIEW), false);
 });
 
 test('buildDeviceEvidenceMap deduplicates by ip and user agent', () => {

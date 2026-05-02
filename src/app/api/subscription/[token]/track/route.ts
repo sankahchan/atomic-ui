@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestIpFromHeaders } from '@/lib/audit';
 import { recordSubscriptionPageEventByToken } from '@/lib/services/subscription-events';
+import {
+  isDeviceLimitEvidenceEventType,
+  primeAccessKeyDeviceLimitObservation,
+  primeDynamicKeyDeviceLimitObservation,
+} from '@/lib/services/device-limits';
 
 export async function POST(
   request: NextRequest,
@@ -36,6 +41,16 @@ export async function POST(
 
     if (!event) {
       return NextResponse.json({ error: 'Subscription token not found' }, { status: 404 });
+    }
+
+    if (isDeviceLimitEvidenceEventType(body.eventType)) {
+      if (event.accessKeyId) {
+        await primeAccessKeyDeviceLimitObservation(event.accessKeyId);
+      }
+
+      if (event.dynamicAccessKeyId) {
+        await primeDynamicKeyDeviceLimitObservation(event.dynamicAccessKeyId);
+      }
     }
 
     return NextResponse.json({ ok: true });

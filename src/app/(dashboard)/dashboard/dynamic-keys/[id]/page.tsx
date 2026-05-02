@@ -396,7 +396,7 @@ function EditDAKDialog({
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Uses recent IP and user-agent activity as an estimate. Dynamic keys warn first, then disable automatically if sharing stays above the limit.
+                    Uses recent client-link and app activity as an estimate. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
                   </p>
                 </div>
 

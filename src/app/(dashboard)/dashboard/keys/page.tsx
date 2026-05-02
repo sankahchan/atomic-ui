@@ -1230,7 +1230,7 @@ function CreateKeyDialog({
               onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Uses recent IP and user-agent activity as an estimate. If the estimate stays over the limit, the key will be warned first and then disabled automatically.
+              Uses recent client-link and app activity as an estimate. For the fastest enforcement, deliver the share page or Outline client URL instead of a copied raw ss:// link.
             </p>
           </div>
 
@@ -2591,6 +2591,9 @@ function EditKeyDialog({
                     value={formData.maxDevices}
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Best enforcement happens when customers install from the share page or Outline client URL. A copied raw ss:// link is only catchable after later activity is observed.
+                  </p>
                 </div>
 
                 {formData.dataLimitGB && (
