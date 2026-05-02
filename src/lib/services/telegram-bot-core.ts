@@ -5518,6 +5518,10 @@ export async function sendAccessKeySharePageToTelegram(input: {
     ? buildShortShareUrl(key.publicSlug, { source: input.source || 'telegram', lang: locale })
     : buildSharePageUrl(token, { source: input.source || 'telegram', lang: locale });
   const subscriptionUrl = buildSubscriptionApiUrl(token, { source: input.source || 'telegram' });
+  const protectedInstallOnly = Boolean(key.boundDeviceInstallsOnly && key.maxDevices);
+  if (protectedInstallOnly && !key.sharePageEnabled) {
+    throw new Error('Protected installs require an enabled share page for this key.');
+  }
   const welcomeMessage =
     key.subscriptionWelcomeMessage?.trim() ||
     resolveTelegramTemplate(
@@ -5539,15 +5543,31 @@ export async function sendAccessKeySharePageToTelegram(input: {
     key.dataLimitBytes ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
     '',
     welcomeMessage ? escapeHtml(welcomeMessage) : ui.accessShareFallback,
-    '',
-    `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`,
-    `🔄 ${ui.subscriptionUrlLabel}: ${subscriptionUrl}`,
   ];
+
+  if (protectedInstallOnly) {
+    lines.push(
+      '',
+      '🔒 Protected install is enabled for this key.',
+      'Install from the share page on each device. The reusable raw config is hidden to reduce sharing.',
+      '',
+      `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`,
+    );
+  } else {
+    lines.push(
+      '',
+      `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`,
+      `🔄 ${ui.subscriptionUrlLabel}: ${subscriptionUrl}`,
+    );
+  }
 
   const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [
     [{ text: ui.openSharePage, url: sharePageUrl }],
-    [{ text: ui.openSubscriptionUrl, url: subscriptionUrl }],
   ];
+
+  if (!protectedInstallOnly) {
+    inlineKeyboard.push([{ text: ui.openSubscriptionUrl, url: subscriptionUrl }]);
+  }
 
   if (salesSettings.enabled && salesSettings.allowRenewals) {
     inlineKeyboard.push([
@@ -5575,7 +5595,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
 
   if (input.includeQr ?? true) {
     try {
-      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(key.accessUrl || sharePageUrl);
+      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(protectedInstallOnly ? sharePageUrl : (key.accessUrl || sharePageUrl));
       await sendTelegramPhoto(
         config.botToken,
         destinationChatId,
@@ -5610,7 +5630,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
 
   return {
     sharePageUrl,
-    subscriptionUrl,
+    subscriptionUrl: protectedInstallOnly ? null : subscriptionUrl,
     destinationChatId,
   };
 }
@@ -5658,8 +5678,12 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     input.source || 'telegram',
     locale,
   );
-  if (!subscriptionUrl || !outlineClientUrl) {
+  const protectedInstallOnly = Boolean(key.boundDeviceInstallsOnly && key.maxDevices);
+  if ((!protectedInstallOnly && !subscriptionUrl) || !outlineClientUrl) {
     throw new Error('This dynamic key does not have a usable client URL yet.');
+  }
+  if (protectedInstallOnly && (!key.sharePageEnabled || !sharePageUrl)) {
+    throw new Error('Protected installs require an enabled share page for this dynamic key.');
   }
 
   const welcomeMessage =
@@ -5737,14 +5761,23 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     lines.push('', `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
   }
 
-  lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
-  lines.push(`⚡ ${ui.outlineClientUrlLabel}: ${outlineClientUrl}`);
+  if (protectedInstallOnly) {
+    lines.push(
+      '🔒 Protected install is enabled for this key.',
+      'Install from the share page on each device. The reusable direct endpoint is hidden to reduce sharing.',
+    );
+  } else {
+    lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
+    lines.push(`⚡ ${ui.outlineClientUrlLabel}: ${outlineClientUrl}`);
+  }
 
   const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [];
   if (key.sharePageEnabled && sharePageUrl) {
     inlineKeyboard.push([{ text: ui.openSharePage, url: sharePageUrl }]);
   }
-  inlineKeyboard.push([{ text: ui.openClientEndpoint, url: subscriptionUrl }]);
+  if (!protectedInstallOnly && subscriptionUrl) {
+    inlineKeyboard.push([{ text: ui.openClientEndpoint, url: subscriptionUrl }]);
+  }
 
   const salesSettings = await getTelegramSalesSettings();
   const renewCommandUrl =
@@ -5796,7 +5829,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
 
   if (input.includeQr ?? true) {
     try {
-      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(outlineClientUrl);
+      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(protectedInstallOnly ? sharePageUrl! : outlineClientUrl);
       await sendTelegramPhoto(
         config.botToken,
         destinationChatId,
@@ -5833,7 +5866,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
 
   return {
     sharePageUrl,
-    subscriptionUrl,
+    subscriptionUrl: protectedInstallOnly ? null : subscriptionUrl,
     outlineClientUrl,
     destinationChatId,
   };

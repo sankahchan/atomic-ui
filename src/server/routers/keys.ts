@@ -136,6 +136,7 @@ const createKeySchema = z.object({
   autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
   quotaAlertThresholds: z.string().optional().nullable(),
   maxDevices: z.number().int().min(1).max(20).optional().nullable(),
+  boundDeviceInstallsOnly: z.boolean().optional(),
   autoRenewPolicy: z.enum(['NONE', 'EXTEND_DURATION']).optional(),
   autoRenewDurationDays: z.number().int().min(1).max(3650).optional().nullable(),
 });
@@ -177,6 +178,7 @@ const updateKeySchema = z.object({
   autoArchiveAfterDays: z.number().int().min(0).max(365).optional().nullable(),
   quotaAlertThresholds: z.string().optional().nullable(),
   maxDevices: z.number().int().min(1).max(20).optional().nullable(),
+  boundDeviceInstallsOnly: z.boolean().optional(),
   autoRenewPolicy: z.enum(['NONE', 'EXTEND_DURATION']).optional(),
   autoRenewDurationDays: z.number().int().min(1).max(3650).optional().nullable(),
 });
@@ -1124,6 +1126,9 @@ export const keysRouter = router({
             autoArchiveAfterDays: input.autoArchiveAfterDays ?? 0,
             quotaAlertThresholds: stringifyQuotaAlertThresholds(input.quotaAlertThresholds),
             maxDevices: input.maxDevices ?? null,
+            boundDeviceInstallsOnly: input.maxDevices
+              ? input.boundDeviceInstallsOnly ?? true
+              : false,
             quotaAlertsSent: '[]',
             autoRenewPolicy: input.autoRenewPolicy ?? 'NONE',
             autoRenewDurationDays: input.autoRenewDurationDays ?? null,
@@ -1337,12 +1342,19 @@ export const keysRouter = router({
         if (data.maxDevices !== undefined) {
           updateData.maxDevices = data.maxDevices ?? null;
           if (!data.maxDevices) {
+            updateData.boundDeviceInstallsOnly = false;
             updateData.deviceLimitExceededAt = null;
             updateData.deviceLimitWarningSentAt = null;
             updateData.deviceLimitLastObservedDevices = null;
             updateData.deviceLimitSuppressedUntil = null;
             updateData.deviceLimitAutoDisabledAt = null;
+          } else if (data.boundDeviceInstallsOnly === undefined) {
+            updateData.boundDeviceInstallsOnly = true;
           }
+        }
+
+        if (data.boundDeviceInstallsOnly !== undefined) {
+          updateData.boundDeviceInstallsOnly = Boolean(data.boundDeviceInstallsOnly && (data.maxDevices ?? existingKey.maxDevices));
         }
 
         if (data.autoRenewPolicy !== undefined) {
@@ -3885,6 +3897,7 @@ export const keysRouter = router({
           estimatedDevices: true,
           peakDevices: true,
           maxDevices: true,
+          boundDeviceInstallsOnly: true,
           status: true,
           deviceLimitExceededAt: true,
           deviceLimitWarningSentAt: true,
@@ -3965,6 +3978,7 @@ export const keysRouter = router({
         estimatedDevices: effectiveEstimatedDevices,
         peakDevices: Math.max(key.peakDevices ?? 0, effectiveEstimatedDevices),
         maxDevices: key.maxDevices,
+        boundDeviceInstallsOnly: key.boundDeviceInstallsOnly,
         deviceLimitObservedDevices: effectiveEstimatedDevices,
         deviceLimitOverLimit: deviceLimitSnapshot?.overLimit ?? false,
         deviceLimitEnforcementStage: deviceLimitSnapshot?.stage ?? 'OK',

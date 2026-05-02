@@ -1890,6 +1890,7 @@ async function createAccessKeyFromDraft(input: {
         ? BigInt(Math.round(input.draft.dataLimitGB * 1024 * 1024 * 1024))
         : null,
       maxDevices: input.draft.maxDevices,
+      boundDeviceInstallsOnly: Boolean(input.draft.maxDevices),
       dataLimitResetStrategy: 'NEVER',
       expirationType: input.draft.expirationType,
       expiresAt: calculated.expiresAt,
@@ -1963,6 +1964,7 @@ async function createDynamicKeyFromDraft(input: {
         ? BigInt(Math.round(input.draft.dataLimitGB * 1024 * 1024 * 1024))
         : null,
       maxDevices: input.draft.maxDevices,
+      boundDeviceInstallsOnly: Boolean(input.draft.maxDevices),
       dataLimitResetStrategy: 'NEVER',
       lastDataLimitReset: new Date(),
       usageOffset: BigInt(0),

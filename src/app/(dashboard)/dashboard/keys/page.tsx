@@ -349,6 +349,7 @@ function CreateKeyDialog({
     autoArchiveAfterDays: string;
     quotaAlertThresholds: string;
     maxDevices: string;
+    boundDeviceInstallsOnly: boolean;
     autoRenewPolicy: 'NONE' | 'EXTEND_DURATION';
     autoRenewDurationDays: string;
   }>({
@@ -378,6 +379,7 @@ function CreateKeyDialog({
     autoArchiveAfterDays: '0',
     quotaAlertThresholds: '80,90',
     maxDevices: '',
+    boundDeviceInstallsOnly: true,
     autoRenewPolicy: 'NONE',
     autoRenewDurationDays: '',
   });
@@ -574,6 +576,7 @@ function CreateKeyDialog({
       autoArchiveAfterDays: '0',
       quotaAlertThresholds: '80,90',
       maxDevices: '',
+      boundDeviceInstallsOnly: true,
       autoRenewPolicy: 'NONE',
       autoRenewDurationDays: '',
     });
@@ -763,6 +766,7 @@ function CreateKeyDialog({
       autoArchiveAfterDays: Number.parseInt(formData.autoArchiveAfterDays || '0', 10) || 0,
       quotaAlertThresholds: formData.quotaAlertThresholds,
       maxDevices: formData.maxDevices ? Number.parseInt(formData.maxDevices, 10) : undefined,
+      boundDeviceInstallsOnly: formData.maxDevices ? formData.boundDeviceInstallsOnly : undefined,
       autoRenewPolicy: formData.autoRenewPolicy,
       autoRenewDurationDays:
         formData.autoRenewPolicy === 'EXTEND_DURATION' && formData.autoRenewDurationDays
@@ -1232,6 +1236,19 @@ function CreateKeyDialog({
             <p className="text-xs text-muted-foreground">
               Uses recent client-link and app activity as an estimate. For the fastest enforcement, deliver the share page or Outline client URL instead of a copied raw ss:// link.
             </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Require protected install flow</p>
+              <p className="text-xs text-muted-foreground">
+                Recommended. Customers install from the share page or Outline client link, and the raw reusable ss:// secret stays hidden.
+              </p>
+            </div>
+            <Switch
+              checked={formData.boundDeviceInstallsOnly}
+              onCheckedChange={(checked) => setFormData({ ...formData, boundDeviceInstallsOnly: checked })}
+            />
           </div>
 
           {/* Expiration type */}
@@ -2421,6 +2438,7 @@ function EditKeyDialog({
     expiresAt: Date | null;
     expirationType: string | null;
     maxDevices: number | null;
+    boundDeviceInstallsOnly?: boolean | null;
     autoDisableOnLimit: boolean;
     autoDisableOnExpire: boolean;
     autoArchiveAfterDays: number;
@@ -2444,6 +2462,7 @@ function EditKeyDialog({
     durationDays: keyData.durationDays?.toString() || '',
     expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
     maxDevices: keyData.maxDevices?.toString() || '',
+    boundDeviceInstallsOnly: keyData.boundDeviceInstallsOnly ?? Boolean(keyData.maxDevices),
   });
 
   // Reset form data when keyData changes
@@ -2460,6 +2479,7 @@ function EditKeyDialog({
       durationDays: keyData.durationDays?.toString() || '',
       expiresAt: keyData.expiresAt ? new Date(keyData.expiresAt).toISOString().split('T')[0] : '',
       maxDevices: keyData.maxDevices?.toString() || '',
+      boundDeviceInstallsOnly: keyData.boundDeviceInstallsOnly ?? Boolean(keyData.maxDevices),
     });
   }, [keyData]);
 
@@ -2504,6 +2524,7 @@ function EditKeyDialog({
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : null,
+      boundDeviceInstallsOnly: formData.maxDevices ? formData.boundDeviceInstallsOnly : false,
     } as any);
   };
 
@@ -2594,6 +2615,19 @@ function EditKeyDialog({
                   <p className="text-xs text-muted-foreground">
                     Best enforcement happens when customers install from the share page or Outline client URL. A copied raw ss:// link is only catchable after later activity is observed.
                   </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3 sm:col-span-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Require protected install flow</p>
+                    <p className="text-xs text-muted-foreground">
+                      Hide the raw reusable ss:// secret from the customer-facing share page and force install through the share page or Outline client link.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.boundDeviceInstallsOnly}
+                    onCheckedChange={(checked) => setFormData({ ...formData, boundDeviceInstallsOnly: checked })}
+                  />
                 </div>
 
                 {formData.dataLimitGB && (

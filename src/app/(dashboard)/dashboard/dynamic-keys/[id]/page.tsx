@@ -181,6 +181,7 @@ function EditDAKDialog({
     notes: string | null;
     dataLimitBytes: bigint | null;
     maxDevices: number | null;
+    boundDeviceInstallsOnly: boolean | null;
     durationDays: number | null;
     expiresAt: Date | null;
     loadBalancerAlgorithm: string;
@@ -213,6 +214,7 @@ function EditDAKDialog({
       ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
       : '',
     maxDevices: dakData.maxDevices?.toString() || '',
+    boundDeviceInstallsOnly: dakData.boundDeviceInstallsOnly ?? Boolean(dakData.maxDevices),
     durationDays: dakData.durationDays?.toString() || '',
     expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
     loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -243,6 +245,7 @@ function EditDAKDialog({
         ? (Number(dakData.dataLimitBytes) / (1024 * 1024 * 1024)).toString()
         : '',
       maxDevices: dakData.maxDevices?.toString() || '',
+      boundDeviceInstallsOnly: dakData.boundDeviceInstallsOnly ?? Boolean(dakData.maxDevices),
       durationDays: dakData.durationDays?.toString() || '',
       expiresAt: dakData.expiresAt ? new Date(dakData.expiresAt).toISOString().split('T')[0] : '',
       loadBalancerAlgorithm: dakData.loadBalancerAlgorithm || 'IP_HASH',
@@ -302,6 +305,7 @@ function EditDAKDialog({
       notes: formData.notes || undefined,
       dataLimitGB: formData.dataLimitGB ? parseFloat(formData.dataLimitGB) : undefined,
       maxDevices: formData.maxDevices ? parseInt(formData.maxDevices, 10) : null,
+      boundDeviceInstallsOnly: formData.maxDevices ? formData.boundDeviceInstallsOnly : false,
       durationDays: formData.durationDays ? parseInt(formData.durationDays) : undefined,
       expiresAt: formData.expiresAt ? new Date(formData.expiresAt) : undefined,
       loadBalancerAlgorithm: formData.loadBalancerAlgorithm as 'IP_HASH' | 'RANDOM' | 'ROUND_ROBIN' | 'LEAST_LOAD',
@@ -398,6 +402,25 @@ function EditDAKDialog({
                   <p className="text-xs text-muted-foreground">
                     Uses recent client-link and app activity as an estimate. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
                   </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="editBoundDeviceInstallsOnly" className="text-sm font-medium">
+                      Require protected install flow
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Hide the reusable raw config from customer-facing install screens and keep installs tied to the share page or Outline client URL when a device limit is set.
+                    </p>
+                  </div>
+                  <Switch
+                    id="editBoundDeviceInstallsOnly"
+                    checked={formData.boundDeviceInstallsOnly}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, boundDeviceInstallsOnly: checked })
+                    }
+                    disabled={!formData.maxDevices}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -2754,6 +2777,7 @@ function DynamicKeyTemplateCard({
     notes: string | null;
     dataLimitBytes: bigint | null;
     maxDevices: number | null;
+    boundDeviceInstallsOnly: boolean | null;
     durationDays: number | null;
     method: string | null;
     serverTagIds: string[];
@@ -2866,6 +2890,7 @@ function DynamicKeyTemplateCard({
       notes: dak.notes || undefined,
       dataLimitGB: dak.dataLimitBytes ? Number(dak.dataLimitBytes) / (1024 * 1024 * 1024) : undefined,
       maxDevices: dak.maxDevices ?? undefined,
+      boundDeviceInstallsOnly: dak.maxDevices ? (dak.boundDeviceInstallsOnly ?? true) : undefined,
       durationDays: dak.durationDays ?? undefined,
       method: (dak.method as 'chacha20-ietf-poly1305' | 'aes-128-gcm' | 'aes-192-gcm' | 'aes-256-gcm') || 'chacha20-ietf-poly1305',
       serverTagIds: dak.serverTagIds,
@@ -4116,6 +4141,7 @@ export default function DynamicKeyDetailPage() {
                   notes: dak.notes ?? null,
                   dataLimitBytes: dak.dataLimitBytes,
                   maxDevices: dak.maxDevices ?? null,
+                  boundDeviceInstallsOnly: dak.boundDeviceInstallsOnly ?? Boolean(dak.maxDevices),
                   durationDays: dak.durationDays ?? null,
                   method: dak.method ?? null,
                   serverTagIds: dak.serverTagIds,
@@ -4353,6 +4379,7 @@ export default function DynamicKeyDetailPage() {
             notes: dak.notes ?? null,
             dataLimitBytes: dak.dataLimitBytes,
             maxDevices: dak.maxDevices ?? null,
+            boundDeviceInstallsOnly: dak.boundDeviceInstallsOnly ?? Boolean(dak.maxDevices),
             durationDays: dak.durationDays ?? null,
             expiresAt: dak.expiresAt ?? null,
             loadBalancerAlgorithm: dak.loadBalancerAlgorithm ?? 'IP_HASH',
@@ -4563,6 +4590,17 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
             </div>
           ) : null}
         </div>
+
+        {data?.maxDevices ? (
+          <div className="rounded-xl border border-border/60 bg-background/45 px-4 py-3 text-sm dark:bg-white/[0.03]">
+            <p className="font-medium">Install protection</p>
+            <p className="text-xs text-muted-foreground">
+              {data.boundDeviceInstallsOnly
+                ? 'Protected installs only. Customers must install from the share page or Outline client URL.'
+                : 'Raw config is still allowed, so customers can manually copy reusable connection secrets.'}
+            </p>
+          </div>
+        ) : null}
 
         {/* Recent Sessions */}
         {data?.sessions && data.sessions.length > 0 && (

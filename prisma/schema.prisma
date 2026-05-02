@@ -235,6 +235,7 @@ model AccessKey {
   estimatedDevices Int @default(0)
   peakDevices      Int @default(0)
   maxDevices       Int?
+  boundDeviceInstallsOnly Boolean @default(false)
   deviceLimitExceededAt     DateTime?
   deviceLimitWarningSentAt  DateTime?
   deviceLimitLastObservedDevices Int?
@@ -256,6 +257,7 @@ model AccessKey {
   slugHistory            AccessKeySlugHistory[]
   distributionLinks      AccessDistributionLink[]
   telegramServerChangeRequests TelegramServerChangeRequest[]
+  installClaims         DeviceInstallClaim[]
 
   @@unique([serverId, outlineKeyId])
   @@index([status])
@@ -846,6 +848,7 @@ model DynamicAccessKey {
   estimatedDevices Int @default(0)
   peakDevices      Int @default(0)
   maxDevices       Int?
+  boundDeviceInstallsOnly Boolean @default(false)
   deviceLimitExceededAt         DateTime?
   deviceLimitWarningSentAt      DateTime?
   deviceLimitLastObservedDevices Int?
@@ -936,6 +939,7 @@ model DynamicAccessKey {
   routingEvents      DynamicRoutingEvent[]
   distributionLinks  AccessDistributionLink[]
   premiumSupportRequests TelegramPremiumSupportRequest[]
+  installClaims      DeviceInstallClaim[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -953,6 +957,7 @@ model DynamicKeyTemplate {
   notes       String?
   dataLimitBytes BigInt?
   maxDevices  Int?
+  boundDeviceInstallsOnly Boolean @default(false)
   dataLimitResetStrategy String @default("NEVER")
   expirationType String @default("NEVER")
   durationDays Int?
@@ -1002,6 +1007,29 @@ model DynamicRoutingEvent {
 
   @@index([dynamicAccessKeyId, createdAt])
   @@index([eventType, createdAt])
+}
+
+model DeviceInstallClaim {
+  id                 String            @id @default(cuid())
+  accessKeyId        String?
+  accessKey          AccessKey?        @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  dynamicAccessKeyId String?
+  dynamicAccessKey   DynamicAccessKey? @relation(fields: [dynamicAccessKeyId], references: [id], onDelete: Cascade)
+  deviceTokenHash    String
+  platform           String?
+  userAgent          String?
+  firstIp            String?
+  lastIp             String?
+  firstSeenAt        DateTime          @default(now())
+  lastSeenAt         DateTime          @default(now())
+  revokedAt          DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([accessKeyId, deviceTokenHash])
+  @@unique([dynamicAccessKeyId, deviceTokenHash])
+  @@index([accessKeyId, revokedAt])
+  @@index([dynamicAccessKeyId, revokedAt])
 }
 
 model TelegramLinkToken {

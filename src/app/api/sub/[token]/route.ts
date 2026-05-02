@@ -36,6 +36,14 @@ import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
 import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
 import {
+  claimAccessKeyDeviceInstall,
+  claimDynamicKeyDeviceInstall,
+  DEVICE_INSTALL_LIMIT_REACHED_CODE,
+  DEVICE_INSTALL_QUERY_PARAM,
+  DEVICE_INSTALL_TOKEN_REQUIRED_CODE,
+  shouldUseBoundDeviceInstalls,
+} from '@/lib/services/device-install-claims';
+import {
   primeAccessKeyDeviceLimitObservation,
   primeDynamicKeyDeviceLimitObservation,
 } from '@/lib/services/device-limits';
@@ -76,6 +84,27 @@ function getClientIp(request: NextRequest): string {
   }
 
   return '127.0.0.1';
+}
+
+function buildDeviceInstallErrorResponse(input: {
+  code: typeof DEVICE_INSTALL_TOKEN_REQUIRED_CODE | typeof DEVICE_INSTALL_LIMIT_REACHED_CODE;
+  claimedDevices: number;
+  maxDevices: number;
+}) {
+  const message =
+    input.code === DEVICE_INSTALL_LIMIT_REACHED_CODE
+      ? 'This key already reached its allowed device installs. Ask support to reset the device list.'
+      : 'A protected install token is required for this key.';
+
+  return NextResponse.json(
+    {
+      error: message,
+      code: input.code,
+      claimedDevices: input.claimedDevices,
+      maxDevices: input.maxDevices,
+    },
+    { status: input.code === DEVICE_INSTALL_LIMIT_REACHED_CODE ? 409 : 400 },
+  );
 }
 
 /**
@@ -449,6 +478,7 @@ export async function handleSubscriptionRequest(
     const platform = request.nextUrl.searchParams.get('platform')
       || (platformHeader ? platformHeader.replace(/"/g, '') : null);
     const source = request.nextUrl.searchParams.get('source');
+    const deviceToken = request.nextUrl.searchParams.get(DEVICE_INSTALL_QUERY_PARAM);
 
     // First, try to find a Dynamic Access Key by dynamicUrl
     const foundDynamicKey = await db.dynamicAccessKey.findFirst({
@@ -531,6 +561,25 @@ export async function handleSubscriptionRequest(
       // Check data limit
       if (dynamicKey.dataLimitBytes && dynamicKey.usedBytes >= dynamicKey.dataLimitBytes) {
         return NextResponse.json({ error: 'Data limit exceeded' }, { status: 403 });
+      }
+
+      const useBoundDeviceInstalls = shouldUseBoundDeviceInstalls({
+        maxDevices: dynamicKey.maxDevices,
+        boundDeviceInstallsOnly: dynamicKey.boundDeviceInstallsOnly,
+      });
+      const deviceClaimResult = useBoundDeviceInstalls
+        ? await claimDynamicKeyDeviceInstall({
+            dynamicAccessKeyId: dynamicKey.id,
+            deviceToken,
+            maxDevices: dynamicKey.maxDevices!,
+            platform,
+            userAgent,
+            ip: clientIp,
+          })
+        : null;
+
+      if (deviceClaimResult && !deviceClaimResult.ok) {
+        return buildDeviceInstallErrorResponse(deviceClaimResult);
       }
 
       // Handle START_ON_FIRST_USE expiration type
@@ -775,6 +824,10 @@ export async function handleSubscriptionRequest(
       return NextResponse.json({ error: 'Data limit exceeded' }, { status: 403 });
     }
 
+    if (!accessKey.clientLinkEnabled) {
+      return NextResponse.json({ error: 'Client URL is disabled' }, { status: 403 });
+    }
+
     // Handle START_ON_FIRST_USE expiration type
     if (accessKey.expirationType === 'START_ON_FIRST_USE' && !accessKey.firstUsedAt) {
       const firstUsedAt = new Date();
@@ -794,6 +847,25 @@ export async function handleSubscriptionRequest(
 
     if (!accessKey.accessUrl) {
       return NextResponse.json({ error: 'No access URL available' }, { status: 404 });
+    }
+
+    const useBoundDeviceInstalls = shouldUseBoundDeviceInstalls({
+      maxDevices: accessKey.maxDevices,
+      boundDeviceInstallsOnly: accessKey.boundDeviceInstallsOnly,
+    });
+    const deviceClaimResult = useBoundDeviceInstalls
+      ? await claimAccessKeyDeviceInstall({
+          accessKeyId: accessKey.id,
+          deviceToken,
+          maxDevices: accessKey.maxDevices!,
+          platform,
+          userAgent,
+          ip: clientIp,
+        })
+      : null;
+
+    if (deviceClaimResult && !deviceClaimResult.ok) {
+      return buildDeviceInstallErrorResponse(deviceClaimResult);
     }
 
     await recordSubscriptionPageEvent({

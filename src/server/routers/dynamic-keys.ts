@@ -77,6 +77,7 @@ function buildDynamicDeviceLimitState(
     estimatedDevices: number | null;
     peakDevices: number | null;
     maxDevices: number | null;
+    boundDeviceInstallsOnly?: boolean | null;
     deviceLimitLastObservedDevices: number | null;
     deviceLimitExceededAt: Date | null;
     deviceLimitWarningSentAt: Date | null;
@@ -101,6 +102,7 @@ function buildDynamicDeviceLimitState(
     estimatedDevices: dak.estimatedDevices ?? 0,
     peakDevices: dak.peakDevices ?? 0,
     maxDevices: dak.maxDevices,
+    boundDeviceInstallsOnly: dak.boundDeviceInstallsOnly ?? false,
     deviceLimitObservedDevices: dak.deviceLimitLastObservedDevices,
     deviceLimitOverLimit: stage.overLimit,
     deviceLimitEnforcementStage: stage.stage,
@@ -121,6 +123,7 @@ const createDAKSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
   maxDevices: z.number().int().min(1).max(20).optional().nullable(),
+  boundDeviceInstallsOnly: z.boolean().optional(),
   dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).default('NEVER'),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
   expiresAt: z.date().optional().nullable(),
@@ -169,6 +172,7 @@ const updateDAKSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
   maxDevices: z.number().int().min(1).max(20).optional().nullable(),
+  boundDeviceInstallsOnly: z.boolean().optional(),
   dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).optional(),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).optional(),
   expiresAt: z.date().optional().nullable(),
@@ -217,6 +221,7 @@ const dynamicKeyTemplateSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
   dataLimitGB: z.number().positive().optional().nullable(),
   maxDevices: z.number().int().min(1).max(20).optional().nullable(),
+  boundDeviceInstallsOnly: z.boolean().optional(),
   dataLimitResetStrategy: z.enum(['NEVER', 'DAILY', 'WEEKLY', 'MONTHLY']).default('NEVER'),
   expirationType: z.enum(['NEVER', 'FIXED_DATE', 'DURATION_FROM_CREATION', 'START_ON_FIRST_USE']).default('NEVER'),
   durationDays: z.number().int().positive().optional().nullable(),
@@ -483,6 +488,7 @@ export const dynamicKeysRouter = router({
         notes: template.notes,
         dataLimitGB: template.dataLimitBytes ? Number(template.dataLimitBytes) / (1024 * 1024 * 1024) : null,
         maxDevices: template.maxDevices,
+        boundDeviceInstallsOnly: template.boundDeviceInstallsOnly,
         dataLimitResetStrategy: template.dataLimitResetStrategy,
         expirationType: template.expirationType,
         durationDays: template.durationDays,
@@ -531,6 +537,9 @@ export const dynamicKeysRouter = router({
           notes: input.notes,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
           maxDevices: input.maxDevices ?? null,
+          boundDeviceInstallsOnly: input.maxDevices
+            ? input.boundDeviceInstallsOnly ?? true
+            : false,
           dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
           durationDays: input.durationDays,
@@ -574,6 +583,9 @@ export const dynamicKeysRouter = router({
           notes: input.notes,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
           maxDevices: input.maxDevices ?? null,
+          boundDeviceInstallsOnly: input.maxDevices
+            ? input.boundDeviceInstallsOnly ?? true
+            : false,
           dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
           durationDays: input.durationDays,
@@ -648,6 +660,7 @@ export const dynamicKeysRouter = router({
           notes: template.notes,
           dataLimitBytes: template.dataLimitBytes,
           maxDevices: template.maxDevices,
+          boundDeviceInstallsOnly: template.boundDeviceInstallsOnly,
           dataLimitResetStrategy: template.dataLimitResetStrategy,
           expirationType: template.expirationType,
           durationDays: template.durationDays,
@@ -2375,6 +2388,9 @@ export const dynamicKeysRouter = router({
           publicSlug,
           dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
           maxDevices: input.maxDevices ?? null,
+          boundDeviceInstallsOnly: input.maxDevices
+            ? input.boundDeviceInstallsOnly ?? true
+            : false,
           dataLimitResetStrategy: input.dataLimitResetStrategy,
           expirationType: input.expirationType,
           expiresAt,
@@ -2454,6 +2470,7 @@ export const dynamicKeysRouter = router({
         serverTagIds,
         dataLimitGB,
         maxDevices,
+        boundDeviceInstallsOnly,
         dataLimitResetStrategy,
         email,
         telegramId,
@@ -2535,11 +2552,18 @@ export const dynamicKeysRouter = router({
       if (maxDevices !== undefined) {
         updateData.maxDevices = maxDevices;
         if (maxDevices == null) {
+          updateData.boundDeviceInstallsOnly = false;
           updateData.deviceLimitExceededAt = null;
           updateData.deviceLimitWarningSentAt = null;
           updateData.deviceLimitSuppressedUntil = null;
           updateData.deviceLimitAutoDisabledAt = null;
+        } else if (boundDeviceInstallsOnly === undefined) {
+          updateData.boundDeviceInstallsOnly = true;
         }
+      }
+
+      if (boundDeviceInstallsOnly !== undefined) {
+        updateData.boundDeviceInstallsOnly = Boolean(boundDeviceInstallsOnly && (maxDevices ?? existing.maxDevices));
       }
 
       if (dataLimitResetStrategy !== undefined) {
@@ -3681,6 +3705,7 @@ export const dynamicKeysRouter = router({
           estimatedDevices: true,
           peakDevices: true,
           maxDevices: true,
+          boundDeviceInstallsOnly: true,
           deviceLimitLastObservedDevices: true,
           accessKeys: {
             select: {
@@ -3713,6 +3738,7 @@ export const dynamicKeysRouter = router({
           estimatedDevices: dak.deviceLimitLastObservedDevices ?? dak.estimatedDevices,
           peakDevices: dak.peakDevices,
           maxDevices: dak.maxDevices,
+          boundDeviceInstallsOnly: dak.boundDeviceInstallsOnly,
           activeCount: 0,
           sessions: [],
         };
@@ -3797,6 +3823,7 @@ export const dynamicKeysRouter = router({
         estimatedDevices: dak.deviceLimitLastObservedDevices ?? dak.estimatedDevices,
         peakDevices: dak.peakDevices,
         maxDevices: dak.maxDevices,
+        boundDeviceInstallsOnly: dak.boundDeviceInstallsOnly,
         activeCount,
         sessions: sessionsWithDuration,
         subscriberDevices,
