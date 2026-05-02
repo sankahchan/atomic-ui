@@ -389,7 +389,7 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+                  <Label htmlFor="editMaxDevices">Managed device limit (estimated)</Label>
                   <Input
                     id="editMaxDevices"
                     type="number"
@@ -400,14 +400,14 @@ function EditDAKDialog({
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Uses recent client-link and app activity as an estimate. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
+                    Recommended for stronger anti-sharing. Customers stay on the managed share page or Outline client URL instead of receiving one reusable raw ss:// secret.
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
                   <div className="space-y-0.5">
                     <Label htmlFor="editBoundDeviceInstallsOnly" className="text-sm font-medium">
-                      Require protected install flow
+                      Keep managed install flow only
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       Hide the reusable raw config from customer-facing install screens and keep installs tied to the share page or Outline client URL when a device limit is set.
@@ -4593,11 +4593,14 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
 
         {data?.maxDevices ? (
           <div className="rounded-xl border border-border/60 bg-background/45 px-4 py-3 text-sm dark:bg-white/[0.03]">
-            <p className="font-medium">Install protection</p>
+            <p className="font-medium">Managed install flow</p>
             <p className="text-xs text-muted-foreground">
               {data.boundDeviceInstallsOnly
                 ? 'Protected installs only. Customers must install from the share page or Outline client URL.'
                 : 'Raw config is still allowed, so customers can manually copy reusable connection secrets.'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              This is the recommended delivery path when you need stronger anti-sharing than a reusable standard key can provide.
             </p>
           </div>
         ) : null}

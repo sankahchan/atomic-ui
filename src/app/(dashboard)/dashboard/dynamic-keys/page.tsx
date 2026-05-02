@@ -1039,7 +1039,7 @@ function CreateDAKDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dakMaxDevices">Max devices (estimated)</Label>
+            <Label htmlFor="dakMaxDevices">Managed device limit (estimated)</Label>
             <Input
               id="dakMaxDevices"
               type="number"
@@ -1050,13 +1050,13 @@ function CreateDAKDialog({
               onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Use an estimated-device cap to slow down key sharing. For the fastest enforcement, deliver the share page or Outline client URL instead of a copied raw ss:// link.
+              Recommended for stronger anti-sharing. Customers stay on the managed share page or Outline client URL instead of receiving one reusable raw ss:// secret.
             </p>
           </div>
 
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium">Require protected install flow</p>
+              <p className="text-sm font-medium">Keep managed install flow only</p>
               <p className="text-xs text-muted-foreground">
                 Recommended. The share page and Outline client link stay usable, while the raw reusable config stays hidden from customers.
               </p>
@@ -1881,7 +1881,7 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+                  <Label htmlFor="editMaxDevices">Managed device limit (estimated)</Label>
                   <Input
                     id="editMaxDevices"
                     type="number"
@@ -1892,13 +1892,13 @@ function EditDAKDialog({
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Leave this empty to allow unlimited devices. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
+                    Leave this empty to allow unlimited devices. This managed flow is the recommended path when you need stronger anti-sharing than a reusable standard key can provide.
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3 sm:col-span-2">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Require protected install flow</p>
+                    <p className="text-sm font-medium">Keep managed install flow only</p>
                     <p className="text-xs text-muted-foreground">
                       Hide the reusable raw config from customer-facing install surfaces and keep installs on the share page or Outline client link.
                     </p>

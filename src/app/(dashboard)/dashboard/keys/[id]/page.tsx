@@ -129,6 +129,15 @@ import {
 } from '@/components/telegram/telegram-billing-history-card';
 import { TELEGRAM_SUPPORT_REPLY_MACROS } from '@/lib/telegram-presets';
 
+const ACCESS_KEY_SOFT_DEVICE_LIMIT_HINT =
+  'Counts managed-install and app activity as an estimate. The share page can block extra installs, but a copied raw ss:// secret can still be reused. Use a dynamic key for stronger anti-sharing.';
+
+const ACCESS_KEY_PROTECTED_INSTALL_HINT =
+  'Hide the raw reusable ss:// secret on the official share page and client-link flow. This reduces casual sharing there, but it cannot hard-block a raw ss:// secret copied from an approved device.';
+
+const ACCESS_KEY_RAW_COPY_WARNING =
+  'Copying or exporting the raw access URL weakens device-limit protection because Outline will accept that ss:// secret on any device.';
+
 /**
  * Status badge configuration
  * Provides consistent styling for different key statuses
@@ -347,7 +356,7 @@ function EditKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editMaxDevices">Max devices (estimated)</Label>
+                  <Label htmlFor="editMaxDevices">Soft device limit (estimated)</Label>
                   <Input
                     id="editMaxDevices"
                     type="number"
@@ -358,17 +367,17 @@ function EditKeyDialog({
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Uses recent client-link and app activity as an estimate. For the fastest enforcement, share the page or Outline client URL instead of a copied raw ss:// link.
+                    {ACCESS_KEY_SOFT_DEVICE_LIMIT_HINT}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
                   <div className="space-y-0.5">
                     <Label htmlFor="editBoundDeviceInstallsOnly" className="text-sm font-medium">
-                      Require protected install flow
+                      Hide raw config on official install screens
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Hide the reusable raw ss:// secret from customer-facing install screens and keep installs tied to the share page or Outline client URL when a device limit is set.
+                      {ACCESS_KEY_PROTECTED_INSTALL_HINT}
                     </p>
                   </div>
                   <Switch
@@ -3032,6 +3041,9 @@ export default function KeyDetailPage() {
 
                     <div className="space-y-2">
                       <Label className="text-sm text-muted-foreground">Access URL</Label>
+                      {key.maxDevices && key.boundDeviceInstallsOnly ? (
+                        <p className="text-xs text-amber-500">{ACCESS_KEY_RAW_COPY_WARNING}</p>
+                      ) : null}
                       <div className="flex items-center gap-2">
                         <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
                           {decoratedAccessUrl}
@@ -3842,13 +3854,16 @@ export default function KeyDetailPage() {
                 )}
 
                 <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 md:grid-cols-2">
+                  {key.maxDevices && key.boundDeviceInstallsOnly ? (
+                    <p className="md:col-span-2 text-xs text-amber-500">{ACCESS_KEY_RAW_COPY_WARNING}</p>
+                  ) : null}
                   <Button
                     variant="outline"
                     className="h-auto w-full justify-start px-4 py-3 text-left"
                     onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
                   >
                     <Copy className="mr-2 h-4 w-4" />
-                    Copy URL
+                    {key.maxDevices && key.boundDeviceInstallsOnly ? 'Copy raw URL' : 'Copy URL'}
                   </Button>
                   <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left" onClick={handleDownloadQr}>
                     <QrCode className="mr-2 h-4 w-4" />
@@ -4185,12 +4200,15 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-medium">Device limit</p>
+                <p className="font-medium">Soft device limit</p>
                 <p className="text-xs text-muted-foreground">
                   Estimated devices: {data.deviceLimitObservedDevices ?? data.estimatedDevices ?? 0} / {data.maxDevices}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Protection mode: {data.boundDeviceInstallsOnly ? 'Protected installs only' : 'Raw config still allowed'}
+                  Install gating: {data.boundDeviceInstallsOnly ? 'Share page / client URL only' : 'Raw config still allowed'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  For stronger anti-sharing, deliver this user through a dynamic key instead of a reusable standard access key.
                 </p>
               </div>
               <Badge
