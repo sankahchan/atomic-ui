@@ -1242,7 +1242,7 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'ACCESS_KEY',
+      deliveryType: 'DYNAMIC_KEY',
       templateId: null,
       dynamicTemplateId: null,
       fixedDurationDays: null,
@@ -4042,10 +4042,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     autoPricePreview: isMyanmar ? 'အလိုအလျောက် စျေးနှုန်း preview' : 'Automatic price preview',
     deliveryType: isMyanmar ? 'Delivery type' : 'Delivery type',
     accessKeyDelivery: isMyanmar ? 'Normal access key' : 'Normal access key',
-    dynamicKeyDelivery: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
+    dynamicKeyDelivery: isMyanmar ? 'Managed dynamic key' : 'Managed dynamic key',
     premiumTemplateOnlyHint: isMyanmar
-      ? 'Premium plan များအတွက် self-managed dynamic template များကိုသာ ပြသပါမည်။'
-      : 'Premium plans only show self-managed dynamic templates.',
+      ? 'Dynamic delivery plan များအတွက် self-managed dynamic template များကိုသာ ပြသပါမည်။'
+      : 'Dynamic delivery plans only show self-managed dynamic templates.',
     accessKeySoftLimitHint: isMyanmar
       ? 'Normal access-key delivery သည် soft-limit only ဖြစ်သည်။ Official flow တွင် raw config ကို ဖုံးထားနိုင်သော်လည်း copied ss:// secret ကို device အခြားတစ်ခုမှာ ပြန်သုံးနိုင်သေးသည်။ Stronger anti-sharing အတွက် dynamic delivery ကို အသုံးပြုပါ။'
       : 'Normal access-key delivery is soft-limit only. You can hide the raw config on the official flow, but a copied ss:// secret can still be reused. Use dynamic delivery for stronger anti-sharing.',
@@ -4053,8 +4053,8 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
       ? 'Dynamic delivery သည် customers ကို managed share page / client-link flow ပေါ်တွင်ထားပေးသောကြောင့် stronger anti-sharing အတွက် အကြံပြုထားသော path ဖြစ်သည်။'
       : 'Dynamic delivery keeps customers on the managed share-page / client-link flow and is the recommended path for stronger anti-sharing.',
     dynamicDeliveryLockedHint: isMyanmar
-      ? 'ဤ built-in premium plan သည် dynamic delivery ပေါ်တွင်ပဲ ဆက်နေရမည်။ Anti-sharing လိုအပ်သော plan ကို normal access key သို့ downgrade မလုပ်ပါနှင့်။'
-      : 'This built-in premium plan stays on dynamic delivery. Do not downgrade an anti-sharing plan to a normal access key.',
+      ? 'ဤ built-in protected plan သည် dynamic delivery ပေါ်တွင်ပဲ ဆက်နေရမည်။ Anti-sharing လိုအပ်သော plan ကို normal access key သို့ downgrade မလုပ်ပါနှင့်။'
+      : 'This built-in protected plan stays on dynamic delivery. Do not downgrade an anti-sharing plan to a normal access key.',
     premiumPool: isMyanmar ? 'Premium pool' : 'Premium pool',
     stableLink: isMyanmar ? 'Stable link' : 'Stable link',
     autoFailover: isMyanmar ? 'Auto failover' : 'Auto failover',

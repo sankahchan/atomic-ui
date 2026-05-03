@@ -155,9 +155,46 @@ type TelegramCommerceKeyItem = {
   expirationSummary: string;
   summaryLine: string;
   detailLines: string[];
+  deviceLimitSummary?: string | null;
+  deviceLimitDetail?: string | null;
   renewSecondary?: string | null;
   latestPremiumRequestId?: string | null;
 };
+
+function formatTelegramCustomerDeviceLimitSummary(input: {
+  locale: SupportedLocale;
+  limit: number | null | undefined;
+}) {
+  if (!input.limit || input.limit < 1) {
+    return null;
+  }
+
+  if (input.locale === 'my') {
+    return `${input.limit}-device limit`;
+  }
+
+  return `${input.limit}-device limit`;
+}
+
+function formatTelegramCustomerDeviceLimitDetail(input: {
+  locale: SupportedLocale;
+  limit: number | null | undefined;
+  boundDeviceInstallsOnly?: boolean | null;
+}) {
+  if (!input.limit || input.limit < 1) {
+    return null;
+  }
+
+  if (input.boundDeviceInstallsOnly) {
+    return input.locale === 'my'
+      ? `Device limit: protected install flow အတွက် ${input.limit} device`
+      : `Device limit: ${input.limit} device${input.limit === 1 ? '' : 's'} on the protected install flow`;
+  }
+
+  return input.locale === 'my'
+    ? `Device limit: ခန့်မှန်း ${input.limit} device`
+    : `Device limit: ${input.limit} estimated device${input.limit === 1 ? '' : 's'}`;
+}
 
 function buildTelegramKeyCountsLine(input: {
   counts: {
@@ -242,6 +279,15 @@ async function buildTelegramCommerceKeyItems(input: {
           `${ui.expirationLabel}: ${formatExpirationSummary(key, input.locale)}`,
           `${ui.preferredServerLabel}: ${serverLabel}`,
         ],
+        deviceLimitSummary: formatTelegramCustomerDeviceLimitSummary({
+          locale: input.locale,
+          limit: key.maxDevices,
+        }),
+        deviceLimitDetail: formatTelegramCustomerDeviceLimitDetail({
+          locale: input.locale,
+          limit: key.maxDevices,
+          boundDeviceInstallsOnly: key.boundDeviceInstallsOnly,
+        }),
         renewSecondary: null,
         latestPremiumRequestId: null,
       } satisfies TelegramCommerceKeyItem;
@@ -283,6 +329,15 @@ async function buildTelegramCommerceKeyItems(input: {
           ? `${ui.premiumThreadStatusLabel}: ${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`
           : null,
       ].filter(Boolean) as string[],
+      deviceLimitSummary: formatTelegramCustomerDeviceLimitSummary({
+        locale: input.locale,
+        limit: key.maxDevices,
+      }),
+      deviceLimitDetail: formatTelegramCustomerDeviceLimitDetail({
+        locale: input.locale,
+        limit: key.maxDevices,
+        boundDeviceInstallsOnly: key.boundDeviceInstallsOnly,
+      }),
       renewSecondary: 'dynamic',
       latestPremiumRequestId: latestRequest?.id || null,
     } satisfies TelegramCommerceKeyItem;
@@ -315,7 +370,7 @@ export function buildTelegramKeysSummaryMessage(input: {
       `${item.kind === 'premium' ? '💎' : item.kind === 'trial' ? '🎁' : '🔑'} <b>${escapeHtml(item.name)}</b>`,
       [
         escapeHtml(item.summaryLine),
-        `${ui.quotaLabel}: ${escapeHtml(item.quotaSummary)} • ${escapeHtml(item.expirationSummary)}`,
+        `${ui.quotaLabel}: ${escapeHtml(item.quotaSummary)} • ${escapeHtml(item.expirationSummary)}${item.deviceLimitSummary ? ` • ${escapeHtml(item.deviceLimitSummary)}` : ''}`,
       ],
     ),
   );
@@ -341,11 +396,13 @@ export function buildTelegramKeyDetailMessage(input: {
       ? [
           `${ui.statusLineLabel}: ${escapeHtml(input.item.summaryLine)}`,
           ...input.item.detailLines.slice(0, 4).map((line) => escapeHtml(line)),
+          ...(input.item.deviceLimitDetail ? [escapeHtml(input.item.deviceLimitDetail)] : []),
         ]
       : [
           `${ui.statusLineLabel}: ${escapeHtml(input.item.summaryLine)}`,
           `${ui.quotaLabel}: ${escapeHtml(input.item.quotaSummary)}`,
           `${ui.expirationLabel}: ${escapeHtml(input.item.expirationSummary)}`,
+          ...(input.item.deviceLimitDetail ? [escapeHtml(input.item.deviceLimitDetail)] : []),
         ];
 
   return buildTelegramCommerceMessage({

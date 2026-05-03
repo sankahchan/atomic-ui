@@ -294,7 +294,7 @@ function defaultPlans(): TelegramSalesPlan[] {
       priceCurrency: 'MMK',
       priceLabel: '',
       localizedPriceLabels: {},
-      deliveryType: 'ACCESS_KEY',
+      deliveryType: 'DYNAMIC_KEY',
       templateId: null,
       dynamicTemplateId: null,
       fixedDurationDays: null,

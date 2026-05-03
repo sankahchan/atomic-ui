@@ -167,6 +167,8 @@ test('my keys summary stays compact and omits raw urls and latest reply dumps', 
         expirationSummary: '30 day(s) left',
         summaryLine: '🟢 ACTIVE • SG-2 🇸🇬',
         detailLines: ['Quota: 0 B / 150 GB'],
+        deviceLimitSummary: '1-device limit',
+        deviceLimitDetail: 'Device limit: 1 estimated device',
         renewSecondary: null,
         latestPremiumRequestId: null,
       },
@@ -189,7 +191,7 @@ test('my keys summary stays compact and omits raw urls and latest reply dumps', 
   assert.match(message, /1 standard • 1 premium/);
   assert.doesNotMatch(message, /Standard key/);
   assert.doesNotMatch(message, /Premium key/);
-  assert.match(message, /Quota: 0 B \/ 150 GB • 30 day\(s\) left/);
+  assert.match(message, /Quota: 0 B \/ 150 GB • 30 day\(s\) left • 1-device limit/);
   assert.doesNotMatch(message, /https?:\/\//);
   assert.doesNotMatch(message, /Latest reply/i);
   assert.ok(message.split('\n').length < 16);
@@ -214,6 +216,7 @@ test('key detail stays compact and keeps actions out of the text body', () => {
         'Quota: 12 GB / 200 GB',
         'Thread: PRM-123 • Waiting for admin',
       ],
+      deviceLimitDetail: 'Device limit: 2 devices on the protected install flow',
       renewSecondary: 'dynamic',
       latestPremiumRequestId: 'req_1',
     },
@@ -221,9 +224,10 @@ test('key detail stays compact and keeps actions out of the text body', () => {
 
   assert.match(message, /Premium key detail/);
   assert.match(message, /buttons below/i);
+  assert.match(message, /Device limit: 2 devices on the protected install flow/);
   assert.doesNotMatch(message, /Share page, renew, and support actions stay below this detail card/i);
   assert.doesNotMatch(message, /https?:\/\//);
-  assert.ok(message.split('\n').length <= 14);
+  assert.ok(message.split('\n').length <= 15);
 });
 
 test('premium hub summary keeps links out of the text body', () => {
