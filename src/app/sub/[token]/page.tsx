@@ -90,6 +90,7 @@ interface KeyData {
   name: string;
   accessUrl: string | null;
   outlineClientUrl?: string | null;
+  isDynamic?: boolean;
   status: string;
   server: {
     name: string;
@@ -360,6 +361,19 @@ export default function SubscriptionPage() {
     tokenMissing: locale === 'my'
       ? 'ဒီ key ကို protected install link နဲ့ပဲ သုံးနိုင်ပါတယ်။ share page ကို ပြန်ဖွင့်ပြီး Outline app ကနေ install လုပ်ပါ။'
       : 'This key requires the protected install flow. Re-open the share page and install through the Outline app.',
+  }), [locale]);
+  const customerDeviceLimitCopy = useMemo(() => ({
+    title: locale === 'my' ? 'Device limit' : 'Device limit',
+    protectedUsage: locale === 'my' ? 'Protected install slot အသုံးပြုထားသည်' : 'Protected install slots used',
+    estimatedUsage: locale === 'my' ? 'Estimated devices max' : 'Estimated devices max',
+    protectedNote: (limit: number, isDynamic: boolean) =>
+      locale === 'my'
+        ? `${isDynamic ? 'Managed delivery flow' : 'Official install flow'} တွင် ${limit} device အထိ ကာကွယ်ထားသည်။ Raw connection URL ကို copy လုပ်ပါက ဤ flow အပြင် enforcement လျော့နိုင်သည်။`
+        : `${isDynamic ? 'Managed delivery' : 'The official install flow'} is capped at ${limit} device${limit === 1 ? '' : 's'}. Copying a raw connection URL can weaken enforcement outside this flow.`,
+    estimatedNote: (limit: number) =>
+      locale === 'my'
+        ? `ဒီ key ကို ခန့်မှန်း ${limit} device limit နဲ့ သတ်မှတ်ထားသည်။ ဒီစာမျက်နှာကနေ install လုပ်ပါက enforcement ပိုကောင်းသည်။`
+        : `This key is set to an estimated ${limit}-device limit. Install from this page for the strongest enforcement.`,
   }), [locale]);
 
   const getSharePasswordStorageKey = useCallback(
@@ -1232,6 +1246,7 @@ export default function SubscriptionPage() {
   const showCompatibleApps = branding.showCompatibleApps ?? true;
   const showHelpContact = branding.showHelpContact ?? true;
   const protectedInstallOnly = Boolean(keyData.boundDeviceInstallsOnly && keyData.maxDevices);
+  const hasDeviceLimit = Boolean(keyData.maxDevices && keyData.maxDevices > 0);
   const installUrl = keyData.outlineClientUrl || keyData.accessUrl || '';
   const rawConnectionUrl = keyData.accessUrl;
   const showManualSetupButton = (branding.showManualSetupButton ?? true) && Boolean(rawConnectionUrl);
@@ -1257,6 +1272,25 @@ export default function SubscriptionPage() {
   const usageDetail = keyData.dataLimitBytes
     ? tr('subscription.summary.percent_used', { percent: usagePercent })
     : tr('subscription.summary.used_no_limit', { used: formatBytes(keyData.usedBytes) });
+  const deviceLimitSummary =
+    keyData.maxDevices && keyData.maxDevices > 0
+      ? (() => {
+          const claimedDevices = Math.max(0, Math.min(keyData.claimedDevices ?? 0, keyData.maxDevices!));
+          if (protectedInstallOnly) {
+            return {
+              headline: `${claimedDevices}/${keyData.maxDevices}`,
+              subline: customerDeviceLimitCopy.protectedUsage,
+              note: customerDeviceLimitCopy.protectedNote(keyData.maxDevices, Boolean(keyData.isDynamic)),
+            };
+          }
+
+          return {
+            headline: String(keyData.maxDevices),
+            subline: customerDeviceLimitCopy.estimatedUsage,
+            note: customerDeviceLimitCopy.estimatedNote(keyData.maxDevices),
+          };
+        })()
+      : null;
   const keyWelcomeMessage = keyData.subscriptionWelcomeMessage?.trim() || '';
   const localizedWelcomeMessage = resolveLocalizedTemplate(
     branding.localizedWelcomeMessages,
@@ -1908,7 +1942,9 @@ export default function SubscriptionPage() {
                 )}
 
                 {showConnectionSummary && (
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_repeat(2,minmax(0,0.72fr))]">
+                  <div className={hasDeviceLimit
+                    ? 'grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_repeat(3,minmax(0,0.72fr))]'
+                    : 'grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_repeat(2,minmax(0,0.72fr))]'}>
                     <div
                       className="min-w-0 rounded-[1.3rem] border p-4"
                       style={{
@@ -2009,6 +2045,40 @@ export default function SubscriptionPage() {
                           : t('subscription.summary.server_ready')}
                       </p>
                     </div>
+
+                    {deviceLimitSummary && (
+                      <div
+                        className="min-w-0 rounded-[1.3rem] border p-4"
+                        style={{
+                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                          borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        }}
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                          {customerDeviceLimitCopy.title}
+                        </p>
+                        <p className="mt-2 break-words text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
+                          {deviceLimitSummary.headline}
+                        </p>
+                        <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
+                          {deviceLimitSummary.subline}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {deviceLimitSummary && (
+                  <div
+                    className="rounded-[1.3rem] border px-4 py-3"
+                    style={{
+                      backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.05)' : theme.bgSecondary,
+                      borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                    }}
+                  >
+                    <p className="text-sm" style={{ color: mutedTextColor }}>
+                      {deviceLimitSummary.note}
+                    </p>
                   </div>
                 )}
 

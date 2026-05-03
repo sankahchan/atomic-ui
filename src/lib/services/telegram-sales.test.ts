@@ -5,7 +5,7 @@ import {
   normalizeTelegramSalesSettings,
 } from '@/lib/services/telegram-sales';
 
-test('built-in premium telegram plans stay on dynamic delivery after normalization', () => {
+test('built-in dynamic telegram plans stay on dynamic delivery after normalization', () => {
   const defaults = getDefaultTelegramSalesSettings();
   const normalized = normalizeTelegramSalesSettings({
     ...defaults,
@@ -15,8 +15,11 @@ test('built-in premium telegram plans stay on dynamic delivery after normalizati
     })),
   });
 
-  for (const plan of normalized.plans.filter((item) => item.code.startsWith('premium_') || item.code === '3plus_unlimited')) {
-    assert.equal(plan.deliveryType, 'DYNAMIC_KEY');
+  for (const defaultPlan of defaults.plans.filter((item) => item.deliveryType === 'DYNAMIC_KEY')) {
+    assert.equal(
+      normalized.plans.find((plan) => plan.code === defaultPlan.code)?.deliveryType,
+      'DYNAMIC_KEY',
+    );
   }
 });
 
