@@ -99,7 +99,7 @@ export type TelegramServerChangeReviewAction = 'approve' | 'reject';
 export type TelegramServerChangeUserAction = 'ky' | 'sv' | 'st' | 'ca';
 export type TelegramDynamicSupportUserAction = 'rg' | 'rv' | 'is' | 'st' | 'rp' | 'ca';
 export type TelegramAdminRefundAction = 'claim' | 'detail' | 'next' | 'prev';
-export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support' | 'orders';
+export type TelegramMenuSection = 'admin' | 'inbox' | 'offers' | 'support' | 'orders' | 'trial';
 export type TelegramCommerceViewSection =
   | 'buy'
   | 'keys'

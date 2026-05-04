@@ -13,6 +13,11 @@ import {
 } from '@/lib/services/telegram-runtime';
 import { acceptTelegramReferralCode, parseReferralStartArg } from '@/lib/services/telegram-referrals';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
+import {
+  buildTelegramTrialOfferKeyboard,
+  buildTelegramTrialOfferMessage,
+  isTelegramTrialEligible,
+} from '@/lib/services/telegram-trial';
 
 async function sendTelegramOfferNudgeIfAny(input: {
   botToken: string;
@@ -51,6 +56,40 @@ async function sendTelegramOfferNudgeIfAny(input: {
       ? `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /offers to compare them before you buy or renew.`
       : `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /offers to compare them before you buy or renew.`,
   );
+}
+
+export async function sendTelegramStartHome(input: {
+  chatId: number;
+  telegramUserId: number;
+  username: string;
+  isAdmin: boolean;
+  botToken: string;
+  locale: SupportedLocale;
+  welcomeMessage: string;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const adminMsg = input.isAdmin ? ui.adminRecognized : '';
+
+  await sendTelegramMessage(
+    input.botToken,
+    input.chatId,
+    ui.hello(
+      escapeHtml(input.username),
+      escapeHtml(input.welcomeMessage),
+      input.telegramUserId,
+      adminMsg,
+    ),
+    {
+      replyMarkup: getCommandKeyboard(input.isAdmin, input.locale),
+    },
+  );
+
+  await sendTelegramOfferNudgeIfAny({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+    locale: input.locale,
+  });
 }
 
 export async function handleTelegramStartCommand(input: {
@@ -128,6 +167,11 @@ export async function handleTelegramStartCommand(input: {
     config?.defaultLanguage ||
     (await getTelegramDefaultLocale());
   const ui = getTelegramUi(locale);
+  const welcomeMessage = input.deps.resolveTelegramTemplate(
+    config?.localizedWelcomeMessages,
+    locale,
+    config?.welcomeMessage || ui.defaultWelcome,
+  );
 
   if (trimmedArgs) {
     const referralCode = parseReferralStartArg(trimmedArgs);
@@ -225,6 +269,26 @@ export async function handleTelegramStartCommand(input: {
     return null;
   }
 
+  if (
+    await isTelegramTrialEligible({
+      chatId: input.chatId,
+      telegramUserId: input.telegramUserId,
+    })
+  ) {
+    await sendTelegramMessage(
+      input.botToken,
+      input.chatId,
+      buildTelegramTrialOfferMessage({
+        locale,
+        firstName: input.username,
+      }),
+      {
+        replyMarkup: buildTelegramTrialOfferKeyboard(locale),
+      },
+    );
+    return null;
+  }
+
   const existingUser = await db.user.findFirst({
     where: { telegramChatId: String(input.chatId) },
   });
@@ -275,26 +339,14 @@ export async function handleTelegramStartCommand(input: {
     return null;
   }
 
-  const adminMsg = input.isAdmin ? ui.adminRecognized : '';
-  const welcomeMessage = input.deps.resolveTelegramTemplate(
-    config?.localizedWelcomeMessages,
-    locale,
-    config?.welcomeMessage || ui.defaultWelcome,
-  );
-
-  await sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    ui.hello(escapeHtml(input.username), escapeHtml(welcomeMessage), input.telegramUserId, adminMsg),
-    {
-      replyMarkup: getCommandKeyboard(input.isAdmin, locale),
-    },
-  );
-  await sendTelegramOfferNudgeIfAny({
-    botToken: input.botToken,
+  await sendTelegramStartHome({
     chatId: input.chatId,
     telegramUserId: input.telegramUserId,
+    username: input.username,
+    isAdmin: input.isAdmin,
+    botToken: input.botToken,
     locale,
+    welcomeMessage,
   });
   return null;
 }

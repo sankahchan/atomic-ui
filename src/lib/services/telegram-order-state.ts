@@ -585,34 +585,6 @@ function buildTelegramBuyPlanDetailKeyboard(input: {
   };
 }
 
-async function isEligibleForTelegramFreeTrialCommerce(chatId: number, telegramUserId: number) {
-  const [linkedKeyCount, fulfilledOrders, fulfilledTrialOrder] = await Promise.all([
-    db.accessKey.count({
-      where: {
-        OR: [{ telegramId: String(telegramUserId) }, { user: { telegramChatId: String(chatId) } }],
-        status: { not: 'ARCHIVED' },
-      },
-    }),
-    db.telegramOrder.count({
-      where: {
-        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
-        kind: 'NEW',
-        status: 'FULFILLED',
-      },
-    }),
-    db.telegramOrder.count({
-      where: {
-        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
-        kind: 'NEW',
-        planCode: 'trial_1d_3gb',
-        status: 'FULFILLED',
-      },
-    }),
-  ]);
-
-  return linkedKeyCount === 0 && fulfilledOrders === 0 && fulfilledTrialOrder === 0;
-}
-
 async function listTelegramPlansForConversationOrder(input: {
   kind: 'NEW' | 'RENEW';
   chatId: number;
@@ -620,21 +592,12 @@ async function listTelegramPlansForConversationOrder(input: {
   settings: Awaited<ReturnType<typeof getTelegramSalesSettings>>;
   deliveryType?: 'ACCESS_KEY' | 'DYNAMIC_KEY' | null;
 }) {
-  const freeTrialEligible =
-    input.kind === 'NEW'
-      ? await isEligibleForTelegramFreeTrialCommerce(input.chatId, input.telegramUserId)
-      : false;
-
   return input.settings.plans.filter((plan) => {
     if (!plan.enabled) {
       return false;
     }
 
-    if (input.kind === 'RENEW' && isTelegramTrialPlan(plan)) {
-      return false;
-    }
-
-    if (isTelegramTrialPlan(plan) && !freeTrialEligible) {
+    if (isTelegramTrialPlan(plan)) {
       return false;
     }
 
@@ -1620,9 +1583,6 @@ export async function handleTelegramOrderTextMessage(input: {
       }
 
       const plan = enabledPlans[numericIndex - 1];
-      if (plan.code === 'trial_1d_3gb' && !(await input.deps.isEligibleForTelegramFreeTrial(input.chatId, input.telegramUserId))) {
-        return ui.freeTrialUnavailable;
-      }
       if (plan.unlimitedQuota && !plan.fixedDurationMonths) {
         const planSnapshot = input.deps.buildTelegramOrderPlanSnapshot(plan, locale, {
           couponCampaignType: activeOrder.couponCampaignType,

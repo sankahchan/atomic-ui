@@ -329,18 +329,18 @@ export function getTelegramUi(locale: SupportedLocale) {
     lifecycleExpiredBody: isMyanmar ? 'ဤ key ကို မလုပ်ဆောင်နိုင်တော့ပါ။ သက်တမ်းတိုးလိုပါက support ကို ဆက်သွယ်ပါ။' : 'The key is no longer active. Contact support if it should be renewed.',
     startLinked: (username: string) =>
       isMyanmar
-        ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📬 /inbox ဖြင့် update များ ကြည့်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည်။`
-        : `✅ Telegram linked for <b>${username}</b>.\n\n<b>Start here</b>\n• 🗂 /mykeys for links and renewals\n• 🛒 /buy for a new order\n• 📬 /inbox for updates\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
+        ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📶 /usage ဖြင့် အသုံးပြုမှု စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည်။`
+        : `✅ Telegram linked for <b>${username}</b>.\n\n<b>Start here</b>\n• 🗂 /mykeys for keys and renewals\n• 🛒 /buy for a new order\n• 📶 /usage for your latest usage\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
     linkExpired: isMyanmar ? '⚠️ ဤ Telegram link သက်တမ်းကုန်သွားပါပြီ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '⚠️ This Telegram link has expired. Ask the admin to generate a new one.',
     linkInvalid: isMyanmar ? '❌ ဤ Telegram link ကို မသုံးနိုင်တော့ပါ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '❌ That Telegram link is not valid anymore. Ask the admin for a fresh link.',
     welcomeBack: (username: string) =>
       isMyanmar
-        ? `✅ <b>${username}</b> ကို ပြန်လည်ကြိုဆိုပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📬 /inbox ဖြင့် update များ ကြည့်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။`
-        : `✅ Welcome back, <b>${username}</b>!\n\n<b>Start here</b>\n• 🗂 /mykeys for links and renewals\n• 🛒 /buy for a new order\n• 📬 /inbox for updates\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
+        ? `✅ <b>${username}</b> ကို ပြန်လည်ကြိုဆိုပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📶 /usage ဖြင့် အသုံးပြုမှု စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။`
+        : `✅ Welcome back, <b>${username}</b>!\n\n<b>Start here</b>\n• 🗂 /mykeys for keys and renewals\n• 🛒 /buy for a new order\n• 📶 /usage for your latest usage\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
     accountLinked: (username: string) =>
       isMyanmar
-        ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key များ စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📬 /inbox ဖြင့် update များ ကြည့်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး စတင်နိုင်ပါသည်။`
-        : `✅ Account linked successfully!\n\n<b>Start here</b>\n• 🗂 /mykeys for your linked keys\n• 🛒 /buy for a new order\n• 📬 /inbox for updates\n• 🛟 /support for help\n\nUse the menu below to continue.`,
+        ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key များ စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📶 /usage ဖြင့် အသုံးပြုမှု စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး စတင်နိုင်ပါသည်။`
+        : `✅ Account linked successfully!\n\n<b>Start here</b>\n• 🗂 /mykeys for your linked keys\n• 🛒 /buy for a new order\n• 📶 /usage for your latest usage\n• 🛟 /support for help\n\nUse the menu below to continue.`,
     adminRecognized: isMyanmar ? '\n\nသင့်ကို administrator အဖြစ် သတ်မှတ်ထားပါသည်။' : '\n\nYou are recognized as an administrator.',
     languagePrompt: isMyanmar ? '🌐 ဘာသာစကား ရွေးချယ်ပါ။' : '🌐 Choose your language.',
     languagePromptDesc: isMyanmar
@@ -355,18 +355,18 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အမြန် menu</b>\n• 🛒 /buy - order အသစ်\n• 🗂 /mykeys - ချိတ်ထားသော key များ\n• 🧾 /orders - မကြာသေးသော order များ\n• 🛟 /support - အကူအညီ စင်တာ\n\n<b>နောက်ထပ်</b>\n• 📬 /inbox - notice နှင့် reply များ\n• 🎁 /trial - free trial\n• 🌐 /language - ဘာသာစကားပြောင်းရန်\n\nအောက်ရှိ keyboard ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick menu</b>\n• 🛒 /buy - new order\n• 🗂 /mykeys - linked keys\n• 🧾 /orders - recent orders\n• 🛟 /support - help center\n\n<b>More</b>\n• 📬 /inbox - updates and replies\n• 🎁 /trial - free trial\n• 🌐 /language - switch language\n\nUse the keyboard below for the fastest path.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အမြန် menu</b>\n• 🛒 /buy - order အသစ်\n• 🗂 /mykeys - ချိတ်ထားသော key များ\n• 🔄 /renew - သက်တမ်းတိုးရန်\n• 🛟 /support - အကူအညီ စင်တာ\n\n<b>နောက်ထပ်</b>\n• 🎟 /offers - offer များ\n• 📶 /usage - အသုံးပြုမှု စစ်ရန်\n• 🌐 /language - ဘာသာစကားပြောင်းရန်\n• ❓ /help - command guide\n\nအောက်ရှိ keyboard ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick menu</b>\n• 🛒 /buy - new order\n• 🗂 /mykeys - linked keys\n• 🔄 /renew - renew a key\n• 🛟 /support - help center\n\n<b>More</b>\n• 🎟 /offers - active offers\n• 📶 /usage - latest usage\n• 🌐 /language - switch language\n• ❓ /help - command guide\n\nUse the keyboard below for the fastest path.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar
-      ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\nအသုံးပြုမှုနှင့် share page ရယူရန် /usage သို့မဟုတ် /sub ကို အသုံးပြုပါ။`
-      : `✅ Linked ${formatTelegramCountLabel(count, locale, 'key')} to this Telegram account.\n\nUse /usage or /sub to receive your usage details and share pages.`,
+      ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\n/usage ဖြင့် အသုံးပြုမှုကို စစ်နိုင်ပြီး /mykeys ဖြင့် key များကို ပြန်ဖွင့်နိုင်ပါသည်။`
+      : `✅ Linked ${formatTelegramCountLabel(count, locale, 'key')} to this Telegram account.\n\nUse /usage for the latest usage or /mykeys to reopen your keys.`,
     keyNotFoundDefault: DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES[locale],
     usageTitle: isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု</b>\n\n' : '📊 <b>Your VPN Usage</b>\n\n',
     myKeysEmpty: isMyanmar
-      ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိသေးပါ။ Key အသစ်ဝယ်ရန် /buy သို့မဟုတ် free trial ရယူရန် /trial ကို အသုံးပြုနိုင်ပါသည်။'
-      : '❌ No linked keys were found for this Telegram account yet. Use /buy for a new key or /trial for a free trial.',
+      ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိသေးပါ။ Key အသစ်ဝယ်ရန် /buy ကို သုံးပါ။ First-time user ဖြစ်ပါက /start ကို ပြန်ပို့ပြီး free trial offer ရှိမရှိ စစ်နိုင်ပါသည်။'
+      : '❌ No linked keys were found for this Telegram account yet. Use /buy for a new key. If you are brand new, send /start again to check the free-trial offer.',
     myKeysTitle: isMyanmar ? '🗂 <b>သင့် key များ</b>' : '🗂 <b>Your keys</b>',
     myKeysSectionStandard: isMyanmar ? '🔑 <b>Standard key များ</b>' : '🔑 <b>Standard keys</b>',
     myKeysSectionTrial: isMyanmar ? '🎁 <b>Trial key များ</b>' : '🎁 <b>Trial keys</b>',
@@ -386,14 +386,14 @@ export function getTelegramUi(locale: SupportedLocale) {
     supportLabel: isMyanmar ? '🛟 အကူအညီ' : '🛟 Support',
     supportHubTitle: isMyanmar ? '🛟 <b>အကူအညီ စင်တာ</b>' : '🛟 <b>Support center</b>',
     supportHubHint: isMyanmar
-      ? 'Order အခြေအနေ၊ refund, server issue နှင့် premium support ကို ဒီနေရာကနေ စတင်နိုင်ပါသည်။'
-      : 'Start here for order updates, refunds, server issues, and premium support.',
+      ? 'Order, key, server issue နှင့် premium support ကို ဒီနေရာကနေ စတင်နိုင်ပါသည်။'
+      : 'Start here for order, key, server-issue, and premium support help.',
     supportHubOrdersHint: isMyanmar
-      ? '• /orders သို့မဟုတ် /order ORDER-CODE ဖြင့် payment နှင့် order progress ကို စစ်ပါ။'
-      : '• Use /orders or /order ORDER-CODE to check payment and order progress.',
+      ? '• Order, payment, နှင့် screenshot ပြဿနာကို အောက်က button များမှ စတင်နိုင်ပါသည်။'
+      : '• Start order, payment, and screenshot help from the buttons below.',
     supportHubInboxHint: isMyanmar
-      ? '• /inbox ဖြင့် announcement, refund, support reply များကို တစ်နေရာတည်းမှာ ကြည့်ပါ။'
-      : '• Use /inbox to see announcements, refund updates, and support replies in one place.',
+      ? '• Thread အခြေအနေများနှင့် support reply များကို ဒီစင်တာမှ တစ်နေရာတည်းမှာ စစ်နိုင်ပါသည်။'
+      : '• Review thread status and support replies here in one place.',
     supportHubPremiumHint: isMyanmar
       ? '• Premium user များအတွက် /premium, /supportstatus, /premiumregion ကို အသုံးပြုနိုင်ပါသည်။'
       : '• Premium users can continue with /premium, /supportstatus, and /premiumregion.',

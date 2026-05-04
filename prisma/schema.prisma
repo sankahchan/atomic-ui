@@ -521,6 +521,10 @@ model TelegramUserProfile {
   referredByCode String?
   pendingReferralCode String?
   lastReferralAcceptedAt DateTime?
+  trialUsed      Boolean  @default(false)
+  trialKeyId     String?
+  trialStartedAt DateTime?
+  trialExpiresAt DateTime?
   allowPromoAnnouncements   Boolean  @default(true)
   allowMaintenanceNotices   Boolean  @default(true)
   allowReceiptNotifications Boolean  @default(true)

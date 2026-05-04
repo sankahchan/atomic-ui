@@ -873,27 +873,25 @@ export function buildTelegramHelpMessage(input: {
     ? `📚 <b>အမြန် command guide</b>
 
 <b>စတင်ရန်</b>
-<code>/buy</code>, <code>/mykeys</code>, <code>/orders</code>, <code>/support</code>
+<code>/buy</code>, <code>/mykeys</code>, <code>/renew</code>, <code>/support</code>
 
-<b>Update များ</b>
-<code>/inbox</code>, <code>/premium</code>, <code>/notifications</code>
+<b>More</b>
+<code>/offers</code>, <code>/usage</code>, <code>/language</code>, <code>/help</code>
 
-<b>နောက်ထပ် tool များ</b>
-အောက်က keyboard ဖြင့် renew, offers, links, language နှင့် cancel ကို ဆက်သုံးနိုင်ပါသည်။
-<code>/order ORDER-CODE</code> သို့မဟုတ် <code>/inbox orders|support|refunds|announcements|premium</code> ကို သုံးပါ။
-Extra: <code>/server</code>, <code>/refund</code>, <code>/gift</code>, <code>/referral</code>`
+<b>Free trial</b>
+အသစ်စတင်သူဆိုပါက <code>/start</code> တွင် free trial offer ပထမဦးစွာ ပြပါမည်။
+Keyboard မှ command များကို တိုက်ရိုက် ရွေးသုံးနိုင်ပါသည်။`
     : `📚 <b>Quick command guide</b>
 
 <b>Start here</b>
-<code>/buy</code>, <code>/mykeys</code>, <code>/orders</code>, <code>/support</code>
+<code>/buy</code>, <code>/mykeys</code>, <code>/renew</code>, <code>/support</code>
 
-<b>Stay updated</b>
-<code>/inbox</code>, <code>/premium</code>, <code>/notifications</code>
+<b>More</b>
+<code>/offers</code>, <code>/usage</code>, <code>/language</code>, <code>/help</code>
 
-<b>Need something else?</b>
-Use the keyboard below for renew, offers, links, language, and cancel.
-Try <code>/order ORDER-CODE</code> or <code>/inbox orders|support|refunds|announcements|premium</code>.
-Extras: <code>/server</code>, <code>/refund</code>, <code>/gift</code>, <code>/referral</code>.`;
+<b>Free trial</b>
+If you are brand new, <code>/start</code> will show the free-trial offer before the main menu.
+Use the keyboard below for the fastest path.`;
 
   if (input.isAdmin) {
     message += isMyanmar
