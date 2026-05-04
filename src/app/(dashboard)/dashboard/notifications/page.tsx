@@ -1200,8 +1200,8 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
     {
       code: 'trial_1d_3gb',
       enabled: true,
-      label: 'Free Trial / 1 Day / 3 GB',
-      localizedLabels: { en: 'Free Trial / 1 Day / 3 GB', my: 'Free Trial / ၁ ရက် / 3 GB' },
+      label: 'Free Trial / 2 Days / 5 GB',
+      localizedLabels: { en: 'Free Trial / 2 Days / 5 GB', my: 'Free Trial / ၂ ရက် / 5 GB' },
       priceAmount: '0',
       priceCurrency: 'MMK',
       priceLabel: 'Free Trial',
@@ -1209,10 +1209,10 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       deliveryType: 'ACCESS_KEY',
       templateId: null,
       dynamicTemplateId: null,
-      fixedDurationDays: 1,
+      fixedDurationDays: 2,
       fixedDurationMonths: null,
       minDurationMonths: null,
-      dataLimitGB: 3,
+      dataLimitGB: 5,
       unlimitedQuota: false,
     },
     {

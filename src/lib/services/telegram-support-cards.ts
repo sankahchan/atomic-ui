@@ -57,7 +57,7 @@ export function resolveTelegramSupportIssueLabel(
     case 'SERVER':
       return isMyanmar ? 'Server / လမ်းကြောင်း' : 'Server / route issue';
     case 'BILLING':
-      return isMyanmar ? 'ငွေတောင်းခံမှု / refund' : 'Billing / refund';
+      return isMyanmar ? 'ငွေပေးချေမှု / coupon' : 'Billing / coupon';
     case 'GENERAL':
     default:
       return isMyanmar ? 'အထွေထွေ အကူအညီ' : 'General help';
@@ -93,8 +93,8 @@ export function resolveTelegramSupportIssuePrompt(
         : 'Tell us the server name, route issue, slow connection, or region problem.';
     case 'BILLING':
       return isMyanmar
-        ? 'Refund, receipt, billing, discount, coupon, payment follow-up ပြဿနာကို ပို့ပါ။'
-        : 'Tell us the refund, receipt, billing, discount, coupon, or payment follow-up issue.';
+        ? 'Receipt, billing, discount, coupon, payment follow-up ပြဿနာကို ပို့ပါ။'
+        : 'Tell us the receipt, billing, discount, coupon, or payment follow-up issue.';
     case 'GENERAL':
     default:
       return isMyanmar
@@ -183,8 +183,8 @@ export function buildTelegramSupportHubMessage(input: {
 }) {
   const isMyanmar = input.locale === 'my';
   const quickRouteLines = isMyanmar
-    ? ['🧾 Order • proof, ငွေပေး', '🔑 Key • renew, usage', '📬 Inbox • reply, premium']
-    : ['🧾 Order • proof, payment', '🔑 Key • renew, usage', '📬 Inbox • replies, premium'];
+    ? ['🧾 Order • proof, ငွေပေး', '🔑 Key • renew, usage', '🛟 Support • thread, premium']
+    : ['🧾 Order • proof, payment', '🔑 Key • renew, usage', '🛟 Support • thread, premium'];
   const stats = [
     isMyanmar ? `${input.openThreadCount} ခု ဖွင့်ထား` : `${input.openThreadCount} open`,
     isMyanmar ? `${input.recentThreadCount} ခု recent` : `${input.recentThreadCount} recent`,
@@ -337,7 +337,7 @@ export function buildTelegramSupportHubKeyboard(input: {
         callback_data: buildTelegramSupportThreadCallbackData('new', 'server'),
       },
       {
-        text: isMyanmar ? '💸 ငွေတောင်းခံမှု / refund' : '💸 Billing / refund',
+        text: isMyanmar ? '💳 ငွေပေးချေမှု / coupon' : '💳 Billing / coupon',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'billing'),
       },
     ],
@@ -353,8 +353,8 @@ export function buildTelegramSupportHubKeyboard(input: {
     ],
     [
       {
-        text: isMyanmar ? '📬 Inbox update များ' : '📬 Inbox updates',
-        callback_data: buildTelegramMenuCallbackData('support', 'inbox'),
+        text: isMyanmar ? '🗂 ကျွန်ုပ်၏ key များ' : '🗂 My keys',
+        callback_data: buildTelegramMenuCallbackData('support', 'keys'),
       },
       {
         text: isMyanmar ? '💎 Premium အကူအညီ' : '💎 Premium help',

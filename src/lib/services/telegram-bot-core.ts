@@ -180,7 +180,7 @@ import {
   handleNotificationPreferencesCommand as handleTelegramNotificationPreferencesCommand,
 } from '@/lib/services/telegram-notifications';
 import { handleOffersCommand } from '@/lib/services/telegram-offers';
-import { handleTelegramStartCommand } from '@/lib/services/telegram-onboarding';
+import { handleTelegramStartCommand, sendTelegramStartHome } from '@/lib/services/telegram-onboarding';
 import { generateTelegramQrBufferWithAtomicLogo } from '@/lib/services/telegram-qr';
 import {
   buildTelegramGiftUsageMessage,
@@ -302,6 +302,14 @@ import {
   type TelegramRetentionSource,
 } from '@/lib/services/telegram-callbacks';
 import {
+  buildTelegramTrialActivatedMessage,
+  buildTelegramTrialAdminAlertMessage,
+  buildTelegramTrialActivationFailedMessage,
+  buildTelegramTrialUnavailableMessage,
+  isTelegramTrialEligible,
+  TELEGRAM_TRIAL_PLAN_CODE,
+} from '@/lib/services/telegram-trial';
+import {
   addTelegramSupportReply,
   buildTelegramSupportThreadKeyboard,
   buildTelegramSupportThreadStatusMessage,
@@ -370,6 +378,18 @@ import { formatBytes, formatDateTime, generateRandomString } from '@/lib/utils';
 import { replaceAccessKeyServer } from '@/lib/services/server-migration';
 
 const TELEGRAM_CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
+  'buy',
+  'help',
+  'language',
+  'mykeys',
+  'offers',
+  'renew',
+  'start',
+  'support',
+  'usage',
+  'cancel',
+]);
 
 export {
   getTelegramConfig,
@@ -1589,22 +1609,6 @@ export async function buildTelegramOrderStatusReplyMarkup(input: {
     }
   }
 
-  if (
-    input.order.status === 'FULFILLED' &&
-    !input.order.refundRequestStatus &&
-    input.order.financeStatus !== 'REFUNDED'
-  ) {
-    const refundEligibility = await evaluateTelegramOrderRefundEligibility(input.order);
-    if (refundEligibility.eligible) {
-      rows.push([
-        {
-          text: ui.orderActionRequestRefund,
-          callback_data: buildTelegramOrderActionCallbackData('rf', input.order.id),
-        },
-      ]);
-    }
-  }
-
   if (supportLink && input.order.status !== 'PENDING_REVIEW' && !supportHandledInKeyboard) {
     rows.push([{ text: ui.getSupport, url: supportLink }]);
   }
@@ -1642,21 +1646,12 @@ export async function listAvailableTelegramPlansForOrder(input: {
   settings: Awaited<ReturnType<typeof getTelegramSalesSettings>>;
   deliveryType?: 'ACCESS_KEY' | 'DYNAMIC_KEY' | null;
 }) {
-  const freeTrialEligible =
-    input.kind === 'NEW'
-      ? await isEligibleForTelegramFreeTrial(input.chatId, input.telegramUserId)
-      : false;
-
   return input.settings.plans.filter((plan) => {
     if (!plan.enabled) {
       return false;
     }
 
-    if (input.kind === 'RENEW' && plan.code === 'trial_1d_3gb') {
-      return false;
-    }
-
-    if (plan.code === 'trial_1d_3gb' && !freeTrialEligible) {
+    if (plan.code === TELEGRAM_TRIAL_PLAN_CODE) {
       return false;
     }
 
@@ -2575,33 +2570,175 @@ function applyTelegramOrderDuration(input: {
 }
 
 export async function isEligibleForTelegramFreeTrial(chatId: number, telegramUserId: number) {
-  const [linkedKeyCount, fulfilledOrders, fulfilledTrialOrder] = await Promise.all([
-    db.accessKey.count({
-      where: {
-        OR: [{ telegramId: String(telegramUserId) }, { user: { telegramChatId: String(chatId) } }],
-        status: {
-          not: 'ARCHIVED',
-        },
-      },
-    }),
-    db.telegramOrder.count({
-      where: {
-        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
-        kind: 'NEW',
-        status: 'FULFILLED',
-      },
-    }),
-    db.telegramOrder.count({
-      where: {
-        OR: [{ telegramChatId: String(chatId) }, { telegramUserId: String(telegramUserId) }],
-        kind: 'NEW',
-        planCode: 'trial_1d_3gb',
-        status: 'FULFILLED',
-      },
-    }),
-  ]);
+  return isTelegramTrialEligible({
+    chatId,
+    telegramUserId,
+  });
+}
 
-  return linkedKeyCount === 0 && fulfilledOrders === 0 && fulfilledTrialOrder === 0;
+async function claimTelegramFreeTrialForUser(input: {
+  chatId: number;
+  telegramUserId: number;
+  username: string;
+  locale: SupportedLocale;
+  botToken: string;
+}) {
+  const settings = await getTelegramSalesSettings();
+  if (!settings.enabled) {
+    return getTelegramUi(input.locale).buyDisabled;
+  }
+
+  const trialPlan = resolveTelegramSalesPlan(settings, TELEGRAM_TRIAL_PLAN_CODE);
+  if (!trialPlan?.enabled) {
+    return buildTelegramTrialUnavailableMessage(input.locale);
+  }
+
+  if (!(await isTelegramTrialEligible({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+  }))) {
+    return buildTelegramTrialUnavailableMessage(input.locale);
+  }
+
+  await cancelStaleTelegramConversationOrders(input.chatId, input.telegramUserId);
+
+  const now = new Date();
+  const order = await db.telegramOrder.create({
+    data: {
+      orderCode: await generateTelegramOrderCode(),
+      kind: 'NEW',
+      status: 'APPROVED',
+      ...buildTelegramOrderPaymentStageFields({
+        nextStatus: 'APPROVED',
+      }),
+      telegramChatId: String(input.chatId),
+      telegramUserId: String(input.telegramUserId),
+      telegramUsername: input.username || null,
+      locale: input.locale,
+      requestedName: `Trial ${input.username}`.trim().slice(0, 100),
+      planCode: trialPlan.code,
+      planName: resolveTelegramSalesPlanLabel(trialPlan, input.locale),
+      originalPriceAmount: trialPlan.priceAmount ?? 0,
+      priceAmount: trialPlan.priceAmount ?? 0,
+      priceCurrency: trialPlan.priceCurrency || 'MMK',
+      priceLabel: resolveTelegramSalesPriceLabel(trialPlan, input.locale),
+      templateId: trialPlan.templateId || null,
+      dynamicTemplateId: trialPlan.dynamicTemplateId || null,
+      deliveryType: trialPlan.deliveryType,
+      durationMonths: trialPlan.fixedDurationMonths ?? null,
+      durationDays: trialPlan.fixedDurationDays ?? null,
+      dataLimitBytes: trialPlan.dataLimitGB
+        ? BigInt(trialPlan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
+        : null,
+      unlimitedQuota: trialPlan.unlimitedQuota,
+      reviewedAt: now,
+      adminNote: appendTelegramOrderAdminNote(null, 'Auto-approved start-screen free trial'),
+    },
+  });
+
+  try {
+    const { plan, template, durationMonths, durationDays } = await resolveTelegramOrderPlanContext(order);
+    const key = await fulfillTelegramNewAccessOrder({
+      orderId: order.id,
+      orderCode: order.orderCode,
+      telegramChatId: order.telegramChatId,
+      telegramUserId: order.telegramUserId,
+      requestedName: order.requestedName,
+      requestedEmail: order.requestedEmail,
+      durationMonths,
+      durationDays,
+      plan,
+      template,
+    });
+    const fulfilledAt = new Date();
+    const keyExpiresAt = key.expiresAt || fulfilledAt;
+    const server = await db.server.findUnique({
+      where: { id: key.serverId },
+      select: { name: true },
+    });
+    if (!key.accessUrl) {
+      throw new Error('Trial key access URL is missing after fulfillment');
+    }
+
+    await db.$transaction([
+      db.telegramOrder.update({
+        where: { id: order.id },
+        data: {
+          status: 'FULFILLED',
+          approvedAccessKeyId: key.id,
+          fulfilledAt,
+          paymentStageEnteredAt: null,
+          paymentReminderSentAt: null,
+          reviewReminderSentAt: null,
+        },
+      }),
+      db.telegramUserProfile.upsert({
+        where: { telegramUserId: String(input.telegramUserId) },
+        create: {
+          telegramUserId: String(input.telegramUserId),
+          telegramChatId: String(input.chatId),
+          username: input.username || null,
+          displayName: input.username || null,
+          locale: input.locale,
+          trialUsed: true,
+          trialKeyId: key.id,
+          trialStartedAt: fulfilledAt,
+          trialExpiresAt: keyExpiresAt,
+        },
+        update: {
+          telegramChatId: String(input.chatId),
+          username: input.username || null,
+          displayName: input.username || null,
+          locale: input.locale,
+          trialUsed: true,
+          trialKeyId: key.id,
+          trialStartedAt: fulfilledAt,
+          trialExpiresAt: keyExpiresAt,
+        },
+      }),
+    ]);
+
+    await sendTelegramMessage(
+      input.botToken,
+      input.chatId,
+      buildTelegramTrialActivatedMessage({
+        locale: input.locale,
+        firstName: input.username,
+        outlineKey: key.accessUrl,
+        expiresAt: keyExpiresAt,
+      }),
+      {
+        replyMarkup: getCommandKeyboard(false, input.locale),
+      },
+    );
+
+    await sendAdminAlert(
+      buildTelegramTrialAdminAlertMessage({
+        locale: input.locale,
+        firstName: input.username,
+        telegramUserId: input.telegramUserId,
+        chatId: input.chatId,
+        keyName: key.name,
+        expiresAt: keyExpiresAt,
+        serverName: server?.name || null,
+      }),
+    );
+
+    return null;
+  } catch (error) {
+    console.error('Failed to claim Telegram free trial:', error);
+    await db.telegramOrder.update({
+      where: { id: order.id },
+      data: {
+        status: 'CANCELLED',
+        adminNote: appendTelegramOrderAdminNote(
+          order.adminNote,
+          `Trial activation failed: ${(error as Error).message}`,
+        ),
+      },
+    });
+    return buildTelegramTrialActivationFailedMessage(input.locale);
+  }
 }
 
 async function isGeneratedAccessSlugAvailable(slug: string) {
@@ -6714,14 +6851,13 @@ export async function handleTelegramCallbackQuery(
             });
             break;
           case 'refunds':
-            await handleRefundCommand({
+            await sendTelegramMessage(
+              config.botToken,
               chatId,
-              telegramUserId: callbackQuery.from.id,
-              locale,
-              botToken: config.botToken,
-              sendTelegramMessage,
-              sendTelegramOrderStatusCard,
-            });
+              locale === 'my'
+                ? 'ℹ️ Refund feature ကို ယာယီ ပိတ်ထားပါသည်။ အခြားအကူအညီအတွက် /support ကို ဆက်သုံးနိုင်ပါသည်။'
+                : 'ℹ️ The refund feature is turned off for now. You can keep using /support for other help.',
+            );
             break;
           case 'inbox':
             await handleInboxCommand({
@@ -6765,6 +6901,58 @@ export async function handleTelegramCallbackQuery(
         }
         await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, ui.orderActionSent);
         return null;
+      }
+
+      if (menuAction.section === 'trial') {
+        if (menuAction.action === 'claim') {
+          const response = await claimTelegramFreeTrialForUser({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            username: callbackQuery.from.first_name || callbackQuery.from.username || 'User',
+            locale,
+            botToken: config.botToken,
+          });
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            response
+              ? buildTelegramTrialUnavailableMessage(locale)
+              : locale === 'my'
+                ? 'Free trial ကို စတင်ပြီးပါပြီ။'
+                : 'Free trial activated.',
+          );
+          if (response) {
+            await sendTelegramMessage(config.botToken, chatId, response, {
+              replyMarkup: getCommandKeyboard(false, locale),
+            });
+          }
+          return null;
+        }
+
+        if (menuAction.action === 'back_main') {
+          const latestConfig = await getTelegramConfig();
+          const welcomeMessage = resolveLocalizedTemplate(
+            latestConfig?.localizedWelcomeMessages,
+            locale,
+            latestConfig?.welcomeMessage || ui.defaultWelcome,
+          );
+
+          await sendTelegramStartHome({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            username: callbackQuery.from.first_name || callbackQuery.from.username || 'User',
+            isAdmin: false,
+            botToken: config.botToken,
+            locale,
+            welcomeMessage,
+          });
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            locale === 'my' ? 'Main menu ကို ပို့ပြီးပါပြီ။' : 'Main menu sent.',
+          );
+          return null;
+        }
       }
     }
 
@@ -8787,135 +8975,21 @@ export async function handleTelegramCallbackQuery(
             return null;
           }
           case 'rf': {
-            const order = await findTelegramOrderByIdForUser({
-              orderId: userOrderAction.primary,
-              chatId,
-              telegramUserId: callbackQuery.from.id,
-            });
-            if (!order) {
-              await answerTelegramCallbackQuery(
-                config.botToken,
-                callbackQuery.id,
-                ui.orderActionStatusMissing,
-              );
-              return null;
-            }
-
-            if (order.refundRequestStatus === 'PENDING') {
-              await sendTelegramOrderStatusCard({
-                botToken: config.botToken,
-                chatId,
-                order,
-                locale,
-              });
-              await answerTelegramCallbackQuery(
-                config.botToken,
-                callbackQuery.id,
-                ui.orderActionSent,
-              );
-              return null;
-            }
-
-            if (order.refundRequestStatus === 'APPROVED') {
-              await sendTelegramOrderStatusCard({
-                botToken: config.botToken,
-                chatId,
-                order,
-                locale,
-              });
-              await answerTelegramCallbackQuery(
-                config.botToken,
-                callbackQuery.id,
-                ui.orderActionSent,
-              );
-              return null;
-            }
-
-            if (order.refundRequestStatus === 'REJECTED') {
-              await sendTelegramOrderStatusCard({
-                botToken: config.botToken,
-                chatId,
-                order,
-                locale,
-              });
-              await answerTelegramCallbackQuery(
-                config.botToken,
-                callbackQuery.id,
-                ui.orderActionSent,
-              );
-              return null;
-            }
-
-            const refundEligibility = await evaluateTelegramOrderRefundEligibility(order);
-            if (!refundEligibility.eligible) {
-              await sendTelegramMessage(
-                config.botToken,
-                chatId,
-                [
-                  ui.refundNoEligibleOrders,
-                  '',
-                  refundEligibility.reason ? escapeHtml(refundEligibility.reason) : ui.refundPolicySummary,
-                ].join('\n'),
-                {
-                  replyMarkup: getCommandKeyboard(isAdmin, locale),
-                },
-              );
-              await answerTelegramCallbackQuery(
-                config.botToken,
-                callbackQuery.id,
-                ui.orderActionSent,
-              );
-              return null;
-            }
-
-            const updatedOrder = await db.telegramOrder.update({
-              where: { id: order.id },
-              data: {
-                refundRequestedAt: new Date(),
-                refundRequestStatus: 'PENDING',
-                refundRequestMessage: null,
-                refundRequestCustomerMessage: null,
-                refundReviewReasonCode: null,
-                refundRequestReviewedAt: null,
-                refundRequestReviewedByUserId: null,
-                refundRequestReviewerEmail: null,
-              },
-            });
-
-            await writeAuditLog({
-              action: 'TELEGRAM_ORDER_REFUND_REQUEST_CREATE',
-              entity: 'TELEGRAM_ORDER',
-              entityId: order.id,
-              details: {
-                orderCode: order.orderCode,
-                telegramUserId: String(callbackQuery.from.id),
-                telegramChatId: String(chatId),
-              },
-            });
-
-            await sendTelegramRefundRequestAlert({
-              orderId: order.id,
-              orderCode: order.orderCode,
-              telegramUsername: callbackQuery.from.username || callbackQuery.from.first_name,
-              telegramUserId: String(callbackQuery.from.id),
-            });
-
             await sendTelegramMessage(
               config.botToken,
               chatId,
-              ui.refundRequested(order.orderCode),
+              locale === 'my'
+                ? 'ℹ️ Refund feature ကို ယာယီ ပိတ်ထားပါသည်။ အခြားအကူအညီလိုပါက /support ကို အသုံးပြုပါ။'
+                : 'ℹ️ The refund feature is turned off for now. Use /support if you need other help.',
               {
-                replyMarkup: await buildTelegramOrderStatusReplyMarkup({
-                  order: updatedOrder,
-                  locale,
-                }),
+                replyMarkup: getCommandKeyboard(isAdmin, locale),
               },
             );
 
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              ui.orderActionSent,
+              locale === 'my' ? 'Refund feature ပိတ်ထားပါသည်။' : 'Refunds are unavailable right now.',
             );
             return null;
           }
@@ -9531,6 +9605,10 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
   const adminReplyRecipientSeed = !argsText.trim()
     ? getTelegramAdminReplyRecipientSeed(message)
     : '';
+
+  if (!isAdmin && !ALLOWED_TELEGRAM_USER_COMMANDS.has(command)) {
+    return ui.unknownCommand;
+  }
 
   switch (command) {
     case 'start':

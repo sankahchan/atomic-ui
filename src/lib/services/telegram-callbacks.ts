@@ -95,33 +95,29 @@ const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
     { command: '/mykeys', labelEn: '🗂 Keys', labelMy: '🗂 Key များ', aliases: ['🗂 My keys'] },
   ],
   [
+    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offers', aliases: ['🎟 Offer များ'] },
     { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
-    { command: '/orders', labelEn: '🧾 Orders', labelMy: '🧾 Orders' },
   ],
   [
-    { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
+    { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
     { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
   ],
   [
-    { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
-    { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
-  ],
-  [
-    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offers', aliases: ['🎟 Offer များ'] },
-    { command: '/trial', labelEn: '🎁 Trial', labelMy: '🎁 Trial', aliases: ['🎁 Free trial', '🎁 Free Trial'] },
-  ],
-  [
-    { command: '/sub', labelEn: '📎 Links', labelMy: '📎 Links', aliases: ['📎 Sub links', '📎 Sub Links'] },
     { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
   ],
   [
     { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
-    { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
   ],
 ];
 
 const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
+  { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
+  { command: '/orders', labelEn: '🧾 Orders', labelMy: '🧾 Orders' },
+  { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
+  { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
   { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
+  { command: '/trial', labelEn: '🎁 Trial', labelMy: '🎁 Trial', aliases: ['🎁 Free trial', '🎁 Free Trial'] },
+  { command: '/sub', labelEn: '📎 Links', labelMy: '📎 Links', aliases: ['📎 Sub links', '📎 Sub Links'] },
   { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
   { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
   { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
@@ -704,9 +700,11 @@ export function parseTelegramMenuCallbackData(data?: string | null): TelegramMen
           ? 'offers'
           : parts[1] === 'orders'
             ? 'orders'
-          : parts[1] === 'support'
-            ? 'support'
-          : null;
+            : parts[1] === 'support'
+              ? 'support'
+              : parts[1] === 'trial'
+                ? 'trial'
+                : null;
 
   if (!section) {
     return null;

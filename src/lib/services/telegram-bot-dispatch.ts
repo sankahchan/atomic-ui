@@ -10,7 +10,20 @@ import { resolveTelegramAdminActor } from '@/lib/services/telegram-admin-core';
 import { handlePremiumSupportFollowUpText } from '@/lib/services/telegram-premium';
 import { handleTelegramSupportReplyMedia, handleTelegramSupportReplyText } from '@/lib/services/telegram-support';
 import { copyTelegramMessage } from '@/lib/services/telegram-runtime';
-import { handleBuyCommand, handleEmailLink, handleGiftCommand, handleLanguageCommand, handleReferralCommand, handleRenewOrderCommand, handleStartCommand, handleTelegramOrderProofMessage, handleTelegramOrderTextMessage, handleTrialCommand } from '@/lib/services/telegram-user-command-handlers';
+import { handleBuyCommand, handleEmailLink, handleLanguageCommand, handleRenewOrderCommand, handleStartCommand, handleTelegramOrderProofMessage, handleTelegramOrderTextMessage } from '@/lib/services/telegram-user-command-handlers';
+
+const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
+  'buy',
+  'help',
+  'language',
+  'mykeys',
+  'offers',
+  'renew',
+  'start',
+  'support',
+  'usage',
+  'cancel',
+]);
 
 export async function handleTelegramUpdate(update: TelegramUpdate): Promise<string | null> {
   const callbackQuery = update.callback_query;
@@ -246,6 +259,10 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     ? getTelegramAdminReplyRecipientSeed(message)
     : '';
 
+  if (!isAdmin && !ALLOWED_TELEGRAM_USER_COMMANDS.has(command)) {
+    return ui.unknownCommand;
+  }
+
   switch (command) {
     case 'start':
       return handleStartCommand(
@@ -260,12 +277,6 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
       return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
-    case 'gift':
-      return handleGiftCommand(chatId, telegramUserId, username, locale, config.botToken, argsText);
-    case 'referral':
-      return handleReferralCommand(chatId, telegramUserId, username, locale);
-    case 'trial':
-      return handleTrialCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'renew':
       return handleRenewOrderCommand(chatId, telegramUserId, username, locale, config.botToken, argsText);
     case 'cancel': {

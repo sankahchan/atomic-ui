@@ -25,11 +25,12 @@ test('getCommandKeyboard renders localized customer labels', () => {
 
   assert.equal(english.keyboard[0]?.[0]?.text, '🛒 Buy');
   assert.equal(english.keyboard[0]?.[1]?.text, '🗂 Keys');
-  assert.equal(english.keyboard[1]?.[0]?.text, '🔄 Renew');
-  assert.equal(english.keyboard.length, 7);
+  assert.equal(english.keyboard[1]?.[0]?.text, '🎟 Offers');
+  assert.equal(english.keyboard[1]?.[1]?.text, '🔄 Renew');
+  assert.equal(english.keyboard.length, 5);
   assert.equal(myanmar.keyboard[0]?.[0]?.text, '🛒 ဝယ်မည်');
   assert.equal(myanmar.keyboard[0]?.[1]?.text, '🗂 Key များ');
-  assert.equal(myanmar.keyboard[4]?.[0]?.text, '🎟 Offers');
+  assert.equal(myanmar.keyboard[4]?.[0]?.text, '❓ Help');
 });
 
 test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back to commands', () => {
@@ -175,6 +176,13 @@ test('telegram menu callbacks support admin and user filters', () => {
     {
       section: 'support',
       action: 'server',
+    },
+  );
+  assert.deepEqual(
+    parseTelegramMenuCallbackData(buildTelegramMenuCallbackData('trial', 'claim')),
+    {
+      section: 'trial',
+      action: 'claim',
     },
   );
 });
