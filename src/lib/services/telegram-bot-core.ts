@@ -6975,6 +6975,32 @@ export async function handleTelegramCallbackQuery(
             botToken: config.botToken,
             retentionSource: null,
             argsText,
+            deps: {
+              createTelegramOrderRecord,
+              resolveTelegramCouponForOrderStart,
+              attachTelegramCouponToOrder: async (input: {
+                orderId: string;
+                coupon: {
+                  campaignType: string;
+                  couponCode: string;
+                  couponDiscountAmount: number;
+                  couponDiscountLabel?: string | null;
+                };
+              }) =>
+                db.telegramOrder.update({
+                  where: { id: input.orderId },
+                  data: {
+                    couponCampaignType: input.coupon.campaignType,
+                    couponCode: input.coupon.couponCode,
+                    couponDiscountAmount: input.coupon.couponDiscountAmount,
+                    couponDiscountLabel: input.coupon.couponDiscountLabel?.trim() || null,
+                  },
+                }),
+              buildTelegramCouponReadyLines,
+              listAvailableTelegramPlansForOrder,
+              buildTelegramSalesPlanPromptText,
+              buildTelegramPlanSelectionKeyboard,
+            },
           });
           return null;
         }
