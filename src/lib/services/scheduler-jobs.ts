@@ -264,6 +264,15 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     cadenceLabel: 'Every 15 minutes',
     cronExpression: '*/15 * * * *',
   },
+  telegramTrialLifecycle: {
+    key: 'telegram_trial_lifecycle',
+    name: 'Telegram Trial Lifecycle Workflow',
+    description: 'Processes trial midpoint, expiry warnings, and winback nudges.',
+    category: 'TELEGRAM',
+    cadenceLabel: 'Every 15 minutes',
+    cronExpression: '*/15 * * * *',
+    manualRunSupported: true,
+  },
 };
 
 export function listSchedulerJobDefinitions() {

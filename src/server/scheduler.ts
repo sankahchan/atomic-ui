@@ -39,6 +39,7 @@ import {
 } from '@/lib/services/monitoring-alerts';
 import { runTelegramPremiumRegionAlertCycle } from '@/lib/services/telegram-premium';
 import { runTelegramSupportSlaAlertCycle } from '@/lib/services/telegram-support';
+import { runTelegramTrialLifecycleCycle } from '@/lib/services/telegram-trial-lifecycle';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
@@ -677,6 +678,30 @@ export function initScheduler() {
             }
     });
 
+    // 19. Telegram Trial Lifecycle (Every 15 minutes)
+    scheduleManagedJob('*/15 * * * *', SCHEDULER_JOB_DEFINITIONS.telegramTrialLifecycle, 'Telegram trial lifecycle failed', async () => {
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramTrialLifecycle,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramTrialLifecycleCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.midpointSent} midpoint, ${result.expiringSent} expiring, ${result.expiredSent} expired, ${result.winbackSent} winback`,
+                        resultPreview: result,
+                    };
+                },
+            );
+            if (!result.skipped && (result.midpointSent > 0 || result.expiringSent > 0 || result.expiredSent > 0 || result.winbackSent > 0)) {
+                logger.info(
+                    `Telegram trial lifecycle: ${result.midpointSent} midpoint, ${result.expiringSent} expiring, ${result.expiredSent} expired, ${result.winbackSent} winback`,
+                );
+            }
+    });
+
     // Run initial checks on startup
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');
@@ -871,6 +896,29 @@ export function initScheduler() {
             if (!result.skipped && (result.alerted > 0 || result.fallbackPinned > 0 || result.recovered > 0 || result.errors.length > 0)) {
                 logger.info(
                     `Initial premium region alert cycle: ${result.alerted} alerted, ${result.fallbackPinned} fallback-pinned, ${result.recovered} recovered, ${result.deduped} deduped, ${result.skippedHealthy} healthy, ${result.skippedPreferences} pref-skipped, ${result.skippedNoDestination} no-destination, ${result.errors.length} errors`,
+                );
+            }
+        });
+
+        await runStartupManagedJob(SCHEDULER_JOB_DEFINITIONS.telegramTrialLifecycle, 'Initial Telegram trial lifecycle failed', async () => {
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramTrialLifecycle,
+                'STARTUP',
+                async () => {
+                    const result = await runTelegramTrialLifecycleCycle();
+                    return {
+                        value: result,
+                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.skipped
+                            ? getSkippedSummary(result)
+                            : `${result.midpointSent} midpoint, ${result.expiringSent} expiring, ${result.expiredSent} expired, ${result.winbackSent} winback`,
+                        resultPreview: result,
+                    };
+                },
+            );
+            if (!result.skipped && (result.midpointSent > 0 || result.expiringSent > 0 || result.expiredSent > 0 || result.winbackSent > 0)) {
+                logger.info(
+                    `Initial Telegram trial lifecycle: ${result.midpointSent} midpoint, ${result.expiringSent} expiring, ${result.expiredSent} expired, ${result.winbackSent} winback`,
                 );
             }
         });
