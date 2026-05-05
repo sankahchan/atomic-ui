@@ -667,3 +667,61 @@ export function buildTelegramSupportThreadStatusMessage(input: {
     ],
   });
 }
+
+export function buildTelegramSupportTriageMessage(input: { locale: SupportedLocale }) {
+  const isMyanmar = input.locale === 'my';
+  return buildTelegramCommerceMessage({
+    title: isMyanmar ? '🛟 <b>အကူအညီ ရယူရန်</b>' : '🛟 <b>Get Support</b>',
+    statsLine: isMyanmar ? 'ကူညီပေးရန် အဆင်သင့်ရှိပါသည်' : 'We are ready to help you',
+    cards: [
+      buildTelegramCommerceCard(
+        isMyanmar ? '🧭 <b>လမ်းညွှန်</b>' : '🧭 <b>Guide</b>',
+        [
+          isMyanmar 
+            ? 'သင့်ပြဿနာနှင့် ကိုက်ညီသော category ကို ရွေးချယ်ပါ။' 
+            : 'Please select a category that matches your issue.',
+          isMyanmar
+            ? 'Category တစ်ခုစီတွင် သက်ဆိုင်ရာ ကျွမ်းကျင်သူများက ကူညီပေးပါမည်။'
+            : 'Specialists for each category will assist you faster.',
+        ]
+      )
+    ],
+    footerLines: [
+      isMyanmar 
+        ? 'Thread တစ်ခု စတင်လိုက်ပါက admin က မကြာမီ အကြောင်းပြန်ပါမည်။' 
+        : 'Once you start a thread, an admin will reply shortly.'
+    ]
+  });
+}
+
+export function buildTelegramSupportTriageKeyboard(input: { locale: SupportedLocale }) {
+  const isMyanmar = input.locale === 'my';
+  const rows = [
+    [
+      {
+        text: isMyanmar ? '🖥 Server Issue' : '🖥 Server Issue',
+        callback_data: buildTelegramSupportThreadCallbackData('new', 'server'),
+      },
+    ],
+    [
+      {
+        text: isMyanmar ? '💳 Payment Help' : '💳 Payment Help',
+        callback_data: buildTelegramSupportThreadCallbackData('new', 'order'),
+      },
+    ],
+    [
+      {
+        text: isMyanmar ? '❓ Other General Support' : '❓ Other General Support',
+        callback_data: buildTelegramSupportThreadCallbackData('new', 'general'),
+      },
+    ],
+    [
+      {
+        text: isMyanmar ? '🗂 My Support Center' : '🗂 My Support Center',
+        callback_data: buildTelegramMenuCallbackData('support', 'home'),
+      },
+    ],
+  ];
+
+  return { inline_keyboard: rows };
+}

@@ -241,6 +241,8 @@ async function main() {
     { text: '/refunds', label: 'admin /refunds', admin: true },
     { text: '/announcements', label: 'admin /announcements', admin: true },
     { text: '/finance', label: 'admin /finance', admin: true },
+    { text: '/referrals', label: 'user /referrals' },
+    { text: '/announce active media=https://example.com/test.jpg :: Smoke Test :: Testing media support', label: 'admin /announce' },
   ];
 
   let updateId = Date.now();
