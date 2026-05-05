@@ -414,6 +414,45 @@ function defaultPlans(): TelegramSalesPlan[] {
   ];
 }
 
+function normalizeBuiltInTelegramPlan(
+  fallbackPlan: TelegramSalesPlan,
+  override: TelegramSalesPlan,
+): TelegramSalesPlan {
+  if (fallbackPlan.code !== 'trial_1d_3gb') {
+    return {
+      ...fallbackPlan,
+      ...override,
+      localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
+      localizedPriceLabels: normalizeLocalizedTemplateMap(override.localizedPriceLabels),
+      deliveryType: override.deliveryType === 'DYNAMIC_KEY' ? 'DYNAMIC_KEY' : fallbackPlan.deliveryType,
+      templateId:
+        (override.templateId ?? '').trim() || (override.deliveryType === 'ACCESS_KEY' ? fallbackPlan.templateId ?? null : null),
+      dynamicTemplateId:
+        (override.dynamicTemplateId ?? '').trim() ||
+        (override.deliveryType === 'DYNAMIC_KEY' ? fallbackPlan.dynamicTemplateId ?? null : null),
+      fixedDurationDays:
+        typeof override.fixedDurationDays === 'number' && Number.isFinite(override.fixedDurationDays)
+          ? override.fixedDurationDays
+          : fallbackPlan.fixedDurationDays ?? null,
+      priceAmount:
+        typeof override.priceAmount === 'number' && Number.isFinite(override.priceAmount)
+          ? override.priceAmount
+          : fallbackPlan.priceAmount ?? null,
+      priceCurrency: (override.priceCurrency || fallbackPlan.priceCurrency || 'MMK')
+        .toString()
+        .trim()
+        .toUpperCase(),
+    };
+  }
+
+  return {
+    ...fallbackPlan,
+    enabled: override.enabled,
+    templateId: (override.templateId ?? '').trim() || null,
+    dynamicTemplateId: null,
+  };
+}
+
 function defaultPaymentMethods(): TelegramSalesPaymentMethod[] {
   return [
     {
@@ -680,30 +719,7 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
         return fallbackPlan;
       }
 
-      return {
-        ...fallbackPlan,
-        ...override,
-        localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
-        localizedPriceLabels: normalizeLocalizedTemplateMap(override.localizedPriceLabels),
-        deliveryType: override.deliveryType === 'DYNAMIC_KEY' ? 'DYNAMIC_KEY' : fallbackPlan.deliveryType,
-        templateId:
-          (override.templateId ?? '').trim() || (override.deliveryType === 'ACCESS_KEY' ? fallbackPlan.templateId ?? null : null),
-        dynamicTemplateId:
-          (override.dynamicTemplateId ?? '').trim() ||
-          (override.deliveryType === 'DYNAMIC_KEY' ? fallbackPlan.dynamicTemplateId ?? null : null),
-        fixedDurationDays:
-          typeof override.fixedDurationDays === 'number' && Number.isFinite(override.fixedDurationDays)
-            ? override.fixedDurationDays
-            : fallbackPlan.fixedDurationDays ?? null,
-        priceAmount:
-          typeof override.priceAmount === 'number' && Number.isFinite(override.priceAmount)
-            ? override.priceAmount
-            : fallbackPlan.priceAmount ?? null,
-        priceCurrency: (override.priceCurrency || fallbackPlan.priceCurrency || 'MMK')
-          .toString()
-          .trim()
-          .toUpperCase(),
-      };
+      return normalizeBuiltInTelegramPlan(fallbackPlan, override);
     }),
   };
 }
