@@ -19,11 +19,12 @@ export async function freezeBrowserTime(page: Page, isoString = smokeVisualNowIs
     const RealDate = Date;
 
     class FrozenDate extends RealDate {
-      constructor(...args: ConstructorParameters<DateConstructor>) {
+      constructor(...args: any[]) {
         if (args.length === 0) {
           super(now);
           return;
         }
+        // @ts-ignore
         super(...args);
       }
 

@@ -130,17 +130,13 @@ export function buildTelegramTrialActivatedMessage(input: {
 
   if (input.locale === 'my') {
     return [
-      '🎉 <b>Trial Activated!</b>',
+      '✅ <b>Trial is Active!</b>',
       '━━━━━━━━━━━━━━━━━━',
-      '',
-      `Your free trial is now active, <b>${firstName}</b>!`,
+      'You have <b>5 GB</b> for <b>2 days</b>.',
+      'Enjoy your free trial! 🎉',
       '',
       '🔑 <b>Your Access Key:</b>',
       `<code>${accessUrl}</code>`,
-      '',
-      '📶 Data        :  5 GB',
-      `🕐 Expires     :  ${expiresAt}`,
-      '💰 Cost        :  FREE',
       '',
       'အထက်ပါ key ကို tap လုပ်၍ copy လုပ်နိုင်ပါသည်။',
       'Outline app ထဲတွင် ထည့်ပြီး ချိတ်ဆက်အသုံးပြုပါ။',
@@ -148,17 +144,13 @@ export function buildTelegramTrialActivatedMessage(input: {
   }
 
   return [
-    '🎉 <b>Trial Activated!</b>',
+    '✅ <b>Trial is Active!</b>',
     '━━━━━━━━━━━━━━━━━━',
-    '',
-    `Your free trial is now active, <b>${firstName}</b>!`,
+    'You have <b>5 GB</b> for <b>2 days</b>.',
+    'Enjoy your free trial! 🎉',
     '',
     '🔑 <b>Your Access Key:</b>',
     `<code>${accessUrl}</code>`,
-    '',
-    '📶 Data        :  5 GB',
-    `🕐 Expires     :  ${expiresAt}`,
-    '💰 Cost        :  FREE',
     '',
     'Tap the key above to copy it.',
     'Use it in the Outline app to connect.',
@@ -210,4 +202,22 @@ export function buildTelegramTrialActivationFailedMessage(locale: SupportedLocal
   return locale === 'my'
     ? '❌ Free trial ကို စတင်မပေးနိုင်သေးပါ။ ခဏအကြာ ပြန်စမ်းပါ သို့မဟုတ် /support ကို အသုံးပြုပါ။'
     : '❌ We could not activate the free trial right now. Please try again shortly or use /support.';
+}
+
+export function buildTelegramTrialActivatedKeyboard(locale: SupportedLocale) {
+  const isMyanmar = locale === 'my';
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: isMyanmar ? '📲 Setup Guide' : '📲 Setup Guide',
+          callback_data: buildTelegramMenuCallbackData('trial', 'setup_guide'),
+        },
+        {
+          text: isMyanmar ? '🛒 View Paid Plans' : '🛒 View Paid Plans',
+          callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
+        },
+      ],
+    ],
+  };
 }

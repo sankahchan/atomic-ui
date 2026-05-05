@@ -145,7 +145,7 @@ async function applyTelegramSmokeLocale(input: {
       telegramChatId: String(input.telegramChatId),
       username: input.username,
       displayName: input.username,
-      locale: originalLocale,
+      locale: originalLocale as any,
     });
   };
 }
@@ -253,7 +253,7 @@ async function main() {
       userLocale,
       adminLocale,
       sameIdentity: adminUserId === userId && adminChatId === chatId,
-    }),
+    }) as any,
   });
   const restoreAdminLocale =
     adminUserId === userId && adminChatId === chatId
@@ -267,7 +267,7 @@ async function main() {
             userLocale,
             adminLocale,
             sameIdentity: false,
-          }),
+          }) as any,
         });
 
   try {

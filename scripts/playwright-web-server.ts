@@ -36,7 +36,7 @@ function setSmokeEnv() {
   process.env.JWT_SECRET = 'playwright-smoke-secret';
   process.env.DISABLE_SCHEDULER = '1';
   process.env.PLAYWRIGHT_SMOKE = '1';
-  process.env.NODE_ENV = 'development';
+  (process.env as any).NODE_ENV = 'development';
 }
 
 type GeneratedSelfSignedCertificate = {
@@ -164,7 +164,7 @@ function createMockOutlineServer() {
     }
 
     if (request.method === 'POST' && requestUrl.pathname === '/access-keys') {
-      const body = await readJsonBody(request).catch(() => ({}));
+      const body = await readJsonBody(request).catch(() => ({})) as Record<string, any>;
       const id = `mock-key-${keyCounter++}`;
       const name =
         typeof body.name === 'string' && body.name.trim().length > 0 ? body.name.trim() : `Mock ${id}`;
@@ -189,7 +189,7 @@ function createMockOutlineServer() {
     }
 
     if (request.method === 'PUT' && /^\/access-keys\/[^/]+$/.test(requestUrl.pathname)) {
-      const body = await readJsonBody(request).catch(() => ({}));
+      const body = await readJsonBody(request).catch(() => ({})) as Record<string, any>;
       const id = requestUrl.pathname.split('/').pop() || '';
       const name =
         typeof body.name === 'string' && body.name.trim().length > 0 ? body.name.trim() : `Mock ${id}`;

@@ -303,6 +303,7 @@ import {
 } from '@/lib/services/telegram-callbacks';
 import {
   buildTelegramTrialActivatedMessage,
+  buildTelegramTrialActivatedKeyboard,
   buildTelegramTrialAdminAlertMessage,
   buildTelegramTrialActivationFailedMessage,
   buildTelegramTrialUnavailableMessage,
@@ -2708,7 +2709,7 @@ async function claimTelegramFreeTrialForUser(input: {
         expiresAt: keyExpiresAt,
       }),
       {
-        replyMarkup: getCommandKeyboard(false, input.locale),
+        replyMarkup: buildTelegramTrialActivatedKeyboard(input.locale),
       },
     );
 
@@ -6951,6 +6952,56 @@ export async function handleTelegramCallbackQuery(
             callbackQuery.id,
             locale === 'my' ? 'Main menu ကို ပို့ပြီးပါပြီ။' : 'Main menu sent.',
           );
+          return null;
+        }
+
+        if (menuAction.action === 'setup_guide') {
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, locale === 'my' ? 'Setup guide ကို ပို့ပြီးပါပြီ။' : 'Setup guide sent.');
+          const guideText = locale === 'my'
+            ? '📲 <b>Setup Guide</b>\n\n၁။ <a href="https://getoutline.org/get-started/">Outline app ကို ဤနေရာမှ ဒေါင်းလုဒ်ဆွဲပါ</a>\n၂။ အထက်တွင်ပေးထားသော Access Key ကို Copy ကူးပါ။\n၃။ Outline app ကိုဖွင့်ပြီး Add Server ကိုနှိပ်၍ Key ကိုထည့်ပါ။\n၄။ Connect ကိုနှိပ်ပြီး အသုံးပြုနိုင်ပါပြီ။'
+            : '📲 <b>Setup Guide</b>\n\n1. <a href="https://getoutline.org/get-started/">Download the Outline app here</a>\n2. Copy the Access Key provided above.\n3. Open the Outline app, click Add Server, and paste the Key.\n4. Tap Connect to start your trial.';
+          await sendTelegramMessage(config.botToken, chatId, guideText);
+          return null;
+        }
+
+        if (menuAction.action === 'show_monthly' || menuAction.action === 'show_quarterly' || menuAction.action === 'claim_discount') {
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, locale === 'my' ? 'Store ကို ဖွင့်နေပါပြီ။' : 'Opening store...');
+          const argsText = menuAction.action === 'claim_discount' ? 'COMEBACK10' : undefined;
+          await handleTelegramBuyCommand({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            username: callbackQuery.from.first_name || callbackQuery.from.username || 'User',
+            locale,
+            botToken: config.botToken,
+            retentionSource: null,
+            argsText,
+            deps: {
+              createTelegramOrderRecord,
+              resolveTelegramCouponForOrderStart,
+              attachTelegramCouponToOrder: async (input: {
+                orderId: string;
+                coupon: {
+                  campaignType: string;
+                  couponCode: string;
+                  couponDiscountAmount: number;
+                  couponDiscountLabel?: string | null;
+                };
+              }) =>
+                db.telegramOrder.update({
+                  where: { id: input.orderId },
+                  data: {
+                    couponCampaignType: input.coupon.campaignType,
+                    couponCode: input.coupon.couponCode,
+                    couponDiscountAmount: input.coupon.couponDiscountAmount,
+                    couponDiscountLabel: input.coupon.couponDiscountLabel?.trim() || null,
+                  },
+                }),
+              buildTelegramCouponReadyLines,
+              listAvailableTelegramPlansForOrder,
+              buildTelegramSalesPlanPromptText,
+              buildTelegramPlanSelectionKeyboard,
+            },
+          });
           return null;
         }
       }

@@ -525,6 +525,10 @@ model TelegramUserProfile {
   trialKeyId     String?
   trialStartedAt DateTime?
   trialExpiresAt DateTime?
+  trialMidpointReminderSentAt DateTime?
+  trialExpiringReminderSentAt DateTime?
+  trialExpiredNoticeSentAt    DateTime?
+  trialWinbackNudgeSentAt     DateTime?
   allowPromoAnnouncements   Boolean  @default(true)
   allowMaintenanceNotices   Boolean  @default(true)
   allowReceiptNotifications Boolean  @default(true)
