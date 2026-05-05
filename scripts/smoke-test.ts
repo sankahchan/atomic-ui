@@ -9,7 +9,8 @@ function getArg(name: string): string | undefined {
   return match ? match.slice(name.length + 3) : undefined;
 }
 
-const baseUrl = (getArg('base-url') || process.env.SMOKE_BASE_URL || '').replace(/\/$/, '');
+const baseUrlArg = getArg('base-url') || process.env.SMOKE_BASE_URL || '';
+const baseUrl = baseUrlArg.endsWith('/') ? baseUrlArg : `${baseUrlArg}/`;
 const email = getArg('email') || process.env.SMOKE_EMAIL || process.env.SMOKE_USERNAME;
 const password = getArg('password') || process.env.SMOKE_PASSWORD;
 
@@ -40,9 +41,19 @@ const client = createTRPCProxyClient<AppRouter>({
           },
         });
 
-        const setCookie = response.headers.get('set-cookie');
-        if (setCookie) {
-          sessionCookie = setCookie.split(';')[0] || sessionCookie;
+        const setCookies = response.headers.getSetCookie();
+        if (setCookies.length > 0) {
+          const newCookies = setCookies.map(c => c.split(';')[0]);
+          const existingCookies = sessionCookie ? sessionCookie.split('; ') : [];
+          
+          // Merge cookies, keeping newer ones
+          const cookieMap = new Map();
+          [...existingCookies, ...newCookies].forEach(c => {
+            const [name, value] = c.split('=');
+            if (name && value) cookieMap.set(name.trim(), value.trim());
+          });
+          
+          sessionCookie = Array.from(cookieMap.entries()).map(([n, v]) => `${n}=${v}`).join('; ');
         }
 
         return response;
@@ -52,7 +63,7 @@ const client = createTRPCProxyClient<AppRouter>({
 });
 
 async function checkRoute(path: string, expectedStatuses: number[], label: string, withSession = false) {
-  const url = new URL(path, baseUrl);
+  const url = new URL(path.replace(/^\//, ''), baseUrl);
   const response = await fetch(url, {
     redirect: 'manual',
     headers: withSession && sessionCookie ? { cookie: sessionCookie } : undefined,
@@ -65,19 +76,19 @@ async function checkRoute(path: string, expectedStatuses: number[], label: strin
 }
 
 async function checkStaticAsset(path: string) {
-  const url = new URL(path, baseUrl);
+  const url = new URL(path.replace(/^\//, ''), baseUrl);
   const response = await fetch(url, { redirect: 'manual' });
 
   assert.equal(response.status, 200, `static asset ${path} expected 200 but got ${response.status}`);
 }
 
 async function main() {
-  await checkRoute('/login', [200], 'login page');
-  const loginHtml = await fetch(new URL('/login', baseUrl)).then((response) => response.text());
+  await checkRoute('login', [200], 'login page');
+  const loginHtml = await fetch(new URL('login', baseUrl)).then((response) => response.text());
   const cssAssetMatch = loginHtml.match(/\/_next\/static\/css\/[^"' ]+\.css/);
   assert(cssAssetMatch?.[0], 'login page is missing a CSS asset reference');
   await checkStaticAsset(cssAssetMatch[0]);
-  await checkRoute('/dashboard', [302, 307], 'dashboard redirect without session');
+  await checkRoute('dashboard', [302, 307], 'dashboard redirect without session');
 
   const loginResult = await client.auth.login.mutate({
     email: smokeEmail,
@@ -88,11 +99,11 @@ async function main() {
   assert.equal(loginResult.requires2FA, false, 'smoke test requires a non-2FA account');
   assert(sessionCookie, 'login succeeded but session cookie was not captured');
 
-  await checkRoute('/dashboard', [200], 'dashboard with session', true);
-  await checkRoute('/dashboard/servers', [200], 'servers page', true);
-  await checkRoute('/dashboard/keys', [200], 'keys page', true);
-  await checkRoute('/dashboard/dynamic-keys', [200], 'dynamic keys page', true);
-  await checkRoute('/dashboard/settings', [200], 'settings page', true);
+  await checkRoute('dashboard', [200], 'dashboard with session', true);
+  await checkRoute('dashboard/servers', [200], 'servers page', true);
+  await checkRoute('dashboard/keys', [200], 'keys page', true);
+  await checkRoute('dashboard/dynamic-keys', [200], 'dynamic keys page', true);
+  await checkRoute('dashboard/settings', [200], 'settings page', true);
 
   const [servers, keys, dynamicKeys] = await Promise.all([
     client.servers.list.query({}),
@@ -101,15 +112,15 @@ async function main() {
   ]);
 
   if (servers[0]?.id) {
-    await checkRoute(`/dashboard/servers/${servers[0].id}`, [200], 'server detail page', true);
+    await checkRoute(`dashboard/servers/${servers[0].id}`, [200], 'server detail page', true);
   }
 
   if (keys.items?.[0]?.id) {
-    await checkRoute(`/dashboard/keys/${keys.items[0].id}`, [200], 'key detail page', true);
+    await checkRoute(`dashboard/keys/${keys.items[0].id}`, [200], 'key detail page', true);
   }
 
   if (dynamicKeys.items?.[0]?.id) {
-    await checkRoute(`/dashboard/dynamic-keys/${dynamicKeys.items[0].id}`, [200], 'dynamic key detail page', true);
+    await checkRoute(`dashboard/dynamic-keys/${dynamicKeys.items[0].id}`, [200], 'dynamic key detail page', true);
   }
 
   console.log('Smoke test passed');
