@@ -273,6 +273,24 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
     cronExpression: '*/15 * * * *',
     manualRunSupported: true,
   },
+  telegramBandwidthAlerts: {
+    key: 'telegram_bandwidth_alerts',
+    name: 'Telegram Bandwidth Alerts Workflow',
+    description: 'Processes proactive bandwidth usage alerts (80%/95%) for all keys.',
+    category: 'TELEGRAM',
+    cadenceLabel: 'Every 15 minutes',
+    cronExpression: '*/15 * * * *',
+    manualRunSupported: true,
+  },
+  telegramBroadcast: {
+    key: 'telegram_broadcast',
+    name: 'Telegram Broadcast',
+    description: 'Processes administrative announcements and message broadcasts to all bot users.',
+    category: 'TELEGRAM',
+    cadenceLabel: 'Every 5 minutes',
+    cronExpression: '*/5 * * * *',
+    manualRunSupported: true,
+  },
 };
 
 export function listSchedulerJobDefinitions() {

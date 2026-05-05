@@ -6,6 +6,8 @@ export type {
 export {
   buildTelegramSupportHubMessage,
   buildTelegramSupportHubKeyboard,
+  buildTelegramSupportTriageMessage,
+  buildTelegramSupportTriageKeyboard,
   buildTelegramSupportReplyMediaUrl,
   buildTelegramSupportThreadKeyboard,
   buildTelegramSupportThreadStatusMessage,

@@ -33,11 +33,14 @@ import { listTelegramPremiumSupportRequestsForUser } from '@/lib/services/telegr
 import {
   buildTelegramSupportHubMessage,
   buildTelegramSupportHubKeyboard,
+  buildTelegramSupportTriageMessage,
+  buildTelegramSupportTriageKeyboard,
   getTelegramSupportThreadState,
   listTelegramSupportThreadsForUser,
   resolveTelegramSupportIssueLabel,
 } from '@/lib/services/telegram-support';
 import {
+  buildTelegramProgressBar,
   escapeHtml,
   formatExpirationSummary,
   formatTelegramDateTime,
@@ -52,6 +55,11 @@ import {
   getTelegramAccessKeyCategory,
   getTelegramUi,
 } from '@/lib/services/telegram-ui';
+import { getTelegramReferralSummary } from '@/lib/services/telegram-referrals';
+import {
+  buildTelegramReferralMessage,
+  buildTelegramReferralKeyboard,
+} from '@/lib/services/telegram-referral-cards';
 
 type SendAccessKeySharePageToTelegram = (input: {
   accessKeyId: string;
@@ -257,6 +265,8 @@ async function buildTelegramCommerceKeyItems(input: {
       const serverLabel = key.server
         ? `${key.server.name}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`
         : ui.premiumRegionUnknownStatus;
+      const usedPercent = key.dataLimitBytes ? Math.round((Number(key.usedBytes) / Number(key.dataLimitBytes)) * 100) : 0;
+      const progressBar = key.dataLimitBytes ? buildTelegramProgressBar(usedPercent) : null;
       return {
         id: key.id,
         kind: isTrial ? 'trial' : 'standard',
@@ -276,6 +286,7 @@ async function buildTelegramCommerceKeyItems(input: {
             dataLimitBytes: key.dataLimitBytes,
             ui,
           })}`,
+          ...(progressBar ? [`<code>${progressBar}</code> ${usedPercent}%`] : []),
           `${ui.expirationLabel}: ${formatExpirationSummary(key, input.locale)}`,
           `${ui.preferredServerLabel}: ${serverLabel}`,
         ],
@@ -300,6 +311,9 @@ async function buildTelegramCommerceKeyItems(input: {
     const preferredRegions = getDynamicKeyRegionChoices(key);
     const currentRouteLabel = getTelegramDynamicCurrentRouteLabel(key, ui);
     const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
+    const usedPercent = key.dataLimitBytes ? Math.round((Number(key.usedBytes) / Number(key.dataLimitBytes)) * 100) : 0;
+    const progressBar = key.dataLimitBytes ? buildTelegramProgressBar(usedPercent) : null;
+
     return {
       id: key.id,
       kind: 'premium' as const,
@@ -324,6 +338,7 @@ async function buildTelegramCommerceKeyItems(input: {
           dataLimitBytes: key.dataLimitBytes,
           ui,
         })}`,
+        ...(progressBar ? [`<code>${progressBar}</code> ${usedPercent}%`] : []),
         `${ui.expirationLabel}: ${formatExpirationSummary(key, input.locale)}`,
         latestRequest
           ? `${ui.premiumThreadStatusLabel}: ${latestRequest.requestCode} • ${formatTelegramPremiumFollowUpState(latestRequest, ui)}`
@@ -365,15 +380,19 @@ export function buildTelegramKeysSummaryMessage(input: {
 }) {
   const ui = getTelegramUi(input.locale);
   const pagination = paginateTelegramCommerce(input.items, input.page);
-  const cards = pagination.pageItems.map((item) =>
-    buildTelegramCommerceCard(
+  const cards = pagination.pageItems.map((item) => {
+    const quotaLine = `${ui.quotaLabel}: ${escapeHtml(item.quotaSummary)} • ${escapeHtml(item.expirationSummary)}${item.deviceLimitSummary ? ` • ${escapeHtml(item.deviceLimitSummary)}` : ''}`;
+    const progressBarLine = item.detailLines.find(line => line.includes('▓'));
+    
+    return buildTelegramCommerceCard(
       `${item.kind === 'premium' ? '💎' : item.kind === 'trial' ? '🎁' : '🔑'} <b>${escapeHtml(item.name)}</b>`,
       [
         escapeHtml(item.summaryLine),
-        `${ui.quotaLabel}: ${escapeHtml(item.quotaSummary)} • ${escapeHtml(item.expirationSummary)}${item.deviceLimitSummary ? ` • ${escapeHtml(item.deviceLimitSummary)}` : ''}`,
+        quotaLine,
+        ...(progressBarLine ? [progressBarLine] : []),
       ],
-    ),
-  );
+    );
+  });
 
   return buildTelegramCommerceMessage({
     title: ui.myKeysTitle,
@@ -838,67 +857,12 @@ export async function handleSupportCommand(input: {
   botToken?: string;
 }) {
   const locale = input.locale;
-  const ui = getTelegramUi(locale);
-  const supportLink = await getTelegramSupportLink();
-  const [threads, premiumRequests] = await Promise.all([
-    listTelegramSupportThreadsForUser({
-      chatId: input.chatId,
-      telegramUserId: input.telegramUserId,
-      limit: 3,
-    }),
-    listTelegramPremiumSupportRequestsForUser(input.chatId, input.telegramUserId, 2),
-  ]);
-  const openThreads = threads.filter((thread) => thread.status !== 'HANDLED');
-  const latestThread = threads[0] || null;
-  const latestPremiumRequest = premiumRequests[0] || null;
-  const message = buildTelegramSupportHubMessage({
-    locale,
-    openThreadCount: openThreads.length,
-    recentThreadCount: threads.length,
-    premiumRequestCount: premiumRequests.length,
-    latestThread: latestThread
-      ? {
-          threadCode: latestThread.threadCode,
-          issueLabel: resolveTelegramSupportIssueLabel(latestThread.issueCategory, locale),
-          stateLabel: getTelegramSupportThreadState({
-            status: latestThread.status,
-            waitingOn: latestThread.waitingOn,
-            locale,
-          }).label,
-          updatedAtLabel: formatTelegramDateTime(latestThread.updatedAt, locale),
-        }
-      : null,
-    latestPremiumRequest: latestPremiumRequest
-      ? {
-          requestCode: latestPremiumRequest.requestCode,
-          keyName: latestPremiumRequest.dynamicAccessKey.name,
-          requestTypeLabel: formatTelegramPremiumSupportTypeLabel(
-            latestPremiumRequest.requestType,
-            ui,
-          ),
-          stateLabel: formatTelegramPremiumFollowUpState(latestPremiumRequest, ui),
-          replyStateLabel: formatTelegramReplyStateLabel({
-            status: latestPremiumRequest.status,
-            latestReplySenderType:
-              latestPremiumRequest.replies?.[latestPremiumRequest.replies.length - 1]?.senderType
-              || null,
-            followUpPending: latestPremiumRequest.followUpPending,
-            locale,
-          }),
-          updatedAtLabel: formatTelegramDateTime(
-            latestPremiumRequest.updatedAt || latestPremiumRequest.createdAt,
-            locale,
-          ),
-        }
-      : null,
-    supportLinkConfigured: Boolean(supportLink),
-  });
+  const message = buildTelegramSupportTriageMessage({ locale });
+  const keyboard = buildTelegramSupportTriageKeyboard({ locale });
+
   if (input.botToken) {
     const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
-      replyMarkup: buildTelegramSupportHubKeyboard({
-        locale,
-        supportLink,
-      }),
+      replyMarkup: keyboard,
     });
     return sent ? null : message;
   }
@@ -967,4 +931,39 @@ export async function handleUserServerCommand(input: {
   });
 
   return sent ? null : lines.join('\n');
+}
+
+export async function handleReferralsCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const summary = await getTelegramReferralSummary({ 
+    telegramUserId: String(input.telegramUserId),
+    telegramChatId: String(input.chatId),
+  });
+
+  if (!summary || !summary.referralCode) {
+    return input.locale === 'my'
+      ? 'Referral program တွင် မပါဝင်သေးပါ။ ကျေးဇူးပြု၍ order တစ်ခု အရင်တင်ပါ။'
+      : 'You are not yet enrolled in the referral program. Please complete an order first.';
+  }
+
+  const message = buildTelegramReferralMessage({
+    referralCode: summary.referralCode,
+    fulfilledOrders: summary.fulfilledOrders,
+    revenue: summary.revenue,
+    locale: input.locale,
+  });
+
+  const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {
+    replyMarkup: buildTelegramReferralKeyboard({
+      referralCode: summary.referralCode,
+      locale: input.locale,
+    }),
+  });
+
+  return sent ? null : message;
 }

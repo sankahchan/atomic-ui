@@ -529,6 +529,8 @@ model TelegramUserProfile {
   trialExpiringReminderSentAt DateTime?
   trialExpiredNoticeSentAt    DateTime?
   trialWinbackNudgeSentAt     DateTime?
+  bandwidthAlert80At          DateTime?
+  bandwidthAlert95At          DateTime?
   allowPromoAnnouncements   Boolean  @default(true)
   allowMaintenanceNotices   Boolean  @default(true)
   allowReceiptNotifications Boolean  @default(true)

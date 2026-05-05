@@ -1,0 +1,15 @@
+
+> atomic-ui@1.2.13 typecheck
+> tsc --project tsconfig.typecheck.json --noEmit --pretty false --incremental false
+
+src/lib/services/telegram-bandwidth-alerts.ts(34,20): error TS2561: Object literal may only specify known properties, but 'telegramUserId' does not exist in type 'AccessKeyWhereInput'. Did you mean to write 'telegramId'?
+src/lib/services/telegram-bandwidth-alerts.ts(38,20): error TS2561: Object literal may only specify known properties, but 'telegramUserId' does not exist in type 'DynamicAccessKeyWhereInput'. Did you mean to write 'telegramId'?
+src/lib/services/telegram-bandwidth-alerts.ts(138,51): error TS2339: Property 'id' does not exist on type '{ name: string; usedBytes: bigint; dataLimitBytes: bigint | null; type: "premium" | "standard"; }'.
+src/lib/services/telegram-keys.ts(943,52): error TS2345: Argument of type 'number' is not assignable to parameter of type '{ telegramUserId: string; telegramChatId?: string | null | undefined; username?: string | null | undefined; displayName?: string | null | undefined; }'.
+src/lib/services/telegram-referral-cards.ts(71,64): error TS2345: Argument of type '"offers"' is not assignable to parameter of type 'TelegramCommerceViewSection'.
+src/server/scheduler.ts(733,17): error TS2345: Argument of type '() => Promise<{ value: { processed: number; alerted80: number; alerted95: number; errors: string[]; }; status: "SUCCESS" | "FAILED"; summary: string; resultPreview: { processed: number; alerted80: number; alerted95: number; errors: string[]; }; }>' is not assignable to parameter of type '() => Promise<SchedulerObservedOutcome<{ processed: number; alerted80: number; alerted95: number; errors: string[]; }>>'.
+  Type 'Promise<{ value: { processed: number; alerted80: number; alerted95: number; errors: string[]; }; status: "SUCCESS" | "FAILED"; summary: string; resultPreview: { processed: number; alerted80: number; alerted95: number; errors: string[]; }; }>' is not assignable to type 'Promise<SchedulerObservedOutcome<{ processed: number; alerted80: number; alerted95: number; errors: string[]; }>>'.
+    Type '{ value: { processed: number; alerted80: number; alerted95: number; errors: string[]; }; status: "SUCCESS" | "FAILED"; summary: string; resultPreview: { processed: number; alerted80: number; alerted95: number; errors: string[]; }; }' is not assignable to type 'SchedulerObservedOutcome<{ processed: number; alerted80: number; alerted95: number; errors: string[]; }>'.
+      Types of property 'status' are incompatible.
+        Type '"SUCCESS" | "FAILED"' is not assignable to type '"SUCCESS" | "SKIPPED" | undefined'.
+          Type '"FAILED"' is not assignable to type '"SUCCESS" | "SKIPPED" | undefined'.

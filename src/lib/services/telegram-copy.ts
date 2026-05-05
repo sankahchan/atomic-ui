@@ -2,8 +2,8 @@ import type { SupportedLocale } from '@/lib/i18n/config';
 import { normalizeLocalizedTemplateMap, type LocalizedTemplateMap } from '@/lib/localized-templates';
 
 export const DEFAULT_TELEGRAM_WELCOME_MESSAGES: Record<SupportedLocale, string> = {
-  en: 'Welcome to Atomic-UI. Use the menu below to buy a key, renew, view your keys, or send your email address to link an existing account.',
-  my: 'Atomic-UI မှ ကြိုဆိုပါတယ်။ အောက်ရှိ menu ဖြင့် key ဝယ်ယူခြင်း၊ renew လုပ်ခြင်း၊ key များကြည့်ခြင်းတို့ကို လုပ်နိုင်ပြီး လက်ရှိ account ကို ချိတ်ရန် email ကိုလည်း တိုက်ရိုက် ပို့နိုင်ပါသည်။',
+  en: '🚀 <b>Welcome to Atomic-UI</b>\n\nExperience high-speed, secure browsing with our premium routing. Use the menu below to buy new plans, manage your keys, or get support instantly.',
+  my: '🚀 <b>Atomic-UI မှ ကြိုဆိုပါတယ်</b>\n\nအဆင့်မြင့် routing စနစ်ဖြင့် မြန်ဆန်စိတ်ချရသော အင်တာနက်ကို အသုံးပြုလိုက်ပါ။ အစီအစဉ်အသစ်များ ဝယ်ယူရန်၊ key များ စစ်ဆေးရန်နှင့် အကူအညီ ရယူရန် အောက်ပါ menu ကို အသုံးပြုနိုင်ပါသည်။',
 };
 
 export const DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES: Record<SupportedLocale, string> = {

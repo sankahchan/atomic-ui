@@ -104,6 +104,7 @@ type TelegramAdminAnnouncementParseSuccess = {
     countryCode: string | null;
   };
   serverName: string | null;
+  heroImageUrl: string | null;
 };
 
 type TelegramAdminAnnouncementParseResult =
@@ -229,8 +230,8 @@ async function parseTelegramAdminAnnouncementArgs(
 ): Promise<TelegramAdminAnnouncementParseResult> {
   const usage =
     locale === 'my'
-      ? 'အသုံးပြုပုံ: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [segment=TRIAL_TO_PAID|PREMIUM_UPSELL|RENEWAL_SOON|HIGH_VALUE] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE'
-      : 'Usage: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [segment=TRIAL_TO_PAID|PREMIUM_UPSELL|RENEWAL_SOON|HIGH_VALUE] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] :: TITLE :: MESSAGE';
+      ? 'အသုံးပြုပုံ: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [segment=TRIAL_TO_PAID|PREMIUM_UPSELL|RENEWAL_SOON|HIGH_VALUE] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] [media=URL] :: TITLE :: MESSAGE'
+      : 'Usage: /announce AUDIENCE [type=info|announcement|promo|new_server|maintenance] [style=default|promo|premium|ops] [tag=TAG] [segment=TRIAL_TO_PAID|PREMIUM_UPSELL|RENEWAL_SOON|HIGH_VALUE] [server=SERVER-ID] [region=CC] [support=yes|no] [pin=yes|no] [media=URL] :: TITLE :: MESSAGE';
   const parts = argsText
     .split('::')
     .map((part) => part.trim())
@@ -257,6 +258,7 @@ async function parseTelegramAdminAnnouncementArgs(
   let serverId: string | null = null;
   let countryCode: string | null = null;
   let serverName: string | null = null;
+  let heroImageUrl: string | null = null;
 
   for (const token of tokens) {
     const [rawKey, ...rawValueParts] = token.split('=');
@@ -336,6 +338,12 @@ async function parseTelegramAdminAnnouncementArgs(
 
       serverId = candidates[0].id;
       serverName = candidates[0].name;
+      continue;
+    }
+
+    if (key === 'media' || key === 'image') {
+      heroImageUrl = rawValue.trim();
+      continue;
     }
   }
 
@@ -355,6 +363,7 @@ async function parseTelegramAdminAnnouncementArgs(
       countryCode,
     },
     serverName,
+    heroImageUrl,
   };
 }
 
@@ -449,6 +458,7 @@ export async function handleScheduleAnnouncementCommand(
       type: parsed.type,
       title: parsed.title,
       message: parsed.message,
+      heroImageUrl: parsed.heroImageUrl,
       cardStyle: parsed.cardStyle,
       includeSupportButton: parsed.includeSupportButton,
       pinToInbox: parsed.pinToInbox,
@@ -510,6 +520,7 @@ export async function handleAnnounceCommand(argsText: string, locale: SupportedL
       type: parsed.type,
       title: parsed.title,
       message: parsed.message,
+      heroImageUrl: parsed.heroImageUrl,
       cardStyle: parsed.cardStyle,
       includeSupportButton: parsed.includeSupportButton,
       pinToInbox: parsed.pinToInbox,
