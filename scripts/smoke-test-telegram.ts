@@ -233,6 +233,7 @@ async function main() {
     { text: '/supportstatus', label: 'user /supportstatus' },
     { text: '/orders', label: 'user /orders' },
     { text: '/inbox', label: 'user /inbox' },
+    { text: '/trial', label: 'user /trial' },
     { text: '/admin', label: 'admin /admin', admin: true },
     { text: '/reviewqueue', label: 'admin /reviewqueue', admin: true },
     { text: '/supportqueue', label: 'admin /supportqueue', admin: true },
@@ -240,6 +241,8 @@ async function main() {
     { text: '/refunds', label: 'admin /refunds', admin: true },
     { text: '/announcements', label: 'admin /announcements', admin: true },
     { text: '/finance', label: 'admin /finance', admin: true },
+    { text: '/referrals', label: 'user /referrals' },
+    { text: '/announce active media=https://example.com/test.jpg :: Smoke Test :: Testing media support', label: 'admin /announce' },
   ];
 
   let updateId = Date.now();
@@ -270,8 +273,17 @@ async function main() {
           }) as any,
         });
 
+  const targetCommand = getArg('command');
+  const filteredCommands = targetCommand 
+    ? commands.filter(c => c.text === targetCommand || c.text === `/${targetCommand}`)
+    : commands;
+
+  if (targetCommand && filteredCommands.length === 0) {
+    throw new Error(`Command ${targetCommand} not found in smoke test suite.`);
+  }
+
   try {
-    for (const command of commands) {
+    for (const command of filteredCommands) {
       const effectiveChatId = command.admin ? adminChatId : chatId;
       const effectiveUserId = command.admin ? adminUserId : userId;
       const effectiveUsername = command.admin ? adminUsername : username;

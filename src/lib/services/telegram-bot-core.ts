@@ -169,6 +169,7 @@ import {
   findLinkedAccessKeys,
   findLinkedDynamicAccessKeys,
   handleMyKeysCommand,
+  handleReferralsCommand,
   handleSubscriptionLinksCommand,
   handleSupportCommand,
   handleTelegramKeysCommerceView,
@@ -9802,6 +9803,14 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
           telegramUserId,
           5,
         ),
+      });
+    case 'referral':
+    case 'referrals':
+      return handleReferralsCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
       });
     case 'sub':
       return handleSubscriptionLinksCommand({

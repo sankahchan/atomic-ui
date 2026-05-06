@@ -91,22 +91,19 @@ type TelegramCommandShortcut = {
 
 const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
-    { command: '/buy', labelEn: '🛒 Buy', labelMy: '🛒 ဝယ်မည်', aliases: ['🛒 Buy key', '🛒 Key ဝယ်မည်'] },
-    { command: '/mykeys', labelEn: '🗂 Keys', labelMy: '🗂 Key များ', aliases: ['🗂 My keys'] },
+    { command: '/buy', labelEn: '🛒 Buy Plans', labelMy: '🛒 Plan ဝယ်မည်', aliases: ['🛒 View Paid Plans'] },
+    { command: '/mykeys', labelEn: '🔑 My Keys', labelMy: '🔑 ကျွန်ုပ်၏ Key များ', aliases: ['🗂 My keys'] },
   ],
   [
-    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offers', aliases: ['🎟 Offer များ'] },
-    { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
+    { command: '/usage', labelEn: '📊 Usage', labelMy: '📊 Usage', aliases: ['📶 Usage'] },
+    { command: '/support', labelEn: '💬 Support', labelMy: '💬 Support', aliases: ['🛟 Support'] },
   ],
   [
-    { command: '/usage', labelEn: '📶 Usage', labelMy: '📶 Usage' },
-    { command: '/support', labelEn: '🛟 Support', labelMy: '🛟 Support' },
+    { command: '/sub', labelEn: '📲 Setup Guide', labelMy: '📲 Setup လမ်းညွှန်', aliases: ['📎 Sub links'] },
+    { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
   ],
   [
     { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
-  ],
-  [
-    { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
   ],
 ];
 
@@ -119,7 +116,7 @@ const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
   { command: '/trial', labelEn: '🎁 Trial', labelMy: '🎁 Trial', aliases: ['🎁 Free trial', '🎁 Free Trial'] },
   { command: '/sub', labelEn: '📎 Links', labelMy: '📎 Links', aliases: ['📎 Sub links', '📎 Sub Links'] },
   { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
-  { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
+  { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral', aliases: ['/referrals', '🔗 Referrals'] },
   { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
 ];
 

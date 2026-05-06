@@ -819,6 +819,10 @@ export async function dispatchTelegramAnnouncement(input: {
           replyMarkup,
         });
 
+    // Rate limiting: Telegram allows ~30 messages per second.
+    // 40ms delay = 25 messages per second (safe margin).
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
     await db.telegramAnnouncementDelivery.update({
       where: { id: delivery.id },
       data: sent

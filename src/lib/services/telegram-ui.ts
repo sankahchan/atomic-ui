@@ -21,6 +21,12 @@ export function getFlagEmoji(countryCode: string) {
   return String.fromCodePoint(...codePoints);
 }
 
+export function buildTelegramProgressBar(percent: number, length = 10) {
+  const filledLength = Math.max(0, Math.min(length, Math.round((percent / 100) * length)));
+  const emptyLength = length - filledLength;
+  return '▓'.repeat(filledLength) + '░'.repeat(emptyLength);
+}
+
 export function formatTelegramCountLabel(
   count: number,
   locale: SupportedLocale,
@@ -355,8 +361,8 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>အမြန် menu</b>\n• 🛒 /buy - order အသစ်\n• 🗂 /mykeys - ချိတ်ထားသော key များ\n• 🔄 /renew - သက်တမ်းတိုးရန်\n• 🛟 /support - အကူအညီ စင်တာ\n\n<b>နောက်ထပ်</b>\n• 🎟 /offers - offer များ\n• 📶 /usage - အသုံးပြုမှု စစ်ရန်\n• 🌐 /language - ဘာသာစကားပြောင်းရန်\n• ❓ /help - command guide\n\nအောက်ရှိ keyboard ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\n<b>Quick menu</b>\n• 🛒 /buy - new order\n• 🗂 /mykeys - linked keys\n• 🔄 /renew - renew a key\n• 🛟 /support - help center\n\n<b>More</b>\n• 🎟 /offers - active offers\n• 📶 /usage - latest usage\n• 🌐 /language - switch language\n• ❓ /help - command guide\n\nUse the keyboard below for the fastest path.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nအောက်ရှိ menu ကို အသုံးပြု၍ အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nUse the main menu below for the fastest navigation.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar

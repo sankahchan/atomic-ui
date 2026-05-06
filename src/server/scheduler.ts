@@ -40,6 +40,7 @@ import {
 import { runTelegramPremiumRegionAlertCycle } from '@/lib/services/telegram-premium';
 import { runTelegramSupportSlaAlertCycle } from '@/lib/services/telegram-support';
 import { runTelegramTrialLifecycleCycle } from '@/lib/services/telegram-trial-lifecycle';
+import { runTelegramBandwidthAlertCycle } from '@/lib/services/telegram-bandwidth-alerts';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
@@ -641,9 +642,9 @@ export function initScheduler() {
                     const result = await runTelegramAnnouncementCycle();
                     return {
                         value: result,
-                        status: result.skipped ? 'SKIPPED' : 'SUCCESS',
-                        summary: result.skipped
-                            ? getSkippedSummary(result)
+                        status: result.processed === 0 ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.processed === 0
+                            ? 'No pending announcements'
                             : `${result.processed} processed, ${result.sent} sent, ${result.failed} failed`,
                         resultPreview: result,
                     };
@@ -651,6 +652,28 @@ export function initScheduler() {
             );
             if (!result.skipped) {
                 logger.info(`Telegram announcements: ${result.processed} processed, ${result.sent} sent, ${result.failed} failed`);
+            }
+    });
+
+    // 17b. Telegram Admin Broadcast (Every 5 minutes)
+    scheduleManagedJob('*/5 * * * *', SCHEDULER_JOB_DEFINITIONS.telegramBroadcast, 'Telegram admin broadcast cycle failed', async () => {
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramBroadcast,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramAnnouncementCycle();
+                    return {
+                        value: result,
+                        status: result.processed === 0 ? 'SKIPPED' : 'SUCCESS',
+                        summary: result.processed === 0
+                            ? 'No pending broadcasts'
+                            : `${result.processed} processed, ${result.sent} sent, ${result.failed} failed`,
+                        resultPreview: result,
+                    };
+                },
+            );
+            if (!result.skipped) {
+                logger.info(`Telegram broadcast: ${result.processed} processed, ${result.sent} sent, ${result.failed} failed`);
             }
     });
 
@@ -702,6 +725,30 @@ export function initScheduler() {
             }
     });
 
+    // 20. Telegram Bandwidth Alerts (Every 15 minutes)
+    scheduleManagedJob('*/15 * * * *', SCHEDULER_JOB_DEFINITIONS.telegramBandwidthAlerts, 'Telegram bandwidth alerts failed', async () => {
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramBandwidthAlerts,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramBandwidthAlertCycle();
+                    if (result.errors.length > 0) {
+                        throw new Error(`Cycle failed with ${result.errors.length} errors: ${result.errors[0]}`);
+                    }
+                    return {
+                        value: result,
+                        status: 'SUCCESS',
+                        summary: `${result.alerted80} alerted 80%, ${result.alerted95} alerted 95%`,
+                        resultPreview: result,
+                    };
+                },
+            );
+            if (result.alerted80 > 0 || result.alerted95 > 0) {
+                logger.info(
+                    `Telegram bandwidth alerts: ${result.alerted80} alerted 80%, ${result.alerted95} alerted 95%`,
+                );
+            }
+    });
     // Run initial checks on startup
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');
