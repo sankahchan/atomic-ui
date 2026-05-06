@@ -227,8 +227,10 @@ model AccessKey {
   telegramDeliveryEnabled    Boolean @default(true)
   sharePagePasswordHash      String?
   sharePageAccessExpiresAt   DateTime?
+  switchesUsed               Int      @default(0)
+  switchesMax                Int      @default(0)
   serverChangeCount          Int      @default(0)
-  serverChangeLimit          Int      @default(3)
+  serverChangeLimit          Int      @default(0)
   lastServerChangeAt         DateTime?
 
   // Connection/device tracking
@@ -825,6 +827,8 @@ model DynamicAccessKey {
   email      String?
   telegramId String?
   notes      String?
+  switchesUsed               Int      @default(0)
+  switchesMax                Int      @default(0)
 
   // User Ownership
   userId String?
@@ -957,6 +961,15 @@ model DynamicAccessKey {
   @@index([userId])
   @@index([status, lastTrafficAt])
   @@index([appliedTemplateId])
+}
+
+model KeySwitchLog {
+  id          String   @id @default(cuid())
+  keyId       String
+  telegramUserId String?
+  fromServer  String
+  toServer    String
+  switchedAt  DateTime @default(now())
 }
 
 model DynamicKeyTemplate {

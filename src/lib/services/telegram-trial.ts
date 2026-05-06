@@ -130,30 +130,34 @@ export function buildTelegramTrialActivatedMessage(input: {
 
   if (input.locale === 'my') {
     return [
-      '✅ <b>Trial is Active!</b>',
+      '🎉 <b>Trial Activated!</b>',
       '━━━━━━━━━━━━━━━━━━',
-      'You have <b>5 GB</b> for <b>2 days</b>.',
-      'Enjoy your free trial! 🎉',
+      `Your free trial is now active, <b>${firstName}</b>!`,
       '',
       '🔑 <b>Your Access Key:</b>',
       `<code>${accessUrl}</code>`,
       '',
-      'အထက်ပါ key ကို tap လုပ်၍ copy လုပ်နိုင်ပါသည်။',
-      'Outline app ထဲတွင် ထည့်ပြီး ချိတ်ဆက်အသုံးပြုပါ။',
+      '📶 <b>Data</b>        : 5 GB',
+      `🕐 <b>Expires</b>     : ${expiresAt}`,
+      '💰 <b>Cost</b>        : FREE',
+      '',
+      'အထက်ပါ key ကို tap လုပ်၍ copy လုပ်နိုင်ပါသည်။ Outline app ထဲတွင် ထည့်ပြီး ချိတ်ဆက်အသုံးပြုပါ။',
     ].join('\n');
   }
 
   return [
-    '✅ <b>Trial is Active!</b>',
+    '🎉 <b>Trial Activated!</b>',
     '━━━━━━━━━━━━━━━━━━',
-    'You have <b>5 GB</b> for <b>2 days</b>.',
-    'Enjoy your free trial! 🎉',
+    `Your free trial is now active, <b>${firstName}</b>!`,
     '',
     '🔑 <b>Your Access Key:</b>',
     `<code>${accessUrl}</code>`,
     '',
-    'Tap the key above to copy it.',
-    'Use it in the Outline app to connect.',
+    '📶 <b>Data</b>        : 5 GB',
+    `🕐 <b>Expires</b>     : ${expiresAt}`,
+    '💰 <b>Cost</b>        : FREE',
+    '',
+    'Tap the key above to copy it. Use it in the Outline app to connect.',
   ].join('\n');
 }
 
@@ -216,6 +220,12 @@ export function buildTelegramTrialActivatedKeyboard(locale: SupportedLocale) {
         {
           text: isMyanmar ? '🛒 View Paid Plans' : '🛒 View Paid Plans',
           callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
+        },
+      ],
+      [
+        {
+          text: isMyanmar ? '💬 Contact Support' : '💬 Contact Support',
+          callback_data: buildTelegramMenuCallbackData('support', 'home'),
         },
       ],
     ],

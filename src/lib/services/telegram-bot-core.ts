@@ -2258,7 +2258,8 @@ export async function sendTelegramRenewalPlanSelection(input: {
                 : 'Choose months after this'
               : null,
           ].filter(Boolean);
-          return `${index + 1}. ${plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : '🔑'} <b>${escapeHtml(label)}</b>${price ? ` • ${escapeHtml(price)}` : ''}\n   ${escapeHtml(detailParts.join(' • '))}`;
+          const badge = plan.badge || (plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : '🔑');
+          return `${index + 1}. ${badge} <b>${escapeHtml(label)}</b>${price ? ` • ${escapeHtml(price)}` : ''}\n   ${escapeHtml(detailParts.join(' • '))}`;
         })
       : [
           isMyanmar
@@ -3931,6 +3932,8 @@ export async function fulfillTelegramNewAccessOrder(input: {
         subscriptionToken: generateRandomString(32),
         publicSlug,
         tags: buildTelegramPlanTags(input.plan),
+        switchesMax: Math.max(0, input.plan.serverSwitches ?? 0),
+        serverChangeLimit: Math.max(0, input.plan.serverSwitches ?? 0),
       },
     });
   } catch (error) {
@@ -4037,6 +4040,8 @@ async function fulfillTelegramRenewAccessOrder(input: {
       bandwidthAlertAt90: false,
       autoRenewPolicy: input.template?.autoRenewPolicy ?? key.autoRenewPolicy,
       autoRenewDurationDays: input.template?.autoRenewDurationDays ?? key.autoRenewDurationDays,
+      switchesMax: Math.max(0, input.plan.serverSwitches ?? 0),
+      serverChangeLimit: Math.max(0, input.plan.serverSwitches ?? 0),
     },
   });
 }
@@ -4142,6 +4147,7 @@ async function fulfillTelegramNewDynamicOrder(input: {
       rotationUsageThresholdPercent: input.dynamicTemplate?.rotationUsageThresholdPercent ?? 85,
       rotateOnHealthFailure: input.dynamicTemplate?.rotateOnHealthFailure ?? false,
       appliedTemplateId: input.dynamicTemplate?.id || null,
+      switchesMax: input.plan.serverSwitches ?? 0,
     },
   });
 }
@@ -4247,6 +4253,7 @@ async function fulfillTelegramRenewDynamicOrder(input: {
       pinExpiresAt: null,
       expirationWarningStage: null,
       lastWarningSentAt: null,
+      switchesMax: input.plan.serverSwitches ?? 0,
     },
   });
 }
@@ -7006,6 +7013,18 @@ export async function handleTelegramCallbackQuery(
           return null;
         }
       }
+    }
+
+    if (callbackQuery.data?.startsWith('sw_')) {
+      await handleTelegramServerSwitchCallback({
+        chatId,
+        telegramUserId: callbackQuery.from.id,
+        locale,
+        botToken: config.botToken,
+        callbackQueryId: callbackQuery.id,
+        data: callbackQuery.data,
+      });
+      return null;
     }
 
     const commerceViewAction = parseTelegramCommerceViewCallbackData(callbackQuery.data);
@@ -10149,4 +10168,181 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     default:
       return ui.unknownCommand;
   }
+}
+
+export async function initiateServerSwitch(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+  botToken: string,
+  kind: 'access' | 'dynamic',
+  key: any,
+) {
+  const ui = getTelegramUi(locale);
+
+  if (kind !== 'access') {
+    await sendTelegramMessage(botToken, chatId, ui.switchServerNotSupported(key.name));
+    return null;
+  }
+
+  if (key.switchesMax !== -1 && key.switchesUsed >= key.switchesMax) {
+    await sendTelegramMessage(botToken, chatId, ui.switchServerLimitReached(key.name));
+    return null;
+  }
+
+  const servers = await listAssignableTelegramOrderServers({ allowDraining: true });
+  const availableServers = servers.filter((s) => s.id !== key.serverId);
+
+  if (availableServers.length === 0) {
+    await sendTelegramMessage(botToken, chatId, ui.serverChangeNoAlternateServers);
+    return null;
+  }
+
+  const rows = availableServers.slice(0, 8).map((s) => [
+    {
+      text: `🖥 ${s.name}`,
+      callback_data: `sw_sv_${kind}_${key.id}_${s.id}`,
+    },
+  ]);
+
+  await sendTelegramMessage(
+    botToken,
+    chatId,
+    ui.switchServerPrompt(key.switchesUsed, key.switchesMax),
+    {
+      replyMarkup: { inline_keyboard: rows },
+    },
+  );
+
+  return null;
+}
+
+export async function handleTelegramServerSwitchCallback(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  callbackQueryId: string;
+  data: string;
+}) {
+  const ui = getTelegramUi(input.locale);
+  if (input.data.startsWith('sw_ky_')) {
+    const parts = input.data.split('_');
+    const kind = parts[2] as 'access' | 'dynamic';
+    const keyId = parts[3];
+
+    if (kind !== 'access') {
+      await answerTelegramCallbackQuery(
+        input.botToken,
+        input.callbackQueryId,
+        ui.switchServerNotSupported('this key'),
+      );
+      return null;
+    }
+
+    const key = await db.accessKey.findUnique({
+      where: { id: keyId },
+      include: { server: { select: { name: true } } },
+    });
+
+    if (!key) return null;
+
+    return initiateServerSwitch(
+      input.chatId,
+      input.telegramUserId,
+      input.locale,
+      input.botToken,
+      kind,
+      key,
+    );
+  }
+
+  if (input.data.startsWith('sw_sv_')) {
+    const parts = input.data.split('_');
+    const kind = parts[2] as 'access' | 'dynamic';
+    const keyId = parts[3];
+    const serverId = parts[4];
+
+    if (kind !== 'access') {
+      await answerTelegramCallbackQuery(
+        input.botToken,
+        input.callbackQueryId,
+        ui.switchServerNotSupported('this key'),
+      );
+      return null;
+    }
+
+    const key = await db.accessKey.findUnique({
+      where: { id: keyId },
+      include: { server: true },
+    });
+
+    if (!key) return null;
+
+    if (key.switchesMax !== -1 && key.switchesUsed >= key.switchesMax) {
+      await answerTelegramCallbackQuery(input.botToken, input.callbackQueryId, ui.switchServerLimitReached(key.name));
+      return null;
+    }
+
+    const server = await db.server.findUnique({ where: { id: serverId } });
+    if (!server) return null;
+
+    try {
+      const oldServerName = key.server?.name || 'Unknown';
+      await replaceAccessKeyServer(key.id, server.id);
+      await db.$transaction([
+        db.accessKey.update({
+          where: { id: key.id },
+          data: {
+            switchesUsed: { increment: 1 },
+          },
+        }),
+        db.keySwitchLog.create({
+          data: {
+            keyId: key.id,
+            telegramUserId: String(input.telegramUserId),
+            fromServer: oldServerName,
+            toServer: server.name,
+          },
+        }),
+      ]);
+      await answerTelegramCallbackQuery(
+        input.botToken,
+        input.callbackQueryId,
+        ui.switchServerSuccess(key.name, server.name),
+      );
+      await sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        ui.switchServerSuccess(key.name, server.name),
+      );
+      await sendAccessKeySharePageToTelegram({
+        accessKeyId: key.id,
+        chatId: input.chatId,
+        reason: 'RESENT',
+        locale: input.locale,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message.trim()
+          : input.locale === 'my'
+            ? 'Server ပြောင်းလဲရာတွင် ပြဿနာ ဖြစ်ပွားခဲ့ပါသည်။'
+            : 'We could not switch this key right now.';
+      await answerTelegramCallbackQuery(
+        input.botToken,
+        input.callbackQueryId,
+        ui.serverChangeReviewActionFailed(message),
+      );
+      await sendTelegramMessage(
+        input.botToken,
+        input.chatId,
+        ui.serverChangeReviewActionFailed(message),
+      );
+    }
+
+    return null;
+  }
+  
+  return null;
 }

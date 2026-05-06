@@ -37,6 +37,10 @@ import {
   TELEGRAM_ANNOUNCEMENT_PRESETS,
   buildTelegramAnnouncementCommand,
 } from '@/lib/telegram-presets';
+import {
+  getDefaultTelegramSalesSettings,
+  type TelegramSalesPlanCode,
+} from '@/lib/services/telegram-sales';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import {
@@ -594,17 +598,6 @@ const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   showLanguageSelectorOnStart: true,
 };
 
-type TelegramSalesPlanCode =
-  | 'trial_1d_3gb'
-  | '1m_150gb'
-  | '2m_300gb'
-  | 'premium_1m_200gb'
-  | 'premium_1m_500gb'
-  | 'premium_1m_unlimited'
-  | 'premium_3m_unlimited'
-  | 'premium_6m_unlimited'
-  | '3plus_unlimited';
-
 type TelegramSalesPlanForm = {
   code: TelegramSalesPlanCode;
   enabled: boolean;
@@ -628,6 +621,10 @@ type TelegramSalesPlanForm = {
   minDurationMonths?: number | null;
   dataLimitGB?: number | null;
   unlimitedQuota: boolean;
+  serverSwitches: number;
+  badge: 'None' | 'Popular' | 'Best Deal';
+  planCategory: 'Flash' | 'Season' | 'Dynamic' | 'Trial';
+  durationLabel?: string | null;
 };
 
 type TelegramSalesPaymentMethodForm = {
@@ -1196,170 +1193,34 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
       localizedNotes: { en: '', my: '' },
     },
   ],
-  plans: [
-    {
-      code: 'trial_1d_3gb',
-      enabled: true,
-      label: 'Free Trial / 2 Days / 5 GB',
-      localizedLabels: { en: 'Free Trial / 2 Days / 5 GB', my: 'Free Trial / ၂ ရက် / 5 GB' },
-      priceAmount: '0',
-      priceCurrency: 'MMK',
-      priceLabel: 'Free Trial',
-      localizedPriceLabels: { en: 'Free Trial', my: 'အခမဲ့ အစမ်းသုံး' },
-      deliveryType: 'ACCESS_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: 2,
-      fixedDurationMonths: null,
-      minDurationMonths: null,
-      dataLimitGB: 5,
-      unlimitedQuota: false,
+  plans: getDefaultTelegramSalesSettings().plans.map((plan) => ({
+    code: plan.code,
+    enabled: plan.enabled,
+    label: plan.label,
+    localizedLabels: {
+      en: plan.localizedLabels.en || plan.label,
+      my: plan.localizedLabels.my || plan.label,
     },
-    {
-      code: '1m_150gb',
-      enabled: true,
-      label: '1 Month / 150 GB',
-      localizedLabels: { en: '1 Month / 150 GB', my: '၁ လ / 150 GB' },
-      priceAmount: '5000',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'ACCESS_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: 1,
-      minDurationMonths: null,
-      dataLimitGB: 150,
-      unlimitedQuota: false,
+    priceAmount: typeof plan.priceAmount === 'number' ? String(plan.priceAmount) : '',
+    priceCurrency: plan.priceCurrency || 'MMK',
+    priceLabel: plan.priceLabel || '',
+    localizedPriceLabels: {
+      en: plan.localizedPriceLabels.en || plan.priceLabel || '',
+      my: plan.localizedPriceLabels.my || '',
     },
-    {
-      code: '2m_300gb',
-      enabled: true,
-      label: '2 Months / 300 GB',
-      localizedLabels: { en: '2 Months / 300 GB', my: '၂ လ / 300 GB' },
-      priceAmount: '',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'DYNAMIC_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: 2,
-      minDurationMonths: null,
-      dataLimitGB: 300,
-      unlimitedQuota: false,
-    },
-    {
-      code: 'premium_1m_200gb',
-      enabled: true,
-      label: 'Premium / 1 Month / 200 GB',
-      localizedLabels: { en: 'Premium / 1 Month / 200 GB', my: 'Premium / ၁ လ / 200 GB' },
-      priceAmount: '6000',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'DYNAMIC_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: 1,
-      minDurationMonths: null,
-      dataLimitGB: 200,
-      unlimitedQuota: false,
-    },
-    {
-      code: 'premium_1m_500gb',
-      enabled: true,
-      label: 'Premium / 1 Month / 500 GB',
-      localizedLabels: { en: 'Premium / 1 Month / 500 GB', my: 'Premium / ၁ လ / 500 GB' },
-      priceAmount: '13000',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'DYNAMIC_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: 1,
-      minDurationMonths: null,
-      dataLimitGB: 500,
-      unlimitedQuota: false,
-    },
-    {
-      code: 'premium_1m_unlimited',
-      enabled: false,
-      label: 'Premium / 1 Month / Unlimited (Legacy)',
-      localizedLabels: { en: 'Premium / 1 Month / Unlimited (Legacy)', my: 'Premium / ၁ လ / Unlimited (Legacy)' },
-      priceAmount: '',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'DYNAMIC_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: 1,
-      minDurationMonths: null,
-      dataLimitGB: null,
-      unlimitedQuota: true,
-    },
-    {
-      code: 'premium_3m_unlimited',
-      enabled: false,
-      label: 'Premium / 3 Months / Unlimited (Legacy)',
-      localizedLabels: { en: 'Premium / 3 Months / Unlimited (Legacy)', my: 'Premium / ၃ လ / Unlimited (Legacy)' },
-      priceAmount: '',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'DYNAMIC_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: 3,
-      minDurationMonths: null,
-      dataLimitGB: null,
-      unlimitedQuota: true,
-    },
-    {
-      code: 'premium_6m_unlimited',
-      enabled: false,
-      label: 'Premium / 6 Months / Unlimited (Legacy)',
-      localizedLabels: { en: 'Premium / 6 Months / Unlimited (Legacy)', my: 'Premium / ၆ လ / Unlimited (Legacy)' },
-      priceAmount: '',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'DYNAMIC_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: 6,
-      minDurationMonths: null,
-      dataLimitGB: null,
-      unlimitedQuota: true,
-    },
-    {
-      code: '3plus_unlimited',
-      enabled: false,
-      label: 'Premium / 3+ Months / Unlimited (Legacy)',
-      localizedLabels: { en: 'Premium / 3+ Months / Unlimited (Legacy)', my: 'Premium / ၃ လနှင့်အထက် / Unlimited (Legacy)' },
-      priceAmount: '',
-      priceCurrency: 'MMK',
-      priceLabel: '',
-      localizedPriceLabels: { en: '', my: '' },
-      deliveryType: 'DYNAMIC_KEY',
-      templateId: null,
-      dynamicTemplateId: null,
-      fixedDurationDays: null,
-      fixedDurationMonths: null,
-      minDurationMonths: 3,
-      dataLimitGB: null,
-      unlimitedQuota: true,
-    },
-  ],
+    deliveryType: plan.deliveryType,
+    templateId: plan.templateId ?? null,
+    dynamicTemplateId: plan.dynamicTemplateId ?? null,
+    fixedDurationDays: plan.fixedDurationDays ?? null,
+    fixedDurationMonths: plan.fixedDurationMonths ?? null,
+    minDurationMonths: plan.minDurationMonths ?? null,
+    dataLimitGB: plan.dataLimitGB ?? null,
+    unlimitedQuota: plan.unlimitedQuota,
+    serverSwitches: plan.serverSwitches ?? 0,
+    badge: plan.badge ?? 'None',
+    planCategory: plan.planCategory ?? 'Flash',
+    durationLabel: plan.durationLabel ?? null,
+  })),
 };
 
 const DYNAMIC_ONLY_TELEGRAM_PLAN_CODES = new Set(
@@ -4041,6 +3902,15 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     burmesePriceLabel: isMyanmar ? 'မြန်မာ စျေးနှုန်း label' : 'Burmese price label',
     autoPricePreview: isMyanmar ? 'အလိုအလျောက် စျေးနှုန်း preview' : 'Automatic price preview',
     deliveryType: isMyanmar ? 'Delivery type' : 'Delivery type',
+    serverSwitches: isMyanmar ? 'Server switch limit' : 'Server switch limit',
+    serverSwitchesHint: isMyanmar ? 'Switch server လုပ်နိုင်သော အကြိမ်ရေ။ -1 = Unlimited' : 'Number of times user can switch servers. -1 = Unlimited.',
+    badge: isMyanmar ? 'Badge' : 'Badge',
+    badgeHint: isMyanmar ? 'Telegram bot plan list တွင် ပြသမည့် badge။' : 'Shown on the Telegram bot plan list.',
+    planCategory: isMyanmar ? 'Plan category' : 'Plan category',
+    flashPlans: isMyanmar ? '⚡ Flash Plans' : '⚡ Flash Plans',
+    seasonPlans: isMyanmar ? '🌙 Season Plans' : '🌙 Season Plans',
+    dynamicPlans: isMyanmar ? '🔑 Dynamic Plans' : '🔑 Dynamic Plans',
+    trialPlans: isMyanmar ? '🎁 Trial Plans' : '🎁 Trial Plans',
     accessKeyDelivery: isMyanmar ? 'Normal access key' : 'Normal access key',
     dynamicKeyDelivery: isMyanmar ? 'Managed dynamic key' : 'Managed dynamic key',
     premiumTemplateOnlyHint: isMyanmar
@@ -4681,6 +4551,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
           minDurationMonths: override?.minDurationMonths ?? fallbackPlan.minDurationMonths ?? null,
           dataLimitGB: override?.dataLimitGB ?? fallbackPlan.dataLimitGB ?? null,
           unlimitedQuota: override?.unlimitedQuota ?? fallbackPlan.unlimitedQuota,
+          serverSwitches: override?.serverSwitches ?? fallbackPlan.serverSwitches,
+          badge: override?.badge ?? fallbackPlan.badge,
+          planCategory: override?.planCategory ?? fallbackPlan.planCategory,
+          durationLabel: override?.durationLabel ?? fallbackPlan.durationLabel ?? null,
         };
       }),
     };
@@ -5184,6 +5058,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
         minDurationMonths: plan.minDurationMonths ?? null,
         dataLimitGB: plan.dataLimitGB ?? null,
         unlimitedQuota: plan.unlimitedQuota,
+        serverSwitches: plan.serverSwitches ?? 3,
+        badge: plan.badge,
+        planCategory: plan.planCategory,
+        durationLabel: plan.durationLabel,
       })),
     };
   };
@@ -6673,242 +6551,290 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 {isMyanmar ? 'Bot မှ အသုံးပြုမည့် plan, ဈေးနှုန်း, custom label နှင့် template ကို သတ်မှတ်ပါ။' : 'Set the plan labels, prices, custom labels, and templates used by the Telegram bot.'}
               </p>
             </div>
-            <div className="space-y-3">
-              {form.plans.map((plan) => (
-                <div key={plan.code} className="rounded-2xl border border-border/60 bg-background/55 p-4">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">{plan.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {plan.fixedDurationDays
-                          ? `${salesUi.days(plan.fixedDurationDays)} • ${salesUi.dataLimit(plan.dataLimitGB)}`
-                          : plan.fixedDurationMonths
-                          ? `${salesUi.months(plan.fixedDurationMonths)} • ${salesUi.dataLimit(plan.dataLimitGB)}`
-                          : `${salesUi.minMonths(plan.minDurationMonths ?? 3)} • ${salesUi.unlimited}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant={plan.enabled ? 'default' : 'secondary'}>
-                        {plan.enabled ? salesUi.enabled : salesUi.disabled}
-                      </Badge>
-                      <Switch
-                        checked={plan.enabled}
-                        onCheckedChange={(checked) =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            enabled: checked,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>{salesUi.planLabel}</Label>
-                      <Input
-                        value={plan.label}
-                        onChange={(event) =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            label: event.target.value,
-                            localizedLabels: {
-                              ...current.localizedLabels,
-                              en: event.target.value,
-                            },
-                          }))
-                        }
-                      />
+            <div className="space-y-8 pt-4">
+              {/* Plan Categories Grouping */}
+              {(['Flash', 'Season', 'Dynamic', 'Trial'] as const).map((category) => {
+                const categoryPlans = form.plans.filter((p) => p.planCategory === category);
+                if (categoryPlans.length === 0 && category !== 'Dynamic') return null;
+
+                const categoryLabels = {
+                  Flash: { label: salesUi.flashPlans, color: 'bg-teal-500/10 text-teal-500 border-teal-500/20' },
+                  Season: { label: salesUi.seasonPlans, color: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' },
+                  Dynamic: { label: salesUi.dynamicPlans, color: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
+                  Trial: { label: salesUi.trialPlans, color: 'bg-gray-500/10 text-gray-500 border-gray-500/20' },
+                };
+
+                const config = categoryLabels[category];
+
+                return (
+                  <Collapsible key={category} defaultOpen={category !== 'Trial'}>
+                    <div className="mb-4 flex items-center gap-4">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <ChevronRight className="h-4 w-4 transition-transform duration-200 [data-state=open]:rotate-90" />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <Badge className={cn('px-3 py-1 text-sm font-bold', config.color)} variant="outline">
+                        {config.label}
+                      </Badge>
+                      <div className="h-px flex-1 bg-border/50" />
                     </div>
-                    <div className="space-y-2">
-                      <Label>{salesUi.burmeseLabel}</Label>
-                      <Input
-                        value={plan.localizedLabels.my}
-                        onChange={(event) =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            localizedLabels: {
-                              ...current.localizedLabels,
-                              my: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{salesUi.priceAmount}</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        inputMode="numeric"
-                        value={plan.priceAmount}
-                        onChange={(event) =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            priceAmount: event.target.value,
-                          }))
-                        }
-                        placeholder="5000"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{salesUi.priceCurrency}</Label>
-                      <Input
-                        value={plan.priceCurrency}
-                        onChange={(event) =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            priceCurrency: event.target.value.toUpperCase(),
-                          }))
-                        }
-                        placeholder="MMK"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{salesUi.priceLabel}</Label>
-                      <Input
-                        value={plan.priceLabel}
-                        onChange={(event) =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            priceLabel: event.target.value,
-                            localizedPriceLabels: {
-                              ...current.localizedPriceLabels,
-                              en: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{salesUi.burmesePriceLabel}</Label>
-                      <Input
-                        value={plan.localizedPriceLabels.my}
-                        onChange={(event) =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            localizedPriceLabels: {
-                              ...current.localizedPriceLabels,
-                              my: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{salesUi.autoPricePreview}</Label>
-                      <Input
-                        readOnly
-                        value={formatAutomaticPricePreview(plan)}
-                      />
-                    </div>
-                    <div className="space-y-2 lg:col-span-2">
-                      <Label>{salesUi.deliveryType}</Label>
-                      <Select
-                        value={plan.deliveryType}
-                        disabled={DYNAMIC_ONLY_TELEGRAM_PLAN_CODES.has(plan.code)}
-                        onValueChange={(value: 'ACCESS_KEY' | 'DYNAMIC_KEY') =>
-                          updatePlan(plan.code, (current) => ({
-                            ...current,
-                            deliveryType: value,
-                            templateId: value === 'ACCESS_KEY' ? current.templateId : null,
-                            dynamicTemplateId: value === 'DYNAMIC_KEY' ? current.dynamicTemplateId : null,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ACCESS_KEY">{salesUi.accessKeyDelivery}</SelectItem>
-                          <SelectItem value="DYNAMIC_KEY">{salesUi.dynamicKeyDelivery}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        {DYNAMIC_ONLY_TELEGRAM_PLAN_CODES.has(plan.code)
-                          ? salesUi.dynamicDeliveryLockedHint
-                          : plan.deliveryType === 'DYNAMIC_KEY'
-                            ? salesUi.dynamicDeliveryStrongHint
-                            : salesUi.accessKeySoftLimitHint}
-                      </p>
-                    </div>
-                    <div className="space-y-2 lg:col-span-2">
-                      <Label>{plan.deliveryType === 'DYNAMIC_KEY' ? salesUi.dynamicTemplate : salesUi.template}</Label>
-                      {plan.deliveryType === 'DYNAMIC_KEY' ? (
-                        <Select
-                          value={plan.dynamicTemplateId || 'none'}
-                          onValueChange={(value) =>
-                            updatePlan(plan.code, (current) => ({
-                              ...current,
-                              dynamicTemplateId: value === 'none' ? null : value,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={salesUi.noTemplate} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
-                            {premiumDynamicTemplates.map((template) => (
-                              <SelectItem key={template.id} value={template.id}>
-                                {template.name}
-                                {template.preferredCountryCodes.length > 0
-                                  ? ` • ${template.preferredCountryCodes.join(', ')}`
-                                  : template.preferredServerIds.length > 0
-                                    ? ` • ${template.preferredServerIds.length} preferred server${template.preferredServerIds.length === 1 ? '' : 's'}`
-                                    : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Select
-                          value={plan.templateId || 'none'}
-                          onValueChange={(value) =>
-                            updatePlan(plan.code, (current) => ({
-                              ...current,
-                              templateId: value === 'none' ? null : value,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={salesUi.noTemplate} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
-                            {(templatesQuery.data || []).map((template) => (
-                              <SelectItem key={template.id} value={template.id}>
-                                {template.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {plan.deliveryType === 'DYNAMIC_KEY' ? (
-                        <p className="text-xs text-muted-foreground">{salesUi.premiumTemplateOnlyHint}</p>
-                      ) : null}
-                      {renderTemplateSummary(plan.deliveryType, plan.templateId, plan.dynamicTemplateId, true)}
-                    </div>
-                  </div>
-                </div>
-              ))}
+
+                    <CollapsibleContent className="space-y-6 pb-4">
+                      <div className="grid gap-6">
+                        {categoryPlans.map((plan) => (
+                          <div key={plan.code} className="relative space-y-4 rounded-2xl border bg-card p-6 shadow-sm transition-all hover:border-primary/20">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-semibold">{plan.label}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {plan.fixedDurationDays
+                                    ? `${salesUi.days(plan.fixedDurationDays)} • ${salesUi.dataLimit(plan.dataLimitGB)}`
+                                    : plan.fixedDurationMonths
+                                    ? `${salesUi.months(plan.fixedDurationMonths)} • ${salesUi.dataLimit(plan.dataLimitGB)}`
+                                    : `${salesUi.minMonths(plan.minDurationMonths ?? 3)} • ${salesUi.unlimited}`}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <Badge variant={plan.enabled ? 'default' : 'secondary'}>
+                                  {plan.enabled ? salesUi.enabled : salesUi.disabled}
+                                </Badge>
+                                <Switch
+                                  checked={plan.enabled}
+                                  disabled={category === 'Trial'}
+                                  onCheckedChange={(checked) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      enabled: checked,
+                                    }))
+                                  }
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid gap-3 lg:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>{salesUi.planLabel}</Label>
+                                <Input
+                                  value={plan.label}
+                                  onChange={(event) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      label: event.target.value,
+                                      localizedLabels: {
+                                        ...current.localizedLabels,
+                                        en: event.target.value,
+                                      },
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.burmeseLabel}</Label>
+                                <Input
+                                  value={plan.localizedLabels.my}
+                                  onChange={(event) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      localizedLabels: {
+                                        ...current.localizedLabels,
+                                        my: event.target.value,
+                                      },
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.priceAmount}</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  inputMode="numeric"
+                                  value={plan.priceAmount}
+                                  onChange={(event) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      priceAmount: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="5000"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.priceCurrency}</Label>
+                                <Input
+                                  value={plan.priceCurrency}
+                                  onChange={(event) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      priceCurrency: event.target.value.toUpperCase(),
+                                    }))
+                                  }
+                                  placeholder="MMK"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.priceLabel}</Label>
+                                <Input
+                                  value={plan.priceLabel}
+                                  onChange={(event) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      priceLabel: event.target.value,
+                                      localizedPriceLabels: {
+                                        ...current.localizedPriceLabels,
+                                        en: event.target.value,
+                                      },
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.burmesePriceLabel}</Label>
+                                <Input
+                                  value={plan.localizedPriceLabels.my}
+                                  onChange={(event) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      localizedPriceLabels: {
+                                        ...current.localizedPriceLabels,
+                                        my: event.target.value,
+                                      },
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.autoPricePreview}</Label>
+                                <Input
+                                  readOnly
+                                  value={formatAutomaticPricePreview(plan)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.deliveryType}</Label>
+                                <Select
+                                  value={plan.deliveryType}
+                                  disabled={DYNAMIC_ONLY_TELEGRAM_PLAN_CODES.has(plan.code)}
+                                  onValueChange={(value: 'ACCESS_KEY' | 'DYNAMIC_KEY') =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      deliveryType: value,
+                                      templateId: value === 'ACCESS_KEY' ? current.templateId : null,
+                                      dynamicTemplateId: value === 'DYNAMIC_KEY' ? current.dynamicTemplateId : null,
+                                      serverSwitches: value === 'DYNAMIC_KEY' ? -1 : current.serverSwitches,
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="ACCESS_KEY">{salesUi.accessKeyDelivery}</SelectItem>
+                                    <SelectItem value="DYNAMIC_KEY">{salesUi.dynamicKeyDelivery}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.serverSwitches}</Label>
+                                <Input
+                                  type="number"
+                                  min="-1"
+                                  value={plan.serverSwitches}
+                                  onChange={(event) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      serverSwitches: parseInt(event.target.value) || 0,
+                                    }))
+                                  }
+                                />
+                                <p className="text-[10px] text-muted-foreground">{salesUi.serverSwitchesHint}</p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{salesUi.badge}</Label>
+                                <Select
+                                  value={plan.badge || 'None'}
+                                  onValueChange={(value: any) =>
+                                    updatePlan(plan.code, (current) => ({
+                                      ...current,
+                                      badge: value,
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="None">{salesUi.none}</SelectItem>
+                                    <SelectItem value="Popular">★ Popular</SelectItem>
+                                    <SelectItem value="Best Deal">★ Best Deal</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-[10px] text-muted-foreground">{salesUi.badgeHint}</p>
+                              </div>
+                              <div className="space-y-2 lg:col-span-2">
+                                <Label>{plan.deliveryType === 'DYNAMIC_KEY' ? salesUi.dynamicTemplate : salesUi.template}</Label>
+                                {plan.deliveryType === 'DYNAMIC_KEY' ? (
+                                  <Select
+                                    value={plan.dynamicTemplateId || 'none'}
+                                    onValueChange={(value) =>
+                                      updatePlan(plan.code, (current) => ({
+                                        ...current,
+                                        dynamicTemplateId: value === 'none' ? null : value,
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder={salesUi.noTemplate} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
+                                      {premiumDynamicTemplates.map((template) => (
+                                        <SelectItem key={template.id} value={template.id}>
+                                          {template.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Select
+                                    value={plan.templateId || 'none'}
+                                    onValueChange={(value) =>
+                                      updatePlan(plan.code, (current) => ({
+                                        ...current,
+                                        templateId: value === 'none' ? null : value,
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder={salesUi.noTemplate} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">{salesUi.noTemplate}</SelectItem>
+                                      {(templatesQuery.data || []).map((template) => (
+                                        <SelectItem key={template.id} value={template.id}>
+                                          {template.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                                {renderTemplateSummary(plan.deliveryType, plan.templateId, plan.dynamicTemplateId, true)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
             </div>
           </div>
-
             </CollapsibleContent>
           </Collapsible>
-
-          <div className={cn('flex justify-end', !workflowConfigWorkspace && 'hidden')}>
-            <Button onClick={handleSaveConfig} disabled={!canManageSalesSettings || saveConfigMutation.isPending}>
-              {saveConfigMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              {salesUi.saveConfig}
-            </Button>
-          </div>
-          </Tabs>
+        </Tabs>
         </CardContent>
       </Card>
 

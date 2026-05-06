@@ -409,3 +409,102 @@ export async function handleTelegramOrderTextMessage(input: {
     },
   });
 }
+
+export async function handleSwitchServerCommand(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+  botToken: string,
+  argsText?: string,
+): Promise<string | null> {
+  const ui = getTelegramUi(locale);
+  const accessKeys = await db.accessKey.findMany({
+    where: {
+      telegramId: String(telegramUserId),
+      status: 'ACTIVE',
+    },
+    include: {
+      server: { select: { name: true } },
+    },
+  });
+
+  const eligibleAccessKeys = accessKeys.filter((k) => k.switchesMax !== 0);
+
+  if (eligibleAccessKeys.length === 0) {
+    return ui.switchServerNotSupported('Your key');
+  }
+
+  if (argsText?.trim()) {
+    const search = argsText.trim().toLowerCase();
+    const matchedAccess = eligibleAccessKeys.find(
+      (k) => k.id === search || k.name.toLowerCase().includes(search),
+    );
+
+    if (matchedAccess) {
+      return initiateServerSwitch(chatId, telegramUserId, locale, botToken, 'access', matchedAccess);
+    }
+  }
+
+  if (eligibleAccessKeys.length === 1) {
+    return initiateServerSwitch(chatId, telegramUserId, locale, botToken, 'access', eligibleAccessKeys[0]);
+  }
+
+  const rows = eligibleAccessKeys.map((k) => [
+    [
+      {
+        text: `🔑 ${k.name} (${k.switchesUsed}/${k.switchesMax === -1 ? '∞' : k.switchesMax})`,
+        callback_data: `sw_ky_access_${k.id}`,
+      },
+    ],
+  ]);
+
+  await sendTelegramMessage(botToken, chatId, ui.switchServerTitle, {
+    replyMarkup: { inline_keyboard: rows },
+  });
+
+  return null;
+}
+
+async function initiateServerSwitch(
+  chatId: number,
+  telegramUserId: number,
+  locale: SupportedLocale,
+  botToken: string,
+  kind: 'access' | 'dynamic',
+  key: any,
+) {
+  const ui = getTelegramUi(locale);
+
+  if (kind !== 'access') {
+    return ui.switchServerNotSupported(key.name);
+  }
+
+  if (key.switchesMax !== -1 && key.switchesUsed >= key.switchesMax) {
+    return ui.switchServerLimitReached(key.name);
+  }
+
+  const servers = await listAssignableTelegramOrderServers({ allowDraining: true });
+  const availableServers = servers.filter((s) => s.id !== key.serverId);
+
+  if (availableServers.length === 0) {
+    return ui.serverChangeNoAlternateServers;
+  }
+
+  const rows = availableServers.slice(0, 8).map((s) => [
+    {
+      text: `🖥 ${s.name}`,
+      callback_data: `sw_sv_${kind}_${key.id}_${s.id}`,
+    },
+  ]);
+
+  await sendTelegramMessage(
+    botToken,
+    chatId,
+    ui.switchServerPrompt(key.switchesUsed, key.switchesMax),
+    {
+      replyMarkup: { inline_keyboard: rows },
+    },
+  );
+
+  return null;
+}

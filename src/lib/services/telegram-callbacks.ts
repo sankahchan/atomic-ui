@@ -91,19 +91,22 @@ type TelegramCommandShortcut = {
 
 const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
-    { command: '/buy', labelEn: '🛒 Buy Plans', labelMy: '🛒 Plan ဝယ်မည်', aliases: ['🛒 View Paid Plans'] },
-    { command: '/mykeys', labelEn: '🔑 My Keys', labelMy: '🔑 ကျွန်ုပ်၏ Key များ', aliases: ['🗂 My keys'] },
+    { command: '/buy', labelEn: '🛒 Buy', labelMy: '🛒 ဝယ်မည်', aliases: ['🛒 Buy key', '🛒 Buy Plans', '🛒 View Paid Plans'] },
+    { command: '/mykeys', labelEn: '🗂 Keys', labelMy: '🗂 Key များ', aliases: ['🔑 My Keys', '🗂 My keys'] },
+  ],
+  [
+    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offers' },
+    { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
   ],
   [
     { command: '/usage', labelEn: '📊 Usage', labelMy: '📊 Usage', aliases: ['📶 Usage'] },
     { command: '/support', labelEn: '💬 Support', labelMy: '💬 Support', aliases: ['🛟 Support'] },
   ],
   [
-    { command: '/sub', labelEn: '📲 Setup Guide', labelMy: '📲 Setup လမ်းညွှန်', aliases: ['📎 Sub links'] },
-    { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral' },
+    { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
   ],
   [
-    { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
+    { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
   ],
 ];
 

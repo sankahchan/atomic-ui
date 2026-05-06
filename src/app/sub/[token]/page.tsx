@@ -110,6 +110,8 @@ interface KeyData {
   boundDeviceInstallsOnly?: boolean;
   maxDevices?: number | null;
   claimedDevices?: number;
+  switchesUsed?: number;
+  switchesMax?: number;
 }
 
 interface SettingsData {
@@ -1291,6 +1293,14 @@ export default function SubscriptionPage() {
           };
         })()
       : null;
+
+  const serverSwitchSummary =
+    typeof keyData.switchesUsed === 'number' && typeof keyData.switchesMax === 'number' && keyData.switchesMax !== 0
+      ? {
+          headline: `${keyData.switchesUsed}/${keyData.switchesMax === -1 ? '∞' : keyData.switchesMax}`,
+          subline: t('subscription.summary.server_switches'),
+        }
+      : null;
   const keyWelcomeMessage = keyData.subscriptionWelcomeMessage?.trim() || '';
   const localizedWelcomeMessage = resolveLocalizedTemplate(
     branding.localizedWelcomeMessages,
@@ -1942,9 +1952,13 @@ export default function SubscriptionPage() {
                 )}
 
                 {showConnectionSummary && (
-                  <div className={hasDeviceLimit
-                    ? 'grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_repeat(3,minmax(0,0.72fr))]'
-                    : 'grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_repeat(2,minmax(0,0.72fr))]'}>
+                  <div className={
+                    (hasDeviceLimit && serverSwitchSummary)
+                      ? 'grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_repeat(4,minmax(0,0.65fr))]'
+                      : (hasDeviceLimit || serverSwitchSummary)
+                        ? 'grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_repeat(3,minmax(0,0.72fr))]'
+                        : 'grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_repeat(2,minmax(0,0.72fr))]'
+                  }>
                     <div
                       className="min-w-0 rounded-[1.3rem] border p-4"
                       style={{
@@ -2062,6 +2076,26 @@ export default function SubscriptionPage() {
                         </p>
                         <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
                           {deviceLimitSummary.subline}
+                        </p>
+                      </div>
+                    )}
+
+                    {serverSwitchSummary && (
+                      <div
+                        className="min-w-0 rounded-[1.3rem] border p-4"
+                        style={{
+                          backgroundColor: hasImageBackground ? 'rgba(255,255,255,0.06)' : theme.bgSecondary,
+                          borderColor: hasImageBackground ? 'rgba(255,255,255,0.12)' : theme.border,
+                        }}
+                      >
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: mutedTextColor }}>
+                          {serverSwitchSummary.subline}
+                        </p>
+                        <p className="mt-2 break-words text-[1.7rem] font-semibold" style={{ color: primaryTextColor }}>
+                          {serverSwitchSummary.headline}
+                        </p>
+                        <p className="mt-2 text-sm" style={{ color: mutedTextColor }}>
+                          {t('subscription.summary.switch_limit')}
                         </p>
                       </div>
                     )}
