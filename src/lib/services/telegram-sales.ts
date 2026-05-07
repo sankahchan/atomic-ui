@@ -259,6 +259,19 @@ const DEFAULT_PAYMENT_INSTRUCTIONS_EN =
 const DEFAULT_PAYMENT_INSTRUCTIONS_MY =
   'ငွေပေးချေပြီးပါက payment screenshot ကို ဤ chat ထဲသို့ photo သို့မဟုတ် document အဖြစ် ပို့ပေးပါ။ Amount, transfer ID နှင့် အချိန်ကို ရှင်းလင်းစွာ မြင်ရပါမည်။ Admin အတည်ပြုပြီးမှ key ကို ထုတ်ပေးပါမည်။';
 
+const FIXED_TELEGRAM_STORE_PLAN_CODES = new Set<TelegramSalesPlanCode>([
+  'trial_1d_3gb',
+  '1m_150gb',
+  '1m_200gb',
+  '1m_350gb',
+  '3m_300gb',
+  '3m_600gb',
+  '3m_1050gb',
+  '1m_200gb_dynamic',
+  '2m_300gb_dynamic',
+  '3m_600gb_dynamic',
+]);
+
 function defaultPlans(): TelegramSalesPlan[] {
   return [
     {
@@ -293,8 +306,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '1 Month / 150 GB', my: '၁ လ / 150 GB' },
       priceAmount: 5000,
       priceCurrency: 'MMK',
-      priceLabel: '5,000 Kyat',
-      localizedPriceLabels: { en: '5,000 Kyat', my: '၅,၀၀၀ ကျပ်' },
+      priceLabel: '5,000 Ks',
+      localizedPriceLabels: { en: '5,000 Ks', my: '၅,၀၀၀ ကျပ်' },
       deliveryType: 'ACCESS_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -315,8 +328,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '1 Month / 200 GB', my: '၁ လ / 200 GB' },
       priceAmount: 7000,
       priceCurrency: 'MMK',
-      priceLabel: '7,000 Kyat',
-      localizedPriceLabels: { en: '7,000 Kyat', my: '၇,၀၀၀ ကျပ်' },
+      priceLabel: '7,000 Ks',
+      localizedPriceLabels: { en: '7,000 Ks', my: '၇,၀၀၀ ကျပ်' },
       deliveryType: 'ACCESS_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -337,8 +350,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '1 Month / 350 GB', my: '၁ လ / 350 GB' },
       priceAmount: 11000,
       priceCurrency: 'MMK',
-      priceLabel: '11,000 Kyat',
-      localizedPriceLabels: { en: '11,000 Kyat', my: '၁၁,၀၀၀ ကျပ်' },
+      priceLabel: '11,000 Ks',
+      localizedPriceLabels: { en: '11,000 Ks', my: '၁၁,၀၀၀ ကျပ်' },
       deliveryType: 'ACCESS_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -359,8 +372,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '3 Months / 300 GB', my: '၃ လ / 300 GB' },
       priceAmount: 10000,
       priceCurrency: 'MMK',
-      priceLabel: '10,000 Kyat',
-      localizedPriceLabels: { en: '10,000 Kyat', my: '၁၀,၀၀၀ ကျပ်' },
+      priceLabel: '10,000 Ks',
+      localizedPriceLabels: { en: '10,000 Ks', my: '၁၀,၀၀၀ ကျပ်' },
       deliveryType: 'ACCESS_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -381,8 +394,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '3 Months / 600 GB', my: '၃ လ / 600 GB' },
       priceAmount: 19500,
       priceCurrency: 'MMK',
-      priceLabel: '19,500 Kyat',
-      localizedPriceLabels: { en: '19,500 Kyat', my: '၁၉,၅၀၀ ကျပ်' },
+      priceLabel: '19,500 Ks',
+      localizedPriceLabels: { en: '19,500 Ks', my: '၁၉,၅၀၀ ကျပ်' },
       deliveryType: 'ACCESS_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -403,8 +416,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '3 Months / 1,050 GB', my: '၃ လ / 1,050 GB' },
       priceAmount: 34500,
       priceCurrency: 'MMK',
-      priceLabel: '34,500 Kyat',
-      localizedPriceLabels: { en: '34,500 Kyat', my: '၃၄,၅၀၀ ကျပ်' },
+      priceLabel: '34,500 Ks',
+      localizedPriceLabels: { en: '34,500 Ks', my: '၃၄,၅၀၀ ကျပ်' },
       deliveryType: 'ACCESS_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -425,8 +438,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '1 Month / 200 GB', my: '၁ လ / 200 GB' },
       priceAmount: 7000,
       priceCurrency: 'MMK',
-      priceLabel: '7,000 Kyat',
-      localizedPriceLabels: { en: '7,000 Kyat', my: '၇,၀၀၀ ကျပ်' },
+      priceLabel: '7,000 Ks',
+      localizedPriceLabels: { en: '7,000 Ks', my: '၇,၀၀၀ ကျပ်' },
       deliveryType: 'DYNAMIC_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -447,8 +460,8 @@ function defaultPlans(): TelegramSalesPlan[] {
       localizedLabels: { en: '2 Months / 300 GB', my: '၂ လ / 300 GB' },
       priceAmount: 12000,
       priceCurrency: 'MMK',
-      priceLabel: '12,000 Kyat',
-      localizedPriceLabels: { en: '12,000 Kyat', my: '၁၂,၀၀၀ ကျပ်' },
+      priceLabel: '12,000 Ks',
+      localizedPriceLabels: { en: '12,000 Ks', my: '၁၂,၀၀၀ ကျပ်' },
       deliveryType: 'DYNAMIC_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -467,10 +480,10 @@ function defaultPlans(): TelegramSalesPlan[] {
       enabled: true,
       label: '3 Months / 600 GB',
       localizedLabels: { en: '3 Months / 600 GB', my: '၃ လ / 600 GB' },
-      priceAmount: 19500,
+      priceAmount: 23000,
       priceCurrency: 'MMK',
-      priceLabel: '19,500 Kyat',
-      localizedPriceLabels: { en: '19,500 Kyat', my: '၁၉,၅၀၀ ကျပ်' },
+      priceLabel: '23,000 Ks',
+      localizedPriceLabels: { en: '23,000 Ks', my: '၂၃,၀၀၀ ကျပ်' },
       deliveryType: 'DYNAMIC_KEY',
       templateId: null,
       dynamicTemplateId: null,
@@ -541,38 +554,49 @@ function normalizeBuiltInTelegramPlan(
   fallbackPlan: TelegramSalesPlan,
   override: TelegramSalesPlan,
 ): TelegramSalesPlan {
-  if (fallbackPlan.code !== 'trial_1d_3gb') {
+  if (FIXED_TELEGRAM_STORE_PLAN_CODES.has(fallbackPlan.code)) {
+    const deliveryType = fallbackPlan.deliveryType;
+    const overrideTemplateId = (override.templateId ?? '').trim();
+    const overrideDynamicTemplateId = (override.dynamicTemplateId ?? '').trim();
     return {
       ...fallbackPlan,
-      ...override,
-      localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
-      localizedPriceLabels: normalizeLocalizedTemplateMap(override.localizedPriceLabels),
-      deliveryType: override.deliveryType === 'DYNAMIC_KEY' ? 'DYNAMIC_KEY' : fallbackPlan.deliveryType,
+      enabled: fallbackPlan.enabled,
       templateId:
-        (override.templateId ?? '').trim() || (override.deliveryType === 'ACCESS_KEY' ? fallbackPlan.templateId ?? null : null),
+        deliveryType === 'ACCESS_KEY'
+          ? overrideTemplateId || fallbackPlan.templateId || null
+          : null,
       dynamicTemplateId:
-        (override.dynamicTemplateId ?? '').trim() ||
-        (override.deliveryType === 'DYNAMIC_KEY' ? fallbackPlan.dynamicTemplateId ?? null : null),
-      fixedDurationDays:
-        typeof override.fixedDurationDays === 'number' && Number.isFinite(override.fixedDurationDays)
-          ? override.fixedDurationDays
-          : fallbackPlan.fixedDurationDays ?? null,
-      priceAmount:
-        typeof override.priceAmount === 'number' && Number.isFinite(override.priceAmount)
-          ? override.priceAmount
-          : fallbackPlan.priceAmount ?? null,
-      priceCurrency: (override.priceCurrency || fallbackPlan.priceCurrency || 'MMK')
-        .toString()
-        .trim()
-        .toUpperCase(),
+        deliveryType === 'DYNAMIC_KEY'
+          ? overrideDynamicTemplateId || fallbackPlan.dynamicTemplateId || null
+          : null,
     };
   }
 
   return {
     ...fallbackPlan,
-    enabled: override.enabled,
-    templateId: (override.templateId ?? '').trim() || null,
-    dynamicTemplateId: null,
+    ...override,
+    localizedLabels: normalizeLocalizedTemplateMap(override.localizedLabels),
+    localizedPriceLabels: normalizeLocalizedTemplateMap(override.localizedPriceLabels),
+    deliveryType:
+      override.deliveryType === 'DYNAMIC_KEY' ? 'DYNAMIC_KEY' : fallbackPlan.deliveryType,
+    templateId:
+      (override.templateId ?? '').trim()
+      || (override.deliveryType === 'ACCESS_KEY' ? fallbackPlan.templateId ?? null : null),
+    dynamicTemplateId:
+      (override.dynamicTemplateId ?? '').trim()
+      || (override.deliveryType === 'DYNAMIC_KEY' ? fallbackPlan.dynamicTemplateId ?? null : null),
+    fixedDurationDays:
+      typeof override.fixedDurationDays === 'number' && Number.isFinite(override.fixedDurationDays)
+        ? override.fixedDurationDays
+        : fallbackPlan.fixedDurationDays ?? null,
+    priceAmount:
+      typeof override.priceAmount === 'number' && Number.isFinite(override.priceAmount)
+        ? override.priceAmount
+        : fallbackPlan.priceAmount ?? null,
+    priceCurrency: (override.priceCurrency || fallbackPlan.priceCurrency || 'MMK')
+      .toString()
+      .trim()
+      .toUpperCase(),
   };
 }
 
@@ -914,7 +938,7 @@ export function resolveTelegramSalesPriceLabel(
 
     switch (currency) {
       case 'MMK':
-        return locale === 'my' ? `${amount} ကျပ်` : `${amount} Kyat`;
+        return locale === 'my' ? `${amount} ကျပ်` : `${amount} Ks`;
       case 'USD':
         return locale === 'my' ? `${amount} ဒေါ်လာ` : `$${amount}`;
       case 'THB':
