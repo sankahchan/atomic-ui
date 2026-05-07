@@ -47,6 +47,15 @@ export function getTelegramUi(locale: SupportedLocale) {
 
   return {
     unlimited: isMyanmar ? 'အကန့်အသတ်မရှိ' : 'Unlimited',
+    flashPlans: isMyanmar ? 'Flash Plans' : 'Flash Plans',
+    seasonPlans: isMyanmar ? 'Season Plans' : 'Season Plans',
+    dynamicPlans: isMyanmar ? 'Dynamic Plans' : 'Dynamic Plans',
+    trialPlans: isMyanmar ? 'Trial Plans' : 'Trial Plans',
+    serverSwitches: isMyanmar ? 'Server ပြောင်းလဲခွင့်' : 'Server switch limit',
+    serverSwitchesHint: isMyanmar ? 'User က server ဘယ်နှစ်ကြိမ်ပြောင်းခွင့်ရှိသလဲ။ (-1 ဆိုလျှင် အကန့်အသတ်မရှိ)' : 'Number of times the user can switch servers. (-1 for unlimited)',
+    badge: isMyanmar ? 'Badge' : 'Badge',
+    badgeHint: isMyanmar ? 'Telegram plan card တွင် ပြမည့် badge' : 'Badge to display on the plan card in Telegram.',
+    none: isMyanmar ? 'မရှိပါ' : 'None',
     startsOnFirstUse: (days?: number | null) =>
       isMyanmar
         ? days
@@ -361,8 +370,8 @@ export function getTelegramUi(locale: SupportedLocale) {
       : '/language - Change the bot language',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nအောက်ရှိ menu ကို အသုံးပြု၍ အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
-        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nUse the main menu below for the fastest navigation.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nQuick menu ကို အသုံးပြု၍ အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nQuick menu: use the buttons below for the fastest navigation.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
     emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar
@@ -431,6 +440,24 @@ export function getTelegramUi(locale: SupportedLocale) {
     serverChangeDesc: isMyanmar
       ? 'Normal key များကို server မလုပ်ဆောင်ပါက admin review ဖြင့် အများဆုံး 3 ကြိမ်အထိ server ပြောင်းနိုင်ပါသည်။ သက်တမ်းနှင့် အသုံးပြုထားသော quota မပြောင်းပါ။'
       : 'If a normal key server is not working, the admin can move it to another server up to 3 times. Expiry and used quota stay the same.',
+    switchServerTitle: isMyanmar ? '🔄 <b>Server ပြောင်းရန် key ရွေးပါ</b>' : '🔄 <b>Choose a key to switch server</b>',
+    switchServerPrompt: (used: number, max: number) =>
+      isMyanmar
+        ? `🖥 Target server ကို ရွေးပါ။\n\nအသုံးပြုထားသော အရေအတွက်: <b>${used}/${max === -1 ? '∞' : max}</b>`
+        : `🖥 Choose the target server.\n\nSwitches used: <b>${used}/${max === -1 ? '∞' : max}</b>`,
+    switchServerSuccess: (keyName: string, server: string) =>
+      isMyanmar
+        ? `✅ <b>${keyName}</b> ကို <b>${server}</b> သို့ ပြောင်းလဲပြီးပါပြီ။`
+        : `✅ <b>${keyName}</b> has been switched to <b>${server}</b>.`,
+    switchServerLimitReached: (keyName: string) =>
+      isMyanmar
+        ? `⚠️ <b>${keyName}</b> သည် server ပြောင်းလဲခွင့် အရေအတွက် ပြည့်သွားပါပြီ။`
+        : `⚠️ <b>${keyName}</b> has reached its server switch limit.`,
+    switchServerNotSupported: (keyName: string) =>
+      isMyanmar
+        ? `ℹ️ <b>${keyName}</b> အတွက် server switching ကို support မလုပ်ပါ။`
+        : `ℹ️ Server switching is not supported for <b>${keyName}</b>.`,
+    switchServerAction: isMyanmar ? 'Server ပြောင်းမည်' : 'Switch Server',
     serverChangeKeyLine: (name: string, currentServer: string, remainingChanges: number, limit: number) =>
       isMyanmar
         ? `• <b>${name}</b>\n  လက်ရှိ server: ${currentServer}\n  ကျန်ရှိသောပြောင်းလဲခွင့်: ${remainingChanges}/${limit}`

@@ -167,6 +167,8 @@ type TelegramCommerceKeyItem = {
   deviceLimitDetail?: string | null;
   renewSecondary?: string | null;
   latestPremiumRequestId?: string | null;
+  switchesUsed: number;
+  switchesMax: number;
 };
 
 function formatTelegramCustomerDeviceLimitSummary(input: {
@@ -301,6 +303,8 @@ async function buildTelegramCommerceKeyItems(input: {
         }),
         renewSecondary: null,
         latestPremiumRequestId: null,
+        switchesUsed: key.switchesUsed,
+        switchesMax: key.switchesMax,
       } satisfies TelegramCommerceKeyItem;
     }),
   );
@@ -355,6 +359,8 @@ async function buildTelegramCommerceKeyItems(input: {
       }),
       renewSecondary: 'dynamic',
       latestPremiumRequestId: latestRequest?.id || null,
+      switchesUsed: key.switchesUsed,
+      switchesMax: key.switchesMax,
     } satisfies TelegramCommerceKeyItem;
   });
 
@@ -548,6 +554,14 @@ function buildTelegramKeyDetailKeyboard(input: {
         text: getTelegramUi(input.locale).myKeysServerIssue,
         callback_data: buildTelegramServerChangeActionCallbackData('ky', input.item.id),
       },
+      ...(input.item.switchesMax !== 0
+        ? [
+            {
+              text: '🔄 Switch Server',
+              callback_data: `sw_ky_access_${input.item.id}`,
+            },
+          ]
+        : []),
       ...(input.supportLink ? [{ text: getTelegramUi(input.locale).myKeysOpenSupport, url: input.supportLink }] : []),
     ]);
   }

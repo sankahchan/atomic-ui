@@ -302,16 +302,24 @@ function buildTelegramBuyPlanSummaryCard(input: {
   plan: TelegramSalesPlanOption;
   index: number;
 }) {
+  const ui = getTelegramUi(input.locale);
   const label = resolveTelegramSalesPlanLabel(input.plan, input.locale);
   const price = resolveTelegramSalesPriceLabel(input.plan, input.locale);
-  const typeSummary = buildTelegramPlanTypeSummary(input.plan, input.locale);
-  const capacitySummary =
-    buildTelegramPlanCapacitySummary(input.plan, input.locale)
-    || (input.locale === 'my' ? 'Choose the duration in chat' : 'Choose the duration in chat');
+  const quota = input.plan.unlimitedQuota
+    ? (input.locale === 'my' ? 'Unlimited' : 'Unlimited')
+    : typeof input.plan.dataLimitGB === 'number' && Number.isFinite(input.plan.dataLimitGB)
+      ? `${input.plan.dataLimitGB} GB`
+      : null;
+  const duration = formatTelegramPlanDurationLabel(input.plan, input.locale);
+  const badgeRaw = input.plan.badge;
+  const badgeEmoji = input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑';
+  const badge = badgeRaw === 'Popular' ? `🔥 Popular` : badgeRaw === 'Best Deal' ? `⭐ Best Deal` : badgeEmoji;
+
   return buildTelegramCommerceCard(
-    `${input.index}. ${input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑'} <b>${escapeHtml(label)}</b>${price ? ` • ${escapeHtml(price)}` : ''}`,
+    `${input.index}. ${badge} <b>${escapeHtml(label)}</b>`,
     [
-      escapeHtml([typeSummary, capacitySummary].filter(Boolean).join(' • ')),
+      price ? `${input.locale === 'my' ? 'Price' : 'Price'}: <b>${escapeHtml(price)}</b>` : null,
+      escapeHtml([duration, quota].filter(Boolean).join(' • ')),
       escapeHtml(
         input.plan.deliveryType === 'DYNAMIC_KEY'
           ? getTelegramPremiumPlanHighlight(input.plan, input.locale)
@@ -319,7 +327,7 @@ function buildTelegramBuyPlanSummaryCard(input: {
             ? (input.locale === 'my' ? 'Try before you buy' : 'Try before you buy')
             : (input.locale === 'my' ? 'Normal daily use' : 'Normal daily use'),
       ),
-    ],
+    ].filter(Boolean) as string[],
   );
 }
 
@@ -390,11 +398,11 @@ export function buildTelegramBuyCompareMessage(input: {
     title: input.locale === 'my' ? `🧭 <b>Plan compare · ${escapeHtml(input.orderCode)}</b>` : `🧭 <b>Plan compare · ${escapeHtml(input.orderCode)}</b>`,
     intro:
       input.locale === 'my'
-        ? 'Standard သည် ပုံမှန်အသုံးပြုမှုအတွက်ဖြစ်ပြီး Premium သည် stable route နှင့် region-aware support အတွက်ဖြစ်သည်။'
-        : 'Standard is for everyday access, while Premium focuses on stable routing and region-aware support.',
+        ? 'Flash နှင့် Season သည် standard access အတွက်ဖြစ်ပြီး Dynamic သည် stable route နှင့် region-aware support အတွက်ဖြစ်သည်။'
+        : 'Flash and Season are for standard access, while Dynamic focuses on stable routing and region-aware support.',
     cards: [
       buildTelegramCommerceCard(
-        '🔑 <b>Standard key</b>',
+        '🔑 <b>Standard (Flash/Season)</b>',
         [
           escapeHtml(
             input.locale === 'my'
@@ -409,7 +417,7 @@ export function buildTelegramBuyCompareMessage(input: {
         ],
       ),
       buildTelegramCommerceCard(
-        '💎 <b>Premium key</b>',
+        '💎 <b>Premium (Dynamic)</b>',
         [
           escapeHtml(
             input.locale === 'my'
@@ -482,7 +490,12 @@ export function buildTelegramBuyPlanDetailMessage(input: {
     statsLine: input.locale === 'my' ? `Order <b>${escapeHtml(input.orderCode)}</b>` : `Order <b>${escapeHtml(input.orderCode)}</b>`,
     cards: [
       buildTelegramCommerceCard(
-        `${input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑'} <b>${escapeHtml(label)}</b>`,
+        (() => {
+          const badgeRaw = input.plan.badge;
+          const badgeEmoji = input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑';
+          const badge = badgeRaw === 'Popular' ? `🔥 Popular` : badgeRaw === 'Best Deal' ? `⭐ Best Deal` : badgeEmoji;
+          return `${badge} <b>${escapeHtml(label)}</b>`;
+        })(),
         summaryLines,
       ),
     ],

@@ -749,7 +749,6 @@ export function initScheduler() {
                 );
             }
     });
-
     // Run initial checks on startup
     setTimeout(async () => {
         logger.verbose('scheduler', 'Running scheduler startup maintenance');

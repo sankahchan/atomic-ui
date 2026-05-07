@@ -241,6 +241,8 @@ export async function GET(
           boundDeviceInstallsOnly: useBoundDeviceInstalls,
           maxDevices: dak.maxDevices,
           claimedDevices: deviceClaimResult?.claimedDevices ?? 0,
+          switchesUsed: dak.switchesUsed,
+          switchesMax: dak.switchesMax,
           isDynamic: true,
         });
       }
@@ -405,6 +407,8 @@ export async function GET(
         boundDeviceInstallsOnly: useBoundDeviceInstalls,
         maxDevices: key.maxDevices,
         claimedDevices: deviceClaimResult?.claimedDevices ?? 0,
+        switchesUsed: key.switchesUsed,
+        switchesMax: key.switchesMax,
       });
     }
 
