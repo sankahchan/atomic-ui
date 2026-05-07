@@ -229,6 +229,7 @@ import {
 import {
   answerTelegramCallbackQuery,
   copyTelegramMessage,
+  editTelegramMessageText,
   getSubscriptionDefaults,
   getTelegramBotUsername,
   getTelegramConfig,
@@ -311,6 +312,29 @@ import {
   isTelegramTrialEligible,
   TELEGRAM_TRIAL_PLAN_CODE,
 } from '@/lib/services/telegram-trial';
+import {
+  buildTelegramStoreActiveKeysView,
+  buildTelegramStoreMainMenuView,
+  buildTelegramStoreOrderSummaryView,
+  buildTelegramStorePlanListView,
+  buildTelegramStoreRenewView,
+  buildTelegramStoreSetupGuideText,
+  buildTelegramStoreSupportAlertText,
+  buildTelegramStoreSwitchKeySelectionView,
+  buildTelegramStoreSwitchLimitReachedView,
+  buildTelegramStoreSwitchServerSelectionView,
+  buildTelegramStoreSwitchSuccessView,
+  createTelegramStoreSummaryOrder,
+  escapeTelegramMarkdownV2,
+  findTelegramStorePlanById,
+  loadTelegramStoreActiveKeysData,
+  loadTelegramStoreMainMenuData,
+  loadTelegramStoreRenewData,
+  loadTelegramStoreSwitchServerOptions,
+  loadTelegramStoreSwitchableKeysData,
+  parseTelegramStorefrontCallbackData,
+  resolveTelegramStorePlans,
+} from '@/lib/services/telegram-storefront';
 import {
   addTelegramSupportReply,
   buildTelegramSupportThreadKeyboard,
@@ -6414,6 +6438,50 @@ export async function handleLanguageCommand(
   return null;
 }
 
+async function sendOrEditTelegramMarkdownView(input: {
+  botToken: string;
+  chatId: number;
+  messageId?: number | null;
+  text: string;
+  replyMarkup?: SendMessageOptions['replyMarkup'];
+}) {
+  const options: SendMessageOptions = {
+    parseMode: 'MarkdownV2',
+    replyMarkup: input.replyMarkup,
+  };
+
+  if (input.messageId) {
+    const edited = await editTelegramMessageText(
+      input.botToken,
+      input.chatId,
+      input.messageId,
+      input.text,
+      options,
+    );
+    if (
+      edited.success
+      || (typeof edited.error === 'string' && edited.error.toLowerCase().includes('message is not modified'))
+    ) {
+      return true;
+    }
+  }
+
+  return sendTelegramMessage(input.botToken, input.chatId, input.text, options);
+}
+
+function buildTelegramStoreCouponPrompt(input: {
+  planName: string;
+}) {
+  return [
+    '🏷 *Apply Coupon Code*',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    `Plan: *${input.planName}*`,
+    '',
+    'Send your coupon code in the next message\\.',
+  ].join('\n');
+}
+
 export async function handleTelegramCallbackQuery(
   callbackQuery: TelegramCallbackQuery,
   config: TelegramConfig,
@@ -6514,6 +6582,524 @@ export async function handleTelegramCallbackQuery(
           ].join('\n'),
         );
         return null;
+      }
+    }
+
+    const storefrontAction = parseTelegramStorefrontCallbackData(callbackQuery.data);
+    if (storefrontAction) {
+      const messageId = callbackQuery.message?.message_id || null;
+      const telegramUsername =
+        callbackQuery.from.username || callbackQuery.from.first_name || 'User';
+
+      switch (storefrontAction.action) {
+        case 'main_menu': {
+          await cancelStaleTelegramConversationOrders(chatId, callbackQuery.from.id);
+          const view = buildTelegramStoreMainMenuView({
+            firstName: telegramUsername,
+            ...(await loadTelegramStoreMainMenuData({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            })),
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'show_plans': {
+          await cancelStaleTelegramConversationOrders(chatId, callbackQuery.from.id);
+          const { plans } = await resolveTelegramStorePlans();
+          const view = buildTelegramStorePlanListView(plans);
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'support': {
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, {
+            text: buildTelegramStoreSupportAlertText(locale),
+            showAlert: true,
+          });
+          return null;
+        }
+        case 'setup_guide': {
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            locale === 'my' ? 'Setup guide ကို ပို့ပြီးပါပြီ။' : 'Setup guide sent.',
+          );
+          await sendTelegramMessage(
+            config.botToken,
+            chatId,
+            buildTelegramStoreSetupGuideText(locale),
+            {
+              parseMode: 'MarkdownV2',
+            },
+          );
+          return null;
+        }
+        case 'order_plan':
+        case 'renew_plan': {
+          await cancelStaleTelegramConversationOrders(chatId, callbackQuery.from.id);
+          const { plans } = await resolveTelegramStorePlans();
+          const plan = findTelegramStorePlanById(plans, storefrontAction.planId);
+          if (!plan || !plan.plan.enabled) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.invalidPlanChoice,
+            );
+            return null;
+          }
+
+          const summaryOrder = await createTelegramStoreSummaryOrder({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            telegramUsername,
+            locale,
+            kind: storefrontAction.action === 'renew_plan' ? 'RENEW' : 'NEW',
+            plan,
+            targetAccessKeyId:
+              storefrontAction.action === 'renew_plan' && storefrontAction.kind === 'access'
+                ? storefrontAction.keyId
+                : null,
+            targetDynamicKeyId:
+              storefrontAction.action === 'renew_plan' && storefrontAction.kind === 'dynamic'
+                ? storefrontAction.keyId
+                : null,
+          });
+
+          const view = buildTelegramStoreOrderSummaryView({ plan });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            storefrontAction.action === 'renew_plan'
+              ? locale === 'my'
+                ? `Renew order ${summaryOrder.orderCode} ကို စတင်ပြီးပါပြီ။`
+                : `Started renewal ${summaryOrder.orderCode}.`
+              : locale === 'my'
+                ? `Order ${summaryOrder.orderCode} ကို စတင်ပြီးပါပြီ။`
+                : `Started order ${summaryOrder.orderCode}.`,
+          );
+          return null;
+        }
+        case 'coupon': {
+          const activeOrder = await getActiveTelegramOrder(chatId, callbackQuery.from.id);
+          const { plans } = await resolveTelegramStorePlans();
+          const selectedPlan = findTelegramStorePlanById(plans, storefrontAction.planId);
+          if (
+            !activeOrder
+            || (activeOrder.status !== 'AWAITING_PLAN_CONFIRMATION' && activeOrder.status !== 'AWAITING_COUPON_CODE')
+            || !selectedPlan
+            || activeOrder.planCode !== selectedPlan.planCode
+          ) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionStatusMissing,
+            );
+            return null;
+          }
+
+          await db.telegramOrder.update({
+            where: { id: activeOrder.id },
+            data: {
+              status: 'AWAITING_COUPON_CODE',
+            },
+          });
+
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: buildTelegramStoreCouponPrompt({
+              planName: escapeTelegramMarkdownV2(selectedPlan.detailName),
+            }),
+            replyMarkup: {
+              inline_keyboard: [[
+                {
+                  text: '◀ Back to Plans',
+                  callback_data: 'show_plans',
+                },
+              ]],
+            },
+          });
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            locale === 'my' ? 'Coupon code ကို စာဖြင့် ပို့ပါ။' : 'Send your coupon code in chat.',
+          );
+          return null;
+        }
+        case 'confirm': {
+          const activeOrder = await getActiveTelegramOrder(chatId, callbackQuery.from.id);
+          const { settings, plans } = await resolveTelegramStorePlans();
+          const selectedPlan = findTelegramStorePlanById(plans, storefrontAction.planId);
+          if (
+            !activeOrder
+            || (activeOrder.status !== 'AWAITING_PLAN_CONFIRMATION' && activeOrder.status !== 'AWAITING_COUPON_CODE')
+            || !selectedPlan
+            || activeOrder.planCode !== selectedPlan.planCode
+          ) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              ui.orderActionStatusMissing,
+            );
+            return null;
+          }
+
+          const planSnapshot = buildTelegramOrderPlanSnapshot(selectedPlan.plan, locale, {
+            couponCampaignType: activeOrder.couponCampaignType,
+            couponCode: activeOrder.couponCode,
+            couponDiscountAmount: activeOrder.couponDiscountAmount,
+            couponDiscountLabel: activeOrder.couponDiscountLabel,
+          });
+          const enabledPaymentMethods = listEnabledTelegramSalesPaymentMethods(settings);
+          const nextStatus = enabledPaymentMethods.length > 0
+            ? 'AWAITING_PAYMENT_METHOD'
+            : 'AWAITING_PAYMENT_PROOF';
+
+          const nextOrder = await db.telegramOrder.update({
+            where: { id: activeOrder.id },
+            data: {
+              ...planSnapshot,
+              planCode: selectedPlan.planCode,
+              deliveryType: selectedPlan.plan.deliveryType,
+              templateId:
+                selectedPlan.plan.deliveryType === 'ACCESS_KEY'
+                  ? selectedPlan.plan.templateId || null
+                  : null,
+              dynamicTemplateId:
+                selectedPlan.plan.deliveryType === 'DYNAMIC_KEY'
+                  ? selectedPlan.plan.dynamicTemplateId || null
+                  : null,
+              durationMonths: selectedPlan.plan.fixedDurationMonths ?? null,
+              durationDays: selectedPlan.plan.fixedDurationDays ?? null,
+              dataLimitBytes: selectedPlan.plan.unlimitedQuota
+                ? null
+                : selectedPlan.plan.dataLimitGB
+                  ? BigInt(selectedPlan.plan.dataLimitGB) * BigInt(1024 * 1024 * 1024)
+                  : null,
+              unlimitedQuota: selectedPlan.plan.unlimitedQuota,
+              selectedServerId: null,
+              selectedServerName: null,
+              selectedServerCountryCode: null,
+              paymentMethodCode: null,
+              paymentMethodLabel: null,
+              paymentMethodAccountName: null,
+              paymentMethodAccountNumber: null,
+              paymentProofFileId: null,
+              paymentProofUniqueId: null,
+              paymentProofType: null,
+              paymentProofRevision: 0,
+              duplicateProofOrderId: null,
+              duplicateProofOrderCode: null,
+              duplicateProofDetectedAt: null,
+              paymentMessageId: null,
+              paymentCaption: null,
+              paymentSubmittedAt: null,
+              reviewReminderSentAt: null,
+              reviewedAt: null,
+              rejectedAt: null,
+              customerMessage: null,
+              rejectionReasonCode: null,
+              adminNote: null,
+              status: nextStatus,
+              ...buildTelegramOrderPaymentStageFields({
+                nextStatus,
+                currentStatus: activeOrder.status,
+                paymentStageEnteredAt: activeOrder.paymentStageEnteredAt,
+                paymentReminderSentAt: activeOrder.paymentReminderSentAt,
+                retryReminderSentAt: activeOrder.retryReminderSentAt,
+              }),
+            },
+          });
+
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: [
+              '✅ *Checkout Started*',
+              '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+              '',
+              `Plan: *${escapeTelegramMarkdownV2(selectedPlan.detailName)}*`,
+              '',
+              'Continue with the payment step below\\.',
+            ].join('\n'),
+          });
+
+          const renewalTarget = nextOrder.targetAccessKeyId
+            ? await db.accessKey.findUnique({
+                where: { id: nextOrder.targetAccessKeyId },
+                select: { name: true },
+              })
+            : nextOrder.targetDynamicKeyId
+              ? await db.dynamicAccessKey.findUnique({
+                  where: { id: nextOrder.targetDynamicKeyId },
+                  select: { name: true },
+                })
+              : null;
+          const planSummary = formatTelegramSalesPlanSummary(
+            selectedPlan.plan,
+            nextOrder.durationMonths,
+            locale,
+          );
+
+          if (nextStatus === 'AWAITING_PAYMENT_METHOD') {
+            const savedPaymentMethods = await listTelegramSavedPaymentMethods({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            });
+            await sendTelegramMessage(
+              config.botToken,
+              chatId,
+              buildTelegramPaymentMethodSelectionPromptText({
+                orderCode: nextOrder.orderCode,
+                locale,
+                methods: enabledPaymentMethods,
+                savedMethods: savedPaymentMethods,
+                planSummary,
+                renewalTargetName: renewalTarget?.name || null,
+              }),
+              {
+                replyMarkup: buildTelegramPaymentMethodSelectionKeyboard({
+                  orderId: nextOrder.id,
+                  locale,
+                  methods: enabledPaymentMethods,
+                  savedMethodCodes: savedPaymentMethods.map((method) => method.code),
+                }),
+              },
+            );
+          } else {
+            await sendTelegramOrderPaymentPromptCard({
+              botToken: config.botToken,
+              chatId,
+              locale,
+              order: nextOrder,
+              orderCode: nextOrder.orderCode,
+              planSummary,
+              paymentInstructions: resolveTelegramSalesPaymentInstructions(settings, locale),
+              paymentMethods: enabledPaymentMethods,
+              renewalTargetName: renewalTarget?.name || null,
+              supportLink: await getTelegramSupportLink(),
+            });
+          }
+
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            locale === 'my' ? 'Payment step ကို ဖွင့်ပြီးပါပြီ။' : 'Opened the payment step.',
+          );
+          return null;
+        }
+        case 'switch':
+        case 'switchkey': {
+          const { keys } = await loadTelegramStoreSwitchableKeysData({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+          });
+          const key = keys.find((candidate) => candidate.id === storefrontAction.keyId) || null;
+          if (!key) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'Switchable key ကို မတွေ့ပါ။' : 'Switchable key not found.',
+            );
+            return null;
+          }
+
+          if (key.switchesMax !== -1 && key.switchesUsed >= key.switchesMax) {
+            const limitView = buildTelegramStoreSwitchLimitReachedView({
+              max: key.switchesMaxLabel,
+              planName: key.planName,
+            });
+            await sendOrEditTelegramMarkdownView({
+              botToken: config.botToken,
+              chatId,
+              messageId,
+              text: limitView.text,
+              replyMarkup: limitView.replyMarkup,
+            });
+            await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+            return null;
+          }
+
+          const serverOptions = await loadTelegramStoreSwitchServerOptions({
+            keyId: key.id,
+            kind: key.kind,
+          });
+          if (!serverOptions || serverOptions.servers.length === 0) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my'
+                ? 'ရွေးချယ်ရန် alternate server မရှိသေးပါ။'
+                : 'No alternate server is available right now.',
+            );
+            return null;
+          }
+
+          const view = buildTelegramStoreSwitchServerSelectionView({
+            keyId: key.id,
+            currentServer: serverOptions.currentServerName,
+            used: serverOptions.switchesUsed,
+            maxLabel: key.switchesMaxLabel,
+            servers: serverOptions.servers,
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'doswitch': {
+          const { keys } = await loadTelegramStoreSwitchableKeysData({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+          });
+          const key = keys.find((candidate) => candidate.id === storefrontAction.keyId) || null;
+          if (!key) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'Switchable key ကို မတွေ့ပါ။' : 'Switchable key not found.',
+            );
+            return null;
+          }
+
+          if (key.switchesMax !== -1 && key.switchesUsed >= key.switchesMax) {
+            const limitView = buildTelegramStoreSwitchLimitReachedView({
+              max: key.switchesMaxLabel,
+              planName: key.planName,
+            });
+            await sendOrEditTelegramMarkdownView({
+              botToken: config.botToken,
+              chatId,
+              messageId,
+              text: limitView.text,
+              replyMarkup: limitView.replyMarkup,
+            });
+            await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+            return null;
+          }
+
+          const available = await loadTelegramStoreSwitchServerOptions({
+            keyId: key.id,
+            kind: key.kind,
+          });
+          const targetServer = available?.servers.find(
+            (candidate) => candidate.id === storefrontAction.serverId,
+          ) || null;
+          if (!available || !targetServer) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'ရွေးထားသော server ကို မတွေ့ပါ။' : 'Selected server was not found.',
+            );
+            return null;
+          }
+
+          if (key.kind === 'access') {
+            const accessKey = await db.accessKey.findUnique({
+              where: { id: key.id },
+              include: { server: true },
+            });
+            if (!accessKey) {
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                ui.orderActionStatusMissing,
+              );
+              return null;
+            }
+
+            await replaceAccessKeyServer(accessKey.id, targetServer.id);
+            await db.$transaction([
+              db.accessKey.update({
+                where: { id: accessKey.id },
+                data: {
+                  switchesUsed: { increment: 1 },
+                },
+              }),
+              db.keySwitchLog.create({
+                data: {
+                  keyId: accessKey.id,
+                  telegramUserId: String(callbackQuery.from.id),
+                  fromServer: accessKey.server?.name || key.currentServerName,
+                  toServer: targetServer.name,
+                },
+              }),
+            ]);
+          } else {
+            await db.$transaction([
+              db.dynamicAccessKey.update({
+                where: { id: key.id },
+                data: {
+                  pinnedAccessKeyId: null,
+                  pinnedServerId: targetServer.id,
+                  pinnedAt: new Date(),
+                  pinExpiresAt: null,
+                  switchesUsed: { increment: 1 },
+                },
+              }),
+              db.keySwitchLog.create({
+                data: {
+                  keyId: key.id,
+                  telegramUserId: String(callbackQuery.from.id),
+                  fromServer: key.currentServerName,
+                  toServer: targetServer.name,
+                },
+              }),
+            ]);
+          }
+
+          const usedCount = key.switchesUsed + 1;
+          const successView = buildTelegramStoreSwitchSuccessView({
+            newServer: `${targetServer.flag} ${targetServer.name}`,
+            used: usedCount,
+            maxLabel: key.switchesMaxLabel,
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: successView.text,
+            replyMarkup: successView.replyMarkup,
+          });
+          if (key.kind === 'access') {
+            await sendAccessKeySharePageToTelegram({
+              accessKeyId: key.id,
+              chatId,
+              reason: 'RESENT',
+              locale,
+            });
+          }
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
       }
     }
 
@@ -6939,21 +7525,19 @@ export async function handleTelegramCallbackQuery(
         }
 
         if (menuAction.action === 'back_main') {
-          const latestConfig = await getTelegramConfig();
-          const welcomeMessage = resolveLocalizedTemplate(
-            latestConfig?.localizedWelcomeMessages,
-            locale,
-            latestConfig?.welcomeMessage || ui.defaultWelcome,
-          );
-
-          await sendTelegramStartHome({
-            chatId,
-            telegramUserId: callbackQuery.from.id,
-            username: callbackQuery.from.first_name || callbackQuery.from.username || 'User',
-            isAdmin: false,
+          const view = buildTelegramStoreMainMenuView({
+            firstName: callbackQuery.from.first_name || callbackQuery.from.username || 'User',
+            ...(await loadTelegramStoreMainMenuData({
+              chatId,
+              telegramUserId: callbackQuery.from.id,
+            })),
+          });
+          await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
-            locale,
-            welcomeMessage,
+            chatId,
+            messageId: callbackQuery.message?.message_id,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
           });
           await answerTelegramCallbackQuery(
             config.botToken,
@@ -6973,43 +7557,26 @@ export async function handleTelegramCallbackQuery(
         }
 
         if (menuAction.action === 'show_monthly' || menuAction.action === 'show_quarterly' || menuAction.action === 'claim_discount') {
-          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, locale === 'my' ? 'Store ကို ဖွင့်နေပါပြီ။' : 'Opening store...');
-          const argsText = menuAction.action === 'claim_discount' ? 'COMEBACK10' : undefined;
-          await handleTelegramBuyCommand({
-            chatId,
-            telegramUserId: callbackQuery.from.id,
-            username: callbackQuery.from.first_name || callbackQuery.from.username || 'User',
-            locale,
+          const { plans } = await resolveTelegramStorePlans();
+          const view = buildTelegramStorePlanListView(plans);
+          await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
-            retentionSource: null,
-            argsText,
-            deps: {
-              createTelegramOrderRecord,
-              resolveTelegramCouponForOrderStart,
-              attachTelegramCouponToOrder: async (input: {
-                orderId: string;
-                coupon: {
-                  campaignType: string;
-                  couponCode: string;
-                  couponDiscountAmount: number;
-                  couponDiscountLabel?: string | null;
-                };
-              }) =>
-                db.telegramOrder.update({
-                  where: { id: input.orderId },
-                  data: {
-                    couponCampaignType: input.coupon.campaignType,
-                    couponCode: input.coupon.couponCode,
-                    couponDiscountAmount: input.coupon.couponDiscountAmount,
-                    couponDiscountLabel: input.coupon.couponDiscountLabel?.trim() || null,
-                  },
-                }),
-              buildTelegramCouponReadyLines,
-              listAvailableTelegramPlansForOrder,
-              buildTelegramSalesPlanPromptText,
-              buildTelegramPlanSelectionKeyboard,
-            },
+            chatId,
+            messageId: callbackQuery.message?.message_id,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
           });
+          await answerTelegramCallbackQuery(
+            config.botToken,
+            callbackQuery.id,
+            menuAction.action === 'claim_discount'
+              ? locale === 'my'
+                ? 'Plan ကို ရွေးပြီး coupon screen ထဲမှာ COMEBACK10 ကို ထည့်ပါ။'
+                : 'Pick a plan, then enter COMEBACK10 on the coupon screen.'
+              : locale === 'my'
+                ? 'Store ကို ဖွင့်ပြီးပါပြီ။'
+                : 'Store opened.',
+          );
           return null;
         }
       }

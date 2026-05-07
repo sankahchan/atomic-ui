@@ -29,7 +29,7 @@ import {
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 
-export type TelegramParseMode = 'HTML' | 'Markdown';
+export type TelegramParseMode = 'HTML' | 'Markdown' | 'MarkdownV2';
 
 export interface TelegramConfig {
   botToken: string;
@@ -52,6 +52,11 @@ export interface SendMessageOptions {
   parseMode?: TelegramParseMode;
   replyMarkup?: Record<string, unknown>;
   disableWebPagePreview?: boolean;
+}
+
+export interface AnswerTelegramCallbackQueryOptions {
+  text?: string;
+  showAlert?: boolean;
 }
 
 export async function getTelegramDefaultLocale(): Promise<SupportedLocale> {
@@ -675,18 +680,96 @@ export async function sendTelegramMessageDetailed(
   }
 }
 
+export async function editTelegramMessageText(
+  botToken: string,
+  chatId: number | string,
+  messageId: number,
+  text: string,
+  options: SendMessageOptions = {},
+): Promise<SendTelegramMessageResult> {
+  const parseMode = options.parseMode || 'HTML';
+  const preparedMessage =
+    parseMode === 'HTML'
+      ? sanitizeTelegramHtmlMessage(text)
+      : { text, changed: false, invalidTags: [], invalidCharactersRemoved: false };
+
+  if (preparedMessage.changed) {
+    console.warn(
+      `Sanitized Telegram HTML edit for ${chatId}/${messageId}; escaped unsupported tags: ${preparedMessage.invalidTags.join(', ') || 'none'}${preparedMessage.invalidCharactersRemoved ? '; removed invalid UTF-8/control characters' : ''}`,
+    );
+  }
+
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text: preparedMessage.text,
+        parse_mode: parseMode,
+        reply_markup: options.replyMarkup,
+        disable_web_page_preview: options.disableWebPagePreview ?? true,
+      }),
+    });
+
+    if (!response.ok) {
+      let description = `Telegram edit request failed with status ${response.status}`;
+      try {
+        const data = (await response.json()) as { description?: unknown };
+        if (typeof data.description === 'string' && data.description.trim().length > 0) {
+          description = data.description;
+        }
+      } catch {
+        // Keep the fallback description.
+      }
+
+      console.error(`Failed to edit Telegram message ${chatId}/${messageId}:`, description);
+      return {
+        success: false,
+        status: response.status,
+        error: description,
+      };
+    }
+
+    return {
+      success: true,
+      status: response.status,
+    };
+  } catch (error) {
+    console.error('Failed to edit Telegram message:', error);
+    return {
+      success: false,
+      status: null,
+      error: error instanceof Error ? error.message : 'Failed to edit Telegram message',
+    };
+  }
+}
+
 export async function answerTelegramCallbackQuery(
   botToken: string,
   callbackQueryId: string,
-  text?: string,
+  input?: string | AnswerTelegramCallbackQueryOptions,
 ) {
+  const options =
+    typeof input === 'string'
+      ? {
+          text: input,
+          showAlert: false,
+        }
+      : {
+          text: input?.text,
+          showAlert: input?.showAlert ?? false,
+        };
+
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/answerCallbackQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         callback_query_id: callbackQueryId,
-        text,
+        text: options.text,
+        show_alert: options.showAlert,
       }),
     });
 
