@@ -40,6 +40,16 @@ import {
   getDynamicKeyMessagingUrls,
 } from '@/lib/services/telegram-links';
 import {
+  buildTelegramStoreDataWarningView,
+  buildTelegramStoreExpiryReminderView,
+  findTelegramStorePlanByCode,
+  formatStoreDate,
+  loadTelegramStoreLatestOrderForKey,
+  progressBar as buildTelegramStoreProgressBar,
+  resolveTelegramStorePlans,
+  type TelegramStoreRenewTarget,
+} from '@/lib/services/telegram-storefront';
+import {
   buildTelegramCommerceCard,
   buildTelegramCommerceMessage,
 } from '@/lib/services/telegram-commerce-ui';
@@ -54,6 +64,18 @@ type TelegramOrderDigestRiskReason =
   | 'retry_pattern'
   | 'multiple_open_orders'
   | 'resubmitted_proof';
+
+async function resolveTelegramStoreRenewPlanContext(input: TelegramStoreRenewTarget) {
+  const [{ plans }, order] = await Promise.all([
+    resolveTelegramStorePlans(),
+    loadTelegramStoreLatestOrderForKey(input),
+  ]);
+
+  return {
+    renewTarget: input,
+    plan: findTelegramStorePlanByCode(plans, order?.planCode || null),
+  };
+}
 
 function isSameLocalDay(left: Date, right: Date) {
   return (
@@ -236,7 +258,6 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
     telegramChatId: destinationChatId,
     fallbackLocale: defaultLanguage,
   });
-  const ui = getTelegramUi(locale);
   const isTrialKey = tagMatchesFilter(key.tags || '', 'trial');
   const recentlyActive =
     Boolean(
@@ -254,6 +275,58 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
           : buildSharePageUrl(token, { source: 'telegram_notification', lang: locale })
       )
     : null;
+
+  if (!isTrialKey && (input.type === 'EXPIRING_7D' || input.type === 'EXPIRING_3D' || input.type === 'EXPIRED')) {
+    const { plan, renewTarget } = await resolveTelegramStoreRenewPlanContext({
+      kind: 'access',
+      keyId: key.id,
+    });
+    const priceLabel = plan?.priceLabel || 'See plans';
+    const planName = plan?.detailName || key.name;
+    const reminder = buildTelegramStoreExpiryReminderView({
+      firstName: key.user?.email || 'friend',
+      planName,
+      expiryLabel: formatStoreDate(key.expiresAt),
+      priceLabel,
+      plan,
+      renewTarget,
+      sameDay: input.type === 'EXPIRED',
+    });
+
+    await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {
+      parseMode: 'MarkdownV2',
+      replyMarkup: reminder.replyMarkup,
+    });
+
+    await recordSubscriptionPageEvent({
+      accessKeyId: key.id,
+      eventType: SUBSCRIPTION_EVENT_TYPES.TELEGRAM_SENT,
+      source: 'telegram_notification',
+      metadata: {
+        notificationType: input.type,
+        destinationChatId,
+        sharePageIncluded: false,
+      },
+    });
+
+    await writeAuditLog({
+      action: 'TELEGRAM_NOTIFICATION_SENT',
+      entity: 'ACCESS_KEY',
+      entityId: key.id,
+      details: {
+        notificationType: input.type,
+        destinationChatId,
+        storefrontReminder: true,
+      },
+    });
+
+    return {
+      sharePageUrl: null,
+      destinationChatId,
+    };
+  }
+
+  const ui = getTelegramUi(locale);
 
   const lines =
     input.type === 'DISABLED'
@@ -531,56 +604,23 @@ export async function sendDynamicKeyRenewalReminder(input: {
     telegramChatId: destinationChatId,
     fallbackLocale: defaults.defaultLanguage,
   });
-  const ui = getTelegramUi(locale);
-  const { sharePageUrl, subscriptionUrl } = getDynamicKeyMessagingUrls(
-    key,
-    input.source || 'premium_renewal_reminder',
-    locale,
-  );
-  const supportLink = await getTelegramSupportLink();
+  const { plan, renewTarget } = await resolveTelegramStoreRenewPlanContext({
+    kind: 'dynamic',
+    keyId: key.id,
+  });
+  const reminder = buildTelegramStoreExpiryReminderView({
+    firstName: key.user?.email || 'friend',
+    planName: plan?.detailName || key.name,
+    expiryLabel: formatStoreDate(key.expiresAt),
+    priceLabel: plan?.priceLabel || 'See plans',
+    plan,
+    renewTarget,
+    sameDay: false,
+  });
 
-  const lines = [
-    ui.premiumRenewalTitle,
-    '',
-    `🔁 ${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
-    `⏳ ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
-    key.dataLimitBytes
-      ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
-      : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
-    '',
-    ui.premiumRenewalBody(input.daysLeft),
-    ui.premiumRenewalBenefits,
-  ];
-
-  if (sharePageUrl) {
-    lines.push('', `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
-  }
-  if (subscriptionUrl) {
-    lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
-  }
-
-  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
-    [
-      {
-        text: ui.premiumRenewNow,
-        callback_data: buildTelegramOrderActionCallbackData(
-          'ky',
-          key.id,
-          input.daysLeft <= 3 ? 'dynamic_renewal_3d' : 'dynamic_renewal_7d',
-        ),
-      },
-    ],
-  ];
-
-  if (sharePageUrl) {
-    inlineKeyboard.push([{ text: ui.openSharePage, url: sharePageUrl }]);
-  }
-  if (supportLink) {
-    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
-  }
-
-  await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
-    replyMarkup: { inline_keyboard: inlineKeyboard },
+  await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {
+    parseMode: 'MarkdownV2',
+    replyMarkup: reminder.replyMarkup,
   });
 
   await writeAuditLog({
@@ -590,15 +630,14 @@ export async function sendDynamicKeyRenewalReminder(input: {
     details: {
       destinationChatId,
       daysLeft: input.daysLeft,
-      sharePageUrl,
-      subscriptionUrl,
+      storefrontReminder: true,
     },
   });
 
   return {
     destinationChatId,
-    sharePageUrl,
-    subscriptionUrl,
+    sharePageUrl: null,
+    subscriptionUrl: null,
   };
 }
 
@@ -627,30 +666,24 @@ export async function sendDynamicKeyExpiryTelegramNotification(input: {
     telegramChatId: destinationChatId,
     fallbackLocale: defaults.defaultLanguage,
   });
-  const ui = getTelegramUi(locale);
-  const supportLink = await getTelegramSupportLink();
+  const { plan, renewTarget } = await resolveTelegramStoreRenewPlanContext({
+    kind: 'dynamic',
+    keyId: key.id,
+  });
+  const reminder = buildTelegramStoreExpiryReminderView({
+    firstName: key.user?.email || 'friend',
+    planName: plan?.detailName || key.name,
+    expiryLabel: formatStoreDate(key.expiresAt),
+    priceLabel: plan?.priceLabel || 'See plans',
+    plan,
+    renewTarget,
+    sameDay: true,
+  });
 
-  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
-    [
-      {
-        text: ui.premiumRenewNow,
-        callback_data: buildTelegramOrderActionCallbackData('ky', key.id, 'dynamic'),
-      },
-    ],
-  ];
-
-  if (supportLink) {
-    inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
-  }
-
-  await sendTelegramMessage(
-    config.botToken,
-    destinationChatId,
-    [ui.premiumExpiredTitle, '', ui.premiumExpiredBody(key.name)].join('\n'),
-    {
-      replyMarkup: { inline_keyboard: inlineKeyboard },
-    },
-  );
+  await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {
+    parseMode: 'MarkdownV2',
+    replyMarkup: reminder.replyMarkup,
+  });
 
   await writeAuditLog({
     action: 'DYNAMIC_KEY_EXPIRED_NOTICE_SENT',

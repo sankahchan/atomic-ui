@@ -9,6 +9,8 @@ import {
   getTelegramDefaultLocale,
   getTelegramNotificationPreferences,
   getTelegramSupportLink,
+  loadAccessKeyForMessaging,
+  loadDynamicAccessKeyForMessaging,
   sendTelegramMessage,
   sendTelegramPhotoUrl,
   type TelegramConfig,
@@ -54,6 +56,21 @@ import {
   TELEGRAM_ORDER_TERMINAL_STATUSES,
   type TelegramSalesPlanCode,
 } from '@/lib/services/telegram-sales';
+import {
+  ensureAccessKeySubscriptionToken,
+  getDynamicKeyMessagingUrls,
+} from '@/lib/services/telegram-links';
+import {
+  buildSharePageUrl,
+  buildShortShareUrl,
+} from '@/lib/subscription-links';
+import {
+  buildTelegramStoreOrderConfirmedView,
+  buildTelegramStoreOrderSummaryView,
+  findTelegramStorePlanByCode,
+  formatStoreDate,
+  resolveTelegramStorePlans,
+} from '@/lib/services/telegram-storefront';
 
 function isTelegramOrderAwaitingPayment(status: string) {
   return status === 'AWAITING_PAYMENT_METHOD' || status === 'AWAITING_PAYMENT_PROOF';
@@ -122,6 +139,8 @@ export async function cancelStaleTelegramConversationOrders(chatId: number, tele
         in: [
           'AWAITING_KEY_SELECTION',
           'AWAITING_PLAN',
+          'AWAITING_PLAN_CONFIRMATION',
+          'AWAITING_COUPON_CODE',
           'AWAITING_MONTHS',
           'AWAITING_SERVER_SELECTION',
           'AWAITING_KEY_NAME',
@@ -1098,6 +1117,7 @@ export async function sendTelegramOrderReceiptConfirmation(input: {
   order: {
     orderCode: string;
     telegramUserId?: string;
+    telegramUsername?: string | null;
     priceLabel?: string | null;
     priceAmount?: number | null;
     priceCurrency?: string | null;
@@ -1113,6 +1133,10 @@ export async function sendTelegramOrderReceiptConfirmation(input: {
     selectedServerName?: string | null;
     selectedServerCountryCode?: string | null;
     deliveryType?: string | null;
+    approvedAccessKeyId?: string | null;
+    targetAccessKeyId?: string | null;
+    approvedDynamicKeyId?: string | null;
+    targetDynamicKeyId?: string | null;
   };
   deliveredKeyName: string;
   isTrial?: boolean;
@@ -1132,6 +1156,78 @@ export async function sendTelegramOrderReceiptConfirmation(input: {
   });
   if (!preferences.receipt) {
     return true;
+  }
+
+  const isTrialOrder = Boolean(input.isTrial || input.order.planCode?.startsWith('trial_'));
+
+  if (!isTrialOrder) {
+    const { plans } = await resolveTelegramStorePlans();
+    const plan = findTelegramStorePlanByCode(plans, input.order.planCode || null);
+    const accessKeyId = input.order.approvedAccessKeyId || input.order.targetAccessKeyId || null;
+    const dynamicKeyId = input.order.approvedDynamicKeyId || input.order.targetDynamicKeyId || null;
+
+    if (plan && (accessKeyId || dynamicKeyId)) {
+      let accessKeyText: string | null = null;
+      let keyId: string | null = null;
+      let expiryLabel = '—';
+
+      if (accessKeyId) {
+        const key = await loadAccessKeyForMessaging(accessKeyId);
+        if (key) {
+          keyId = key.id;
+          expiryLabel = formatStoreDate(key.expiresAt);
+          const protectedInstallOnly = Boolean(key.boundDeviceInstallsOnly && key.maxDevices);
+          if (protectedInstallOnly) {
+            const token = await ensureAccessKeySubscriptionToken(key.id, key.subscriptionToken);
+            accessKeyText = key.publicSlug
+              ? buildShortShareUrl(key.publicSlug, { source: 'telegram_order_confirmed', lang: input.locale })
+              : buildSharePageUrl(token, { source: 'telegram_order_confirmed', lang: input.locale });
+          } else {
+            accessKeyText = key.accessUrl || null;
+          }
+        }
+      } else if (dynamicKeyId) {
+        const key = await loadDynamicAccessKeyForMessaging(dynamicKeyId);
+        if (key) {
+          keyId = key.id;
+          expiryLabel = formatStoreDate(key.expiresAt);
+          const protectedInstallOnly = Boolean(key.boundDeviceInstallsOnly && key.maxDevices);
+          const urls = getDynamicKeyMessagingUrls(
+            key,
+            'telegram_order_confirmed',
+            input.locale,
+          );
+          accessKeyText = protectedInstallOnly
+            ? urls.sharePageUrl
+            : urls.outlineClientUrl || urls.subscriptionUrl || urls.sharePageUrl;
+        }
+      }
+
+      if (accessKeyText && keyId) {
+        const paidLabel = input.order.priceLabel?.trim()
+          || (typeof input.order.priceAmount === 'number'
+            ? `${new Intl.NumberFormat('en-US').format(input.order.priceAmount)} Ks`
+            : plan.priceLabel);
+        const confirmation = buildTelegramStoreOrderConfirmedView({
+          firstName: input.order.telegramUsername || input.order.requestedName || 'friend',
+          plan,
+          accessKey: accessKeyText,
+          expiryLabel,
+          paidLabel,
+          keyId,
+        });
+
+        return sendTelegramMessage(
+          config.botToken,
+          input.chatId,
+          confirmation.text,
+          {
+            parseMode: 'MarkdownV2',
+            replyMarkup: confirmation.replyMarkup,
+          },
+        );
+      }
+    }
   }
 
   const replyMarkup = {
@@ -1526,6 +1622,67 @@ export async function handleTelegramOrderTextMessage(input: {
   const trimmed = input.text.trim();
 
   switch (activeOrder.status) {
+    case 'AWAITING_PLAN_CONFIRMATION':
+      return locale === 'my'
+        ? '👇 Confirm button ကိုနှိပ်၍ ဆက်လုပ်ပါ သို့မဟုတ် Coupon code ထည့်ရန် button ကို သုံးပါ။'
+        : '👇 Use the confirm button below to continue, or use the coupon button to apply a code.';
+    case 'AWAITING_COUPON_CODE': {
+      const { plans } = await resolveTelegramStorePlans();
+      const storefrontPlan = findTelegramStorePlanByCode(plans, activeOrder.planCode);
+      if (!storefrontPlan) {
+        return ui.invalidPlanChoice;
+      }
+
+      const coupon = await input.deps.resolveTelegramCouponForOrderStart({
+        chatId: input.chatId,
+        telegramUserId: input.telegramUserId,
+        source: activeOrder.retentionSource ?? null,
+        couponCode: trimmed,
+        accessKeyId: activeOrder.targetAccessKeyId ?? null,
+        dynamicAccessKeyId: activeOrder.targetDynamicKeyId ?? null,
+      });
+
+      if (!coupon?.coupon) {
+        return locale === 'my'
+          ? '❌ Coupon code မမှန်ပါ။ Code ကို ပြန်ပို့ပါ သို့မဟုတ် /cancel ဖြင့် checkout ကို ပယ်ဖျက်ပါ။'
+          : '❌ That coupon code is not valid. Send another code, or use /cancel to stop this checkout.';
+      }
+
+      const planSnapshot = input.deps.buildTelegramOrderPlanSnapshot(
+        storefrontPlan.plan,
+        locale,
+        {
+          couponCampaignType: coupon.coupon.campaignType,
+          couponCode: coupon.coupon.couponCode,
+          couponDiscountAmount: coupon.coupon.couponDiscountAmount,
+          couponDiscountLabel: coupon.coupon.couponDiscountLabel,
+        },
+      );
+
+      await db.telegramOrder.update({
+        where: { id: activeOrder.id },
+        data: {
+          ...planSnapshot,
+          status: 'AWAITING_PLAN_CONFIRMATION',
+        },
+      });
+
+      const view = buildTelegramStoreOrderSummaryView({
+        plan: storefrontPlan,
+        couponCode: coupon.coupon.couponCode,
+        originalPriceAmount: storefrontPlan.priceAmount,
+        discountAmount: coupon.coupon.couponDiscountAmount,
+        finalPriceAmount: Math.max(
+          0,
+          storefrontPlan.priceAmount - coupon.coupon.couponDiscountAmount,
+        ),
+      });
+      await sendTelegramMessage(input.botToken, input.chatId, view.text, {
+        parseMode: 'MarkdownV2',
+        replyMarkup: view.replyMarkup,
+      });
+      return null;
+    }
     case 'AWAITING_KEY_SELECTION': {
       const [accessKeys, dynamicKeys] = await Promise.all([
         findLinkedAccessKeys(input.chatId, input.telegramUserId, true),

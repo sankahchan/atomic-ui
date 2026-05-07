@@ -10,7 +10,17 @@ import { resolveTelegramAdminActor } from '@/lib/services/telegram-admin-core';
 import { handlePremiumSupportFollowUpText } from '@/lib/services/telegram-premium';
 import { handleTelegramSupportReplyMedia, handleTelegramSupportReplyText } from '@/lib/services/telegram-support';
 import { copyTelegramMessage } from '@/lib/services/telegram-runtime';
-import { handleBuyCommand, handleEmailLink, handleLanguageCommand, handleRenewOrderCommand, handleStartCommand, handleTelegramOrderProofMessage, handleTelegramOrderTextMessage } from '@/lib/services/telegram-user-command-handlers';
+import {
+  handleEmailLink,
+  handleLanguageCommand,
+  handleStartCommand,
+  handleStoreBuyCommand,
+  handleStoreMyKeysCommand,
+  handleStoreRenewCommand,
+  handleStoreSwitchServerCommand,
+  handleTelegramOrderProofMessage,
+  handleTelegramOrderTextMessage,
+} from '@/lib/services/telegram-user-command-handlers';
 
 const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
   'buy',
@@ -20,6 +30,7 @@ const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
   'offers',
   'renew',
   'start',
+  'switchserver',
   'support',
   'usage',
   'cancel',
@@ -276,9 +287,24 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     case 'language':
       return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
-      return handleBuyCommand(chatId, telegramUserId, username, locale, config.botToken, null, argsText);
+      return handleStoreBuyCommand(chatId, telegramUserId, username, locale, config.botToken);
+    case 'mykeys':
+      return handleStoreMyKeysCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+      });
     case 'renew':
-      return handleRenewOrderCommand(chatId, telegramUserId, username, locale, config.botToken, argsText);
+      return handleStoreRenewCommand(chatId, telegramUserId, username, locale, config.botToken);
+    case 'switchserver':
+      return handleStoreSwitchServerCommand({
+        chatId,
+        telegramUserId,
+        locale,
+        botToken: config.botToken,
+        argsText,
+      });
     case 'cancel': {
       const currentOrder = activeOrder ?? (await getActiveTelegramOrder(chatId, telegramUserId));
       if (!currentOrder && pendingPremiumReply) {

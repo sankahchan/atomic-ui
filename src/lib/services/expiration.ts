@@ -62,7 +62,10 @@ export async function checkExpirations(): Promise<ExpirationResult> {
 
             const remainingMs = key.expiresAt.getTime() - now.getTime();
             const daysLeft = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
-            const nextStage = daysLeft <= 3 ? '3D' : '7D';
+            if (daysLeft > 3) {
+                continue;
+            }
+            const nextStage = '3D';
 
             if (key.expirationWarningStage === nextStage) {
                 continue;
@@ -71,7 +74,7 @@ export async function checkExpirations(): Promise<ExpirationResult> {
             try {
                 await sendAccessKeyLifecycleTelegramNotification({
                     accessKeyId: key.id,
-                    type: nextStage === '3D' ? 'EXPIRING_3D' : 'EXPIRING_7D',
+                    type: 'EXPIRING_3D',
                     daysLeft,
                 });
 

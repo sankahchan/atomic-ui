@@ -116,11 +116,7 @@ const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
   { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
   { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
   { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
-  { command: '/trial', labelEn: '🎁 Trial', labelMy: '🎁 Trial', aliases: ['🎁 Free trial', '🎁 Free Trial'] },
-  { command: '/sub', labelEn: '📎 Links', labelMy: '📎 Links', aliases: ['📎 Sub links', '📎 Sub Links'] },
-  { command: '/gift', labelEn: '🎁 Gift', labelMy: '🎁 Gift' },
-  { command: '/referral', labelEn: '🔗 Referral', labelMy: '🔗 Referral', aliases: ['/referrals', '🔗 Referrals'] },
-  { command: '/server', labelEn: '🛠 Server change', labelMy: '🛠 Server ပြောင်း' },
+  { command: '/switchserver', labelEn: '🔄 Switch Server', labelMy: '🔄 Server ပြောင်း' },
 ];
 
 const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [

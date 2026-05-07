@@ -1,8 +1,14 @@
 import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { getTelegramUi, escapeHtml } from '@/lib/services/telegram-ui';
 import { sendTelegramMessage } from '@/lib/services/telegram-bot-core';
 import { formatBytes } from '@/lib/utils';
+import {
+  buildTelegramStoreDataWarningView,
+  findTelegramStorePlanByCode,
+  loadTelegramStoreLatestOrderForKey,
+  progressBar as buildTelegramStoreProgressBar,
+  resolveTelegramStorePlans,
+} from '@/lib/services/telegram-storefront';
 
 export async function runTelegramBandwidthAlertCycle() {
   const result = {
@@ -23,7 +29,6 @@ export async function runTelegramBandwidthAlertCycle() {
     for (const profile of profiles) {
       try {
         const locale = (profile.locale as any) || 'en';
-        const ui = getTelegramUi(locale);
 
         // Fetch access keys and dynamic keys for this user
         // We assume keys are linked to the telegram profile via some logic
@@ -52,27 +57,16 @@ export async function runTelegramBandwidthAlertCycle() {
           const limitBytes = Number(key.dataLimitBytes);
           const percent = (usedBytes / limitBytes) * 100;
 
-          let alerted = false;
-
-          // 95% Alert
-          if (percent >= 95 && !profile.bandwidthAlert95At) {
-            await sendBandwidthAlert(profile.telegramChatId!, key, 95, ui, locale);
+          if (percent >= 80 && !profile.bandwidthAlert80At) {
+            await sendBandwidthAlert(profile.telegramChatId!, key, locale);
             await db.telegramUserProfile.update({
               where: { telegramUserId: profile.telegramUserId },
-              data: { bandwidthAlert95At: new Date() },
-            });
-            result.alerted95++;
-            alerted = true;
-          } 
-          // 80% Alert (only if 95% hasn't been sent yet in this cycle)
-          else if (percent >= 80 && !profile.bandwidthAlert80At && !profile.bandwidthAlert95At) {
-            await sendBandwidthAlert(profile.telegramChatId!, key, 80, ui, locale);
-            await db.telegramUserProfile.update({
-              where: { telegramUserId: profile.telegramUserId },
-              data: { bandwidthAlert80At: new Date() },
+              data: {
+                bandwidthAlert80At: new Date(),
+                bandwidthAlert95At: null,
+              },
             });
             result.alerted80++;
-            alerted = true;
           }
 
           // Reset alerts if usage is low (e.g. after renewal/reset)
@@ -102,50 +96,38 @@ export async function runTelegramBandwidthAlertCycle() {
 async function sendBandwidthAlert(
   chatId: string,
   key: { id: string; name: string; usedBytes: bigint; dataLimitBytes: bigint | null; type: 'standard' | 'premium' },
-  threshold: 80 | 95,
-  ui: any,
   locale: string
 ) {
-  const isMyanmar = locale === 'my';
   const used = formatBytes(Number(key.usedBytes));
   const limit = formatBytes(Number(key.dataLimitBytes));
-  
-  const title = threshold === 95
-    ? (isMyanmar ? '⚠️ <b>Bandwidth အသုံးပြုမှု အလွန်များနေပါသည်</b>' : '⚠️ <b>Critical Bandwidth Usage</b>')
-    : (isMyanmar ? '📊 <b>Bandwidth အသုံးပြုမှု သတိပေးချက်</b>' : '📊 <b>Bandwidth Usage Alert</b>');
-
-  const body = isMyanmar
-    ? `သင့် ${key.type === 'premium' ? 'premium ' : ''}key <b>${escapeHtml(key.name)}</b> သည် သတ်မှတ်ထားသော quota ၏ <b>${threshold}%</b> အထိ အသုံးပြုပြီး ဖြစ်ပါသည်။\n\nအသုံးပြုပြီး: ${used}\nစုစုပေါင်း quota: ${limit}`
-    : `Your ${key.type === 'premium' ? 'premium ' : ''}key <b>${escapeHtml(key.name)}</b> has reached <b>${threshold}%</b> of its data quota.\n\nUsed: ${used}\nTotal quota: ${limit}`;
-
-  const hint = isMyanmar
-    ? 'Quota ကုန်သွားပါက traffic ကို အသုံးပြုနိုင်တော့မည် မဟုတ်ပါ။ ဆက်လက်အသုံးပြုလိုပါက /renew ဖြင့် သက်တမ်းတိုးနိုင်ပါသည်။'
-    : 'Once the quota is exhausted, traffic will be blocked. Use /renew to top up or renew your key.';
-
-  const message = [title, body, hint].join('\n\n');
+  const [{ plans }, latestOrder] = await Promise.all([
+    resolveTelegramStorePlans(),
+    loadTelegramStoreLatestOrderForKey({
+      kind: key.type === 'premium' ? 'dynamic' : 'access',
+      keyId: key.id,
+    }),
+  ]);
+  const plan = findTelegramStorePlanByCode(plans, latestOrder?.planCode || null);
+  const view = buildTelegramStoreDataWarningView({
+    planName: plan?.detailName || key.name,
+    usedLabel: used,
+    totalLabel: limit,
+    priceLabel: plan?.priceLabel || 'See plans',
+    progressBar: buildTelegramStoreProgressBar(Number(key.usedBytes), Number(key.dataLimitBytes || BigInt(0))),
+    plan,
+    renewTarget: {
+      kind: key.type === 'premium' ? 'dynamic' : 'access',
+      keyId: key.id,
+    },
+  });
 
   try {
     const { getTelegramConfig } = await import('@/lib/services/telegram-runtime');
     const config = await getTelegramConfig();
     if (config) {
-      await sendTelegramMessage(config.botToken, chatId, message, {
-        parseMode: 'HTML',
-        replyMarkup: {
-          inline_keyboard: [
-            [
-              {
-                text: isMyanmar ? '🔄 သက်တမ်းတိုးရန်' : '🔄 Renew Now',
-                callback_data: `tg_order_ky_${key.id}${key.type === 'premium' ? '_dynamic' : ''}`,
-              },
-            ],
-            [
-              {
-                text: isMyanmar ? '🛟 အကူအညီ ရယူရန်' : '🛟 Get Support',
-                callback_data: `tg_support_new_${key.type === 'premium' ? 'server' : 'key'}`,
-              },
-            ],
-          ],
-        },
+      await sendTelegramMessage(config.botToken, chatId, view.text, {
+        parseMode: 'MarkdownV2',
+        replyMarkup: view.replyMarkup,
       });
     }
   } catch (error) {

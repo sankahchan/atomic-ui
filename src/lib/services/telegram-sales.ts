@@ -132,6 +132,8 @@ export type TelegramSalesSettings = z.infer<typeof telegramSalesSettingsSchema>;
 export const TELEGRAM_ORDER_ACTIVE_STATUSES = [
   'AWAITING_KEY_SELECTION',
   'AWAITING_PLAN',
+  'AWAITING_PLAN_CONFIRMATION',
+  'AWAITING_COUPON_CODE',
   'AWAITING_MONTHS',
   'AWAITING_SERVER_SELECTION',
   'AWAITING_KEY_NAME',

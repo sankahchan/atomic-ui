@@ -14,6 +14,10 @@ import {
 import { acceptTelegramReferralCode, parseReferralStartArg } from '@/lib/services/telegram-referrals';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 import {
+  buildTelegramStoreMainMenuView,
+  loadTelegramStoreMainMenuData,
+} from '@/lib/services/telegram-storefront';
+import {
   buildTelegramTrialOfferKeyboard,
   buildTelegramTrialOfferMessage,
   isTelegramTrialEligible,
@@ -66,30 +70,29 @@ export async function sendTelegramStartHome(input: {
   botToken: string;
   locale: SupportedLocale;
   welcomeMessage: string;
+  sendOfferNudge?: boolean;
 }) {
-  const ui = getTelegramUi(input.locale);
-  const adminMsg = input.isAdmin ? ui.adminRecognized : '';
-
-  await sendTelegramMessage(
-    input.botToken,
-    input.chatId,
-    ui.hello(
-      escapeHtml(input.username),
-      escapeHtml(input.welcomeMessage),
-      input.telegramUserId,
-      adminMsg,
-    ),
-    {
-      replyMarkup: getCommandKeyboard(input.isAdmin, input.locale),
-    },
-  );
-
-  await sendTelegramOfferNudgeIfAny({
-    botToken: input.botToken,
-    chatId: input.chatId,
-    telegramUserId: input.telegramUserId,
-    locale: input.locale,
+  const menu = buildTelegramStoreMainMenuView({
+    firstName: input.username,
+    ...(await loadTelegramStoreMainMenuData({
+      chatId: input.chatId,
+      telegramUserId: input.telegramUserId,
+    })),
   });
+
+  await sendTelegramMessage(input.botToken, input.chatId, menu.text, {
+    parseMode: 'MarkdownV2',
+    replyMarkup: menu.replyMarkup,
+  });
+
+  if (input.sendOfferNudge) {
+    await sendTelegramOfferNudgeIfAny({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      telegramUserId: input.telegramUserId,
+      locale: input.locale,
+    });
+  }
 }
 
 export async function handleTelegramStartCommand(input: {
@@ -294,19 +297,14 @@ export async function handleTelegramStartCommand(input: {
   });
 
   if (existingUser) {
-    await sendTelegramMessage(
-      input.botToken,
-      input.chatId,
-      ui.welcomeBack(escapeHtml(input.username)),
-      {
-        replyMarkup: getCommandKeyboard(input.isAdmin, locale),
-      },
-    );
-    await sendTelegramOfferNudgeIfAny({
-      botToken: input.botToken,
+    await sendTelegramStartHome({
       chatId: input.chatId,
       telegramUserId: input.telegramUserId,
+      username: input.username,
+      isAdmin: input.isAdmin,
+      botToken: input.botToken,
       locale,
+      welcomeMessage,
     });
     return null;
   }
@@ -322,19 +320,14 @@ export async function handleTelegramStartCommand(input: {
       data: { telegramChatId: String(input.chatId) },
     });
 
-    await sendTelegramMessage(
-      input.botToken,
-      input.chatId,
-      ui.accountLinked(escapeHtml(input.username)),
-      {
-        replyMarkup: getCommandKeyboard(input.isAdmin, locale),
-      },
-    );
-    await sendTelegramOfferNudgeIfAny({
-      botToken: input.botToken,
+    await sendTelegramStartHome({
       chatId: input.chatId,
       telegramUserId: input.telegramUserId,
+      username: input.username,
+      isAdmin: input.isAdmin,
+      botToken: input.botToken,
       locale,
+      welcomeMessage,
     });
     return null;
   }

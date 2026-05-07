@@ -38,8 +38,7 @@ test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back 
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛒 Buy key', false), '/buy');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🗂 Key များ', false), '/mykeys');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🎟 Offers', false), '/offers');
-  assert.equal(normalizeTelegramReplyKeyboardCommand('🎁 Gift', false), '/gift');
-  assert.equal(normalizeTelegramReplyKeyboardCommand('🛠 Server change', false), '/server');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🔄 Switch Server', false), '/switchserver');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🌐 Language', false), '/language');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛑 Cancel', false), '/cancel');
 });

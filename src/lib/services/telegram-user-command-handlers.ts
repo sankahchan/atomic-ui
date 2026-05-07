@@ -46,8 +46,40 @@ import {
 } from '@/lib/services/telegram-sales';
 import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 import { buildTelegramLocaleSelectorKeyboard, buildTelegramLocaleSelectorMessage } from '@/lib/services/telegram-callbacks';
+import {
+  buildTelegramStoreActiveKeysView,
+  buildTelegramStoreMainMenuView,
+  buildTelegramStorePlanListView,
+  buildTelegramStoreRenewView,
+  buildTelegramStoreSetupGuideText,
+  buildTelegramStoreSupportAlertText,
+  buildTelegramStoreSwitchKeySelectionView,
+  buildTelegramStoreSwitchLimitReachedView,
+  buildTelegramStoreSwitchServerSelectionView,
+  buildTelegramStorefrontCallbackData,
+  escapeTelegramMarkdownV2,
+  loadTelegramStoreActiveKeysData,
+  loadTelegramStoreMainMenuData,
+  loadTelegramStoreRenewData,
+  loadTelegramStoreSwitchServerOptions,
+  loadTelegramStoreSwitchableKeysData,
+} from '@/lib/services/telegram-storefront';
 
 export { handleTelegramStartCommand as handleStartCommand };
+
+async function sendTelegramStoreView(input: {
+  botToken: string;
+  chatId: number;
+  text: string;
+  replyMarkup?: Record<string, unknown>;
+}) {
+  const sent = await sendTelegramMessage(input.botToken, input.chatId, input.text, {
+    parseMode: 'MarkdownV2',
+    replyMarkup: input.replyMarkup,
+  });
+
+  return sent ? null : input.text;
+}
 
 export async function handleEmailLink(
   chatId: number,
@@ -169,6 +201,36 @@ export async function handleBuyCommand(
       buildTelegramSalesPlanPromptText,
       buildTelegramPlanSelectionKeyboard,
     },
+  });
+}
+
+export async function handleStoreBuyCommand(
+  chatId: number,
+  telegramUserId: number,
+  username: string,
+  locale: SupportedLocale,
+  botToken: string,
+): Promise<string | null> {
+  const ui = getTelegramUi(locale);
+  const existing = await getActiveTelegramOrder(chatId, telegramUserId);
+  if (existing?.status === 'PENDING_REVIEW') {
+    return ui.activeOrderPendingReview(existing.orderCode);
+  }
+
+  await cancelStaleTelegramConversationOrders(chatId, telegramUserId);
+  const view = buildTelegramStoreMainMenuView({
+    firstName: username,
+    ...(await loadTelegramStoreMainMenuData({
+      chatId,
+      telegramUserId,
+    })),
+  });
+
+  return sendTelegramStoreView({
+    botToken,
+    chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
   });
 }
 
@@ -379,6 +441,99 @@ export async function handleRenewOrderCommand(
   });
 }
 
+export async function handleStoreRenewCommand(
+  chatId: number,
+  telegramUserId: number,
+  username: string,
+  locale: SupportedLocale,
+  botToken: string,
+): Promise<string | null> {
+  const ui = getTelegramUi(locale);
+  const settings = await getTelegramSalesSettings();
+
+  if (!settings.enabled || !settings.allowRenewals) {
+    return ui.renewDisabled;
+  }
+
+  const existing = await getActiveTelegramOrder(chatId, telegramUserId);
+  if (existing?.status === 'PENDING_REVIEW') {
+    return ui.activeOrderPendingReview(existing.orderCode);
+  }
+
+  await cancelStaleTelegramConversationOrders(chatId, telegramUserId);
+  const { plans, plan, renewTarget } = await loadTelegramStoreRenewData({
+    chatId,
+    telegramUserId,
+  });
+
+  if (!plan) {
+    const planList = buildTelegramStorePlanListView(plans);
+    return sendTelegramStoreView({
+      botToken,
+      chatId,
+      text: planList.text,
+      replyMarkup: planList.replyMarkup,
+    });
+  }
+
+  const view = buildTelegramStoreRenewView({
+    plan,
+    renewTarget,
+  });
+
+  return sendTelegramStoreView({
+    botToken,
+    chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
+  });
+}
+
+export async function handleStoreMyKeysCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+}) {
+  const { items } = await loadTelegramStoreActiveKeysData({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+  });
+
+  if (items.length === 0) {
+    const text = [
+      '🔑 *Your Active Keys*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      'No active keys right now\\.',
+      '',
+      'Tap below to buy a new plan\\.',
+    ].join('\n');
+
+    return sendTelegramStoreView({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      text,
+      replyMarkup: {
+        inline_keyboard: [[
+          {
+            text: '➕ Buy New Plan',
+            callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+          },
+        ]],
+      },
+    });
+  }
+
+  const view = buildTelegramStoreActiveKeysView(items);
+  return sendTelegramStoreView({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
+  });
+}
+
 export async function handleTelegramOrderTextMessage(input: {
   chatId: number;
   telegramUserId: number;
@@ -463,6 +618,136 @@ export async function handleSwitchServerCommand(
   });
 
   return null;
+}
+
+export async function handleStoreSwitchServerCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  locale: SupportedLocale;
+  botToken: string;
+  argsText?: string;
+}) {
+  const { keys } = await loadTelegramStoreSwitchableKeysData({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+  });
+
+  if (keys.length === 0) {
+    const text = [
+      '🔄 *Switch Server*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      'No switchable active keys found\\.',
+    ].join('\n');
+
+    return sendTelegramStoreView({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      text,
+      replyMarkup: {
+        inline_keyboard: [[
+          {
+            text: '◀ Back',
+            callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
+          },
+        ]],
+      },
+    });
+  }
+
+  const search = input.argsText?.trim().toLowerCase() || '';
+  const matchedKey = search
+    ? keys.find(
+        (key) =>
+          key.id.toLowerCase() === search
+          || key.planName.toLowerCase().includes(search),
+      ) || null
+    : null;
+
+  if (matchedKey) {
+    if (matchedKey.switchesMax !== -1 && matchedKey.switchesUsed >= matchedKey.switchesMax) {
+      const limitView = buildTelegramStoreSwitchLimitReachedView({
+        max: matchedKey.switchesMaxLabel,
+        planName: matchedKey.planName,
+      });
+      return sendTelegramStoreView({
+        botToken: input.botToken,
+        chatId: input.chatId,
+        text: limitView.text,
+        replyMarkup: limitView.replyMarkup,
+      });
+    }
+
+    const serverOptions = await loadTelegramStoreSwitchServerOptions({
+      keyId: matchedKey.id,
+      kind: matchedKey.kind,
+    });
+
+    if (!serverOptions || serverOptions.servers.length === 0) {
+      const text = [
+        '🌍 *Select New Server*',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        '',
+        `Current  :  *${escapeTelegramMarkdownV2(matchedKey.currentServerName)}*`,
+        `Used     :  ${escapeTelegramMarkdownV2(String(matchedKey.switchesUsed))} / ${escapeTelegramMarkdownV2(matchedKey.switchesMaxLabel)} switches`,
+        '',
+        'No alternate server is available right now\\.',
+      ].join('\n');
+
+      return sendTelegramStoreView({
+        botToken: input.botToken,
+        chatId: input.chatId,
+        text,
+        replyMarkup: {
+          inline_keyboard: [[
+            {
+              text: '◀ Back',
+              callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
+            },
+          ]],
+        },
+      });
+    }
+
+    const view = buildTelegramStoreSwitchServerSelectionView({
+      keyId: matchedKey.id,
+      currentServer: serverOptions.currentServerName,
+      used: serverOptions.switchesUsed,
+      maxLabel: matchedKey.switchesMaxLabel,
+      servers: serverOptions.servers,
+    });
+
+    return sendTelegramStoreView({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      text: view.text,
+      replyMarkup: view.replyMarkup,
+    });
+  }
+
+  const view = buildTelegramStoreSwitchKeySelectionView(keys);
+  return sendTelegramStoreView({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
+  });
+}
+
+export async function sendTelegramStoreSetupGuide(
+  chatId: number,
+  locale: SupportedLocale,
+  botToken: string,
+) {
+  return sendTelegramStoreView({
+    botToken,
+    chatId,
+    text: buildTelegramStoreSetupGuideText(locale),
+  });
+}
+
+export function getTelegramStoreSupportAlert(locale: SupportedLocale) {
+  return buildTelegramStoreSupportAlertText(locale);
 }
 
 async function initiateServerSwitch(
