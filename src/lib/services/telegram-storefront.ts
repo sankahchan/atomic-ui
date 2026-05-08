@@ -260,7 +260,10 @@ function formatStoreDataLabel(gigabytes: number | null | undefined) {
   if (typeof gigabytes !== 'number' || !Number.isFinite(gigabytes) || gigabytes <= 0) {
     return 'Unlimited';
   }
-  return `${new Intl.NumberFormat('en-US').format(gigabytes)} GB`;
+  const value = Number.isInteger(gigabytes)
+    ? String(gigabytes)
+    : gigabytes.toFixed(1).replace(/\.0$/, '');
+  return `${value} GB`;
 }
 
 export function badgeStar(badge: string | null | undefined) {
@@ -1035,9 +1038,9 @@ export function buildTelegramStoreMainMenuView(input: {
     text,
     replyMarkup: {
       inline_keyboard: [
-        [{ text: '⚡ Flash Plans · 30 Days · 🔄 3×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [{ text: '🌙 Season Plans · 90 Days · 🔄 5×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [{ text: '🔑 Dynamic Plans · Flexible · 🔄 ∞', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+        [{ text: '⚡ Flash Plans    ·  30 Days  ·  🔄 3×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+        [{ text: '🌙 Season Plans   ·  90 Days  ·  🔄 5×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+        [{ text: '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
         [{ text: '💬 Live Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) }],
       ],
     },
@@ -1142,15 +1145,15 @@ export function buildTelegramStoreOrderSummaryView(input: {
     replyMarkup: {
       inline_keyboard: [
         [{
-          text: `✅ Confirm & Pay ${couponCode ? formatStorePriceAmount(finalPrice) : input.plan.priceLabel}`,
+          text: `✅  Confirm & Pay   ${couponCode ? formatStorePriceAmount(finalPrice) : input.plan.priceLabel}`,
           callback_data: buildTelegramStorefrontCallbackData({ action: 'confirm', planId: input.plan.id }),
         }],
         [{
-          text: couponCode ? '🏷 Change Coupon' : '🏷 Apply Coupon Code',
+          text: couponCode ? '🏷  Change Coupon' : '🏷  Apply Coupon Code',
           callback_data: buildTelegramStorefrontCallbackData({ action: 'coupon', planId: input.plan.id }),
         }],
         [{
-          text: '◀ Back to Plans',
+          text: '◀   Back to Plans',
           callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
         }],
       ],
@@ -1180,7 +1183,7 @@ export function buildTelegramStoreRenewView(input: {
     replyMarkup: {
       inline_keyboard: [
         [{
-          text: `✅ Renew ${input.plan.detailName} — ${input.plan.priceLabel}`,
+          text: `✅  Renew ${input.plan.detailName}  —  ${input.plan.priceLabel}`,
           callback_data: input.renewTarget
             ? buildTelegramStorefrontCallbackData({
                 action: 'renew_plan',
@@ -1194,7 +1197,7 @@ export function buildTelegramStoreRenewView(input: {
               }),
         }],
         [{
-          text: '🔍 Choose a Different Plan',
+          text: '🔍  Choose a Different Plan',
           callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
         }],
       ],
@@ -1226,7 +1229,7 @@ export function buildTelegramStoreActiveKeysView(items: TelegramStoreKeyView[]) 
       inline_keyboard: [
         ...items.map((item) => [
           {
-            text: `🔄 Renew ${item.planName} — ${item.renewPriceLabel || 'See plans'}`,
+            text: `🔄 Renew ${item.planName}  —  ${item.renewPriceLabel || 'See plans'}`,
             callback_data: item.planId
               ? buildTelegramStorefrontCallbackData({
                   action: 'renew_plan',
@@ -1237,7 +1240,7 @@ export function buildTelegramStoreActiveKeysView(items: TelegramStoreKeyView[]) 
               : buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
           },
         ]),
-        [{ text: '➕ Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+        [{ text: '➕  Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
       ],
     },
   };
@@ -1255,7 +1258,7 @@ export function buildTelegramStoreSwitchKeySelectionView(items: TelegramStoreSwi
       inline_keyboard: [
         ...items.map((item) => [
           {
-            text: `🔑 ${item.planName} · ${item.switchesUsed}/${item.switchesMaxLabel} switches used`,
+            text: `🔑 ${item.planName}  ·  ${item.switchesUsed}/${item.switchesMaxLabel} switches used`,
             callback_data: buildTelegramStorefrontCallbackData({
               action: 'switchkey',
               keyId: item.id,
@@ -1287,7 +1290,7 @@ export function buildTelegramStoreSwitchServerSelectionView(input: {
       inline_keyboard: [
         ...input.servers.map((server) => [
           {
-            text: `🟢 ${server.flag} ${server.name} · ${server.location}`,
+            text: `🟢 ${server.flag} ${server.name}  ·  ${server.location}`,
             callback_data: buildTelegramStorefrontCallbackData({
               action: 'doswitch',
               keyId: input.keyId,
