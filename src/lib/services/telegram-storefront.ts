@@ -126,12 +126,26 @@ export type TelegramStoreGuideKeyData = {
   id: string;
   kind: TelegramStoreKeyKind;
   variant: 'paid' | 'trial';
+  planId: TelegramStorePlanId | null;
   planName: string;
+  categoryLabel: string;
+  statusLabel: string;
+  currentServerName: string;
+  keyTypeLabel: string;
   dataLabel: string;
+  usedLabel: string;
+  totalLabel: string;
+  progressBar: string;
+  percentLabel: string;
   expiryLabel: string;
   paidLabel: string;
   switchesLabel: string;
+  switchesUsed: number;
+  switchesMaxLabel: string;
   switchesMax: number;
+  renewPriceLabel: string | null;
+  deviceLimitLabel: string | null;
+  showSwitchButton: boolean;
   accessKeyText: string;
 };
 
@@ -590,6 +604,41 @@ function formatBytesToGbLabel(bytes?: bigint | null) {
   return `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} GB`;
 }
 
+function formatTelegramStoreDeviceLimitLabel(input: {
+  limit?: number | null;
+  boundDeviceInstallsOnly?: boolean | null;
+}) {
+  if (!input.limit || input.limit < 1) {
+    return null;
+  }
+
+  if (input.boundDeviceInstallsOnly) {
+    return `${input.limit} device${input.limit === 1 ? '' : 's'} on protected install`;
+  }
+
+  return `${input.limit} estimated device${input.limit === 1 ? '' : 's'}`;
+}
+
+function formatTelegramStoreStatusLabel(status: string, variant: 'paid' | 'trial') {
+  if (status === 'ACTIVE') {
+    return variant === 'trial' ? 'Trial active' : 'Active';
+  }
+
+  if (status === 'DISABLED') {
+    return 'Disabled';
+  }
+
+  if (status === 'PENDING') {
+    return 'Pending';
+  }
+
+  if (status === 'EXPIRED') {
+    return 'Expired';
+  }
+
+  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+}
+
 function formatCurrentServerName(input: {
   name?: string | null;
   countryCode?: string | null;
@@ -976,11 +1025,16 @@ export async function loadTelegramStoreGuideKeyData(input: {
 
   const accessKey = accessKeys.find((key) => key.id === input.keyId) || null;
   if (accessKey) {
+    const variant = getTelegramAccessKeyCategory(accessKey.tags) === 'trial' ? 'trial' : 'paid';
     const latestOrder = await loadTelegramStoreLatestOrderForKey({
       kind: 'access',
       keyId: accessKey.id,
     });
     const plan = findTelegramStorePlanByCode(plans, latestOrder?.planCode || null);
+    const used = Number(accessKey.usedBytes || BigInt(0));
+    const total = accessKey.dataLimitBytes ? Number(accessKey.dataLimitBytes) : 0;
+    const bar = progressBar(used, total || 1);
+    const [barChars, percent] = bar.split(' ');
     let accessKeyText = accessKey.accessUrl || '';
     if (accessKey.boundDeviceInstallsOnly && accessKey.maxDevices) {
       const token = await ensureAccessKeySubscriptionToken(accessKey.id, accessKey.subscriptionToken);
@@ -996,15 +1050,37 @@ export async function loadTelegramStoreGuideKeyData(input: {
     return {
       id: accessKey.id,
       kind: 'access' as const,
-      variant: getTelegramAccessKeyCategory(accessKey.tags) === 'trial' ? 'trial' : 'paid',
+      variant,
+      planId: plan?.id || null,
       planName: plan?.detailName || accessKey.name,
+      categoryLabel: variant === 'trial' ? 'Trial' : plan ? formatCategoryLabel(plan.category) : 'Flash',
+      statusLabel: formatTelegramStoreStatusLabel(accessKey.status, variant),
+      currentServerName: formatCurrentServerName({
+        name: accessKey.server?.name,
+        countryCode: accessKey.server?.countryCode,
+      }),
+      keyTypeLabel: plan?.keyTypeLabel || 'Standard Key',
       dataLabel: plan?.dataLabel || formatBytesToGbLabel(accessKey.dataLimitBytes),
+      usedLabel: formatBytesToGbLabel(BigInt(used)),
+      totalLabel: formatBytesToGbLabel(accessKey.dataLimitBytes),
+      progressBar: barChars || '░░░░░░░░░░',
+      percentLabel: percent || '0%',
       expiryLabel: formatStoreDate(accessKey.expiresAt),
-      paidLabel: latestOrder?.planCode
-        ? plan?.priceLabel || '—'
-        : '—',
+      paidLabel: variant === 'trial'
+        ? 'FREE'
+        : latestOrder?.planCode
+          ? plan?.priceLabel || '—'
+          : '—',
       switchesLabel: plan?.switchesLabel || switchesLabel(accessKey.switchesMax),
+      switchesUsed: accessKey.switchesUsed,
+      switchesMaxLabel: switchesMaxLabel(accessKey.switchesMax),
       switchesMax: accessKey.switchesMax,
+      renewPriceLabel: variant === 'trial' ? null : plan?.priceLabel || null,
+      deviceLimitLabel: formatTelegramStoreDeviceLimitLabel({
+        limit: accessKey.maxDevices,
+        boundDeviceInstallsOnly: accessKey.boundDeviceInstallsOnly,
+      }),
+      showSwitchButton: accessKey.status === 'ACTIVE' && accessKey.switchesMax !== 0,
       accessKeyText,
     } satisfies TelegramStoreGuideKeyData;
   }
@@ -1019,6 +1095,17 @@ export async function loadTelegramStoreGuideKeyData(input: {
     keyId: dynamicKey.id,
   });
   const plan = findTelegramStorePlanByCode(plans, latestOrder?.planCode || null);
+  const used = Number(dynamicKey.usedBytes || BigInt(0));
+  const total = dynamicKey.dataLimitBytes ? Number(dynamicKey.dataLimitBytes) : 0;
+  const bar = progressBar(used, total || 1);
+  const [barChars, percent] = bar.split(' ');
+  const currentServerId = dynamicKey.pinnedServerId || dynamicKey.lastResolvedServerId || '';
+  const currentServer = currentServerId
+    ? await db.server.findUnique({
+        where: { id: currentServerId },
+        select: { name: true, countryCode: true },
+      })
+    : null;
   const protectedInstallOnly = Boolean(dynamicKey.boundDeviceInstallsOnly && dynamicKey.maxDevices);
   const urls = getDynamicKeyMessagingUrls(dynamicKey, 'telegram_setup_guide', input.locale);
   const accessKeyText = protectedInstallOnly
@@ -1033,14 +1120,34 @@ export async function loadTelegramStoreGuideKeyData(input: {
     id: dynamicKey.id,
     kind: 'dynamic' as const,
     variant: 'paid' as const,
+    planId: plan?.id || null,
     planName: plan?.detailName || dynamicKey.name,
+    categoryLabel: plan ? formatCategoryLabel(plan.category) : 'Dynamic',
+    statusLabel: formatTelegramStoreStatusLabel(dynamicKey.status, 'paid'),
+    currentServerName: formatCurrentServerName({
+      name: currentServer?.name || null,
+      countryCode: currentServer?.countryCode || null,
+    }),
+    keyTypeLabel: plan?.keyTypeLabel || 'Dynamic Key ⚙️',
     dataLabel: plan?.dataLabel || formatBytesToGbLabel(dynamicKey.dataLimitBytes),
+    usedLabel: formatBytesToGbLabel(BigInt(used)),
+    totalLabel: formatBytesToGbLabel(dynamicKey.dataLimitBytes),
+    progressBar: barChars || '░░░░░░░░░░',
+    percentLabel: percent || '0%',
     expiryLabel: formatStoreDate(dynamicKey.expiresAt),
     paidLabel: latestOrder?.planCode
       ? plan?.priceLabel || '—'
       : '—',
     switchesLabel: plan?.switchesLabel || switchesLabel(dynamicKey.switchesMax),
+    switchesUsed: dynamicKey.switchesUsed,
+    switchesMaxLabel: switchesMaxLabel(dynamicKey.switchesMax),
     switchesMax: dynamicKey.switchesMax,
+    renewPriceLabel: plan?.priceLabel || null,
+    deviceLimitLabel: formatTelegramStoreDeviceLimitLabel({
+      limit: dynamicKey.maxDevices,
+      boundDeviceInstallsOnly: dynamicKey.boundDeviceInstallsOnly,
+    }),
+    showSwitchButton: dynamicKey.status === 'ACTIVE' && dynamicKey.switchesMax !== 0,
     accessKeyText,
   } satisfies TelegramStoreGuideKeyData;
 }
@@ -1597,14 +1704,23 @@ export function buildTelegramStoreActiveKeysView(items: TelegramStoreKeyView[]) 
     );
   });
 
+  lines.push('Tap a key below to open details 👇');
+
   return {
     text: lines.join('\n').trim(),
     replyMarkup: {
       inline_keyboard: [
-        ...items.flatMap((item) => [
+        ...items.map((item) => (
           [
             {
-              text: `🔄 Renew ${item.planName}  —  ${item.renewPriceLabel || 'See plans'}`,
+              text: `📄 Open ${item.planName}`,
+              callback_data: buildTelegramStorefrontCallbackData({
+                action: 'key_page',
+                keyId: item.id,
+              }),
+            },
+            {
+              text: item.planId ? '🔄 Renew' : '🛒 Plans',
               callback_data: item.planId
                 ? buildTelegramStorefrontCallbackData({
                     action: 'renew_plan',
@@ -1614,17 +1730,8 @@ export function buildTelegramStoreActiveKeysView(items: TelegramStoreKeyView[]) 
                   })
                 : buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
             },
-          ],
-          [
-            {
-              text: '📲 Setup Guide',
-              callback_data: buildTelegramStorefrontCallbackData({
-                action: 'setup_guide',
-                keyId: item.id,
-              }),
-            },
-          ],
-        ]),
+          ]
+        )),
         [{ text: '➕  Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
       ],
     },
@@ -1740,93 +1847,116 @@ export function buildTelegramStoreSwitchLimitReachedView(input: {
 }
 
 export function buildTelegramStoreKeyPageView(input: {
-  firstName: string;
+  kind: TelegramStoreKeyKind;
+  variant?: 'paid' | 'trial';
   planName: string;
-  accessKey: string;
-  dataLabel: string;
+  categoryLabel: string;
+  statusLabel: string;
+  currentServerName: string;
+  keyTypeLabel: string;
+  usedLabel: string;
+  totalLabel: string;
+  progressBar: string;
+  percentLabel: string;
   expiryLabel: string;
-  switchesLabel: string;
+  switchesUsed: number;
+  switchesMaxLabel: string;
   paidLabel: string;
   keyId: string;
+  renewPlanId?: TelegramStorePlanId | null;
+  renewPriceLabel?: string | null;
+  deviceLimitLabel?: string | null;
   showSwitchButton?: boolean;
 }) {
+  const isTrial = input.variant === 'trial';
   const inlineKeyboard: Array<Array<{ text: string; callback_data: string }>> = [
     [{
-      text: '📲  Setup Guide',
+      text: '📲 Setup Guide',
       callback_data: buildTelegramStorefrontCallbackData({
         action: 'platform_select',
         keyId: input.keyId,
       }),
     }],
-    [
-      {
-        text: '🤖 Android',
-        callback_data: buildTelegramStorefrontCallbackData({
-          action: 'guide_platform',
-          keyId: input.keyId,
-          platform: 'android',
-        }),
-      },
-      {
-        text: '🍎 iOS',
-        callback_data: buildTelegramStorefrontCallbackData({
-          action: 'guide_platform',
-          keyId: input.keyId,
-          platform: 'ios',
-        }),
-      },
-    ],
-    [
-      {
-        text: '🪟 Windows',
-        callback_data: buildTelegramStorefrontCallbackData({
-          action: 'guide_platform',
-          keyId: input.keyId,
-          platform: 'windows',
-        }),
-      },
-      {
-        text: '🍏 macOS',
-        callback_data: buildTelegramStorefrontCallbackData({
-          action: 'guide_platform',
-          keyId: input.keyId,
-          platform: 'macos',
-        }),
-      },
-    ],
   ];
 
-  if (input.showSwitchButton !== false) {
+  if (isTrial) {
     inlineKeyboard.push([{
-      text: '🔄 Switch Server',
-      callback_data: buildTelegramStorefrontCallbackData({ action: 'switch', keyId: input.keyId }),
+      text: '🛒 Buy a Full Plan',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+    }]);
+  } else {
+    inlineKeyboard.push([{
+      text: input.renewPlanId
+        ? `🔄 Renew ${input.planName}  —  ${input.renewPriceLabel || 'See plans'}`
+        : '🛒 See Plans',
+      callback_data: input.renewPlanId
+        ? buildTelegramStorefrontCallbackData({
+            action: 'renew_plan',
+            planId: input.renewPlanId,
+            keyId: input.keyId,
+            kind: input.kind,
+          })
+        : buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
     }]);
   }
 
-  inlineKeyboard.push([
-    { text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
-    { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) },
-  ]);
+  if (input.showSwitchButton !== false) {
+    inlineKeyboard.push([
+      {
+        text: '🌍 Switch Server',
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'switch', keyId: input.keyId }),
+      },
+      {
+        text: '💬 Support',
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }),
+      },
+    ]);
+  } else {
+    inlineKeyboard.push([{
+      text: '💬 Support',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }),
+    }]);
+  }
+
+  inlineKeyboard.push([{
+    text: '🏠 Back to Menu',
+    callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
+  }]);
+
+  const lines = [
+    isTrial ? '🎁 *Trial Key Details*' : '🔑 *Key Details*',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    `📦 *${escapeTelegramMarkdownV2(input.planName)}*  ·  ${escapeTelegramMarkdownV2(input.categoryLabel)}`,
+    `🟢 Status      :  ${escapeTelegramMarkdownV2(input.statusLabel)}`,
+    `🌍 Server      :  ${escapeTelegramMarkdownV2(input.currentServerName)}`,
+    `🔑 Key type    :  ${escapeTelegramMarkdownV2(input.keyTypeLabel)}`,
+    `📶 Usage       :  ${escapeTelegramMarkdownV2(input.usedLabel)} / ${escapeTelegramMarkdownV2(input.totalLabel)}`,
+    `   ${input.progressBar}  ${escapeTelegramMarkdownV2(input.percentLabel)}`,
+    `🕐 Expires     :  ${escapeTelegramMarkdownV2(input.expiryLabel)}`,
+  ];
+
+  if (input.showSwitchButton !== false) {
+    lines.push(
+      `🔄 Switches    :  ${escapeTelegramMarkdownV2(String(input.switchesUsed))} / ${escapeTelegramMarkdownV2(input.switchesMaxLabel)}`,
+    );
+  }
+
+  lines.push(
+    `${isTrial ? '💰 Paid        :  FREE' : `💵 Plan        :  ${escapeTelegramMarkdownV2(input.paidLabel)}`}`,
+  );
+
+  if (input.deviceLimitLabel) {
+    lines.push(`📱 Device      :  ${escapeTelegramMarkdownV2(input.deviceLimitLabel)}`);
+  }
+
+  lines.push(
+    '',
+    'Open the setup guide or manage this key below 👇',
+  );
 
   return {
-    text: [
-      '✅ *Order Confirmed\\!*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '',
-      `Your *${escapeTelegramMarkdownV2(input.planName)}* is now active, *${escapeTelegramMarkdownV2(input.firstName)}*\\!`,
-      '',
-      '🔑 *Your Access Key:*',
-      formatTelegramMarkdownCode(input.accessKey),
-      '',
-      `📶 Data        :  ${escapeTelegramMarkdownV2(input.dataLabel)}`,
-      `🕐 Expires     :  ${escapeTelegramMarkdownV2(input.expiryLabel)}`,
-      `🔄 Switches   :  ${escapeTelegramMarkdownV2(input.switchesLabel)}`,
-      `💵 Paid        :  ${escapeTelegramMarkdownV2(input.paidLabel)}`,
-      '',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      '📲 _Tap Setup Guide to connect in 2 minutes\\._',
-      'Thank you for your purchase\\! 🙏',
-    ].join('\n'),
+    text: lines.join('\n'),
     replyMarkup: {
       inline_keyboard: inlineKeyboard,
     },
@@ -1924,17 +2054,87 @@ export function buildTelegramStoreOrderConfirmedView(input: {
   paidLabel: string;
   keyId: string;
 }) {
-  return buildTelegramStoreKeyPageView({
-    firstName: input.firstName,
-    planName: input.plan.detailName,
-    accessKey: input.accessKey,
-    dataLabel: input.plan.dataLabel,
-    expiryLabel: input.expiryLabel,
-    switchesLabel: input.plan.switchesLabel,
-    paidLabel: input.paidLabel,
-    keyId: input.keyId,
-    showSwitchButton: input.plan.switchesValue !== 0,
-  });
+  const inlineKeyboard: Array<Array<{ text: string; callback_data: string }>> = [
+    [{
+      text: '📲  Setup Guide',
+      callback_data: buildTelegramStorefrontCallbackData({
+        action: 'platform_select',
+        keyId: input.keyId,
+      }),
+    }],
+    [
+      {
+        text: '🤖 Android',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'android',
+        }),
+      },
+      {
+        text: '🍎 iOS',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'ios',
+        }),
+      },
+    ],
+    [
+      {
+        text: '🪟 Windows',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'windows',
+        }),
+      },
+      {
+        text: '🍏 macOS',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'macos',
+        }),
+      },
+    ],
+  ];
+
+  if (input.plan.switchesValue !== 0) {
+    inlineKeyboard.push([{
+      text: '🔄 Switch Server',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'switch', keyId: input.keyId }),
+    }]);
+  }
+
+  inlineKeyboard.push([
+    { text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+    { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) },
+  ]);
+
+  return {
+    text: [
+      '✅ *Order Confirmed\\!*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      `Your *${escapeTelegramMarkdownV2(input.plan.detailName)}* is now active, *${escapeTelegramMarkdownV2(input.firstName)}*\\! 🎉`,
+      '',
+      '🔑 *Your Access Key:*',
+      formatTelegramMarkdownCode(input.accessKey),
+      '',
+      `📶 Data        :  ${escapeTelegramMarkdownV2(input.plan.dataLabel)}`,
+      `🕐 Expires     :  ${escapeTelegramMarkdownV2(input.expiryLabel)}`,
+      `🔄 Switches   :  ${escapeTelegramMarkdownV2(input.plan.switchesLabel)}`,
+      `💵 Paid        :  ${escapeTelegramMarkdownV2(input.paidLabel)}`,
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '📲 _Tap Setup Guide to connect in 2 minutes\\._',
+      'Thank you for your purchase\\! 🙏',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: inlineKeyboard,
+    },
+  };
 }
 
 export function buildTelegramStorePlatformSelectView(input: {

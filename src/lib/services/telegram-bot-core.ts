@@ -326,7 +326,6 @@ import {
   buildTelegramStoreSwitchLimitReachedView,
   buildTelegramStoreSwitchServerSelectionView,
   buildTelegramStoreSwitchSuccessView,
-  buildTelegramStoreTrialKeyPageView,
   createTelegramStoreSummaryOrder,
   escapeTelegramMarkdownV2,
   findTelegramStorePlanById,
@@ -6661,24 +6660,28 @@ export async function handleTelegramCallbackQuery(
 
           const view =
             storefrontAction.action === 'key_page'
-              ? keyView.variant === 'trial'
-                ? buildTelegramStoreTrialKeyPageView({
-                    firstName: telegramUsername,
-                    accessKey: keyView.accessKeyText,
-                    expiryLabel: keyView.expiryLabel,
-                    keyId: keyView.id,
-                  })
-                : buildTelegramStoreKeyPageView({
-                    firstName: telegramUsername,
-                    planName: keyView.planName,
-                    accessKey: keyView.accessKeyText,
-                    dataLabel: keyView.dataLabel,
-                    expiryLabel: keyView.expiryLabel,
-                    switchesLabel: keyView.switchesLabel,
-                    paidLabel: keyView.paidLabel,
-                    keyId: keyView.id,
-                    showSwitchButton: keyView.switchesMax !== 0,
-                  })
+              ? buildTelegramStoreKeyPageView({
+                  kind: keyView.kind,
+                  variant: keyView.variant,
+                  planName: keyView.planName,
+                  categoryLabel: keyView.categoryLabel,
+                  statusLabel: keyView.statusLabel,
+                  currentServerName: keyView.currentServerName,
+                  keyTypeLabel: keyView.keyTypeLabel,
+                  usedLabel: keyView.usedLabel,
+                  totalLabel: keyView.totalLabel,
+                  progressBar: keyView.progressBar,
+                  percentLabel: keyView.percentLabel,
+                  expiryLabel: keyView.expiryLabel,
+                  switchesUsed: keyView.switchesUsed,
+                  switchesMaxLabel: keyView.switchesMaxLabel,
+                  paidLabel: keyView.paidLabel,
+                  keyId: keyView.id,
+                  renewPlanId: keyView.planId,
+                  renewPriceLabel: keyView.renewPriceLabel,
+                  deviceLimitLabel: keyView.deviceLimitLabel,
+                  showSwitchButton: keyView.showSwitchButton,
+                })
               : storefrontAction.action === 'guide_platform'
                 ? buildTelegramStorePlatformGuideView({
                     keyId: keyView.id,

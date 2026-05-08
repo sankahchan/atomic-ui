@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildTelegramStoreActiveKeysView,
   buildTelegramStoreKeyPageView,
+  buildTelegramStoreOrderConfirmedView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
   buildTelegramStoreTrialKeyPageView,
@@ -264,30 +265,66 @@ test('store order summary and active keys keep the polished storefront labels', 
 
   assert.match(active.text, /1️⃣ 🪨 Basic  ·  Flash/);
   assert.match(active.text, /🔄 Switches: 1 \/ 3/);
-  assert.equal(active.replyMarkup.inline_keyboard[0]?.[0]?.text, '🔄 Renew 🪨 Basic  —  5,000 Ks');
-  assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '📲 Setup Guide');
-  assert.equal(active.replyMarkup.inline_keyboard[2]?.[0]?.text, '➕  Buy New Plan');
+  assert.match(active.text, /Tap a key below to open details/);
+  assert.equal(active.replyMarkup.inline_keyboard[0]?.[0]?.text, '📄 Open 🪨 Basic');
+  assert.equal(active.replyMarkup.inline_keyboard[0]?.[1]?.text, '🔄 Renew');
+  assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '➕  Buy New Plan');
 });
 
-test('store paid and trial key pages expose direct setup platform shortcuts', () => {
+test('store paid key detail screen becomes a persistent hub', () => {
   const paid = buildTelegramStoreKeyPageView({
-    firstName: 'Sankha',
+    kind: 'access',
+    variant: 'paid',
     planName: '💎 Pro',
-    accessKey: 'ss://example-key',
-    dataLabel: '200 GB',
+    categoryLabel: 'Flash',
+    statusLabel: 'Active',
+    currentServerName: 'Malaysia 🇲🇾',
+    keyTypeLabel: 'Standard Key',
+    usedLabel: '80 GB',
+    totalLabel: '200 GB',
+    progressBar: '████░░░░░░',
+    percentLabel: '40%',
     expiryLabel: '02 Jun 2026',
-    switchesLabel: '3 times',
+    switchesUsed: 1,
+    switchesMaxLabel: '3',
     paidLabel: '7,000 Ks',
     keyId: 'key_123',
+    renewPlanId: 'plan_pro',
+    renewPriceLabel: '7,000 Ks',
+    deviceLimitLabel: '1 device on protected install',
     showSwitchButton: true,
   });
 
-  assert.match(paid.text, /Order Confirmed/);
-  assert.match(paid.text, /Tap Setup Guide to connect in 2 minutes/);
+  assert.match(paid.text, /Key Details/);
+  assert.match(paid.text, /Malaysia/);
+  assert.match(paid.text, /📶 Usage       :  80 GB \/ 200 GB/);
+  assert.match(paid.text, /📱 Device      :  1 device on protected install/);
   assert.equal(
     paid.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
   );
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'renew_plan', planId: 'plan_pro', keyId: 'key_123', kind: 'access' }),
+  );
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
+  );
+});
+
+test('store order confirmed and trial activated screens keep direct setup shortcuts', () => {
+  const paid = buildTelegramStoreOrderConfirmedView({
+    firstName: 'Sankha',
+    plan: samplePlans[1]!,
+    accessKey: 'ss://example-key',
+    expiryLabel: '02 Jun 2026',
+    paidLabel: '7,000 Ks',
+    keyId: 'key_123',
+  });
+
+  assert.match(paid.text, /Order Confirmed/);
+  assert.match(paid.text, /Tap Setup Guide to connect in 2 minutes/);
   assert.equal(
     paid.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'guide_platform', keyId: 'key_123', platform: 'android' }),
