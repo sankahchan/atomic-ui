@@ -5,9 +5,11 @@ import { parseTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks
 import { validateTelegramHtmlMessage } from '@/lib/services/telegram-message-validation';
 import {
   buildTelegramTrialActivatedMessage,
+  buildTelegramTrialActivatedKeyboard,
   buildTelegramTrialOfferKeyboard,
   buildTelegramTrialOfferMessage,
 } from '@/lib/services/telegram-trial';
+import { parseTelegramStorefrontCallbackData } from '@/lib/services/telegram-storefront';
 
 test('telegram trial offer message stays compact and HTML-safe', () => {
   const message = buildTelegramTrialOfferMessage({
@@ -21,7 +23,7 @@ test('telegram trial offer message stays compact and HTML-safe', () => {
   assert.ok(message.split('\n').length <= 12);
 });
 
-test('telegram trial activated message stays HTML-safe', () => {
+test('telegram trial activated message uses the new MarkdownV2 storefront layout', () => {
   const message = buildTelegramTrialActivatedMessage({
     locale: 'en',
     firstName: 'Trial User',
@@ -29,10 +31,10 @@ test('telegram trial activated message stays HTML-safe', () => {
     expiresAt: new Date('2026-05-07T09:00:00.000Z'),
   });
 
-  assert.deepEqual(validateTelegramHtmlMessage(message), { valid: true, invalidTags: [] });
   assert.match(message, /Trial Activated/);
   assert.match(message, /ss:\/\/example-key/);
   assert.match(message, /5 GB/);
+  assert.match(message, /Tap Setup Guide to connect in 2 minutes/);
 });
 
 test('telegram trial keyboard uses trial callback actions', () => {
@@ -48,4 +50,28 @@ test('telegram trial keyboard uses trial callback actions', () => {
     section: 'trial',
     action: 'back_main',
   });
+});
+
+test('telegram trial activated keyboard opens setup guide and paid storefront actions', () => {
+  const keyboard = buildTelegramTrialActivatedKeyboard({
+    locale: 'en',
+    keyId: 'key_123',
+  });
+
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData(keyboard.inline_keyboard[0]?.[0]?.callback_data ?? null),
+    { action: 'platform_select', keyId: 'key_123' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData(keyboard.inline_keyboard[1]?.[0]?.callback_data ?? null),
+    { action: 'guide_platform', keyId: 'key_123', platform: 'android' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData(keyboard.inline_keyboard[2]?.[1]?.callback_data ?? null),
+    { action: 'guide_platform', keyId: 'key_123', platform: 'macos' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData(keyboard.inline_keyboard[3]?.[0]?.callback_data ?? null),
+    { action: 'show_plans' },
+  );
 });

@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   buildTelegramStoreActiveKeysView,
+  buildTelegramStoreKeyPageView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
+  buildTelegramStoreTrialKeyPageView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
@@ -267,6 +269,49 @@ test('store order summary and active keys keep the polished storefront labels', 
   assert.equal(active.replyMarkup.inline_keyboard[2]?.[0]?.text, '➕  Buy New Plan');
 });
 
+test('store paid and trial key pages expose direct setup platform shortcuts', () => {
+  const paid = buildTelegramStoreKeyPageView({
+    firstName: 'Sankha',
+    planName: '💎 Pro',
+    accessKey: 'ss://example-key',
+    dataLabel: '200 GB',
+    expiryLabel: '02 Jun 2026',
+    switchesLabel: '3 times',
+    paidLabel: '7,000 Ks',
+    keyId: 'key_123',
+    showSwitchButton: true,
+  });
+
+  assert.match(paid.text, /Order Confirmed/);
+  assert.match(paid.text, /Tap Setup Guide to connect in 2 minutes/);
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
+  );
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'guide_platform', keyId: 'key_123', platform: 'android' }),
+  );
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[3]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
+  );
+
+  const trial = buildTelegramStoreTrialKeyPageView({
+    firstName: 'Sankha',
+    accessKey: 'ss://trial-key',
+    expiryLabel: '02 Jun 2026',
+    keyId: 'trial_123',
+  });
+
+  assert.match(trial.text, /Trial Activated/);
+  assert.match(trial.text, /FREE/);
+  assert.equal(
+    trial.replyMarkup.inline_keyboard[3]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+  );
+});
+
 test('store setup guide platform select and platform screens keep key-specific callbacks', () => {
   const select = buildTelegramStorePlatformSelectView({
     keyId: 'key_123',
@@ -274,7 +319,8 @@ test('store setup guide platform select and platform screens keep key-specific c
   });
 
   assert.match(select.text, /📱 \*Let's Get You Connected\\!\*/);
-  assert.match(select.text, /Setting up takes less than 2 minutes/);
+  assert.match(select.text, /Setting up takes less than \*2 minutes\*/);
+  assert.match(select.text, /Your key works on all devices/);
   assert.match(select.text, /`ss:\/\/example-key`/);
   assert.equal(select.replyMarkup.inline_keyboard[0]?.[0]?.text, '🤖 Android');
   assert.equal(select.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀ Back');
@@ -289,13 +335,21 @@ test('store setup guide platform select and platform screens keep key-specific c
     accessKey: 'ss://example-key',
   });
 
-  assert.match(guide.text, /🤖 Android Setup/);
+  assert.match(guide.text, /🤖 \*Android  —  You're almost connected\\!\*/);
   assert.match(guide.text, /You're almost connected\\!/);
-  assert.match(guide.text, /╔═ 🔵 Outline  ·  Easiest/);
-  assert.match(guide.text, /╚═ ⑤ Connect 🟢/);
-  assert.equal(guide.replyMarkup.inline_keyboard[0]?.length, 3);
+  assert.match(guide.text, /Download your app/);
+  assert.match(guide.text, /🔵 OUTLINE/);
+  assert.match(guide.text, /Tap \*Connect\* 🟢/);
+  const download1 = guide.replyMarkup.inline_keyboard[0]?.[0];
+  const download2 = guide.replyMarkup.inline_keyboard[1]?.[0];
+  const download3 = guide.replyMarkup.inline_keyboard[2]?.[0];
+  const backButton = guide.replyMarkup.inline_keyboard[4]?.[0];
+  assert.equal(download1 && 'url' in download1 ? download1.url : null, 'https://play.google.com/store/apps/details?id=org.outline.android.client');
+  assert.equal(download2 && 'url' in download2 ? download2.url : null, 'https://play.google.com/store/apps/details?id=app.hiddify.com');
+  assert.equal(download3 && 'url' in download3 ? download3.url : null, 'https://play.google.com/store/apps/details?id=com.v2ray.ang');
+  assert.equal(guide.replyMarkup.inline_keyboard[3]?.length, 3);
   assert.equal(
-    guide.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    backButton && 'callback_data' in backButton ? backButton.callback_data : null,
     buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
   );
 });

@@ -326,6 +326,7 @@ import {
   buildTelegramStoreSwitchLimitReachedView,
   buildTelegramStoreSwitchServerSelectionView,
   buildTelegramStoreSwitchSuccessView,
+  buildTelegramStoreTrialKeyPageView,
   createTelegramStoreSummaryOrder,
   escapeTelegramMarkdownV2,
   findTelegramStorePlanById,
@@ -2738,7 +2739,11 @@ async function claimTelegramFreeTrialForUser(input: {
         expiresAt: keyExpiresAt,
       }),
       {
-        replyMarkup: buildTelegramTrialActivatedKeyboard(input.locale),
+        parseMode: 'MarkdownV2',
+        replyMarkup: buildTelegramTrialActivatedKeyboard({
+          locale: input.locale,
+          keyId: key.id,
+        }),
       },
     );
 
@@ -6656,17 +6661,24 @@ export async function handleTelegramCallbackQuery(
 
           const view =
             storefrontAction.action === 'key_page'
-              ? buildTelegramStoreKeyPageView({
-                  firstName: telegramUsername,
-                  planName: keyView.planName,
-                  accessKey: keyView.accessKeyText,
-                  dataLabel: keyView.dataLabel,
-                  expiryLabel: keyView.expiryLabel,
-                  switchesLabel: keyView.switchesLabel,
-                  paidLabel: keyView.paidLabel,
-                  keyId: keyView.id,
-                  showSwitchButton: keyView.switchesMax !== 0,
-                })
+              ? keyView.variant === 'trial'
+                ? buildTelegramStoreTrialKeyPageView({
+                    firstName: telegramUsername,
+                    accessKey: keyView.accessKeyText,
+                    expiryLabel: keyView.expiryLabel,
+                    keyId: keyView.id,
+                  })
+                : buildTelegramStoreKeyPageView({
+                    firstName: telegramUsername,
+                    planName: keyView.planName,
+                    accessKey: keyView.accessKeyText,
+                    dataLabel: keyView.dataLabel,
+                    expiryLabel: keyView.expiryLabel,
+                    switchesLabel: keyView.switchesLabel,
+                    paidLabel: keyView.paidLabel,
+                    keyId: keyView.id,
+                    showSwitchButton: keyView.switchesMax !== 0,
+                  })
               : storefrontAction.action === 'guide_platform'
                 ? buildTelegramStorePlatformGuideView({
                     keyId: keyView.id,
