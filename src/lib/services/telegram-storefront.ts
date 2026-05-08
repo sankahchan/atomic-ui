@@ -17,7 +17,10 @@ import {
   type TelegramSalesPlanCode,
   type TelegramSalesSettings,
 } from '@/lib/services/telegram-sales';
-import { getFlagEmoji } from '@/lib/services/telegram-ui';
+import {
+  getFlagEmoji,
+  getTelegramAccessKeyCategory,
+} from '@/lib/services/telegram-ui';
 
 export type TelegramStorePlanId =
   | 'plan_basic'
@@ -122,6 +125,7 @@ export type TelegramStoreLatestOrderForKey = {
 export type TelegramStoreGuideKeyData = {
   id: string;
   kind: TelegramStoreKeyKind;
+  variant: 'paid' | 'trial';
   planName: string;
   dataLabel: string;
   expiryLabel: string;
@@ -275,164 +279,229 @@ const GUIDE_PLATFORM_LABELS: Record<TelegramStoreGuidePlatform, string> = {
   macos: '🍏 macOS',
 };
 
-const GUIDE_PLATFORM_TITLES: Record<TelegramStoreGuidePlatform, string> = {
-  android: '🤖 Android Setup',
-  ios: '🍎 iOS Setup',
-  windows: '🪟 Windows Setup',
-  macos: '🍏 macOS Setup',
+type TelegramStorePlatformGuideConfig = {
+  title: string;
+  bodyLines: string[];
+  downloadButtons: Array<{ text: string; url: string }>;
+  quickSwitches: Array<{ text: string; platform: TelegramStoreGuidePlatform }>;
 };
 
-const GUIDE_PLATFORM_SPECS: Record<
-  TelegramStoreGuidePlatform,
-  Array<{ app: string; difficulty: string; steps: string[] }>
-> = {
-  android: [
-    {
-      app: '🔵 Outline',
-      difficulty: 'Easiest',
-      steps: [
-        'Open Play Store',
-        'Install Outline',
-        'Tap ✚',
-        'Paste your key',
-        'Connect 🟢',
-      ],
-    },
-    {
-      app: '🟣 Hiddify',
-      difficulty: 'Most Popular',
-      steps: [
-        'Open Play Store',
-        'Install Hiddify',
-        'Tap Add Config',
-        'Paste your key',
-        'Connect 🟢',
-      ],
-    },
-    {
-      app: '🔴 V2RayNG',
-      difficulty: 'Advanced',
-      steps: [
-        'Open Play Store',
-        'Install V2RayNG',
-        'Tap ✚',
-        'Import clipboard or paste key',
-        'Tap ▶️ and connect 🟢',
-      ],
-    },
-  ],
-  ios: [
-    {
-      app: '🔵 Outline',
-      difficulty: 'Easiest',
-      steps: [
-        'Open App Store',
-        'Install Outline',
-        'Tap ✚',
-        'Paste your key',
-        'Connect and Allow VPN 🟢',
-      ],
-    },
-    {
-      app: '🟣 Hiddify Next',
-      difficulty: 'Most Popular',
-      steps: [
-        'Open App Store',
-        'Install Hiddify Next',
-        'Tap Add Config',
-        'Paste your key',
-        'Connect 🟢',
-      ],
-    },
-    {
-      app: '🔴 Shadowrocket',
-      difficulty: 'Pro',
-      steps: [
-        'Use a non-MM Apple ID',
-        'Open App Store and buy Shadowrocket',
-        'Tap ✚',
-        'Subscribe and paste your key',
-        'Done, then toggle VPN 🟢',
-      ],
-    },
-  ],
-  windows: [
-    {
-      app: '🔵 Outline',
-      difficulty: 'Easiest',
-      steps: [
-        'Open getoutline.org',
-        'Download and install Outline',
-        'Tap ✚',
-        'Paste your key',
-        'Connect 🟢',
-      ],
-    },
-    {
-      app: '🟣 Hiddify',
-      difficulty: 'Most Popular',
-      steps: [
-        'Open hiddify.com',
-        'Install Hiddify',
-        'Tap Add Profile',
-        'Paste your key',
-        'Connect 🟢',
-      ],
-    },
-    {
-      app: '🔴 V2RayN',
-      difficulty: 'Advanced',
-      steps: [
-        'Open github.com/2dust/v2rayN',
-        'Download and extract it',
-        'Run v2rayN.exe',
-        'Servers → Add SS server → paste key',
-        'Enable from tray 🟢',
-      ],
-    },
-  ],
-  macos: [
-    {
-      app: '🔵 Outline',
-      difficulty: 'Easiest',
-      steps: [
-        'Open Mac App Store or getoutline.org',
-        'Install Outline',
-        'Tap ✚',
-        'Paste your key',
-        'Connect 🟢',
-      ],
-    },
-    {
-      app: '🟣 Hiddify',
-      difficulty: 'Most Popular',
-      steps: [
-        'Open hiddify.com',
-        'Install Hiddify',
-        'Tap Add Profile',
-        'Paste your key',
-        'Connect 🟢',
-      ],
-    },
-    {
-      app: '🔴 V2RayX / Mango',
-      difficulty: 'Advanced',
-      steps: [
-        'Open Mac App Store or GitHub',
-        'Install V2RayX or Mango',
-        'Tap ✚',
-        'Paste your key',
-        'Enable Global Mode 🟢',
-      ],
-    },
-  ],
+const GUIDE_PLATFORM_CONTENT: Record<TelegramStoreGuidePlatform, TelegramStorePlatformGuideConfig> = {
+  android: {
+    title: "🤖 *Android  —  You're almost connected\\!*",
+    bodyLines: [
+      '*Step 2* — Download your app:',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔵 OUTLINE           Easiest   ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Open → Tap ✚                 ║',
+      '║  ③ Paste your key               ║',
+      '║  ④ Tap *Connect* 🟢             ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🟣 HIDDIFY         Most Popular ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Tap *Add Config*             ║',
+      '║  ③ Paste your key → *Add*       ║',
+      '║  ④ Tap *Connect* 🟢             ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔴 V2RAYNG             Advanced ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Tap ✚ → *Import clipboard*   ║',
+      '║  ③ Paste your key               ║',
+      '║  ④ Tap ▶️ to start 🟢           ║',
+      '╚══════════════════════════════════╝',
+    ],
+    downloadButtons: [
+      {
+        text: '⬇️ Download Outline  (Play Store)',
+        url: 'https://play.google.com/store/apps/details?id=org.outline.android.client',
+      },
+      {
+        text: '⬇️ Download Hiddify  (Play Store)',
+        url: 'https://play.google.com/store/apps/details?id=app.hiddify.com',
+      },
+      {
+        text: '⬇️ Download V2RayNG (Play Store)',
+        url: 'https://play.google.com/store/apps/details?id=com.v2ray.ang',
+      },
+    ],
+    quickSwitches: [
+      { text: '🍎 iOS', platform: 'ios' },
+      { text: '🪟 Windows', platform: 'windows' },
+      { text: '🍏 Mac', platform: 'macos' },
+    ],
+  },
+  ios: {
+    title: "🍎 *iOS  —  You're almost connected\\!*",
+    bodyLines: [
+      '*Step 2* — Download your app:',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔵 OUTLINE           Easiest   ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Open → Tap ✚                 ║',
+      '║  ③ Paste your key               ║',
+      '║  ④ Tap *Connect*                ║',
+      '║  ⑤ Tap *Allow* for VPN 🟢       ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🟣 HIDDIFY NEXT    Most Popular ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Tap *Add Config*             ║',
+      '║  ③ Paste your key → *Add*       ║',
+      '║  ④ Tap *Connect* 🟢             ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔴 V2BOX                   Pro  ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Tap ✚ → *Import from URL*    ║',
+      '║  ③ Paste your key → *Import*    ║',
+      '║  ④ Tap the config to select it  ║',
+      '║  ⑤ Tap *Connect* 🟢             ║',
+      '╚══════════════════════════════════╝',
+    ],
+    downloadButtons: [
+      {
+        text: '⬇️ Download Outline   (App Store)',
+        url: 'https://apps.apple.com/app/outline-app/id1356177741',
+      },
+      {
+        text: '⬇️ Download Hiddify   (App Store)',
+        url: 'https://apps.apple.com/app/hiddify-next/id6596777532',
+      },
+      {
+        text: '⬇️ Download V2Box     (App Store)',
+        url: 'https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690',
+      },
+    ],
+    quickSwitches: [
+      { text: '🤖 Android', platform: 'android' },
+      { text: '🪟 Windows', platform: 'windows' },
+      { text: '🍏 Mac', platform: 'macos' },
+    ],
+  },
+  windows: {
+    title: "🪟 *Windows  —  You're almost connected\\!*",
+    bodyLines: [
+      '*Step 2* — Download your app:',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔵 OUTLINE           Easiest   ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Click ✚ → Paste your key     ║',
+      '║  ③ Click *Connect* 🟢           ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🟣 HIDDIFY         Most Popular ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Click *Add Profile*          ║',
+      '║  ③ Paste your key → *Add*       ║',
+      '║  ④ Click *Connect* 🟢           ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔴 V2RAYN              Advanced ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Extract       ║',
+      '║  ② Run *v2rayN\\.exe*            ║',
+      '║  ③ Servers → *Add \\[SS\\] server* ║',
+      '║  ④ Paste key → Save             ║',
+      '║  ⑤ Tray icon → *Enable* 🟢      ║',
+      '╚══════════════════════════════════╝',
+    ],
+    downloadButtons: [
+      {
+        text: '⬇️ Download Outline  (Windows)',
+        url: 'https://s3.amazonaws.com/outline-releases/client/windows/stable/Outline-Client.exe',
+      },
+      {
+        text: '⬇️ Download Hiddify  (Windows)',
+        url: 'https://github.com/hiddify/hiddify-app/releases/latest',
+      },
+      {
+        text: '⬇️ Download V2RayN   (GitHub)',
+        url: 'https://github.com/2dust/v2rayN/releases/latest',
+      },
+    ],
+    quickSwitches: [
+      { text: '🤖 Android', platform: 'android' },
+      { text: '🍎 iOS', platform: 'ios' },
+      { text: '🍏 Mac', platform: 'macos' },
+    ],
+  },
+  macos: {
+    title: "🍏 *macOS  —  You're almost connected\\!*",
+    bodyLines: [
+      '*Step 2* — Download your app:',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔵 OUTLINE           Easiest   ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Click ✚ → Paste your key     ║',
+      '║  ③ Click *Connect* 🟢           ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🟣 HIDDIFY         Most Popular ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Click *Add Profile*          ║',
+      '║  ③ Paste your key → *Add*       ║',
+      '║  ④ Click *Connect* 🟢           ║',
+      '╚══════════════════════════════════╝',
+      '',
+      '╔══════════════════════════════════╗',
+      '║  🔴 V2RAYX / MANGO      Advanced ║',
+      '╠══════════════════════════════════╣',
+      '║  ① Tap download → Install       ║',
+      '║  ② Click ✚ → Paste your key     ║',
+      '║  ③ Menu bar → *Global Mode* 🟢  ║',
+      '╚══════════════════════════════════╝',
+    ],
+    downloadButtons: [
+      {
+        text: '⬇️ Download Outline  (Mac Store)',
+        url: 'https://apps.apple.com/app/outline-secure-internet-access/id1356178125',
+      },
+      {
+        text: '⬇️ Download Hiddify  (Mac)',
+        url: 'https://github.com/hiddify/hiddify-app/releases/latest',
+      },
+      {
+        text: '⬇️ Download V2RayX   (GitHub)',
+        url: 'https://github.com/Cenmrev/V2RayX/releases/latest',
+      },
+    ],
+    quickSwitches: [
+      { text: '🤖 Android', platform: 'android' },
+      { text: '🍎 iOS', platform: 'ios' },
+      { text: '🪟 Win', platform: 'windows' },
+    ],
+  },
 };
 
 export function escapeTelegramMarkdownV2(value: string) {
   return value.replace(TELEGRAM_MARKDOWN_V2_SPECIAL_CHARS, '\\$1');
 }
 
-function formatTelegramMarkdownCode(value: string) {
+export function formatTelegramMarkdownCode(value: string) {
   return `\`${value.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``;
 }
 
@@ -927,6 +996,7 @@ export async function loadTelegramStoreGuideKeyData(input: {
     return {
       id: accessKey.id,
       kind: 'access' as const,
+      variant: getTelegramAccessKeyCategory(accessKey.tags) === 'trial' ? 'trial' : 'paid',
       planName: plan?.detailName || accessKey.name,
       dataLabel: plan?.dataLabel || formatBytesToGbLabel(accessKey.dataLimitBytes),
       expiryLabel: formatStoreDate(accessKey.expiresAt),
@@ -962,6 +1032,7 @@ export async function loadTelegramStoreGuideKeyData(input: {
   return {
     id: dynamicKey.id,
     kind: 'dynamic' as const,
+    variant: 'paid' as const,
     planName: plan?.detailName || dynamicKey.name,
     dataLabel: plan?.dataLabel || formatBytesToGbLabel(dynamicKey.dataLimitBytes),
     expiryLabel: formatStoreDate(dynamicKey.expiresAt),
@@ -1681,12 +1752,48 @@ export function buildTelegramStoreKeyPageView(input: {
 }) {
   const inlineKeyboard: Array<Array<{ text: string; callback_data: string }>> = [
     [{
-      text: '📲 Setup Guide',
+      text: '📲  Setup Guide',
       callback_data: buildTelegramStorefrontCallbackData({
-        action: 'setup_guide',
+        action: 'platform_select',
         keyId: input.keyId,
       }),
     }],
+    [
+      {
+        text: '🤖 Android',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'android',
+        }),
+      },
+      {
+        text: '🍎 iOS',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'ios',
+        }),
+      },
+    ],
+    [
+      {
+        text: '🪟 Windows',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'windows',
+        }),
+      },
+      {
+        text: '🍏 macOS',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'guide_platform',
+          keyId: input.keyId,
+          platform: 'macos',
+        }),
+      },
+    ],
   ];
 
   if (input.showSwitchButton !== false) {
@@ -1716,10 +1823,95 @@ export function buildTelegramStoreKeyPageView(input: {
       `🔄 Switches   :  ${escapeTelegramMarkdownV2(input.switchesLabel)}`,
       `💵 Paid        :  ${escapeTelegramMarkdownV2(input.paidLabel)}`,
       '',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '📲 _Tap Setup Guide to connect in 2 minutes\\._',
       'Thank you for your purchase\\! 🙏',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: inlineKeyboard,
+    },
+  };
+}
+
+export function buildTelegramStoreTrialKeyPageView(input: {
+  firstName: string;
+  accessKey: string;
+  expiryLabel: string;
+  keyId: string;
+}) {
+  return {
+    text: [
+      '🎁 *Trial Activated\\!*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      `Welcome, *${escapeTelegramMarkdownV2(input.firstName)}*\\! Your free trial`,
+      'is ready to use right now\\! 🚀',
+      '',
+      '🔑 *Your Access Key:*',
+      formatTelegramMarkdownCode(input.accessKey),
+      '',
+      '📶 Data        :  5 GB',
+      `🕐 Expires     :  ${escapeTelegramMarkdownV2(input.expiryLabel)}`,
+      '💰 Paid        :  FREE',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '📲 _Tap Setup Guide to connect in 2 minutes\\._',
+      'Enjoy your free trial\\! 🎉',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [{
+          text: '📲  Setup Guide',
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'platform_select',
+            keyId: input.keyId,
+          }),
+        }],
+        [
+          {
+            text: '🤖 Android',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'guide_platform',
+              keyId: input.keyId,
+              platform: 'android',
+            }),
+          },
+          {
+            text: '🍎 iOS',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'guide_platform',
+              keyId: input.keyId,
+              platform: 'ios',
+            }),
+          },
+        ],
+        [
+          {
+            text: '🪟 Windows',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'guide_platform',
+              keyId: input.keyId,
+              platform: 'windows',
+            }),
+          },
+          {
+            text: '🍏 macOS',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'guide_platform',
+              keyId: input.keyId,
+              platform: 'macos',
+            }),
+          },
+        ],
+        [{
+          text: '🛒 Buy a Full Plan',
+          callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+        }],
+        [
+          { text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+          { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) },
+        ],
+      ],
     },
   };
 }
@@ -1754,12 +1946,17 @@ export function buildTelegramStorePlatformSelectView(input: {
       "📱 *Let's Get You Connected\\!*",
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      'Setting up takes less than 2 minutes ⚡',
+      'Setting up takes less than *2 minutes* ⚡',
+      'Your key works on all devices 📱 💻',
       '',
+      '🔑 *Your Key:*',
       formatTelegramMarkdownCode(input.accessKey),
       '',
-      '🌟 Recommended → Outline',
-      '🔧 Power Users → Hiddify or V2Ray',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '🌟 *Recommended*   →  Outline',
+      '🔧 *Power Users*   →  Hiddify or V2Ray',
+      '',
+      'Which device are you on? 👇',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
@@ -1811,57 +2008,36 @@ export function buildTelegramStorePlatformSelectView(input: {
   };
 }
 
-function buildTelegramStoreGuideCard(input: {
-  app: string;
-  difficulty: string;
-  steps: string[];
-}) {
-  const numberedSteps = input.steps.map((step, index) => {
-    const number = ['①', '②', '③', '④', '⑤'][index] || `${index + 1}.`;
-    return `╠═ ${escapeTelegramMarkdownV2(number)} ${escapeTelegramMarkdownV2(step)}`;
-  });
-
-  if (numberedSteps.length > 0) {
-    const last = numberedSteps.pop()!;
-    numberedSteps.push(last.replace(/^╠═/, '╚═'));
-  }
-
-  return [
-    `╔═ ${escapeTelegramMarkdownV2(input.app)}  ·  ${escapeTelegramMarkdownV2(input.difficulty)}`,
-    ...numberedSteps,
-  ].join('\n');
-}
-
 export function buildTelegramStorePlatformGuideView(input: {
   keyId: string;
   platform: TelegramStoreGuidePlatform;
   accessKey: string;
 }) {
-  const otherPlatforms = (Object.keys(GUIDE_PLATFORM_LABELS) as TelegramStoreGuidePlatform[])
-    .filter((platform) => platform !== input.platform);
-  const cards = GUIDE_PLATFORM_SPECS[input.platform].map(buildTelegramStoreGuideCard);
+  const config = GUIDE_PLATFORM_CONTENT[input.platform];
 
   return {
     text: [
-      `*${escapeTelegramMarkdownV2(GUIDE_PLATFORM_TITLES[input.platform])}*`,
+      config.title,
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      "You're almost connected\\!",
+      '*Step 1* — Copy your key 👇',
+      `🔑 ${formatTelegramMarkdownCode(input.accessKey)}`,
       '',
-      '🔑 *Your Access Key:*',
-      formatTelegramMarkdownCode(input.accessKey),
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      ...config.bodyLines,
       '',
-      ...cards.flatMap((card) => [card, '']),
-      '💡 First time? Use Outline — one tap to connect\\.',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '💡 _First time? Use Outline — one tap to connect\\._',
     ].join('\n').trim(),
     replyMarkup: {
       inline_keyboard: [
-        otherPlatforms.map((platform) => ({
-          text: GUIDE_PLATFORM_LABELS[platform],
+        ...config.downloadButtons.map((button) => [{ text: button.text, url: button.url }]),
+        config.quickSwitches.map((button) => ({
+          text: button.text,
           callback_data: buildTelegramStorefrontCallbackData({
             action: 'guide_platform',
             keyId: input.keyId,
-            platform,
+            platform: button.platform,
           }),
         })),
         [{

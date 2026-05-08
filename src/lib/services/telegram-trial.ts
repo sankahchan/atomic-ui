@@ -1,7 +1,15 @@
 import { db } from '@/lib/db';
 import type { SupportedLocale } from '@/lib/i18n/config';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
-import { escapeHtml, formatTelegramDateTime } from '@/lib/services/telegram-ui';
+import {
+  buildTelegramStorefrontCallbackData,
+  escapeTelegramMarkdownV2,
+  formatTelegramMarkdownCode,
+} from '@/lib/services/telegram-storefront';
+import {
+  escapeHtml,
+  formatTelegramDateTime,
+} from '@/lib/services/telegram-ui';
 
 export const TELEGRAM_TRIAL_PLAN_CODE = 'trial_1d_3gb';
 export const TELEGRAM_TRIAL_DURATION_DAYS = 2;
@@ -124,40 +132,25 @@ export function buildTelegramTrialActivatedMessage(input: {
   outlineKey: string;
   expiresAt: Date;
 }) {
-  const firstName = escapeHtml(input.firstName);
-  const accessUrl = escapeHtml(input.outlineKey);
-  const expiresAt = escapeHtml(formatTelegramDateTime(input.expiresAt, input.locale));
-
-  if (input.locale === 'my') {
-    return [
-      '🎉 <b>Trial Activated!</b>',
-      '━━━━━━━━━━━━━━━━━━',
-      `Your free trial is now active, <b>${firstName}</b>!`,
-      '',
-      '🔑 <b>Your Access Key:</b>',
-      `<code>${accessUrl}</code>`,
-      '',
-      '📶 <b>Data</b>        : 5 GB',
-      `🕐 <b>Expires</b>     : ${expiresAt}`,
-      '💰 <b>Cost</b>        : FREE',
-      '',
-      'အထက်ပါ key ကို tap လုပ်၍ copy လုပ်နိုင်ပါသည်။ Outline app ထဲတွင် ထည့်ပြီး ချိတ်ဆက်အသုံးပြုပါ။',
-    ].join('\n');
-  }
-
+  const firstName = escapeTelegramMarkdownV2(input.firstName);
+  const expiresAt = escapeTelegramMarkdownV2(formatTelegramDateTime(input.expiresAt, input.locale));
   return [
-    '🎉 <b>Trial Activated!</b>',
-    '━━━━━━━━━━━━━━━━━━',
-    `Your free trial is now active, <b>${firstName}</b>!`,
+    '🎁 *Trial Activated\\!*',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '',
-    '🔑 <b>Your Access Key:</b>',
-    `<code>${accessUrl}</code>`,
+    `Welcome, *${firstName}*\\! Your free trial`,
+    'is ready to use right now\\! 🚀',
     '',
-    '📶 <b>Data</b>        : 5 GB',
-    `🕐 <b>Expires</b>     : ${expiresAt}`,
-    '💰 <b>Cost</b>        : FREE',
+    '🔑 *Your Access Key:*',
+    formatTelegramMarkdownCode(input.outlineKey),
     '',
-    'Tap the key above to copy it. Use it in the Outline app to connect.',
+    '📶 Data        :  5 GB',
+    `🕐 Expires     :  ${expiresAt}`,
+    '💰 Paid        :  FREE',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '📲 _Tap Setup Guide to connect in 2 minutes\\._',
+    'Enjoy your free trial\\! 🎉',
   ].join('\n');
 }
 
@@ -208,24 +201,71 @@ export function buildTelegramTrialActivationFailedMessage(locale: SupportedLocal
     : '❌ We could not activate the free trial right now. Please try again shortly or use /support.';
 }
 
-export function buildTelegramTrialActivatedKeyboard(locale: SupportedLocale) {
-  const isMyanmar = locale === 'my';
+export function buildTelegramTrialActivatedKeyboard(input: {
+  locale: SupportedLocale;
+  keyId: string;
+}) {
   return {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '📲 Setup Guide' : '📲 Setup Guide',
-          callback_data: buildTelegramMenuCallbackData('trial', 'setup_guide'),
-        },
-        {
-          text: isMyanmar ? '🛒 View Paid Plans' : '🛒 View Paid Plans',
-          callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
+          text: '📲  Setup Guide',
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'platform_select',
+            keyId: input.keyId,
+          }),
         },
       ],
       [
         {
-          text: isMyanmar ? '💬 Contact Support' : '💬 Contact Support',
-          callback_data: buildTelegramMenuCallbackData('support', 'home'),
+          text: '🤖 Android',
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'guide_platform',
+            keyId: input.keyId,
+            platform: 'android',
+          }),
+        },
+        {
+          text: '🍎 iOS',
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'guide_platform',
+            keyId: input.keyId,
+            platform: 'ios',
+          }),
+        },
+      ],
+      [
+        {
+          text: '🪟 Windows',
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'guide_platform',
+            keyId: input.keyId,
+            platform: 'windows',
+          }),
+        },
+        {
+          text: '🍏 macOS',
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'guide_platform',
+            keyId: input.keyId,
+            platform: 'macos',
+          }),
+        },
+      ],
+      [
+        {
+          text: '🛒 Buy a Full Plan',
+          callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+        },
+      ],
+      [
+        {
+          text: '🏠 Back to Menu',
+          callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
+        },
+        {
+          text: '💬 Support',
+          callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }),
         },
       ],
     ],
