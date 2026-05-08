@@ -329,6 +329,7 @@ export async function handleTelegramSupportStatusCommand(input: {
         : buildTelegramSupportHubKeyboard({
             locale: input.locale,
             supportLink,
+            showPremiumShortcut: Boolean(input.premiumRequests && input.premiumRequests.length > 0),
           }),
   });
 
