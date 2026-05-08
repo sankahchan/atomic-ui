@@ -314,11 +314,13 @@ import {
 } from '@/lib/services/telegram-trial';
 import {
   buildTelegramStoreActiveKeysView,
+  buildTelegramStoreKeyPageView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
+  buildTelegramStorePlatformGuideView,
+  buildTelegramStorePlatformSelectView,
   buildTelegramStoreRenewView,
-  buildTelegramStoreSetupGuideText,
   buildTelegramStoreSupportAlertText,
   buildTelegramStoreSwitchKeySelectionView,
   buildTelegramStoreSwitchLimitReachedView,
@@ -328,6 +330,7 @@ import {
   escapeTelegramMarkdownV2,
   findTelegramStorePlanById,
   loadTelegramStoreActiveKeysData,
+  loadTelegramStoreGuideKeyData,
   loadTelegramStoreMainMenuData,
   loadTelegramStoreRenewData,
   loadTelegramStoreSwitchServerOptions,
@@ -6632,20 +6635,57 @@ export async function handleTelegramCallbackQuery(
           });
           return null;
         }
-        case 'setup_guide': {
-          await answerTelegramCallbackQuery(
-            config.botToken,
-            callbackQuery.id,
-            locale === 'my' ? 'Setup guide ကို ပို့ပြီးပါပြီ။' : 'Setup guide sent.',
-          );
-          await sendTelegramMessage(
-            config.botToken,
+        case 'setup_guide':
+        case 'platform_select':
+        case 'guide_platform':
+        case 'key_page': {
+          const keyView = await loadTelegramStoreGuideKeyData({
             chatId,
-            buildTelegramStoreSetupGuideText(locale),
-            {
-              parseMode: 'MarkdownV2',
-            },
-          );
+            telegramUserId: callbackQuery.from.id,
+            keyId: storefrontAction.keyId,
+            locale,
+          });
+          if (!keyView) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'Key ကို မတွေ့ပါ။' : 'Key not found.',
+            );
+            return null;
+          }
+
+          const view =
+            storefrontAction.action === 'key_page'
+              ? buildTelegramStoreKeyPageView({
+                  firstName: telegramUsername,
+                  planName: keyView.planName,
+                  accessKey: keyView.accessKeyText,
+                  dataLabel: keyView.dataLabel,
+                  expiryLabel: keyView.expiryLabel,
+                  switchesLabel: keyView.switchesLabel,
+                  paidLabel: keyView.paidLabel,
+                  keyId: keyView.id,
+                  showSwitchButton: keyView.switchesMax !== 0,
+                })
+              : storefrontAction.action === 'guide_platform'
+                ? buildTelegramStorePlatformGuideView({
+                    keyId: keyView.id,
+                    platform: storefrontAction.platform,
+                    accessKey: keyView.accessKeyText,
+                  })
+                : buildTelegramStorePlatformSelectView({
+                    keyId: keyView.id,
+                    accessKey: keyView.accessKeyText,
+                  });
+
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;
         }
         case 'order_plan':

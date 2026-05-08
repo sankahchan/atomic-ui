@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 
 import {
   buildTelegramStoreActiveKeysView,
+  buildTelegramStorePlatformGuideView,
+  buildTelegramStorePlatformSelectView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
+  buildTelegramStorefrontCallbackData,
+  parseTelegramStorefrontCallbackData,
   type TelegramStoreResolvedPlan,
 } from '@/lib/services/telegram-storefront';
 
@@ -259,5 +263,58 @@ test('store order summary and active keys keep the polished storefront labels', 
   assert.match(active.text, /1️⃣ 🪨 Basic  ·  Flash/);
   assert.match(active.text, /🔄 Switches: 1 \/ 3/);
   assert.equal(active.replyMarkup.inline_keyboard[0]?.[0]?.text, '🔄 Renew 🪨 Basic  —  5,000 Ks');
-  assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '➕  Buy New Plan');
+  assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '📲 Setup Guide');
+  assert.equal(active.replyMarkup.inline_keyboard[2]?.[0]?.text, '➕  Buy New Plan');
+});
+
+test('store setup guide platform select and platform screens keep key-specific callbacks', () => {
+  const select = buildTelegramStorePlatformSelectView({
+    keyId: 'key_123',
+    accessKey: 'ss://example-key',
+  });
+
+  assert.match(select.text, /📱 \*Let's Get You Connected\\!\*/);
+  assert.match(select.text, /Setting up takes less than 2 minutes/);
+  assert.match(select.text, /`ss:\/\/example-key`/);
+  assert.equal(select.replyMarkup.inline_keyboard[0]?.[0]?.text, '🤖 Android');
+  assert.equal(select.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀ Back');
+  assert.equal(
+    select.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'key_page', keyId: 'key_123' }),
+  );
+
+  const guide = buildTelegramStorePlatformGuideView({
+    keyId: 'key_123',
+    platform: 'android',
+    accessKey: 'ss://example-key',
+  });
+
+  assert.match(guide.text, /🤖 Android Setup/);
+  assert.match(guide.text, /You're almost connected\\!/);
+  assert.match(guide.text, /╔═ 🔵 Outline  ·  Easiest/);
+  assert.match(guide.text, /╚═ ⑤ Connect 🟢/);
+  assert.equal(guide.replyMarkup.inline_keyboard[0]?.length, 3);
+  assert.equal(
+    guide.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
+  );
+});
+
+test('storefront callback parser handles setup-guide platform routes', () => {
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData('setup_guide_key_123'),
+    { action: 'setup_guide', keyId: 'key_123' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData('platform_select_key_123'),
+    { action: 'platform_select', keyId: 'key_123' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData('guide_ios_key_123'),
+    { action: 'guide_platform', platform: 'ios', keyId: 'key_123' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData('key_page_key_123'),
+    { action: 'key_page', keyId: 'key_123' },
+  );
 });
