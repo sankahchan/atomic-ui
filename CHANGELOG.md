@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.2.14 - 2026-05-08
+
+### Changed
+
+- Refined Telegram paid and trial key delivery screens so `Order Confirmed` and `Trial Activated` now surface the setup guide immediately, include direct Android/iOS/Windows/macOS shortcuts, and keep support and menu actions visible.
+- Expanded the Telegram setup guide into richer per-platform screens with download links for Outline, Hiddify, and power-user clients, plus a clearer platform-select handoff and back path.
+
+### Fixed
+
+- Fixed `key_page_{key_id}` so Telegram now re-renders the correct paid or trial screen when users return from the setup guide flow instead of always falling back to the paid confirmation layout.
+- Verified the deployed setup-guide callbacks, platform redirects, and post-restart production logs after shipping the Telegram setup-guide refresh.
+
 ## v1.2.13 - 2026-05-01
 
 ### Changed
