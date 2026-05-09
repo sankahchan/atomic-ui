@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.2.15 - 2026-05-09
+
+### Changed
+
+- Updated the Telegram user command surface to the current production set: `/start`, `/buy`, `/mykeys`, `/renew`, `/status`, `/switchserver`, `/setup`, `/referral`, `/support`, `/help`, and `/cancel`.
+- Added focused Telegram user screens for quick status, setup entry, referral sharing, direct support contact, and help/FAQ while keeping the paid storefront, trial, key detail, and setup-guide flows intact.
+- Compacted the Telegram admin support queue summary/detail copy and action labels so support handling stays faster on mobile.
+
+### Fixed
+
+- Synced the Telegram Bot API command menu and smoke script with the new user command set so removed legacy commands are no longer advertised or probed.
+- Preserved compatibility for existing referral codes while supporting the new `ref_{telegram_user_id}` referral link format.
+
 ## v1.2.14 - 2026-05-08
 
 ### Changed
