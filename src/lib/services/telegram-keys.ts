@@ -33,8 +33,6 @@ import { listTelegramPremiumSupportRequestsForUser } from '@/lib/services/telegr
 import {
   buildTelegramSupportHubMessage,
   buildTelegramSupportHubKeyboard,
-  buildTelegramSupportTriageMessage,
-  buildTelegramSupportTriageKeyboard,
   getTelegramSupportThreadState,
   listTelegramSupportThreadsForUser,
   resolveTelegramSupportIssueLabel,
@@ -871,8 +869,73 @@ export async function handleSupportCommand(input: {
   botToken?: string;
 }) {
   const locale = input.locale;
-  const message = buildTelegramSupportTriageMessage({ locale });
-  const keyboard = buildTelegramSupportTriageKeyboard({ locale });
+  const [supportLink, threads, premiumRequests, dynamicKeyCount] = await Promise.all([
+    getTelegramSupportLink(),
+    listTelegramSupportThreadsForUser({
+      chatId: input.chatId,
+      telegramUserId: input.telegramUserId,
+      limit: 5,
+    }),
+    listTelegramPremiumSupportRequestsForUser(
+      input.chatId,
+      input.telegramUserId,
+      3,
+    ),
+    db.dynamicAccessKey.count({
+      where: {
+        OR: [
+          { telegramId: String(input.telegramUserId) },
+          { user: { telegramChatId: String(input.chatId) } },
+        ],
+      },
+    }),
+  ]);
+  const latestThread = threads[0] || null;
+  const latestPremiumRequest = premiumRequests[0] || null;
+  const message = buildTelegramSupportHubMessage({
+    locale,
+    openThreadCount: threads.filter((thread) => thread.status !== 'HANDLED').length,
+    recentThreadCount: threads.length,
+    premiumRequestCount: premiumRequests.length,
+    latestThread: latestThread
+      ? {
+          threadCode: latestThread.threadCode,
+          issueLabel: resolveTelegramSupportIssueLabel(latestThread.issueCategory, locale),
+          stateLabel: getTelegramSupportThreadState({
+            status: latestThread.status,
+            waitingOn: latestThread.waitingOn,
+            locale,
+          }).label,
+          updatedAtLabel: formatTelegramDateTime(latestThread.updatedAt || latestThread.createdAt, locale),
+        }
+      : null,
+    latestPremiumRequest: latestPremiumRequest
+      ? {
+          requestCode: latestPremiumRequest.requestCode,
+          keyName: latestPremiumRequest.dynamicAccessKey.name,
+          requestTypeLabel: formatTelegramPremiumSupportTypeLabel(
+            latestPremiumRequest.requestType,
+            getTelegramUi(locale),
+          ),
+          stateLabel: latestPremiumRequest.status,
+          replyStateLabel: formatTelegramReplyStateLabel({
+            followUpPending: latestPremiumRequest.followUpPending,
+            status: latestPremiumRequest.status,
+            locale,
+          }),
+          updatedAtLabel: formatTelegramDateTime(
+            latestPremiumRequest.updatedAt || latestPremiumRequest.createdAt,
+            locale,
+          ),
+        }
+      : null,
+    supportLinkConfigured: Boolean(supportLink),
+  });
+  const keyboard = buildTelegramSupportHubKeyboard({
+    locale,
+    supportLink,
+    showPremiumShortcut: premiumRequests.length > 0 || dynamicKeyCount > 0,
+  });
 
   if (input.botToken) {
     const sent = await sendTelegramMessage(input.botToken, input.chatId, message, {

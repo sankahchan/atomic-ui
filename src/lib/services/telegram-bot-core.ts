@@ -321,7 +321,6 @@ import {
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
   buildTelegramStoreRenewView,
-  buildTelegramStoreSupportAlertText,
   buildTelegramStoreSwitchKeySelectionView,
   buildTelegramStoreSwitchLimitReachedView,
   buildTelegramStoreSwitchServerSelectionView,
@@ -6633,10 +6632,13 @@ export async function handleTelegramCallbackQuery(
           return null;
         }
         case 'support': {
-          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id, {
-            text: buildTelegramStoreSupportAlertText(locale),
-            showAlert: true,
+          await handleSupportCommand({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            locale,
+            botToken: config.botToken,
           });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;
         }
         case 'setup_guide':

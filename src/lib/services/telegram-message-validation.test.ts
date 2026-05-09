@@ -439,9 +439,9 @@ test('myanmar support summary and admin queue labels stay localized', () => {
   });
 
   assert.deepEqual(validateTelegramHtmlMessage(summary), { valid: true, invalidTags: [] });
-  assert.match(summary, /သင့် support center/);
+  assert.match(summary, /သင့် thread များ/);
   assert.match(summary, /Admin အဖြေ စောင့်နေ/);
-  assert.doesNotMatch(summary, /Your support center/);
+  assert.doesNotMatch(summary, /Your threads/);
 
   const firstRow = keyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
   assert.match(firstRow, /အားလုံး/);
