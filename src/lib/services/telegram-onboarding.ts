@@ -57,8 +57,8 @@ async function sendTelegramOfferNudgeIfAny(input: {
     input.botToken,
     input.chatId,
     input.locale === 'my'
-      ? `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /offers to compare them before you buy or renew.`
-      : `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /offers to compare them before you buy or renew.`,
+      ? `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /buy or /renew before you place the next order.`
+      : `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /buy or /renew before you place the next order.`,
   );
 }
 

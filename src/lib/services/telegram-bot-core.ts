@@ -314,17 +314,24 @@ import {
 } from '@/lib/services/telegram-trial';
 import {
   buildTelegramStoreActiveKeysView,
+  buildTelegramStoreHelpView,
   buildTelegramStoreKeyPageView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
+  buildTelegramStoreReferralView,
   buildTelegramStoreRenewView,
+  buildTelegramStoreSetupHomeView,
+  buildTelegramStoreSetupKeyPickerView,
+  buildTelegramStoreSetupNoKeyView,
+  buildTelegramStoreSupportContactView,
   buildTelegramStoreSwitchKeySelectionView,
   buildTelegramStoreSwitchLimitReachedView,
   buildTelegramStoreSwitchServerSelectionView,
   buildTelegramStoreSwitchSuccessView,
+  buildTelegramStorefrontCallbackData,
   createTelegramStoreSummaryOrder,
   escapeTelegramMarkdownV2,
   findTelegramStorePlanById,
@@ -337,6 +344,7 @@ import {
   parseTelegramStorefrontCallbackData,
   resolveTelegramStorePlans,
 } from '@/lib/services/telegram-storefront';
+import { getTelegramReferralSummary } from '@/lib/services/telegram-referrals';
 import {
   addTelegramSupportReply,
   buildTelegramSupportThreadKeyboard,
@@ -409,13 +417,14 @@ const TELEGRAM_CONNECT_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
   'buy',
   'help',
-  'language',
   'mykeys',
-  'offers',
+  'referral',
   'renew',
   'start',
+  'status',
+  'setup',
+  'switchserver',
   'support',
-  'usage',
   'cancel',
 ]);
 
@@ -6617,6 +6626,48 @@ export async function handleTelegramCallbackQuery(
           await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;
         }
+        case 'mykeys_home': {
+          const { items } = await loadTelegramStoreActiveKeysData({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+          });
+
+          if (items.length === 0) {
+            const text = [
+              '🔑 *Your Active Keys*',
+              '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+              '',
+              'No active keys right now\\.',
+              '',
+              'Tap below to buy a new plan\\.',
+            ].join('\n');
+            await sendOrEditTelegramMarkdownView({
+              botToken: config.botToken,
+              chatId,
+              messageId,
+              text,
+              replyMarkup: {
+                inline_keyboard: [[
+                  {
+                    text: '➕ Buy New Plan',
+                    callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+                  },
+                ]],
+              },
+            });
+          } else {
+            const view = buildTelegramStoreActiveKeysView(items);
+            await sendOrEditTelegramMarkdownView({
+              botToken: config.botToken,
+              chatId,
+              messageId,
+              text: view.text,
+              replyMarkup: view.replyMarkup,
+            });
+          }
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
         case 'show_plans': {
           await cancelStaleTelegramConversationOrders(chatId, callbackQuery.from.id);
           const { plans } = await resolveTelegramStorePlans();
@@ -6631,12 +6682,141 @@ export async function handleTelegramCallbackQuery(
           await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;
         }
-        case 'support': {
-          await handleSupportCommand({
+        case 'support_contact': {
+          const view = buildTelegramStoreSupportContactView({
+            locale,
+            supportUrl: await getTelegramSupportLink(),
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'help': {
+          const view = buildTelegramStoreHelpView({
+            supportUrl: await getTelegramSupportLink(),
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'referral': {
+          const summary = await getTelegramReferralSummary({
+            telegramUserId: String(callbackQuery.from.id),
+            telegramChatId: String(chatId),
+            username: callbackQuery.from.username || telegramUsername,
+            displayName: callbackQuery.from.first_name || telegramUsername,
+          });
+          const view = buildTelegramStoreReferralView({
+            botUsername: config.botUsername?.trim().replace(/^@+/, '') || 'atomicui_bot',
+            telegramUserId: callbackQuery.from.id,
+            count: summary.fulfilledOrders,
+            bonusGb: 0,
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'setup_home': {
+          const { items } = await loadTelegramStoreActiveKeysData({
             chatId,
             telegramUserId: callbackQuery.from.id,
-            locale,
+          });
+          const view = items.length === 0
+            ? buildTelegramStoreSetupNoKeyView()
+            : buildTelegramStoreSetupHomeView();
+          await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'setup_platform': {
+          const { items } = await loadTelegramStoreActiveKeysData({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+          });
+
+          if (items.length === 0) {
+            const view = buildTelegramStoreSetupNoKeyView();
+            await sendOrEditTelegramMarkdownView({
+              botToken: config.botToken,
+              chatId,
+              messageId,
+              text: view.text,
+              replyMarkup: view.replyMarkup,
+            });
+            await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+            return null;
+          }
+
+          if (items.length > 1) {
+            const view = buildTelegramStoreSetupKeyPickerView({
+              platform: storefrontAction.platform,
+              items: items.map((item) => ({
+                keyId: item.id,
+                planName: item.planName,
+                categoryLabel: item.categoryLabel,
+              })),
+            });
+            await sendOrEditTelegramMarkdownView({
+              botToken: config.botToken,
+              chatId,
+              messageId,
+              text: view.text,
+              replyMarkup: view.replyMarkup,
+            });
+            await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+            return null;
+          }
+
+          const keyView = await loadTelegramStoreGuideKeyData({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+            keyId: items[0].id,
+            locale,
+          });
+          if (!keyView) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'Key ကို မတွေ့ပါ။' : 'Key not found.',
+            );
+            return null;
+          }
+
+          const view = buildTelegramStorePlatformGuideView({
+            keyId: keyView.id,
+            platform: storefrontAction.platform,
+            accessKey: keyView.accessKeyText,
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
           });
           await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;

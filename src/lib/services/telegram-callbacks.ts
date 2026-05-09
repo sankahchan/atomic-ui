@@ -89,21 +89,27 @@ type TelegramCommandShortcut = {
   aliases?: string[];
 };
 
+export type TelegramBotCommandDefinition = {
+  command: string;
+  description: string;
+};
+
 const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
     { command: '/buy', labelEn: '🛒 Buy', labelMy: '🛒 ဝယ်မည်', aliases: ['🛒 Buy key', '🛒 Buy Plans', '🛒 View Paid Plans'] },
     { command: '/mykeys', labelEn: '🗂 Keys', labelMy: '🗂 Key များ', aliases: ['🔑 My Keys', '🗂 My keys'] },
   ],
   [
-    { command: '/offers', labelEn: '🎟 Offers', labelMy: '🎟 Offers' },
     { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
+    { command: '/status', labelEn: '📊 Status', labelMy: '📊 Status', aliases: ['📊 Quick status'] },
   ],
   [
-    { command: '/usage', labelEn: '📊 Usage', labelMy: '📊 Usage', aliases: ['📶 Usage'] },
-    { command: '/support', labelEn: '💬 Support', labelMy: '💬 Support', aliases: ['🛟 Support'] },
+    { command: '/switchserver', labelEn: '🌍 Switch Server', labelMy: '🌍 Server ပြောင်း', aliases: ['🔄 Switch Server'] },
+    { command: '/setup', labelEn: '📲 Setup', labelMy: '📲 Setup', aliases: ['📲 Setup Guide'] },
   ],
   [
-    { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 Language' },
+    { command: '/referral', labelEn: '🎁 Referral', labelMy: '🎁 Referral', aliases: ['🎁 Refer a friend'] },
+    { command: '/support', labelEn: '💬 Support', labelMy: '💬 Support', aliases: ['🛟 Support', '💬 Contact Support'] },
   ],
   [
     { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
@@ -111,12 +117,8 @@ const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
 ];
 
 const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
+  { command: '/start', labelEn: '🏠 Start', labelMy: '🏠 Start' },
   { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
-  { command: '/orders', labelEn: '🧾 Orders', labelMy: '🧾 Orders' },
-  { command: '/inbox', labelEn: '📬 Inbox', labelMy: '📬 Inbox' },
-  { command: '/premium', labelEn: '💎 Premium', labelMy: '💎 Premium' },
-  { command: '/notifications', labelEn: '🔔 Preferences', labelMy: '🔔 Notice' },
-  { command: '/switchserver', labelEn: '🔄 Switch Server', labelMy: '🔄 Server ပြောင်း' },
 ];
 
 const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
@@ -170,6 +172,24 @@ export function getCommandKeyboard(isAdmin: boolean, locale: SupportedLocale = '
     resize_keyboard: true,
     one_time_keyboard: false,
   };
+}
+
+const TELEGRAM_DEFAULT_BOT_COMMANDS: TelegramBotCommandDefinition[] = [
+  { command: 'start', description: '🏠 Main menu' },
+  { command: 'buy', description: '🛒 Browse plans' },
+  { command: 'mykeys', description: '🔑 My active keys' },
+  { command: 'renew', description: '🔄 Renew a plan' },
+  { command: 'status', description: '📊 Quick status' },
+  { command: 'switchserver', description: '🌍 Switch server' },
+  { command: 'setup', description: '📲 Setup guide' },
+  { command: 'referral', description: '🎁 Refer a friend' },
+  { command: 'support', description: '💬 Contact support' },
+  { command: 'help', description: '❓ Help & FAQ' },
+  { command: 'cancel', description: '✖️ Cancel' },
+];
+
+export function getTelegramUserBotCommands() {
+  return TELEGRAM_DEFAULT_BOT_COMMANDS;
 }
 
 export function normalizeTelegramReplyKeyboardCommand(

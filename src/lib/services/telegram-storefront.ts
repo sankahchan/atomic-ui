@@ -152,7 +152,12 @@ export type TelegramStoreGuideKeyData = {
 export type TelegramStoreCallbackPayload =
   | { action: 'show_plans' }
   | { action: 'main_menu' }
-  | { action: 'support' }
+  | { action: 'support_contact' }
+  | { action: 'help' }
+  | { action: 'mykeys_home' }
+  | { action: 'setup_home' }
+  | { action: 'setup_platform'; platform: TelegramStoreGuidePlatform }
+  | { action: 'referral' }
   | { action: 'setup_guide'; keyId: string }
   | { action: 'platform_select'; keyId: string }
   | { action: 'guide_platform'; keyId: string; platform: TelegramStoreGuidePlatform }
@@ -688,8 +693,18 @@ export function buildTelegramStorefrontCallbackData(payload: TelegramStoreCallba
       return 'show_plans';
     case 'main_menu':
       return 'main_menu';
-    case 'support':
+    case 'support_contact':
       return 'support';
+    case 'help':
+      return 'help';
+    case 'mykeys_home':
+      return 'mykeys_home';
+    case 'setup_home':
+      return 'setup_home';
+    case 'setup_platform':
+      return `setup_platform_${payload.platform}`;
+    case 'referral':
+      return 'referral';
     case 'setup_guide':
       return `setup_guide_${payload.keyId}`;
     case 'platform_select':
@@ -729,7 +744,28 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
     return { action: 'main_menu' };
   }
   if (data === 'support') {
-    return { action: 'support' };
+    return { action: 'support_contact' };
+  }
+  if (data === 'help') {
+    return { action: 'help' };
+  }
+  if (data === 'mykeys_home') {
+    return { action: 'mykeys_home' };
+  }
+  if (data === 'setup_home') {
+    return { action: 'setup_home' };
+  }
+  if (data === 'referral') {
+    return { action: 'referral' };
+  }
+  if (data.startsWith('setup_platform_')) {
+    const platform = data.slice('setup_platform_'.length).trim();
+    if (platform === 'android' || platform === 'ios' || platform === 'windows' || platform === 'macos') {
+      return {
+        action: 'setup_platform',
+        platform,
+      };
+    }
   }
 
   if (data.startsWith('setup_guide_')) {
@@ -1522,7 +1558,7 @@ export function buildTelegramStoreMainMenuView(input: {
         [{ text: '⚡ Flash Plans    ·  30 Days  ·  🔄 3×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
         [{ text: '🌙 Season Plans   ·  90 Days  ·  🔄 5×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
         [{ text: '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [{ text: '💬 Live Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) }],
+        [{ text: '💬 Live Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) }],
       ],
     },
   };
@@ -1568,7 +1604,7 @@ export function buildTelegramStorePlanListView(plans: TelegramStoreResolvedPlan[
         buildStorePlanKeyboardRow(flash),
         buildStorePlanKeyboardRow(season),
         buildStorePlanKeyboardRow(dynamic),
-        [{ text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) }],
+        [{ text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) }],
       ],
     },
   };
@@ -1814,7 +1850,7 @@ export function buildTelegramStoreSwitchSuccessView(input: {
     replyMarkup: {
       inline_keyboard: [[
         { text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
-        { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) },
+        { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
       ]],
     },
   };
@@ -1908,13 +1944,13 @@ export function buildTelegramStoreKeyPageView(input: {
       },
       {
         text: '💬 Support',
-        callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }),
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
       },
     ]);
   } else {
     inlineKeyboard.push([{
       text: '💬 Support',
-      callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }),
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
     }]);
   }
 
@@ -2039,7 +2075,7 @@ export function buildTelegramStoreTrialKeyPageView(input: {
         }],
         [
           { text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
-          { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) },
+          { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
         ],
       ],
     },
@@ -2109,7 +2145,7 @@ export function buildTelegramStoreOrderConfirmedView(input: {
 
   inlineKeyboard.push([
     { text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
-    { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }) },
+    { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
   ]);
 
   return {
@@ -2325,6 +2361,237 @@ export function buildTelegramStoreSupportAlertText(locale: SupportedLocale) {
   return locale === 'my'
     ? '💬 Live support လိုအပ်ပါက /support ကို အသုံးပြုပါ။'
     : '💬 Use /support if you need live support.';
+}
+
+function extractTelegramHandleFromUrl(url?: string | null) {
+  const trimmed = url?.trim() || '';
+  if (!trimmed) {
+    return null;
+  }
+
+  const normalized = trimmed.replace(/^@+/, '');
+  if (!normalized.includes('://') && !normalized.includes('/')) {
+    return `@${normalized}`;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.hostname === 't.me') {
+      const slug = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+      if (slug) {
+        return `@${slug}`;
+      }
+    }
+    if (parsed.protocol === 'tg:' && parsed.searchParams.get('domain')) {
+      return `@${parsed.searchParams.get('domain')}`;
+    }
+  } catch {
+    // Ignore malformed URLs and fall through.
+  }
+
+  return null;
+}
+
+export function buildTelegramStoreSupportContactView(input: {
+  locale: SupportedLocale;
+  supportUrl?: string | null;
+}) {
+  const supportHandle = extractTelegramHandleFromUrl(input.supportUrl) || '@YourSupportHandle';
+  const supportText = input.locale === 'my'
+    ? [
+        '💬 *Contact Support*',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        '',
+        'Our team is ready to help you\\.',
+        '',
+        `👤 Support: ${escapeTelegramMarkdownV2(supportHandle)}`,
+        '⏰ Hours: 9am – 11pm \\(MMT\\)',
+      ]
+    : [
+        '💬 *Contact Support*',
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        '',
+        'Our team is ready to help you\\.',
+        '',
+        `👤 Support: ${escapeTelegramMarkdownV2(supportHandle)}`,
+        '⏰ Hours: 9am – 11pm \\(MMT\\)',
+      ];
+
+  const rows: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [];
+  if (input.supportUrl?.trim()) {
+    rows.push([{ text: '💬 Open Support Chat', url: input.supportUrl.trim() }]);
+  }
+  rows.push([{ text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }]);
+
+  return {
+    text: supportText.join('\n'),
+    replyMarkup: {
+      inline_keyboard: rows,
+    },
+  };
+}
+
+export function buildTelegramStoreHelpView(input?: {
+  supportUrl?: string | null;
+}) {
+  const supportHandle = extractTelegramHandleFromUrl(input?.supportUrl) || '@YourSupportHandle';
+  return {
+    text: [
+      '❓ *Help & FAQ*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      '*How do I connect?*',
+      'Tap /setup for step\\-by\\-step guide\\.',
+      '',
+      "*My key isn't working?*",
+      `Contact ${escapeTelegramMarkdownV2(supportHandle)}\\.`,
+      '',
+      '*How do I check my data?*',
+      'Tap /mykeys to see usage\\.',
+      '',
+      '*Can I use on multiple devices?*',
+      'Yes\\! Unlimited devices on all plans\\.',
+      '',
+      '*How do I switch server?*',
+      'Tap /switchserver to change region\\.',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: '📲 Setup Guide', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }) },
+          { text: '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
+        ],
+        [
+          { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+          { text: '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+        ],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreSetupHomeView() {
+  return {
+    text: [
+      "📱 *Let's Get You Connected\\!*",
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      'Setting up takes less than *2 minutes* ⚡',
+      'Your key works on all devices 📱 💻',
+      '',
+      '🌟 *Recommended*   →  Outline',
+      '🔧 *Power Users*   →  Hiddify or V2Ray',
+      '',
+      'Which device are you on? 👇',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: '🤖 Android', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_platform', platform: 'android' }) },
+          { text: '🍎 iOS', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_platform', platform: 'ios' }) },
+        ],
+        [
+          { text: '🪟 Windows', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_platform', platform: 'windows' }) },
+          { text: '🍏 macOS', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_platform', platform: 'macos' }) },
+        ],
+        [
+          { text: '◀ Back', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+        ],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreSetupKeyPickerView(input: {
+  platform: TelegramStoreGuidePlatform;
+  items: Array<{
+    keyId: string;
+    planName: string;
+    categoryLabel: string;
+  }>;
+}) {
+  return {
+    text: [
+      `📱 *${input.platform === 'ios' ? 'iOS' : input.platform === 'macos' ? 'macOS' : input.platform === 'windows' ? 'Windows' : 'Android'} Setup*`,
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      'Choose which active key you want to open on this device 👇',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        ...input.items.map((item) => [
+          {
+            text: `🔑 ${item.planName} · ${item.categoryLabel}`,
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'guide_platform',
+              keyId: item.keyId,
+              platform: input.platform,
+            }),
+          },
+        ]),
+        [
+          { text: '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
+          { text: '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+        ],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreSetupNoKeyView() {
+  return {
+    text: [
+      '📲 *Setup Guide*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      'You do not have an active key yet\\.',
+      '',
+      'Tap *My Keys* after you buy a plan, or browse plans below\\.',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
+          { text: '🛒 View Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
+        ],
+        [{ text: '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreReferralView(input: {
+  botUsername: string;
+  telegramUserId: number;
+  count: number;
+  bonusGb: number;
+}) {
+  const botUsername = input.botUsername.trim().replace(/^@+/, '') || 'atomicui_bot';
+  const referralLink = `https://t.me/${botUsername}?start=ref_${input.telegramUserId}`;
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(
+    'Join this VPN bot and get connected fast.',
+  )}`;
+
+  return {
+    text: [
+      '🎁 *Refer a Friend*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      'Share your link and earn free data\\.',
+      '',
+      '🔗 Your referral link:',
+      escapeTelegramMarkdownV2(referralLink),
+      '',
+      `👥 Friends referred  :  ${escapeTelegramMarkdownV2(String(input.count))}`,
+      `🎁 Bonus earned      :  ${escapeTelegramMarkdownV2(String(input.bonusGb))} GB`,
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [{ text: '📤 Share My Link', url: shareUrl }],
+        [{ text: '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
+      ],
+    },
+  };
 }
 
 export function buildTelegramStoreSetupGuideText(locale: SupportedLocale) {

@@ -876,7 +876,7 @@ export function buildTelegramHelpMessage(input: {
 <code>/buy</code>, <code>/mykeys</code>, <code>/renew</code>, <code>/support</code>
 
 <b>More</b>
-<code>/offers</code>, <code>/usage</code>, <code>/language</code>, <code>/help</code>
+<code>/status</code>, <code>/switchserver</code>, <code>/setup</code>, <code>/referral</code>, <code>/help</code>
 
 <b>Free trial</b>
 အသစ်စတင်သူဆိုပါက <code>/start</code> တွင် free trial offer ပထမဦးစွာ ပြပါမည်။
@@ -887,7 +887,7 @@ Keyboard မှ command များကို တိုက်ရိုက် ရ
 <code>/buy</code>, <code>/mykeys</code>, <code>/renew</code>, <code>/support</code>
 
 <b>More</b>
-<code>/offers</code>, <code>/usage</code>, <code>/language</code>, <code>/help</code>
+<code>/status</code>, <code>/switchserver</code>, <code>/setup</code>, <code>/referral</code>, <code>/help</code>
 
 <b>Free trial</b>
 If you are brand new, <code>/start</code> will show the free-trial offer before the main menu.

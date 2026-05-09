@@ -265,7 +265,7 @@ export function buildTelegramTrialActivatedKeyboard(input: {
         },
         {
           text: '💬 Support',
-          callback_data: buildTelegramStorefrontCallbackData({ action: 'support' }),
+          callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
         },
       ],
     ],

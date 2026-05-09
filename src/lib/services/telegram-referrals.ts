@@ -91,7 +91,12 @@ export async function acceptTelegramReferralCode(input: {
       },
     }),
     db.telegramUserProfile.findFirst({
-      where: { referralCode },
+      where: {
+        OR: [
+          { referralCode },
+          { telegramUserId: referralCode },
+        ],
+      },
       select: {
         telegramUserId: true,
         referralCode: true,

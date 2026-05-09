@@ -375,8 +375,8 @@ export function buildTelegramBuySummaryMessage(input: {
   const footerLines = [
     input.activeOfferCount > 0
       ? input.locale === 'my'
-        ? `🎟 Active offers: ${input.activeOfferCount} • /offers ဖြင့် ကြည့်နိုင်သည်။`
-        : `🎟 Active offers: ${input.activeOfferCount} • use /offers any time.`
+        ? `🎟 Active offers: ${input.activeOfferCount} • /buy ဖြင့် plan ကို ဆက်ကြည့်နိုင်သည်။`
+        : `🎟 Active offers: ${input.activeOfferCount} • use /buy to keep browsing plans.`
       : null,
     ...(input.couponHintLines || []),
     input.order.orderMode === 'GIFT' && input.order.giftRecipientLabel

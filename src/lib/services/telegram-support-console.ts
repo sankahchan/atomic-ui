@@ -156,7 +156,7 @@ export function buildTelegramSupportThreadsSummaryMessage(input: {
     : '';
 
   return [
-    isMyanmar ? '🧵 <b>Customer support thread များ</b>' : '🧵 <b>Customer support threads</b>',
+    isMyanmar ? '🛟 <b>Customer support queue</b>' : '🛟 <b>Customer support queue</b>',
     '',
     modeLabel,
     stats,
@@ -206,8 +206,8 @@ export function buildTelegramSupportThreadQueueMessage(input: {
 
   return [
     input.locale === 'my'
-      ? '🧵 <b>Customer support thread</b>'
-      : '🧵 <b>Customer support thread</b>',
+      ? '🧵 <b>Queue thread</b>'
+      : '🧵 <b>Queue thread</b>',
     '',
     `<b>${escapeHtml(input.thread.threadCode)}</b> • ${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}`,
     userLine,
@@ -238,7 +238,7 @@ export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
         {
           text:
             input.claimedByMe
-              ? (isMyanmar ? '↩️ လွှတ်မည်' : '↩️ Unclaim')
+              ? (isMyanmar ? '↩️ Release' : '↩️ Release')
               : input.isClaimed
                 ? (isMyanmar ? '🔒 ယူထားပြီး' : '🔒 Claimed')
                 : (isMyanmar ? '🙋 ယူမည်' : '🙋 Claim'),
@@ -253,17 +253,17 @@ export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
           callback_data: buildTelegramSupportQueueCallbackData('rp', `thr_${input.threadId}`, input.mode),
         },
         {
-          text: isMyanmar ? '✅ ဖြေရှင်းပြီး' : '✅ Handled',
+          text: isMyanmar ? '✅ Resolve' : '✅ Resolve',
           callback_data: buildTelegramSupportQueueCallbackData('hd', `thr_${input.threadId}`, input.mode),
         },
       ],
       [
         {
-          text: isMyanmar ? '👀 စစ်နေသည်' : '👀 Working on it',
+          text: isMyanmar ? '👀 Working' : '👀 Working',
           callback_data: buildTelegramSupportQueueCallbackData('wk', `thr_${input.threadId}`, input.mode),
         },
         {
-          text: isMyanmar ? '❓ အသေးစိတ်လို' : '❓ Need details',
+          text: isMyanmar ? '❓ Ask user' : '❓ Ask user',
           callback_data: buildTelegramSupportQueueCallbackData('nd', `thr_${input.threadId}`, input.mode),
         },
       ],
@@ -271,19 +271,19 @@ export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
         ...(includeDetail
           ? [
               {
-                text: isMyanmar ? 'ℹ️ အသေးစိတ်' : 'ℹ️ Detail',
+                text: isMyanmar ? '🧾 Detail' : '🧾 Detail',
                 callback_data: buildTelegramSupportQueueCallbackData('dt', `thr_${input.threadId}`, input.mode),
               },
             ]
           : []),
         {
-          text: isMyanmar ? '📌 Panel သို့ တင်မည်' : '📌 Escalate',
+          text: isMyanmar ? '📌 Escalate' : '📌 Escalate',
           callback_data: buildTelegramSupportQueueCallbackData('es', `thr_${input.threadId}`, input.mode),
         },
       ],
       [
         {
-          text: isMyanmar ? '⬅️ Thread များ' : '⬅️ Threads',
+          text: isMyanmar ? '⬅️ List' : '⬅️ List',
           callback_data: buildTelegramMenuCallbackData(
             'admin',
             input.mode === 'admin'
@@ -339,15 +339,15 @@ export function buildTelegramSupportThreadQueueDetailMessage(input: {
 
   return [
     input.locale === 'my'
-      ? 'ℹ️ <b>Support thread အသေးစိတ်</b>'
-      : 'ℹ️ <b>Support thread detail</b>',
+      ? '🧾 <b>Support thread detail</b>'
+      : '🧾 <b>Support thread detail</b>',
     '',
     `<b>${escapeHtml(input.thread.threadCode)}</b> • ${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))}`,
     `👤 <b>${escapeHtml(input.thread.telegramUsername || input.thread.telegramUserId || '—')}</b> • ${escapeHtml(state.label)}`,
     input.thread.firstResponseDueAt
       ? `⏱ ${escapeHtml(formatTelegramDateTime(input.thread.firstResponseDueAt, input.locale))}`
       : '',
-    contextParts.length > 0 ? `🧩 ${contextParts.join(' • ')}` : '',
+    contextParts.length > 0 ? `🧩 <b>${input.locale === 'my' ? 'Context' : 'Context'}</b>: ${contextParts.join(' • ')}` : '',
     subject ? `${input.locale === 'my' ? '📝 အကြောင်းအရာ' : '📝 Subject'}: ${escapeHtml(subject)}` : '',
     ...latestReplyPreview,
   ]
@@ -563,8 +563,8 @@ export async function handleTelegramSupportConsoleCommand(input: {
         : '🛟 <b>Support console</b>',
       '',
       input.locale === 'my'
-        ? '<b>Customer thread များ</b>'
-        : '<b>Customer threads</b>',
+        ? '<b>Customer queue</b>'
+        : '<b>Customer queue</b>',
       input.locale === 'my'
         ? `${customerSnapshot.totalOpen} ခု ဖွင့်ထား • ${customerSnapshot.waitingAdmin} ခု admin စောင့်နေ • ${customerSnapshot.waitingUser} ခု user စောင့်နေ • ${customerSnapshot.overdue} ခု နောက်ကျ`
         : `${customerSnapshot.totalOpen} open • ${customerSnapshot.waitingAdmin} need admin • ${customerSnapshot.waitingUser} waiting for user • ${customerSnapshot.overdue} overdue`,
@@ -577,8 +577,8 @@ export async function handleTelegramSupportConsoleCommand(input: {
         : `${premiumSnapshot.totalOpen} open • ${premiumSnapshot.waitingAdmin} need admin • ${premiumSnapshot.waitingUser} waiting for user`,
       '',
       input.locale === 'my'
-        ? 'ကြည့်လိုသော queue ကို အောက်က button များဖြင့် ဖွင့်နိုင်ပါသည်။'
-        : 'Use the buttons below to open the queue you want.',
+        ? 'အောက်က button များဖြင့် queue ကို ချက်ချင်း ဖွင့်နိုင်ပါသည်။'
+        : 'Open the queue you need with the buttons below.',
     ].join('\n'),
     {
       replyMarkup: {

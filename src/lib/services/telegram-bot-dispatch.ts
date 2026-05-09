@@ -12,12 +12,16 @@ import { handleTelegramSupportReplyMedia, handleTelegramSupportReplyText } from 
 import { copyTelegramMessage } from '@/lib/services/telegram-runtime';
 import {
   handleEmailLink,
-  handleLanguageCommand,
   handleStartCommand,
+  handleStoreHelpCommand,
   handleStoreBuyCommand,
   handleStoreMyKeysCommand,
+  handleStoreSetupCommand,
+  handleStoreStatusCommand,
+  handleStoreSupportCommand,
   handleStoreRenewCommand,
   handleStoreSwitchServerCommand,
+  handleReferralCommand,
   handleTelegramOrderProofMessage,
   handleTelegramOrderTextMessage,
 } from '@/lib/services/telegram-user-command-handlers';
@@ -25,14 +29,14 @@ import {
 const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
   'buy',
   'help',
-  'language',
   'mykeys',
-  'offers',
+  'referral',
   'renew',
   'start',
+  'status',
+  'setup',
   'switchserver',
   'support',
-  'usage',
   'cancel',
 ]);
 
@@ -284,8 +288,6 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         config.botToken,
         argsText,
       );
-    case 'language':
-      return handleLanguageCommand(chatId, config.botToken);
     case 'buy':
       return handleStoreBuyCommand(chatId, telegramUserId, username, locale, config.botToken);
     case 'mykeys':
@@ -297,6 +299,20 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       });
     case 'renew':
       return handleStoreRenewCommand(chatId, telegramUserId, username, locale, config.botToken);
+    case 'status':
+      return handleStoreStatusCommand({
+        chatId,
+        telegramUserId,
+        botToken: config.botToken,
+      });
+    case 'setup':
+      return handleStoreSetupCommand({
+        chatId,
+        telegramUserId,
+        botToken: config.botToken,
+      });
+    case 'referral':
+      return handleReferralCommand(chatId, telegramUserId, username, locale);
     case 'switchserver':
       return handleStoreSwitchServerCommand({
         chatId,
@@ -305,58 +321,60 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         botToken: config.botToken,
         argsText,
       });
+    case 'support':
+      return handleStoreSupportCommand({
+        chatId,
+        locale,
+        botToken: config.botToken,
+      });
+    case 'help':
+      return handleStoreHelpCommand({
+        chatId,
+        botToken: config.botToken,
+      });
     case 'cancel': {
       const currentOrder = activeOrder ?? (await getActiveTelegramOrder(chatId, telegramUserId));
-      if (!currentOrder && pendingPremiumReply) {
+      if (pendingPremiumReply) {
         await setTelegramPendingPremiumReply({
           telegramUserId: String(telegramUserId),
           telegramChatId: String(chatId),
           requestId: null,
         });
-        return ui.premiumFollowUpCancelled;
       }
-      if (!currentOrder && pendingSupportReply) {
+      if (pendingSupportReply) {
         await setTelegramPendingSupportReply({
           telegramUserId: String(telegramUserId),
           telegramChatId: String(chatId),
           threadId: null,
         });
-        return locale === 'my'
-          ? 'Support reply draft ကို ဖျက်ပြီးပါပြီ။'
-          : 'Cancelled the support reply draft.';
       }
-      const pendingAdminFlow = !currentOrder && isAdmin
+      const pendingAdminFlow = isAdmin
         ? await getTelegramPendingAdminFlow({
             telegramUserId: String(telegramUserId),
             telegramChatId: String(chatId),
           })
         : null;
-      if (!currentOrder && pendingAdminFlow) {
+      if (pendingAdminFlow) {
         await cancelTelegramAdminKeyFlow({
           telegramUserId,
           chatId,
         });
-        return locale === 'my'
-          ? 'Telegram admin key wizard ကို ပယ်ဖျက်ပြီးပါပြီ။'
-          : 'Cancelled the Telegram admin key wizard.';
       }
 
-      if (!currentOrder) {
-        return ui.noOrderToCancel;
+      if (currentOrder) {
+        await db.telegramOrder.update({
+          where: { id: currentOrder.id },
+          data: {
+            status: 'CANCELLED',
+            paymentStageEnteredAt: null,
+            paymentReminderSentAt: null,
+            reviewReminderSentAt: null,
+            expiredAt: null,
+          },
+        });
       }
 
-      await db.telegramOrder.update({
-        where: { id: currentOrder.id },
-        data: {
-          status: 'CANCELLED',
-          paymentStageEnteredAt: null,
-          paymentReminderSentAt: null,
-          reviewReminderSentAt: null,
-          expiredAt: null,
-        },
-      });
-
-      return ui.orderCancelled(currentOrder.orderCode);
+      return '✖️ Cancelled\\. Use /start to begin again\\.';
     }
     default:
       return handleTelegramUpdateCore(update);

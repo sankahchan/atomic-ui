@@ -35,7 +35,7 @@ import {
   handleTelegramOrderProofMessage as handleTelegramOrderProofMessageModule,
   handleTelegramOrderTextMessage as handleTelegramOrderTextMessageModule,
 } from '@/lib/services/telegram-order-state';
-import { getTelegramConfig, sendTelegramMessage } from '@/lib/services/telegram-runtime';
+import { getTelegramConfig, getTelegramSupportLink, sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { getTelegramReferralSummary } from '@/lib/services/telegram-referrals';
 import {
   generateTelegramOrderCode,
@@ -48,22 +48,26 @@ import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
 import { buildTelegramLocaleSelectorKeyboard, buildTelegramLocaleSelectorMessage } from '@/lib/services/telegram-callbacks';
 import {
   buildTelegramStoreActiveKeysView,
-  buildTelegramStoreMainMenuView,
+  buildTelegramStoreHelpView,
   buildTelegramStorePlanListView,
+  buildTelegramStoreReferralView,
   buildTelegramStoreRenewView,
+  buildTelegramStoreSetupHomeView,
+  buildTelegramStoreSetupNoKeyView,
+  buildTelegramStoreSetupKeyPickerView,
   buildTelegramStoreSetupGuideText,
-  buildTelegramStoreSupportAlertText,
+  buildTelegramStoreSupportContactView,
   buildTelegramStoreSwitchKeySelectionView,
   buildTelegramStoreSwitchLimitReachedView,
   buildTelegramStoreSwitchServerSelectionView,
   buildTelegramStorefrontCallbackData,
   escapeTelegramMarkdownV2,
   loadTelegramStoreActiveKeysData,
-  loadTelegramStoreMainMenuData,
   loadTelegramStoreRenewData,
   loadTelegramStoreSwitchServerOptions,
   loadTelegramStoreSwitchableKeysData,
 } from '@/lib/services/telegram-storefront';
+import { findLinkedAccessKeys, findLinkedDynamicAccessKeys } from '@/lib/services/telegram-keys';
 
 export { handleTelegramStartCommand as handleStartCommand };
 
@@ -218,13 +222,11 @@ export async function handleStoreBuyCommand(
   }
 
   await cancelStaleTelegramConversationOrders(chatId, telegramUserId);
-  const view = buildTelegramStoreMainMenuView({
-    firstName: username,
-    ...(await loadTelegramStoreMainMenuData({
-      chatId,
-      telegramUserId,
-    })),
+  const { plans } = await loadTelegramStoreRenewData({
+    chatId,
+    telegramUserId,
   });
+  const view = buildTelegramStorePlanListView(plans);
 
   return sendTelegramStoreView({
     botToken,
@@ -307,32 +309,24 @@ export async function handleReferralCommand(
   });
   const config = await getTelegramConfig();
   const botUsername = config?.botUsername?.trim().replace(/^@+/, '') || 'atomicui_bot';
-  const inviteLink = `https://t.me/${botUsername}?start=ref_${summary.referralCode}`;
-  const revenueLabel = summary.revenue > 0
-    ? new Intl.NumberFormat('en-US').format(summary.revenue)
-    : '0';
+  const view = buildTelegramStoreReferralView({
+    botUsername,
+    telegramUserId,
+    count: summary.fulfilledOrders,
+    bonusGb: 0,
+  });
 
-  return locale === 'my'
-    ? [
-        '🔗 <b>Referral center</b>',
-        '',
-        `Code: <b>${summary.referralCode}</b>`,
-        `Invite link: ${inviteLink}`,
-        `Converted orders: <b>${summary.fulfilledOrders}</b>`,
-        `Revenue: <b>${revenueLabel} MMK</b>`,
-        '',
-        'ဤ link ကို သူငယ်ချင်းထံ ပို့ပြီး bot ကို start လုပ်ခိုင်းပါ။ နောက်ထပ် /buy order တွင် code ကို attach လုပ်ပေးပါမည်။',
-      ].join('\n')
-    : [
-        '🔗 <b>Referral center</b>',
-        '',
-        `Code: <b>${summary.referralCode}</b>`,
-        `Invite link: ${inviteLink}`,
-        `Converted orders: <b>${summary.fulfilledOrders}</b>`,
-        `Revenue: <b>${revenueLabel} MMK</b>`,
-        '',
-        'Share this link with a friend. When they start the bot and place their next /buy order, the referral code will be attached automatically.',
-      ].join('\n');
+  const botToken = config?.botToken;
+  if (!botToken) {
+    return view.text;
+  }
+
+  return sendTelegramStoreView({
+    botToken,
+    chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
+  });
 }
 
 export async function handleTrialCommand(
@@ -526,6 +520,147 @@ export async function handleStoreMyKeysCommand(input: {
   }
 
   const view = buildTelegramStoreActiveKeysView(items);
+  return sendTelegramStoreView({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
+  });
+}
+
+function formatStoreStatusDate(date: Date | null) {
+  if (!date) {
+    return '—';
+  }
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatStoreRemainingGb(bytes: bigint) {
+  const gb = Number(bytes) / (1024 * 1024 * 1024);
+  if (gb >= 100) {
+    return gb.toFixed(0);
+  }
+  if (gb >= 10) {
+    return gb.toFixed(1);
+  }
+  return gb.toFixed(2);
+}
+
+export async function handleStoreStatusCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  botToken: string;
+}) {
+  const [accessKeys, dynamicKeys] = await Promise.all([
+    findLinkedAccessKeys(input.chatId, input.telegramUserId, false),
+    findLinkedDynamicAccessKeys(input.chatId, input.telegramUserId, false),
+  ]);
+
+  const activeAccessKeys = accessKeys.filter((key) => key.status === 'ACTIVE');
+  const activeDynamicKeys = dynamicKeys.filter((key) => key.status === 'ACTIVE');
+  const activeCount = activeAccessKeys.length + activeDynamicKeys.length;
+
+  const expiries = [
+    ...activeAccessKeys.map((key) => key.expiresAt).filter((date): date is Date => Boolean(date)),
+    ...activeDynamicKeys.map((key) => key.expiresAt).filter((date): date is Date => Boolean(date)),
+  ].sort((left, right) => left.getTime() - right.getTime());
+
+  const remainingBytes = [
+    ...activeAccessKeys.map((key) =>
+      key.dataLimitBytes && key.dataLimitBytes > BigInt(0)
+        ? key.dataLimitBytes - key.usedBytes > BigInt(0)
+          ? key.dataLimitBytes - key.usedBytes
+          : BigInt(0)
+        : null),
+    ...activeDynamicKeys.map((key) =>
+      key.dataLimitBytes && key.dataLimitBytes > BigInt(0)
+        ? key.dataLimitBytes - key.usedBytes > BigInt(0)
+          ? key.dataLimitBytes - key.usedBytes
+          : BigInt(0)
+        : null),
+  ].reduce<bigint>((sum, value) => (value === null ? sum : sum + value), BigInt(0));
+
+  const finiteQuotaCount = [...activeAccessKeys, ...activeDynamicKeys].filter(
+    (key) => key.dataLimitBytes && key.dataLimitBytes > BigInt(0),
+  ).length;
+  const dataLeftLabel =
+    finiteQuotaCount > 0 ? `${formatStoreRemainingGb(remainingBytes)} GB` : 'Unlimited';
+
+  const text = [
+    '📊 *Your Status*',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    `🔑 Active keys   :  ${escapeTelegramMarkdownV2(String(activeCount))}`,
+    `📅 Next expiry   :  ${escapeTelegramMarkdownV2(formatStoreStatusDate(expiries[0] || null))}`,
+    `📶 Data left     :  ${escapeTelegramMarkdownV2(dataLeftLabel)}`,
+  ].join('\n');
+
+  await sendTelegramMessage(input.botToken, input.chatId, text, {
+    parseMode: 'MarkdownV2',
+  });
+
+  return null;
+}
+
+export async function handleStoreSetupCommand(input: {
+  chatId: number;
+  telegramUserId: number;
+  botToken: string;
+}) {
+  const { items } = await loadTelegramStoreActiveKeysData({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+  });
+
+  if (items.length === 0) {
+    const view = buildTelegramStoreSetupNoKeyView();
+    return sendTelegramStoreView({
+      botToken: input.botToken,
+      chatId: input.chatId,
+      text: view.text,
+      replyMarkup: view.replyMarkup,
+    });
+  }
+
+  const view = buildTelegramStoreSetupHomeView();
+  return sendTelegramStoreView({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
+  });
+}
+
+export async function handleStoreSupportCommand(input: {
+  chatId: number;
+  locale: SupportedLocale;
+  botToken: string;
+}) {
+  const supportUrl = await getTelegramSupportLink();
+  const view = buildTelegramStoreSupportContactView({
+    locale: input.locale,
+    supportUrl,
+  });
+
+  return sendTelegramStoreView({
+    botToken: input.botToken,
+    chatId: input.chatId,
+    text: view.text,
+    replyMarkup: view.replyMarkup,
+  });
+}
+
+export async function handleStoreHelpCommand(input: {
+  chatId: number;
+  botToken: string;
+}) {
+  const supportUrl = await getTelegramSupportLink();
+  const view = buildTelegramStoreHelpView({ supportUrl });
+
   return sendTelegramStoreView({
     botToken: input.botToken,
     chatId: input.chatId,
@@ -747,7 +882,9 @@ export async function sendTelegramStoreSetupGuide(
 }
 
 export function getTelegramStoreSupportAlert(locale: SupportedLocale) {
-  return buildTelegramStoreSupportAlertText(locale);
+  return locale === 'my'
+    ? '💬 Support contact ကို ဖွင့်ရန် /support ကို အသုံးပြုပါ။'
+    : '💬 Use /support to open the support contact card.';
 }
 
 async function initiateServerSwitch(

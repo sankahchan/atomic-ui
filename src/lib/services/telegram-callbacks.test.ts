@@ -9,6 +9,7 @@ import {
   buildTelegramOrderReviewCallbackData,
   buildTelegramSupportQueueCallbackData,
   getCommandKeyboard,
+  getTelegramUserBotCommands,
   parseTelegramAdminKeyCallbackData,
   parseTelegramAdminRefundCallbackData,
   parseTelegramCommerceViewCallbackData,
@@ -25,8 +26,10 @@ test('getCommandKeyboard renders localized customer labels', () => {
 
   assert.equal(english.keyboard[0]?.[0]?.text, '🛒 Buy');
   assert.equal(english.keyboard[0]?.[1]?.text, '🗂 Keys');
-  assert.equal(english.keyboard[1]?.[0]?.text, '🎟 Offers');
-  assert.equal(english.keyboard[1]?.[1]?.text, '🔄 Renew');
+  assert.equal(english.keyboard[1]?.[0]?.text, '🔄 Renew');
+  assert.equal(english.keyboard[1]?.[1]?.text, '📊 Status');
+  assert.equal(english.keyboard[2]?.[0]?.text, '🌍 Switch Server');
+  assert.equal(english.keyboard[2]?.[1]?.text, '📲 Setup');
   assert.equal(english.keyboard.length, 5);
   assert.equal(myanmar.keyboard[0]?.[0]?.text, '🛒 ဝယ်မည်');
   assert.equal(myanmar.keyboard[0]?.[1]?.text, '🗂 Key များ');
@@ -37,10 +40,30 @@ test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back 
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛒 Buy', false), '/buy');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛒 Buy key', false), '/buy');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🗂 Key များ', false), '/mykeys');
-  assert.equal(normalizeTelegramReplyKeyboardCommand('🎟 Offers', false), '/offers');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('📊 Quick status', false), '/status');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🔄 Switch Server', false), '/switchserver');
-  assert.equal(normalizeTelegramReplyKeyboardCommand('🌐 Language', false), '/language');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('📲 Setup Guide', false), '/setup');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🎁 Refer a friend', false), '/referral');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛑 Cancel', false), '/cancel');
+});
+
+test('getTelegramUserBotCommands matches the registered storefront command surface', () => {
+  assert.deepEqual(
+    getTelegramUserBotCommands().map((command) => command.command),
+    [
+      'start',
+      'buy',
+      'mykeys',
+      'renew',
+      'status',
+      'switchserver',
+      'setup',
+      'referral',
+      'support',
+      'help',
+      'cancel',
+    ],
+  );
 });
 
 test('normalizeTelegramReplyKeyboardCommand keeps admin labels admin-only', () => {

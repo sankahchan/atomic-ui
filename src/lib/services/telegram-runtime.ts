@@ -17,6 +17,7 @@ import {
 } from '@/lib/services/telegram-domain-types';
 import { getJwtSecretString } from '@/lib/session-secret';
 import { escapeHtml } from '@/lib/services/telegram-ui';
+import { getTelegramUserBotCommands, type TelegramBotCommandDefinition } from '@/lib/services/telegram-callbacks';
 import {
   resolveTelegramWebhookSecret,
   TELEGRAM_WEBHOOK_SECRET_HEADER,
@@ -28,6 +29,7 @@ import {
 } from '@/lib/telegram-bot-settings';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
+const TELEGRAM_COMMAND_SYNC_SIGNATURE = new Map<string, string>();
 
 export type TelegramParseMode = 'HTML' | 'Markdown' | 'MarkdownV2';
 
@@ -46,6 +48,44 @@ export interface TelegramConfig {
   digestLookbackHours?: number;
   defaultLanguage?: SupportedLocale;
   showLanguageSelectorOnStart?: boolean;
+}
+
+async function setTelegramMyCommands(
+  botToken: string,
+  commands: TelegramBotCommandDefinition[],
+) {
+  const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/setMyCommands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      commands,
+    }),
+  });
+
+  if (!response.ok) {
+    let description = `setMyCommands failed with status ${response.status}`;
+    try {
+      const payload = (await response.json()) as { description?: string };
+      if (typeof payload.description === 'string' && payload.description.trim()) {
+        description = payload.description.trim();
+      }
+    } catch {
+      // Keep the fallback description.
+    }
+
+    throw new Error(description);
+  }
+}
+
+async function ensureTelegramMyCommands(botToken: string) {
+  const commands = getTelegramUserBotCommands();
+  const signature = JSON.stringify(commands);
+  if (TELEGRAM_COMMAND_SYNC_SIGNATURE.get(botToken) === signature) {
+    return;
+  }
+
+  await setTelegramMyCommands(botToken, commands);
+  TELEGRAM_COMMAND_SYNC_SIGNATURE.set(botToken, signature);
 }
 
 export interface SendMessageOptions {
@@ -516,6 +556,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
       );
 
       const webhookSecretToken = await ensurePersistedTelegramWebhookSecret(config);
+      await ensureTelegramMyCommands(config.botToken);
 
       return {
         botToken: config.botToken,
@@ -582,6 +623,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
           : [];
 
       if (botToken && adminChatIds.length > 0) {
+        await ensureTelegramMyCommands(botToken);
         return {
           botToken,
           botUsername:
