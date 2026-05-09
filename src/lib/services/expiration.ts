@@ -65,7 +65,7 @@ export async function checkExpirations(): Promise<ExpirationResult> {
             if (daysLeft > 3) {
                 continue;
             }
-            const nextStage = '3D';
+            const nextStage = daysLeft <= 1 ? '1D' : '3D';
 
             if (key.expirationWarningStage === nextStage) {
                 continue;

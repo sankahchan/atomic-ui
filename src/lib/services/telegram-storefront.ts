@@ -88,6 +88,9 @@ export type TelegramStoreKeyView = {
   switchesMaxLabel: string;
   renewPriceLabel: string | null;
   currentServerName: string;
+  usedBytes?: number;
+  totalBytes?: number | null;
+  expiresAt?: Date | null;
 };
 
 export type TelegramStoreSwitchKeyView = {
@@ -152,6 +155,7 @@ export type TelegramStoreGuideKeyData = {
 export type TelegramStoreCallbackPayload =
   | { action: 'show_plans' }
   | { action: 'main_menu' }
+  | { action: 'my_account' }
   | { action: 'support_contact' }
   | { action: 'help' }
   | { action: 'mykeys_home' }
@@ -168,7 +172,8 @@ export type TelegramStoreCallbackPayload =
   | { action: 'renew_plan'; planId: TelegramStorePlanId; keyId: string; kind: TelegramStoreKeyKind }
   | { action: 'switch'; keyId: string }
   | { action: 'switchkey'; keyId: string }
-  | { action: 'doswitch'; keyId: string; serverId: string };
+  | { action: 'doswitch'; keyId: string; serverId: string }
+  | { action: 'noop' };
 
 const STORE_PLAN_SPECS: TelegramStorePlanSpec[] = [
   {
@@ -576,7 +581,13 @@ export function progressBar(used: number, total: number, length = 10) {
 
   const pct = Math.min(Math.max(used / total, 0), 1);
   const filled = Math.max(0, Math.min(length, Math.round(pct * length)));
-  return `${'█'.repeat(filled)}${'░'.repeat(length - filled)} ${Math.round(pct * 100)}%`;
+  const block = pct <= 0.4 ? '🟩' : pct <= 0.7 ? '🟧' : '🟥';
+  return `${block.repeat(filled)}${'░'.repeat(length - filled)} ${Math.round(pct * 100)}%`;
+}
+
+export function usageBar(used: number, total: number, length = 10) {
+  const [bar] = progressBar(used, total, length).split(' ');
+  return `${bar || '░'.repeat(length)}  ${formatBytesToGbLabel(BigInt(Math.max(0, Math.round(used))))}/${formatBytesToGbLabel(BigInt(Math.max(0, Math.round(total))))}`;
 }
 
 export function formatStoreDate(date?: Date | null) {
@@ -693,6 +704,8 @@ export function buildTelegramStorefrontCallbackData(payload: TelegramStoreCallba
       return 'show_plans';
     case 'main_menu':
       return 'main_menu';
+    case 'my_account':
+      return 'my_account';
     case 'support_contact':
       return 'support';
     case 'help':
@@ -727,6 +740,8 @@ export function buildTelegramStorefrontCallbackData(payload: TelegramStoreCallba
       return `switchkey_${payload.keyId}`;
     case 'doswitch':
       return `doswitch_${payload.keyId}_${payload.serverId}`;
+    case 'noop':
+      return 'noop';
     default:
       return 'noop';
   }
@@ -742,6 +757,12 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
   }
   if (data === 'main_menu') {
     return { action: 'main_menu' };
+  }
+  if (data === 'my_account') {
+    return { action: 'my_account' };
+  }
+  if (data === 'noop') {
+    return { action: 'noop' };
   }
   if (data === 'support') {
     return { action: 'support_contact' };
@@ -1259,6 +1280,9 @@ export async function loadTelegramStoreActiveKeysData(input: {
           name: key.server?.name,
           countryCode: key.server?.countryCode,
         }),
+        usedBytes: used,
+        totalBytes: total || null,
+        expiresAt: key.expiresAt,
       };
     }),
     ...activeDynamic.map((key) => {
@@ -1288,11 +1312,50 @@ export async function loadTelegramStoreActiveKeysData(input: {
           name: currentServer?.name || null,
           countryCode: currentServer?.countryCode || null,
         }),
+        usedBytes: used,
+        totalBytes: total || null,
+        expiresAt: key.expiresAt,
       };
     }),
   ];
 
   return { plans, items };
+}
+
+export async function loadTelegramStoreAccountData(input: {
+  chatId: number;
+  telegramUserId: number;
+}) {
+  const { items } = await loadTelegramStoreActiveKeysData(input);
+  const nextExpiry = items
+    .map((item) => item.expiresAt)
+    .filter((date): date is Date => date instanceof Date)
+    .sort((left, right) => left.getTime() - right.getTime())[0] || null;
+
+  const finiteItems = items.filter((item) => item.totalBytes && item.totalBytes > 0);
+  const remainingBytes = finiteItems.reduce((sum, item) => {
+    const used = item.usedBytes || 0;
+    const total = item.totalBytes || 0;
+    return sum + Math.max(0, total - used);
+  }, 0);
+  const dataLeftLabel = finiteItems.length > 0
+    ? formatBytesToGbLabel(BigInt(Math.max(0, Math.round(remainingBytes))))
+    : 'Unlimited';
+  const primaryKey =
+    [...items]
+      .sort((left, right) => {
+        const leftTime = left.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY;
+        const rightTime = right.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY;
+        return leftTime - rightTime;
+      })[0] || null;
+
+  return {
+    activeKeyCount: items.length,
+    nextExpiryLabel: formatStoreDate(nextExpiry),
+    dataLeftLabel,
+    primaryKey,
+    items,
+  };
 }
 
 export async function loadTelegramStoreSwitchableKeysData(input: {
@@ -1558,7 +1621,10 @@ export function buildTelegramStoreMainMenuView(input: {
         [{ text: '⚡ Flash Plans    ·  30 Days  ·  🔄 3×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
         [{ text: '🌙 Season Plans   ·  90 Days  ·  🔄 5×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
         [{ text: '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [{ text: '💬 Live Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) }],
+        [
+          { text: '👤 My Account', callback_data: buildTelegramStorefrontCallbackData({ action: 'my_account' }) },
+          { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+        ],
       ],
     },
   };
@@ -1771,6 +1837,70 @@ export function buildTelegramStoreActiveKeysView(items: TelegramStoreKeyView[]) 
         [{ text: '➕  Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
       ],
     },
+  };
+}
+
+export function buildTelegramStoreMyAccountView(input: {
+  activeKeyCount: number;
+  nextExpiryLabel: string;
+  dataLeftLabel: string;
+  primaryKey?: TelegramStoreKeyView | null;
+}) {
+  const lines = [
+    '👤 *My Account*',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    `🔑 Active keys   :  ${escapeTelegramMarkdownV2(String(input.activeKeyCount))}`,
+    `📅 Next expiry   :  ${escapeTelegramMarkdownV2(input.nextExpiryLabel)}`,
+    `📶 Data left     :  ${escapeTelegramMarkdownV2(input.dataLeftLabel)}`,
+  ];
+
+  if (input.primaryKey) {
+    const primaryBar = input.primaryKey.totalBytes && input.primaryKey.totalBytes > 0
+      ? usageBar(input.primaryKey.usedBytes || 0, input.primaryKey.totalBytes)
+      : `${input.primaryKey.progressBar}  ${input.primaryKey.percentLabel}`;
+    lines.push(
+      '',
+      `📦 *${escapeTelegramMarkdownV2(input.primaryKey.planName)}*  ·  ${escapeTelegramMarkdownV2(input.primaryKey.categoryLabel)}`,
+      `📶 ${escapeTelegramMarkdownV2(input.primaryKey.usedLabel)} / ${escapeTelegramMarkdownV2(input.primaryKey.totalLabel)}`,
+      `   ${escapeTelegramMarkdownV2(primaryBar)}`,
+      `🕐 Expires: ${escapeTelegramMarkdownV2(input.primaryKey.expiryLabel)}`,
+    );
+  } else {
+    lines.push('', 'No active keys yet\\.');
+  }
+
+  return {
+    text: lines.join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
+          { text: '🔄 Renew', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
+        ],
+        [
+          { text: '📲 Setup', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }) },
+          { text: '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+        ],
+        [{ text: '🏠 Main Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreQuickStatusView(input: {
+  activeKeyCount: number;
+  nextExpiryLabel: string;
+  dataLeftLabel: string;
+}) {
+  return {
+    text: [
+      '📊 *Your Status*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      `🔑 Active keys   :  ${escapeTelegramMarkdownV2(String(input.activeKeyCount))}`,
+      `📅 Next expiry   :  ${escapeTelegramMarkdownV2(input.nextExpiryLabel)}`,
+      `📶 Data left     :  ${escapeTelegramMarkdownV2(input.dataLeftLabel)}`,
+    ].join('\n'),
   };
 }
 
@@ -2296,31 +2426,40 @@ export function buildTelegramStoreExpiryReminderView(input: {
   plan: TelegramStoreResolvedPlan | null;
   renewTarget?: TelegramStoreRenewTarget | null;
   sameDay?: boolean;
+  daysLeft?: number | null;
+  dataRemainingLabel?: string | null;
 }) {
   const renewCallbackData = buildTelegramStoreRenewCallbackData({
     plan: input.plan,
     renewTarget: input.renewTarget,
   });
+  const daysLeft = Math.max(0, input.daysLeft ?? (input.sameDay ? 0 : 3));
+  const daysLeftLabel = daysLeft === 0
+    ? 'today'
+    : `${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
 
   return {
     text: [
-      input.sameDay ? '⚠️ *Plan Expires Today\\!*' : '📅 *Plan Expiring Soon\\!*',
+      input.sameDay ? '⚠️ *Plan Expires Today\\!*' : '⏰ *Plan Expiring Soon\\!*',
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
       input.sameDay
         ? `Your *${escapeTelegramMarkdownV2(input.planName)}* expires today,`
-        : `Hey ${escapeTelegramMarkdownV2(input.firstName)}\\! Your *${escapeTelegramMarkdownV2(input.planName)}* plan`,
+        : `Your *${escapeTelegramMarkdownV2(input.planName)}* expires in *${escapeTelegramMarkdownV2(daysLeftLabel)}*\\.`,
       input.sameDay
         ? `*${escapeTelegramMarkdownV2(input.firstName)}*\\. Renew now to stay connected\\.`
-        : `expires on *${escapeTelegramMarkdownV2(input.expiryLabel)}*\\.`,
-      ...(input.sameDay ? [] : ['', "Don't lose your access\\!"]),
+        : 'Renew now to stay connected\\.',
+      '',
+      `📶 Data remaining  :  ${escapeTelegramMarkdownV2(input.dataRemainingLabel || '—')}`,
+      `⏳ Days left       :  ${escapeTelegramMarkdownV2(daysLeftLabel)}`,
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: input.sameDay
         ? [[{ text: `🔄 Renew Now — ${input.priceLabel}`, callback_data: renewCallbackData }]]
         : [
             [{ text: `🔄 Renew Now — ${input.priceLabel}`, callback_data: renewCallbackData }],
-            [{ text: '🔍 See All Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+            [{ text: '📦 View All Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+            [{ text: 'Remind me later', callback_data: buildTelegramStorefrontCallbackData({ action: 'noop' }) }],
           ],
     },
   };

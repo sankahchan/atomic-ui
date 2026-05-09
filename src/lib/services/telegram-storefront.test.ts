@@ -3,16 +3,21 @@ import assert from 'node:assert/strict';
 
 import {
   buildTelegramStoreActiveKeysView,
+  buildTelegramStoreExpiryReminderView,
   buildTelegramStoreKeyPageView,
   buildTelegramStoreOrderConfirmedView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
   buildTelegramStoreTrialKeyPageView,
   buildTelegramStoreMainMenuView,
+  buildTelegramStoreMyAccountView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
+  buildTelegramStoreQuickStatusView,
   buildTelegramStorefrontCallbackData,
   parseTelegramStorefrontCallbackData,
+  progressBar,
+  usageBar,
   type TelegramStoreResolvedPlan,
 } from '@/lib/services/telegram-storefront';
 
@@ -215,9 +220,56 @@ test('store main menu matches the paid storefront button layout', () => {
       '⚡ Flash Plans    ·  30 Days  ·  🔄 3×',
       '🌙 Season Plans   ·  90 Days  ·  🔄 5×',
       '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞',
-      '💬 Live Support',
+      '👤 My Account',
     ],
   );
+});
+
+test('store usage bars use color semantics and account summary stays compact', () => {
+  assert.equal(progressBar(20, 100), '🟩🟩░░░░░░░░ 20%');
+  assert.equal(progressBar(60, 100), '🟧🟧🟧🟧🟧🟧░░░░ 60%');
+  assert.equal(progressBar(80, 100), '🟥🟥🟥🟥🟥🟥🟥🟥░░ 80%');
+  assert.equal(usageBar(40 * 1024 * 1024 * 1024, 100 * 1024 * 1024 * 1024), '🟩🟩🟩🟩░░░░░░  40 GB/100 GB');
+
+  const account = buildTelegramStoreMyAccountView({
+    activeKeyCount: 1,
+    nextExpiryLabel: '02 Jun 2026',
+    dataLeftLabel: '120 GB',
+    primaryKey: {
+      id: 'key_1',
+      kind: 'access',
+      planId: 'plan_pro',
+      planName: '💎 Pro',
+      categoryLabel: 'Flash',
+      usedLabel: '80 GB',
+      totalLabel: '200 GB',
+      progressBar: '🟩🟩🟩🟩░░░░░░',
+      percentLabel: '40%',
+      expiryLabel: '02 Jun 2026',
+      switchesUsed: 0,
+      switchesMaxLabel: '3',
+      renewPriceLabel: '7,000 Ks',
+      currentServerName: 'SG 🇸🇬',
+      usedBytes: 80 * 1024 * 1024 * 1024,
+      totalBytes: 200 * 1024 * 1024 * 1024,
+      expiresAt: new Date('2026-06-02T00:00:00Z'),
+    },
+  });
+
+  assert.match(account.text, /👤 \*My Account\*/);
+  assert.match(account.text, /🔑 Active keys   :  1/);
+  assert.match(account.text, /📶 Data left     :  120 GB/);
+  assert.match(account.text, /🟩🟩🟩🟩░░░░░░  80 GB\/200 GB/);
+  assert.equal(account.replyMarkup.inline_keyboard[0]?.[0]?.text, '🔑 My Keys');
+  assert.equal(account.replyMarkup.inline_keyboard[1]?.[0]?.text, '📲 Setup');
+
+  const status = buildTelegramStoreQuickStatusView({
+    activeKeyCount: 1,
+    nextExpiryLabel: '02 Jun 2026',
+    dataLeftLabel: '120 GB',
+  });
+  assert.match(status.text, /📊 \*Your Status\*/);
+  assert.match(status.text, /📶 Data left     :  120 GB/);
 });
 
 test('store plan list keeps the fixed 9-plan catalog and dynamic ultra pricing', () => {
@@ -228,6 +280,30 @@ test('store plan list keeps the fixed 9-plan catalog and dynamic ultra pricing',
   assert.match(view.text, /★ Popular  ·  ★★ Best Deal/);
   assert.equal(view.replyMarkup.inline_keyboard[0]?.[0]?.text, '1️⃣ 🪨 Basic');
   assert.equal(view.replyMarkup.inline_keyboard[2]?.[2]?.text, '9️⃣ 🚀 Ultra ★★');
+});
+
+test('store expiry reminders include data remaining, days left, and remind-later action', () => {
+  const reminder = buildTelegramStoreExpiryReminderView({
+    firstName: 'Sankha',
+    planName: '💎 Pro',
+    expiryLabel: '02 Jun 2026',
+    priceLabel: '8,800 Ks',
+    plan: samplePlans[1]!,
+    daysLeft: 3,
+    dataRemainingLabel: '80 GB',
+  });
+
+  assert.match(reminder.text, /Plan Expiring Soon/);
+  assert.match(reminder.text, /expires in \*3 days\*/);
+  assert.match(reminder.text, /📶 Data remaining  :  80 GB/);
+  assert.match(reminder.text, /⏳ Days left       :  3 days/);
+  assert.equal(reminder.replyMarkup.inline_keyboard[0]?.[0]?.text, '🔄 Renew Now — 8,800 Ks');
+  assert.equal(reminder.replyMarkup.inline_keyboard[1]?.[0]?.text, '📦 View All Plans');
+  assert.equal(reminder.replyMarkup.inline_keyboard[2]?.[0]?.text, 'Remind me later');
+  assert.equal(
+    reminder.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'noop' }),
+  );
 });
 
 test('store order summary and active keys keep the polished storefront labels', () => {
@@ -392,6 +468,8 @@ test('store setup guide platform select and platform screens keep key-specific c
 });
 
 test('storefront callback parser handles setup-guide platform routes', () => {
+  assert.deepEqual(parseTelegramStorefrontCallbackData('my_account'), { action: 'my_account' });
+  assert.deepEqual(parseTelegramStorefrontCallbackData('noop'), { action: 'noop' });
   assert.deepEqual(
     parseTelegramStorefrontCallbackData('setup_guide_key_123'),
     { action: 'setup_guide', keyId: 'key_123' },
