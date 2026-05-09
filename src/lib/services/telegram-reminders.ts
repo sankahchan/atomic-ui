@@ -77,6 +77,20 @@ async function resolveTelegramStoreRenewPlanContext(input: TelegramStoreRenewTar
   };
 }
 
+function formatRemainingDataLabel(input: {
+  usedBytes?: bigint | null;
+  dataLimitBytes?: bigint | null;
+}) {
+  if (!input.dataLimitBytes || input.dataLimitBytes <= BigInt(0)) {
+    return 'Unlimited';
+  }
+
+  const remaining = input.dataLimitBytes > (input.usedBytes || BigInt(0))
+    ? input.dataLimitBytes - (input.usedBytes || BigInt(0))
+    : BigInt(0);
+  return formatBytes(Number(remaining));
+}
+
 function isSameLocalDay(left: Date, right: Date) {
   return (
     left.getFullYear() === right.getFullYear() &&
@@ -291,6 +305,11 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
       plan,
       renewTarget,
       sameDay: input.type === 'EXPIRED',
+      daysLeft: input.daysLeft,
+      dataRemainingLabel: formatRemainingDataLabel({
+        usedBytes: key.usedBytes,
+        dataLimitBytes: key.dataLimitBytes,
+      }),
     });
 
     await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {
@@ -616,6 +635,11 @@ export async function sendDynamicKeyRenewalReminder(input: {
     plan,
     renewTarget,
     sameDay: false,
+    daysLeft: input.daysLeft,
+    dataRemainingLabel: formatRemainingDataLabel({
+      usedBytes: key.usedBytes,
+      dataLimitBytes: key.dataLimitBytes,
+    }),
   });
 
   await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {
@@ -678,6 +702,11 @@ export async function sendDynamicKeyExpiryTelegramNotification(input: {
     plan,
     renewTarget,
     sameDay: true,
+    daysLeft: 0,
+    dataRemainingLabel: formatRemainingDataLabel({
+      usedBytes: key.usedBytes,
+      dataLimitBytes: key.dataLimitBytes,
+    }),
   });
 
   await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {

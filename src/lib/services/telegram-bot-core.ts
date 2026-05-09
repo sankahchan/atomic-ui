@@ -317,6 +317,7 @@ import {
   buildTelegramStoreHelpView,
   buildTelegramStoreKeyPageView,
   buildTelegramStoreMainMenuView,
+  buildTelegramStoreMyAccountView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
   buildTelegramStorePlatformGuideView,
@@ -335,6 +336,7 @@ import {
   createTelegramStoreSummaryOrder,
   escapeTelegramMarkdownV2,
   findTelegramStorePlanById,
+  loadTelegramStoreAccountData,
   loadTelegramStoreActiveKeysData,
   loadTelegramStoreGuideKeyData,
   loadTelegramStoreMainMenuData,
@@ -6626,6 +6628,21 @@ export async function handleTelegramCallbackQuery(
           await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;
         }
+        case 'my_account': {
+          const view = buildTelegramStoreMyAccountView(await loadTelegramStoreAccountData({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+          }));
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
         case 'mykeys_home': {
           const { items } = await loadTelegramStoreActiveKeysData({
             chatId,
@@ -6731,6 +6748,10 @@ export async function handleTelegramCallbackQuery(
             text: view.text,
             replyMarkup: view.replyMarkup,
           });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
+        case 'noop': {
           await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;
         }

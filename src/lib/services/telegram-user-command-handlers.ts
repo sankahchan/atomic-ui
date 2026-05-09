@@ -50,6 +50,7 @@ import {
   buildTelegramStoreActiveKeysView,
   buildTelegramStoreHelpView,
   buildTelegramStorePlanListView,
+  buildTelegramStoreQuickStatusView,
   buildTelegramStoreReferralView,
   buildTelegramStoreRenewView,
   buildTelegramStoreSetupHomeView,
@@ -62,12 +63,12 @@ import {
   buildTelegramStoreSwitchServerSelectionView,
   buildTelegramStorefrontCallbackData,
   escapeTelegramMarkdownV2,
+  loadTelegramStoreAccountData,
   loadTelegramStoreActiveKeysData,
   loadTelegramStoreRenewData,
   loadTelegramStoreSwitchServerOptions,
   loadTelegramStoreSwitchableKeysData,
 } from '@/lib/services/telegram-storefront';
-import { findLinkedAccessKeys, findLinkedDynamicAccessKeys } from '@/lib/services/telegram-keys';
 
 export { handleTelegramStartCommand as handleStartCommand };
 
@@ -528,78 +529,18 @@ export async function handleStoreMyKeysCommand(input: {
   });
 }
 
-function formatStoreStatusDate(date: Date | null) {
-  if (!date) {
-    return '—';
-  }
-
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function formatStoreRemainingGb(bytes: bigint) {
-  const gb = Number(bytes) / (1024 * 1024 * 1024);
-  if (gb >= 100) {
-    return gb.toFixed(0);
-  }
-  if (gb >= 10) {
-    return gb.toFixed(1);
-  }
-  return gb.toFixed(2);
-}
-
 export async function handleStoreStatusCommand(input: {
   chatId: number;
   telegramUserId: number;
   botToken: string;
 }) {
-  const [accessKeys, dynamicKeys] = await Promise.all([
-    findLinkedAccessKeys(input.chatId, input.telegramUserId, false),
-    findLinkedDynamicAccessKeys(input.chatId, input.telegramUserId, false),
-  ]);
+  const account = await loadTelegramStoreAccountData({
+    chatId: input.chatId,
+    telegramUserId: input.telegramUserId,
+  });
+  const view = buildTelegramStoreQuickStatusView(account);
 
-  const activeAccessKeys = accessKeys.filter((key) => key.status === 'ACTIVE');
-  const activeDynamicKeys = dynamicKeys.filter((key) => key.status === 'ACTIVE');
-  const activeCount = activeAccessKeys.length + activeDynamicKeys.length;
-
-  const expiries = [
-    ...activeAccessKeys.map((key) => key.expiresAt).filter((date): date is Date => Boolean(date)),
-    ...activeDynamicKeys.map((key) => key.expiresAt).filter((date): date is Date => Boolean(date)),
-  ].sort((left, right) => left.getTime() - right.getTime());
-
-  const remainingBytes = [
-    ...activeAccessKeys.map((key) =>
-      key.dataLimitBytes && key.dataLimitBytes > BigInt(0)
-        ? key.dataLimitBytes - key.usedBytes > BigInt(0)
-          ? key.dataLimitBytes - key.usedBytes
-          : BigInt(0)
-        : null),
-    ...activeDynamicKeys.map((key) =>
-      key.dataLimitBytes && key.dataLimitBytes > BigInt(0)
-        ? key.dataLimitBytes - key.usedBytes > BigInt(0)
-          ? key.dataLimitBytes - key.usedBytes
-          : BigInt(0)
-        : null),
-  ].reduce<bigint>((sum, value) => (value === null ? sum : sum + value), BigInt(0));
-
-  const finiteQuotaCount = [...activeAccessKeys, ...activeDynamicKeys].filter(
-    (key) => key.dataLimitBytes && key.dataLimitBytes > BigInt(0),
-  ).length;
-  const dataLeftLabel =
-    finiteQuotaCount > 0 ? `${formatStoreRemainingGb(remainingBytes)} GB` : 'Unlimited';
-
-  const text = [
-    '📊 *Your Status*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `🔑 Active keys   :  ${escapeTelegramMarkdownV2(String(activeCount))}`,
-    `📅 Next expiry   :  ${escapeTelegramMarkdownV2(formatStoreStatusDate(expiries[0] || null))}`,
-    `📶 Data left     :  ${escapeTelegramMarkdownV2(dataLeftLabel)}`,
-  ].join('\n');
-
-  await sendTelegramMessage(input.botToken, input.chatId, text, {
+  await sendTelegramMessage(input.botToken, input.chatId, view.text, {
     parseMode: 'MarkdownV2',
   });
 
