@@ -1923,7 +1923,7 @@ export function buildTelegramStoreSwitchKeySelectionView(items: TelegramStoreSwi
             }),
           },
         ]),
-        [{ text: '◀ Back', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
+        [{ text: '◀ Back', callback_data: buildTelegramStorefrontCallbackData({ action: 'switch_home' }) }],
       ],
     },
   };
@@ -1950,13 +1950,57 @@ export function buildTelegramStoreSwitchServerSelectionView(input: {
           {
             text: `🟢 ${server.flag} ${server.name}  ·  ${server.location}`,
             callback_data: buildTelegramStorefrontCallbackData({
-              action: 'doswitch',
+              action: 'confirm_switch',
               keyId: input.keyId,
               serverId: server.id,
             }),
           },
         ]),
         [{ text: '◀ Back', callback_data: buildTelegramStorefrontCallbackData({ action: 'switch', keyId: input.keyId }) }],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreSwitchConfirmationView(input: {
+  keyId: string;
+  currentServer: string;
+  newServer: string;
+  newServerId: string;
+  used: number;
+  maxLabel: string;
+}) {
+  return {
+    text: [
+      '⚠️ *Confirm Server Switch*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      `From: *${escapeTelegramMarkdownV2(input.currentServer)}*`,
+      `To  : *${escapeTelegramMarkdownV2(input.newServer)}*`,
+      '',
+      `Used: ${escapeTelegramMarkdownV2(String(input.used))} / ${escapeTelegramMarkdownV2(input.maxLabel)} switches`,
+      '',
+      'Are you sure you want to switch? This action cannot be undone.',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: '✅ Yes, Switch',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'doswitch',
+              keyId: input.keyId,
+              serverId: input.newServerId,
+            }),
+          },
+          {
+            text: '❌ Cancel',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'switch',
+              keyId: input.keyId,
+            }),
+          },
+        ],
       ],
     },
   };

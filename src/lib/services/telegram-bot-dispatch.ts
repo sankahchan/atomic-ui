@@ -374,7 +374,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         });
       }
 
-      return '✖️ Cancelled\\. Use /start to begin again\\.';
+      return '✖️ Cancelled. Use /start to restart.';
     }
     default:
       return handleTelegramUpdateCore(update);

@@ -200,7 +200,7 @@ export async function handleTelegramStartCommand(input: {
                 : '❌ You cannot use your own referral code.'
               : locale === 'my'
                 ? '❌ Referral code ကို မတွေ့ပါ။'
-                : '❌ Referral code was not found.';
+                : '❌ Referral code not found. Please check the code or try /referral for more options.';
 
       await sendTelegramMessage(input.botToken, input.chatId, referralMessage, {
         replyMarkup: getCommandKeyboard(input.isAdmin, locale),

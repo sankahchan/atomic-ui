@@ -7233,6 +7233,53 @@ export async function handleTelegramCallbackQuery(
           await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
           return null;
         }
+        case 'confirm_switch': {
+          const { keys } = await loadTelegramStoreSwitchableKeysData({
+            chatId,
+            telegramUserId: callbackQuery.from.id,
+          });
+          const key = keys.find((candidate) => candidate.id === storefrontAction.keyId) || null;
+          if (!key) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'Switchable key ကို မတွေ့ပါ။' : 'Switchable key not found.',
+            );
+            return null;
+          }
+
+          const serverOptions = await loadTelegramStoreSwitchServerOptions({
+            keyId: key.id,
+            kind: key.kind,
+          });
+          const targetServer = serverOptions?.servers.find((s) => s.id === storefrontAction.serverId);
+          if (!targetServer) {
+            await answerTelegramCallbackQuery(
+              config.botToken,
+              callbackQuery.id,
+              locale === 'my' ? 'Server ကို မတွေ့ပါ။' : 'Server not found.',
+            );
+            return null;
+          }
+
+          const view = buildTelegramStoreSwitchConfirmationView({
+            keyId: key.id,
+            currentServer: serverOptions.currentServerName,
+            newServer: targetServer.name,
+            newServerId: targetServer.id,
+            used: serverOptions.switchesUsed,
+            maxLabel: key.switchesMaxLabel,
+          });
+          await sendOrEditTelegramMarkdownView({
+            botToken: config.botToken,
+            chatId,
+            messageId,
+            text: view.text,
+            replyMarkup: view.replyMarkup,
+          });
+          await answerTelegramCallbackQuery(config.botToken, callbackQuery.id);
+          return null;
+        }
         case 'doswitch': {
           const { keys } = await loadTelegramStoreSwitchableKeysData({
             chatId,
