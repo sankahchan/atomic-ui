@@ -328,6 +328,7 @@ import {
   buildTelegramStoreSetupKeyPickerView,
   buildTelegramStoreSetupNoKeyView,
   buildTelegramStoreSupportContactView,
+  buildTelegramStoreSwitchConfirmationView,
   buildTelegramStoreSwitchKeySelectionView,
   buildTelegramStoreSwitchLimitReachedView,
   buildTelegramStoreSwitchServerSelectionView,
@@ -7253,7 +7254,7 @@ export async function handleTelegramCallbackQuery(
             kind: key.kind,
           });
           const targetServer = serverOptions?.servers.find((s) => s.id === storefrontAction.serverId);
-          if (!targetServer) {
+          if (!serverOptions || !targetServer) {
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
