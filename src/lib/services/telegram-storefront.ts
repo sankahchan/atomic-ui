@@ -172,6 +172,7 @@ export type TelegramStoreCallbackPayload =
   | { action: 'renew_plan'; planId: TelegramStorePlanId; keyId: string; kind: TelegramStoreKeyKind }
   | { action: 'switch'; keyId: string }
   | { action: 'switchkey'; keyId: string }
+  | { action: 'confirm_switch'; keyId: string; serverId: string }
   | { action: 'doswitch'; keyId: string; serverId: string }
   | { action: 'noop' };
 
@@ -738,6 +739,8 @@ export function buildTelegramStorefrontCallbackData(payload: TelegramStoreCallba
       return `switch_${payload.keyId}`;
     case 'switchkey':
       return `switchkey_${payload.keyId}`;
+    case 'confirm_switch':
+      return `confirm_switch_${payload.keyId}_${payload.serverId}`;
     case 'doswitch':
       return `doswitch_${payload.keyId}_${payload.serverId}`;
     case 'noop':
@@ -800,6 +803,17 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
     const keyId = data.slice('platform_select_'.length).trim();
     if (keyId) {
       return { action: 'platform_select', keyId };
+    }
+  }
+
+  if (data.startsWith('confirm_switch_')) {
+    const parts = data.slice('confirm_switch_'.length).split('_');
+    if (parts.length === 2) {
+      return {
+        action: 'confirm_switch',
+        keyId: parts[0],
+        serverId: parts[1],
+      };
     }
   }
 
@@ -1950,13 +1964,57 @@ export function buildTelegramStoreSwitchServerSelectionView(input: {
           {
             text: `🟢 ${server.flag} ${server.name}  ·  ${server.location}`,
             callback_data: buildTelegramStorefrontCallbackData({
-              action: 'doswitch',
+              action: 'confirm_switch',
               keyId: input.keyId,
               serverId: server.id,
             }),
           },
         ]),
         [{ text: '◀ Back', callback_data: buildTelegramStorefrontCallbackData({ action: 'switch', keyId: input.keyId }) }],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreSwitchConfirmationView(input: {
+  keyId: string;
+  currentServer: string;
+  newServer: string;
+  newServerId: string;
+  used: number;
+  maxLabel: string;
+}) {
+  return {
+    text: [
+      '⚠️ *Confirm Server Switch*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      `From: *${escapeTelegramMarkdownV2(input.currentServer)}*`,
+      `To  : *${escapeTelegramMarkdownV2(input.newServer)}*`,
+      '',
+      `Used: ${escapeTelegramMarkdownV2(String(input.used))} / ${escapeTelegramMarkdownV2(input.maxLabel)} switches`,
+      '',
+      'Are you sure you want to switch? This action cannot be undone.',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: '✅ Yes, Switch',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'doswitch',
+              keyId: input.keyId,
+              serverId: input.newServerId,
+            }),
+          },
+          {
+            text: '❌ Cancel',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'switch',
+              keyId: input.keyId,
+            }),
+          },
+        ],
       ],
     },
   };
