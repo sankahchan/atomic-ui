@@ -807,13 +807,18 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
   }
 
   if (data.startsWith('confirm_switch_')) {
-    const parts = data.slice('confirm_switch_'.length).split('_');
-    if (parts.length === 2) {
-      return {
-        action: 'confirm_switch',
-        keyId: parts[0],
-        serverId: parts[1],
-      };
+    const remainder = data.slice('confirm_switch_'.length);
+    const splitAt = remainder.indexOf('_');
+    if (splitAt > 0) {
+      const keyId = remainder.slice(0, splitAt).trim();
+      const serverId = remainder.slice(splitAt + 1).trim();
+      if (keyId && serverId) {
+        return {
+          action: 'confirm_switch',
+          keyId,
+          serverId,
+        };
+      }
     }
   }
 
@@ -1994,7 +1999,7 @@ export function buildTelegramStoreSwitchConfirmationView(input: {
       '',
       `Used: ${escapeTelegramMarkdownV2(String(input.used))} / ${escapeTelegramMarkdownV2(input.maxLabel)} switches`,
       '',
-      'Are you sure you want to switch? This action cannot be undone.',
+      'Are you sure you want to switch? This action cannot be undone\\.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [

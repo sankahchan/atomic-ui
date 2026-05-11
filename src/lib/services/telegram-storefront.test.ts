@@ -8,6 +8,7 @@ import {
   buildTelegramStoreOrderConfirmedView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
+  buildTelegramStoreSwitchConfirmationView,
   buildTelegramStoreTrialKeyPageView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreMyAccountView,
@@ -485,5 +486,37 @@ test('storefront callback parser handles setup-guide platform routes', () => {
   assert.deepEqual(
     parseTelegramStorefrontCallbackData('key_page_key_123'),
     { action: 'key_page', keyId: 'key_123' },
+  );
+});
+
+test('storefront callback parser round-trips switch confirmation actions', () => {
+  const callbackData = buildTelegramStorefrontCallbackData({
+    action: 'confirm_switch',
+    keyId: 'cmabc123',
+    serverId: 'server_456_region',
+  });
+
+  assert.equal(callbackData, 'confirm_switch_cmabc123_server_456_region');
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData(callbackData),
+    { action: 'confirm_switch', keyId: 'cmabc123', serverId: 'server_456_region' },
+  );
+});
+
+test('store switch confirmation message is safe for MarkdownV2', () => {
+  const confirmation = buildTelegramStoreSwitchConfirmationView({
+    keyId: 'key_123',
+    currentServer: 'SG-2',
+    newServer: 'Malaysia',
+    newServerId: 'server_456',
+    used: 1,
+    maxLabel: '3',
+  });
+
+  assert.match(confirmation.text, /SG\\-2/);
+  assert.match(confirmation.text, /undone\\\./);
+  assert.equal(
+    confirmation.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'doswitch', keyId: 'key_123', serverId: 'server_456' }),
   );
 });
