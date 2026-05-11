@@ -296,7 +296,7 @@ export function buildTelegramOrdersSummaryMessage(input: {
       [
         escapeHtml(buildTelegramCompactOrderStateLine(order, ui)),
         `${ui.statusLineLabel}: ${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}`,
-        buildTelegramOrderProgressSummary({ order, locale: input.locale }),
+        escapeHtml(buildTelegramOrderProgressSummary({ order, locale: input.locale })),
         `<b>Step ${order.status === 'AWAITING_SERVER_SELECTION' ? '1' : order.status === 'AWAITING_PAYMENT_METHOD' ? '2' : order.status === 'AWAITING_PAYMENT_PROOF' ? '3' : '4'} of 4</b>`,
       ],
     ),
