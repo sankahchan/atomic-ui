@@ -119,6 +119,7 @@ async function sendBandwidthAlert(
       kind: key.type === 'premium' ? 'dynamic' : 'access',
       keyId: key.id,
     },
+    locale: locale === 'my' ? 'my' : 'en',
   });
 
   try {

@@ -227,7 +227,7 @@ export async function handleStoreBuyCommand(
     chatId,
     telegramUserId,
   });
-  const view = buildTelegramStorePlanListView(plans);
+  const view = buildTelegramStorePlanListView(plans, locale);
 
   return sendTelegramStoreView({
     botToken,
@@ -315,6 +315,7 @@ export async function handleReferralCommand(
     telegramUserId,
     count: summary.fulfilledOrders,
     bonusGb: 0,
+    locale,
   });
 
   const botToken = config?.botToken;
@@ -462,7 +463,7 @@ export async function handleStoreRenewCommand(
   });
 
   if (!plan) {
-    const planList = buildTelegramStorePlanListView(plans);
+    const planList = buildTelegramStorePlanListView(plans, locale);
     return sendTelegramStoreView({
       botToken,
       chatId,
@@ -474,6 +475,7 @@ export async function handleStoreRenewCommand(
   const view = buildTelegramStoreRenewView({
     plan,
     renewTarget,
+    locale,
   });
 
   return sendTelegramStoreView({
@@ -493,16 +495,17 @@ export async function handleStoreMyKeysCommand(input: {
   const { items } = await loadTelegramStoreActiveKeysData({
     chatId: input.chatId,
     telegramUserId: input.telegramUserId,
+    locale: input.locale,
   });
 
   if (items.length === 0) {
     const text = [
-      '🔑 *Your Active Keys*',
+      input.locale === 'my' ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      'No active keys right now\\.',
+      input.locale === 'my' ? 'အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'No active keys right now\\.',
       '',
-      'Tap below to buy a new plan\\.',
+      input.locale === 'my' ? 'အောက်မှ နှိပ်ပြီး plan အသစ်ဝယ်ပါ\\.' : 'Tap below to buy a new plan\\.',
     ].join('\n');
 
     return sendTelegramStoreView({
@@ -512,7 +515,7 @@ export async function handleStoreMyKeysCommand(input: {
       replyMarkup: {
         inline_keyboard: [[
           {
-            text: '➕ Buy New Plan',
+            text: input.locale === 'my' ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan',
             callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
           },
         ]],
@@ -520,7 +523,7 @@ export async function handleStoreMyKeysCommand(input: {
     });
   }
 
-  const view = buildTelegramStoreActiveKeysView(items);
+  const view = buildTelegramStoreActiveKeysView(items, input.locale);
   return sendTelegramStoreView({
     botToken: input.botToken,
     chatId: input.chatId,
@@ -532,13 +535,18 @@ export async function handleStoreMyKeysCommand(input: {
 export async function handleStoreStatusCommand(input: {
   chatId: number;
   telegramUserId: number;
+  locale: SupportedLocale;
   botToken: string;
 }) {
   const account = await loadTelegramStoreAccountData({
     chatId: input.chatId,
     telegramUserId: input.telegramUserId,
+    locale: input.locale,
   });
-  const view = buildTelegramStoreQuickStatusView(account);
+  const view = buildTelegramStoreQuickStatusView({
+    ...account,
+    locale: input.locale,
+  });
 
   await sendTelegramMessage(input.botToken, input.chatId, view.text, {
     parseMode: 'MarkdownV2',
@@ -550,15 +558,17 @@ export async function handleStoreStatusCommand(input: {
 export async function handleStoreSetupCommand(input: {
   chatId: number;
   telegramUserId: number;
+  locale: SupportedLocale;
   botToken: string;
 }) {
   const { items } = await loadTelegramStoreActiveKeysData({
     chatId: input.chatId,
     telegramUserId: input.telegramUserId,
+    locale: input.locale,
   });
 
   if (items.length === 0) {
-    const view = buildTelegramStoreSetupNoKeyView();
+    const view = buildTelegramStoreSetupNoKeyView(input.locale);
     return sendTelegramStoreView({
       botToken: input.botToken,
       chatId: input.chatId,
@@ -567,7 +577,7 @@ export async function handleStoreSetupCommand(input: {
     });
   }
 
-  const view = buildTelegramStoreSetupHomeView();
+  const view = buildTelegramStoreSetupHomeView(input.locale);
   return sendTelegramStoreView({
     botToken: input.botToken,
     chatId: input.chatId,
@@ -597,10 +607,14 @@ export async function handleStoreSupportCommand(input: {
 
 export async function handleStoreHelpCommand(input: {
   chatId: number;
+  locale: SupportedLocale;
   botToken: string;
 }) {
   const supportUrl = await getTelegramSupportLink();
-  const view = buildTelegramStoreHelpView({ supportUrl });
+  const view = buildTelegramStoreHelpView({
+    locale: input.locale,
+    supportUrl,
+  });
 
   return sendTelegramStoreView({
     botToken: input.botToken,
@@ -710,10 +724,10 @@ export async function handleStoreSwitchServerCommand(input: {
 
   if (keys.length === 0) {
     const text = [
-      '🔄 *Switch Server*',
+      input.locale === 'my' ? '🔄 *Server ပြောင်းမည်*' : '🔄 *Switch Server*',
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      'No switchable active keys found\\.',
+      input.locale === 'my' ? 'Server ပြောင်းနိုင်သော အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'No switchable active keys found\\.',
     ].join('\n');
 
     return sendTelegramStoreView({
@@ -723,7 +737,7 @@ export async function handleStoreSwitchServerCommand(input: {
       replyMarkup: {
         inline_keyboard: [[
           {
-            text: '◀ Back',
+            text: input.locale === 'my' ? '◀ ပြန်မည်' : '◀ Back',
             callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
           },
         ]],
@@ -745,6 +759,7 @@ export async function handleStoreSwitchServerCommand(input: {
       const limitView = buildTelegramStoreSwitchLimitReachedView({
         max: matchedKey.switchesMaxLabel,
         planName: matchedKey.planName,
+        locale: input.locale,
       });
       return sendTelegramStoreView({
         botToken: input.botToken,
@@ -761,13 +776,13 @@ export async function handleStoreSwitchServerCommand(input: {
 
     if (!serverOptions || serverOptions.servers.length === 0) {
       const text = [
-        '🌍 *Select New Server*',
+        input.locale === 'my' ? '🌍 *Server အသစ်ရွေးပါ*' : '🌍 *Select New Server*',
         '━━━━━━━━━━━━━━━━━━━━━━━━━━',
         '',
-        `Current  :  *${escapeTelegramMarkdownV2(matchedKey.currentServerName)}*`,
-        `Used     :  ${escapeTelegramMarkdownV2(String(matchedKey.switchesUsed))} / ${escapeTelegramMarkdownV2(matchedKey.switchesMaxLabel)} switches`,
+        `${input.locale === 'my' ? 'လက်ရှိ     :  *' : 'Current  :  *'}${escapeTelegramMarkdownV2(matchedKey.currentServerName)}*`,
+        `${input.locale === 'my' ? 'အသုံးပြုပြီး :  ' : 'Used     :  '}${escapeTelegramMarkdownV2(String(matchedKey.switchesUsed))} / ${escapeTelegramMarkdownV2(matchedKey.switchesMaxLabel)}${input.locale === 'my' ? ' ကြိမ်' : ' switches'}`,
         '',
-        'No alternate server is available right now\\.',
+        input.locale === 'my' ? 'လက်ရှိအချိန်တွင် alternate server မရှိသေးပါ\\.' : 'No alternate server is available right now\\.',
       ].join('\n');
 
       return sendTelegramStoreView({
@@ -777,7 +792,7 @@ export async function handleStoreSwitchServerCommand(input: {
         replyMarkup: {
           inline_keyboard: [[
             {
-              text: '◀ Back',
+              text: input.locale === 'my' ? '◀ ပြန်မည်' : '◀ Back',
               callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
             },
           ]],
@@ -791,6 +806,7 @@ export async function handleStoreSwitchServerCommand(input: {
       used: serverOptions.switchesUsed,
       maxLabel: matchedKey.switchesMaxLabel,
       servers: serverOptions.servers,
+      locale: input.locale,
     });
 
     return sendTelegramStoreView({
@@ -801,7 +817,7 @@ export async function handleStoreSwitchServerCommand(input: {
     });
   }
 
-  const view = buildTelegramStoreSwitchKeySelectionView(keys);
+  const view = buildTelegramStoreSwitchKeySelectionView(keys, input.locale);
   return sendTelegramStoreView({
     botToken: input.botToken,
     chatId: input.chatId,

@@ -77,7 +77,9 @@ export async function sendTelegramStartHome(input: {
     ...(await loadTelegramStoreMainMenuData({
       chatId: input.chatId,
       telegramUserId: input.telegramUserId,
+      locale: input.locale,
     })),
+    locale: input.locale,
   });
 
   await sendTelegramMessage(input.botToken, input.chatId, menu.text, {

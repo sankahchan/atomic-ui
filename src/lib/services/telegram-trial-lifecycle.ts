@@ -85,27 +85,38 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
         const progressBar = '▓'.repeat(bars) + '░'.repeat(10 - bars);
         const isMyanmar = locale === 'my';
         
-        const text = [
-          '⏳ <b>Trial Reminder</b>',
-          '━━━━━━━━━━━━━━━━━━',
-          "You're halfway through your free trial!",
-          '',
-          `📶 Used     :  ${usedGb} GB / ${limitGb} GB`,
-          `<code>[${progressBar}] ${Math.round(progress)}%</code>`,
-          '',
-          'Like what you see? Upgrade to a paid plan.',
-        ].join('\n');
+        const text = isMyanmar
+          ? [
+              '⏳ <b>အစမ်းသုံး သတိပေးချက်</b>',
+              '━━━━━━━━━━━━━━━━━━',
+              'သင်၏ အခမဲ့အစမ်းသုံးကာလ၏ တစ်ဝက်အချိန်သို့ ရောက်ရှိလာပါပြီ!',
+              '',
+              `📶 အသုံးပြုပြီး :  ${usedGb} GB / ${limitGb} GB`,
+              `<code>[${progressBar}] ${Math.round(progress)}%</code>`,
+              '',
+              'နှစ်သက်ပါက paid plan သို့ upgrade လုပ်နိုင်ပါသည်။',
+            ].join('\n')
+          : [
+              '⏳ <b>Trial Reminder</b>',
+              '━━━━━━━━━━━━━━━━━━',
+              "You're halfway through your free trial!",
+              '',
+              `📶 Used     :  ${usedGb} GB / ${limitGb} GB`,
+              `<code>[${progressBar}] ${Math.round(progress)}%</code>`,
+              '',
+              'Like what you see? Upgrade to a paid plan.',
+            ].join('\n');
 
         await sendTelegramMessage(config.botToken, chatId, text, {
           replyMarkup: {
             inline_keyboard: [
               [
                 {
-                  text: isMyanmar ? '⚡ See Flash Plans' : '⚡ See Flash Plans',
+                  text: isMyanmar ? '⚡ Flash plan များ' : '⚡ See Flash Plans',
                   callback_data: buildTelegramMenuCallbackData('trial', 'show_monthly'),
                 },
                 {
-                  text: isMyanmar ? '🌙 See Season Plans' : '🌙 See Season Plans',
+                  text: isMyanmar ? '🌙 Season plan များ' : '🌙 See Season Plans',
                   callback_data: buildTelegramMenuCallbackData('trial', 'show_quarterly'),
                 },
               ],
@@ -124,23 +135,30 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
     // 2. Pre-expiry Warning (6 hours before expiry)
     if (!profile.trialExpiringReminderSentAt && now >= expiringTime && now < expiresAt) {
       const isMyanmar = locale === 'my';
-      const text = [
-        '⚠️ <b>Trial Expiring Soon</b>',
-        '━━━━━━━━━━━━━━━━━━',
-        'Your free trial expires in <b>6 hours</b>.',
-        "Don't lose your connection!",
-      ].join('\n');
+      const text = isMyanmar
+        ? [
+            '⚠️ <b>အစမ်းသုံး မကြာမီကုန်မည်</b>',
+            '━━━━━━━━━━━━━━━━━━',
+            'သင်၏ အခမဲ့အစမ်းသုံးသည် <b>၆ နာရီအတွင်း</b> ကုန်ဆုံးမည်ဖြစ်သည်။',
+            'VPN ချိတ်ဆက်မှု မပြတ်သွားစေရန် ယခုပဲ plan ဝယ်ပါ!',
+          ].join('\n')
+        : [
+            '⚠️ <b>Trial Expiring Soon</b>',
+            '━━━━━━━━━━━━━━━━━━',
+            'Your free trial expires in <b>6 hours</b>.',
+            "Don't lose your connection!",
+          ].join('\n');
 
       await sendTelegramMessage(config.botToken, chatId, text, {
         replyMarkup: {
           inline_keyboard: [
             [
               {
-                text: isMyanmar ? '🛒 Upgrade Now' : '🛒 Upgrade Now',
+                text: isMyanmar ? '🛒 ယခုပဲ upgrade လုပ်မည်' : '🛒 Upgrade Now',
                 callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
               },
               {
-                text: isMyanmar ? '💬 Support' : '💬 Support',
+                text: isMyanmar ? '💬 အကူအညီ' : '💬 Support',
                 callback_data: buildTelegramMenuCallbackData('support', 'start'),
               },
             ],
@@ -158,21 +176,30 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
     // 3. Expiry Notice (On expiry)
     if (!profile.trialExpiredNoticeSentAt && now >= expiresAt) {
       const isMyanmar = locale === 'my';
-      const text = [
-        '❌ <b>Trial Expired</b>',
-        '━━━━━━━━━━━━━━━━━━',
-        'Your free trial has ended.',
-        'We hope you enjoyed the service!',
-        '',
-        'To stay connected, please purchase a plan.',
-      ].join('\n');
+      const text = isMyanmar
+        ? [
+            '❌ <b>အစမ်းသုံး ကုန်ဆုံးသွားပါပြီ</b>',
+            '━━━━━━━━━━━━━━━━━━',
+            'သင်၏ အခမဲ့အစမ်းသုံးကာလ ကုန်ဆုံးသွားပါပြီ။',
+            'ဝန်ဆောင်မှုကို နှစ်သက်ခဲ့မည်ဟု မျှော်လင့်ပါသည်!',
+            '',
+            'ဆက်လက်အသုံးပြုလိုပါက plan တစ်ခု ဝယ်ယူပါ။',
+          ].join('\n')
+        : [
+            '❌ <b>Trial Expired</b>',
+            '━━━━━━━━━━━━━━━━━━',
+            'Your free trial has ended.',
+            'We hope you enjoyed the service!',
+            '',
+            'To stay connected, please purchase a plan.',
+          ].join('\n');
 
       await sendTelegramMessage(config.botToken, chatId, text, {
         replyMarkup: {
           inline_keyboard: [
             [
               {
-                text: isMyanmar ? '🛒 View Paid Plans' : '🛒 View Paid Plans',
+                text: isMyanmar ? '🛒 Paid plan များကြည့်မည်' : '🛒 View Paid Plans',
                 callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
               },
             ],
@@ -190,24 +217,32 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
     // 4. Winback Nudge (24 hours after expiry)
     if (!profile.trialWinbackNudgeSentAt && now >= winbackTime && !hasConverted) {
       const isMyanmar = locale === 'my';
-      const text = [
-        '👋 <b>Still there?</b>',
-        '━━━━━━━━━━━━━━━━━━',
-        "Your trial expired yesterday, but we'd love to have you back!",
-        '',
-        'Get <b>10% off</b> your first purchase with code: <b>COMEBACK10</b>',
-      ].join('\n');
+      const text = isMyanmar
+        ? [
+            '👋 <b>စိတ်ဝင်စားနေသေးလား?</b>',
+            '━━━━━━━━━━━━━━━━━━',
+            'သင်၏ အစမ်းသုံးကာလ မနေ့က ကုန်ဆုံးသွားပေမယ့် ပြန်လည်အသုံးပြုဖို့ ဖိတ်ခေါ်ချင်ပါတယ်!',
+            '',
+            'ပထမဆုံးဝယ်ယူမှုအတွက် <b>10% လျှော့စျေး</b> ကို <b>COMEBACK10</b> code ဖြင့် ရယူနိုင်ပါသည်။',
+          ].join('\n')
+        : [
+            '👋 <b>Still there?</b>',
+            '━━━━━━━━━━━━━━━━━━',
+            "Your trial expired yesterday, but we'd love to have you back!",
+            '',
+            'Get <b>10% off</b> your first purchase with code: <b>COMEBACK10</b>',
+          ].join('\n');
 
       await sendTelegramMessage(config.botToken, chatId, text, {
         replyMarkup: {
           inline_keyboard: [
             [
               {
-                text: isMyanmar ? '🎁 Claim 10% Off' : '🎁 Claim 10% Off',
+                text: isMyanmar ? '🎁 10% လျှော့စျေး ရယူမည်' : '🎁 Claim 10% Off',
                 callback_data: buildTelegramMenuCallbackData('trial', 'claim_discount'),
               },
               {
-                text: isMyanmar ? '🛒 Shop Plans' : '🛒 Shop Plans',
+                text: isMyanmar ? '🛒 Plan များကြည့်မည်' : '🛒 Shop Plans',
                 callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
               },
             ],

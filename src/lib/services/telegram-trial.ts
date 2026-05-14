@@ -75,16 +75,16 @@ export function buildTelegramTrialOfferMessage(input: {
 
   if (input.locale === 'my') {
     return [
-      '🎁 <b>Welcome Gift — Free Trial!</b>',
+      '🎁 <b>ကြိုဆိုလက်ဆောင် — အခမဲ့အစမ်းသုံး!</b>',
       '━━━━━━━━━━━━━━━━━━',
       '',
-      `Hello, <b>${firstName}</b>! 👋`,
+      `မင်္ဂလာပါ၊ <b>${firstName}</b>! 👋`,
       '',
-      'အသစ်စတင်သော user အဖြစ် <b>အခမဲ့ ၂ ရက် trial</b> ရရှိနိုင်ပါသည်။',
+      'အသစ်စတင်အသုံးပြုသူအဖြစ် <b>အခမဲ့ ၂ ရက်အစမ်းသုံး</b> ရရှိနိုင်ပါသည်။',
       '',
       '📶 Data        :  5 GB',
-      '🕐 Duration   :  2 days',
-      '💰 Price       :  FREE',
+      '🕐 Duration   :  ၂ ရက်',
+      '💰 Price       :  အခမဲ့',
       '',
       'ငွေပေးချေမှုမလိုပါ။ အခုချက်ချင်း စတင်နိုင်ပါသည်။',
     ].join('\n');
@@ -112,7 +112,7 @@ export function buildTelegramTrialOfferKeyboard(locale: SupportedLocale) {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '🎁 Free Trial ရယူမည်' : '🎁 Claim Free Trial',
+          text: isMyanmar ? '🎁 အခမဲ့အစမ်းသုံးမည်' : '🎁 Claim Free Trial',
           callback_data: buildTelegramMenuCallbackData('trial', 'claim'),
         },
       ],
@@ -134,6 +134,27 @@ export function buildTelegramTrialActivatedMessage(input: {
 }) {
   const firstName = escapeTelegramMarkdownV2(input.firstName);
   const expiresAt = escapeTelegramMarkdownV2(formatTelegramDateTime(input.expiresAt, input.locale));
+  if (input.locale === 'my') {
+    return [
+      '🎁 *Trial စတင်ပြီးပါပြီ\\!*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      `ကြိုဆိုပါတယ်၊ *${firstName}*\\! သင်၏ အခမဲ့အစမ်းသုံးကို`,
+      'ယခုချက်ချင်း အသုံးပြုနိုင်ပါပြီ\\! 🚀',
+      '',
+      '🔑 *သင်၏ Access Key:*',
+      formatTelegramMarkdownCode(input.outlineKey),
+      '',
+      '📶 Data        :  5 GB',
+      `🕐 သက်တမ်းကုန်မည့်နေ့ :  ${expiresAt}`,
+      '💰 ပေးချေမှု     :  အခမဲ့',
+      '',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '📲 _Setup Guide ကိုနှိပ်ပြီး ၂ မိနစ်အတွင်း ချိတ်ဆက်ပါ\\._',
+      'သင်၏ အခမဲ့အစမ်းသုံးကို ပျော်ရွှင်စွာ အသုံးပြုပါ\\! 🎉',
+    ].join('\n');
+  }
+
   return [
     '🎁 *Trial Activated\\!*',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━',
@@ -168,13 +189,13 @@ export function buildTelegramTrialAdminAlertMessage(input: {
 
   if (input.locale === 'my') {
     return [
-      '🎁 <b>Telegram trial claimed</b>',
+      '🎁 <b>Telegram အစမ်းသုံး ရယူပြီးပါပြီ</b>',
       '',
       `User: <b>${escapeHtml(input.firstName)}</b>`,
       `Telegram ID: <code>${input.telegramUserId}</code>`,
       `Chat ID: <code>${input.chatId}</code>`,
       `Key: <b>${escapeHtml(input.keyName)}</b>`,
-      `Expires: <b>${expiresAt}</b>${serverLabel}`,
+      `သက်တမ်းကုန်မည့်နေ့: <b>${expiresAt}</b>${serverLabel}`,
     ].join('\n');
   }
 
@@ -191,13 +212,13 @@ export function buildTelegramTrialAdminAlertMessage(input: {
 
 export function buildTelegramTrialUnavailableMessage(locale: SupportedLocale) {
   return locale === 'my'
-    ? 'ℹ️ Free trial ကို first-time user တစ်ဦးအတွက် တစ်ကြိမ်သာ ရနိုင်ပါသည်။'
+    ? 'ℹ️ အခမဲ့အစမ်းသုံးကို ပထမဆုံးအသုံးပြုသူတစ်ဦးအတွက် တစ်ကြိမ်သာ ရနိုင်ပါသည်။'
     : 'ℹ️ The free trial is available only once for each first-time user.';
 }
 
 export function buildTelegramTrialActivationFailedMessage(locale: SupportedLocale) {
   return locale === 'my'
-    ? '❌ Free trial ကို စတင်မပေးနိုင်သေးပါ။ ခဏအကြာ ပြန်စမ်းပါ သို့မဟုတ် /support ကို အသုံးပြုပါ။'
+    ? '❌ အခမဲ့အစမ်းသုံးကို ယခုစတင်မပေးနိုင်သေးပါ။ ခဏအကြာ ပြန်စမ်းပါ သို့မဟုတ် /support ကို အသုံးပြုပါ။'
     : '❌ We could not activate the free trial right now. Please try again shortly or use /support.';
 }
 
@@ -205,11 +226,12 @@ export function buildTelegramTrialActivatedKeyboard(input: {
   locale: SupportedLocale;
   keyId: string;
 }) {
+  const isMyanmar = input.locale === 'my';
   return {
     inline_keyboard: [
       [
         {
-          text: '📲  Setup Guide',
+          text: isMyanmar ? '📲  ချိတ်ဆက်နည်း' : '📲  Setup Guide',
           callback_data: buildTelegramStorefrontCallbackData({
             action: 'platform_select',
             keyId: input.keyId,
@@ -254,17 +276,17 @@ export function buildTelegramTrialActivatedKeyboard(input: {
       ],
       [
         {
-          text: '🛒 Buy a Full Plan',
+          text: isMyanmar ? '🛒 Full Plan ဝယ်မည်' : '🛒 Buy a Full Plan',
           callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
         },
       ],
       [
         {
-          text: '🏠 Back to Menu',
+          text: isMyanmar ? '🏠 ပင်မ Menu' : '🏠 Back to Menu',
           callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
         },
         {
-          text: '💬 Support',
+          text: isMyanmar ? '💬 အကူအညီ' : '💬 Support',
           callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
         },
       ],

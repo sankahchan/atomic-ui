@@ -37,6 +37,26 @@ test('telegram trial activated message uses the new MarkdownV2 storefront layout
   assert.match(message, /Tap Setup Guide to connect in 2 minutes/);
 });
 
+test('telegram trial screens localize Burmese copy', () => {
+  const message = buildTelegramTrialActivatedMessage({
+    locale: 'my',
+    firstName: 'Trial User',
+    outlineKey: 'ss://example-key',
+    expiresAt: new Date('2026-05-07T09:00:00.000Z'),
+  });
+
+  assert.match(message, /Trial စတင်ပြီးပါပြီ/);
+  assert.match(message, /သင်၏ Access Key/);
+  assert.match(message, /Setup Guide ကိုနှိပ်ပြီး ၂ မိနစ်အတွင်း ချိတ်ဆက်ပါ/);
+
+  const keyboard = buildTelegramTrialActivatedKeyboard({
+    locale: 'my',
+    keyId: 'key_123',
+  });
+  assert.equal(keyboard.inline_keyboard[3]?.[0]?.text, '🛒 Full Plan ဝယ်မည်');
+  assert.equal(keyboard.inline_keyboard[4]?.[1]?.text, '💬 အကူအညီ');
+});
+
 test('telegram trial keyboard uses trial callback actions', () => {
   const keyboard = buildTelegramTrialOfferKeyboard('en');
   const claim = keyboard.inline_keyboard[0]?.[0]?.callback_data ?? null;

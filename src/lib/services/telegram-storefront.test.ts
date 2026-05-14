@@ -15,6 +15,7 @@ import {
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
   buildTelegramStoreQuickStatusView,
+  buildTelegramStoreSupportContactView,
   buildTelegramStorefrontCallbackData,
   parseTelegramStorefrontCallbackData,
   progressBar,
@@ -224,6 +225,30 @@ test('store main menu matches the paid storefront button layout', () => {
       '👤 My Account',
     ],
   );
+});
+
+test('storefront views localize Burmese copy for the main menu and setup flow', () => {
+  const menu = buildTelegramStoreMainMenuView({
+    firstName: 'Sankha',
+    activeKeyCount: 2,
+    nextExpiryLabel: '02 Jun 2026',
+    locale: 'my',
+  });
+
+  assert.match(menu.text, /ပြန်လည်ကြိုဆိုပါတယ်/);
+  assert.match(menu.text, /နောက်ဆုံးသက်တမ်း/);
+  assert.equal(menu.replyMarkup.inline_keyboard[0]?.[0]?.text, '⚡ Flash Plans    ·  30 ရက်  ·  🔄 3 ကြိမ်');
+  assert.equal(menu.replyMarkup.inline_keyboard[3]?.[1]?.text, '💬 အကူအညီ');
+
+  const setup = buildTelegramStorePlatformSelectView({
+    keyId: 'key_123',
+    accessKey: 'ss://example-key',
+    locale: 'my',
+  });
+
+  assert.match(setup.text, /Setup ပြုလုပ်ရန် \*၂ မိနစ်မပြည့်\*/);
+  assert.match(setup.text, /သင်၏ Key/);
+  assert.equal(setup.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀ ပြန်မည်');
 });
 
 test('store usage bars use color semantics and account summary stays compact', () => {
@@ -547,4 +572,27 @@ test('store switch confirmation message is safe for MarkdownV2', () => {
     confirmation.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'doswitch', keyId: 'key_123', serverId: 'server_456' }),
   );
+});
+
+test('store support and switch confirmation screens localize Burmese copy', () => {
+  const support = buildTelegramStoreSupportContactView({
+    locale: 'my',
+    supportUrl: 'https://t.me/example_support',
+  });
+  assert.match(support.text, /အကူအညီဆက်သွယ်ရန်/);
+  assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💬 အကူအညီ chat ဖွင့်မည်');
+
+  const confirmation = buildTelegramStoreSwitchConfirmationView({
+    keyId: 'key_123',
+    currentServer: 'SG-2',
+    newServer: 'Malaysia',
+    newServerId: 'server_456',
+    used: 1,
+    maxLabel: '3',
+    locale: 'my',
+  });
+
+  assert.match(confirmation.text, /Server ပြောင်းခြင်း အတည်ပြုပါ/);
+  assert.match(confirmation.text, /ပြန်မလုပ်နိုင်ပါ/);
+  assert.equal(confirmation.replyMarkup.inline_keyboard[0]?.[0]?.text, '✅ ပြောင်းမည်');
 });
