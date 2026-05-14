@@ -740,9 +740,9 @@ export function buildTelegramStorefrontCallbackData(payload: TelegramStoreCallba
     case 'switchkey':
       return `switchkey_${payload.keyId}`;
     case 'confirm_switch':
-      return `confirm_switch_${payload.keyId}_${payload.serverId}`;
+      return `cs_${payload.keyId}|${payload.serverId}`;
     case 'doswitch':
-      return `doswitch_${payload.keyId}_${payload.serverId}`;
+      return `ds_${payload.keyId}|${payload.serverId}`;
     case 'noop':
       return 'noop';
     default:
@@ -822,6 +822,18 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
     }
   }
 
+  if (data.startsWith('cs_')) {
+    const remainder = data.slice('cs_'.length);
+    const splitAt = remainder.indexOf('|');
+    if (splitAt > 0) {
+      const keyId = remainder.slice(0, splitAt).trim();
+      const serverId = remainder.slice(splitAt + 1).trim();
+      if (keyId && serverId) {
+        return { action: 'confirm_switch', keyId, serverId };
+      }
+    }
+  }
+
   if (data.startsWith('guide_')) {
     const match = /^guide_(android|ios|windows|macos)_(.+)$/.exec(data);
     if (match?.[1] && match?.[2]) {
@@ -890,6 +902,18 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
   if (data.startsWith('doswitch_')) {
     const remainder = data.slice('doswitch_'.length);
     const splitAt = remainder.indexOf('_');
+    if (splitAt > 0) {
+      const keyId = remainder.slice(0, splitAt).trim();
+      const serverId = remainder.slice(splitAt + 1).trim();
+      if (keyId && serverId) {
+        return { action: 'doswitch', keyId, serverId };
+      }
+    }
+  }
+
+  if (data.startsWith('ds_')) {
+    const remainder = data.slice('ds_'.length);
+    const splitAt = remainder.indexOf('|');
     if (splitAt > 0) {
       const keyId = remainder.slice(0, splitAt).trim();
       const serverId = remainder.slice(splitAt + 1).trim();

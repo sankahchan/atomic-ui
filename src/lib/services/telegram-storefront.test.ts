@@ -492,14 +492,42 @@ test('storefront callback parser handles setup-guide platform routes', () => {
 test('storefront callback parser round-trips switch confirmation actions', () => {
   const callbackData = buildTelegramStorefrontCallbackData({
     action: 'confirm_switch',
-    keyId: 'cmabc123',
+    keyId: 'key_123',
     serverId: 'server_456_region',
   });
 
-  assert.equal(callbackData, 'confirm_switch_cmabc123_server_456_region');
+  assert.equal(callbackData, 'cs_key_123|server_456_region');
+  assert.ok(callbackData.length <= 64);
   assert.deepEqual(
     parseTelegramStorefrontCallbackData(callbackData),
-    { action: 'confirm_switch', keyId: 'cmabc123', serverId: 'server_456_region' },
+    { action: 'confirm_switch', keyId: 'key_123', serverId: 'server_456_region' },
+  );
+
+  const longKeyId = 'ckabcdefghijklmnopqrstuvwxyz'.slice(0, 25);
+  const longServerId = 'csabcdefghijklmnopqrstuvwxyz'.slice(0, 25);
+  const longCallbackData = buildTelegramStorefrontCallbackData({
+    action: 'confirm_switch',
+    keyId: longKeyId,
+    serverId: longServerId,
+  });
+
+  assert.ok(longCallbackData.length <= 64);
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData(longCallbackData),
+    { action: 'confirm_switch', keyId: longKeyId, serverId: longServerId },
+  );
+
+  const doSwitchCallbackData = buildTelegramStorefrontCallbackData({
+    action: 'doswitch',
+    keyId: 'key_123',
+    serverId: 'server_456_region',
+  });
+
+  assert.equal(doSwitchCallbackData, 'ds_key_123|server_456_region');
+  assert.ok(doSwitchCallbackData.length <= 64);
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData(doSwitchCallbackData),
+    { action: 'doswitch', keyId: 'key_123', serverId: 'server_456_region' },
   );
 });
 
