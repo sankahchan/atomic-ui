@@ -310,6 +310,7 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
       }),
+      locale,
     });
 
     await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {
@@ -640,6 +641,7 @@ export async function sendDynamicKeyRenewalReminder(input: {
       usedBytes: key.usedBytes,
       dataLimitBytes: key.dataLimitBytes,
     }),
+    locale,
   });
 
   await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {
@@ -707,6 +709,7 @@ export async function sendDynamicKeyExpiryTelegramNotification(input: {
       usedBytes: key.usedBytes,
       dataLimitBytes: key.dataLimitBytes,
     }),
+    locale,
   });
 
   await sendTelegramMessage(config.botToken, destinationChatId, reminder.text, {

@@ -228,18 +228,18 @@ function getTelegramPremiumPlanHighlight(plan: {
   unlimitedQuota?: boolean;
 }, locale: SupportedLocale) {
   if (plan.code === 'premium_1m_500gb') {
-    return locale === 'my' ? 'Most popular premium choice' : 'Most popular premium choice';
+    return locale === 'my' ? 'လူကြိုက်အများဆုံး premium ရွေးချယ်မှု' : 'Most popular premium choice';
   }
 
   if (plan.unlimitedQuota) {
-    return locale === 'my' ? 'Maximum premium coverage' : 'Maximum premium coverage';
+    return locale === 'my' ? 'premium coverage အများဆုံး' : 'Maximum premium coverage';
   }
 
   if ((plan.dataLimitGB || 0) <= 250) {
-    return locale === 'my' ? 'Good first premium step' : 'Good first premium step';
+    return locale === 'my' ? 'premium စတင်သုံးရန် သင့်တော်သည်' : 'Good first premium step';
   }
 
-  return locale === 'my' ? 'Balanced premium plan' : 'Balanced premium plan';
+  return locale === 'my' ? 'ညီမျှသော premium plan' : 'Balanced premium plan';
 }
 
 function buildTelegramPremiumPlanCard(input: {
@@ -250,7 +250,7 @@ function buildTelegramPremiumPlanCard(input: {
   const label = resolveTelegramSalesPlanLabel(plan, locale);
   const price = resolveTelegramSalesPriceLabel(plan, locale);
   const quota = plan.unlimitedQuota
-    ? (locale === 'my' ? 'Unlimited quota' : 'Unlimited quota')
+    ? (locale === 'my' ? 'data အကန့်အသတ်မရှိ' : 'Unlimited quota')
     : typeof plan.dataLimitGB === 'number' && Number.isFinite(plan.dataLimitGB)
       ? `${plan.dataLimitGB} GB`
       : null;
@@ -259,10 +259,10 @@ function buildTelegramPremiumPlanCard(input: {
 
   return [
     `💎 <b>${label}</b>`,
-    price ? `   ${locale === 'my' ? 'Price' : 'Price'}: <b>${price}</b>` : '',
+    price ? `   ${locale === 'my' ? 'စျေးနှုန်း' : 'Price'}: <b>${price}</b>` : '',
     detailLine ? `   ${detailLine}` : '',
-    `   ${locale === 'my' ? 'Best for' : 'Best for'}: ${getTelegramPremiumPlanBestFor(plan, locale)}`,
-    `   ${locale === 'my' ? 'Highlight' : 'Highlight'}: ${getTelegramPremiumPlanHighlight(plan, locale)}`,
+    `   ${locale === 'my' ? 'အသုံးပြုရန်သင့်' : 'Best for'}: ${getTelegramPremiumPlanBestFor(plan, locale)}`,
+    `   ${locale === 'my' ? 'အထူးချက်' : 'Highlight'}: ${getTelegramPremiumPlanHighlight(plan, locale)}`,
   ]
     .filter(Boolean)
     .join('\n');
@@ -300,15 +300,15 @@ function buildTelegramPlanTypeSummary(plan: TelegramSalesPlanOption, locale: Sup
   }
 
   if (isTelegramTrialPlan(plan)) {
-    return locale === 'my' ? 'Free trial access key' : 'Free trial access key';
+    return locale === 'my' ? 'အခမဲ့အစမ်းသုံး key' : 'Free trial access key';
   }
 
-  return locale === 'my' ? 'Standard access key' : 'Standard access key';
+  return locale === 'my' ? 'ပုံမှန် access key' : 'Standard access key';
 }
 
 function buildTelegramPlanCapacitySummary(plan: TelegramSalesPlanOption, locale: SupportedLocale) {
   const quota = plan.unlimitedQuota
-    ? (locale === 'my' ? 'Unlimited quota' : 'Unlimited quota')
+    ? (locale === 'my' ? 'data အကန့်အသတ်မရှိ' : 'Unlimited quota')
     : typeof plan.dataLimitGB === 'number' && Number.isFinite(plan.dataLimitGB)
       ? `${plan.dataLimitGB} GB`
       : null;
@@ -325,26 +325,30 @@ function buildTelegramBuyPlanSummaryCard(input: {
   const label = resolveTelegramSalesPlanLabel(input.plan, input.locale);
   const price = resolveTelegramSalesPriceLabel(input.plan, input.locale);
   const quota = input.plan.unlimitedQuota
-    ? (input.locale === 'my' ? 'Unlimited' : 'Unlimited')
+    ? (input.locale === 'my' ? 'အကန့်အသတ်မရှိ' : 'Unlimited')
     : typeof input.plan.dataLimitGB === 'number' && Number.isFinite(input.plan.dataLimitGB)
       ? `${input.plan.dataLimitGB} GB`
       : null;
   const duration = formatTelegramPlanDurationLabel(input.plan, input.locale);
   const badgeRaw = input.plan.badge;
   const badgeEmoji = input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑';
-  const badge = badgeRaw === 'Popular' ? `🔥 Popular` : badgeRaw === 'Best Deal' ? `⭐ Best Deal` : badgeEmoji;
+  const badge = badgeRaw === 'Popular'
+    ? (input.locale === 'my' ? '🔥 လူကြိုက်များ' : '🔥 Popular')
+    : badgeRaw === 'Best Deal'
+      ? (input.locale === 'my' ? '⭐ တန်ဆုံး' : '⭐ Best Deal')
+      : badgeEmoji;
 
   return buildTelegramCommerceCard(
     `${input.index}. ${badge} <b>${escapeHtml(label)}</b>`,
     [
-      price ? `${input.locale === 'my' ? 'Price' : 'Price'}: <b>${escapeHtml(price)}</b>` : null,
+      price ? `${input.locale === 'my' ? 'စျေးနှုန်း' : 'Price'}: <b>${escapeHtml(price)}</b>` : null,
       escapeHtml([duration, quota].filter(Boolean).join(' • ')),
       escapeHtml(
         input.plan.deliveryType === 'DYNAMIC_KEY'
           ? getTelegramPremiumPlanHighlight(input.plan, input.locale)
           : isTelegramTrialPlan(input.plan)
-            ? (input.locale === 'my' ? 'Try before you buy' : 'Try before you buy')
-            : (input.locale === 'my' ? 'Normal daily use' : 'Normal daily use'),
+            ? (input.locale === 'my' ? 'မဝယ်မီ စမ်းသုံးနိုင်သည်' : 'Try before you buy')
+            : (input.locale === 'my' ? 'နေ့စဉ်ပုံမှန်အသုံးပြုရန်' : 'Normal daily use'),
       ),
     ].filter(Boolean) as string[],
   );
@@ -375,15 +379,15 @@ export function buildTelegramBuySummaryMessage(input: {
   const footerLines = [
     input.activeOfferCount > 0
       ? input.locale === 'my'
-        ? `🎟 Active offers: ${input.activeOfferCount} • /buy ဖြင့် plan ကို ဆက်ကြည့်နိုင်သည်။`
+        ? `🎟 လက်ရှိ offer: ${input.activeOfferCount} ခု • /buy ဖြင့် plan များကို ဆက်ကြည့်နိုင်သည်။`
         : `🎟 Active offers: ${input.activeOfferCount} • use /buy to keep browsing plans.`
       : null,
     ...(input.couponHintLines || []),
     input.order.orderMode === 'GIFT' && input.order.giftRecipientLabel
-      ? `🎁 ${input.locale === 'my' ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
+      ? `🎁 ${input.locale === 'my' ? 'လက်ဆောင်ပေးမည့်သူ' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
       : null,
     input.order.referralCode
-      ? `🔗 ${input.locale === 'my' ? 'Referral' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
+      ? `🔗 ${input.locale === 'my' ? 'Referral code' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
       : null,
     input.locale === 'my'
       ? 'Plan ကို နှိပ်ပါ။ Button မရပါက plan နံပါတ်ကို reply လုပ်နိုင်ပါသည်။'
@@ -392,7 +396,9 @@ export function buildTelegramBuySummaryMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: ui.orderPlanPrompt(input.order.orderCode),
-    statsLine: `${input.plans.length} ${input.plans.length === 1 ? 'plan' : 'plans'} • ${standardCount} standard • ${premiumCount} premium${trialCount > 0 ? ` • ${trialCount} trial` : ''}`,
+    statsLine: input.locale === 'my'
+      ? `${input.plans.length} plan • ${standardCount} ပုံမှန် • ${premiumCount} premium${trialCount > 0 ? ` • ${trialCount} အစမ်းသုံး` : ''}`
+      : `${input.plans.length} ${input.plans.length === 1 ? 'plan' : 'plans'} • ${standardCount} standard • ${premiumCount} premium${trialCount > 0 ? ` • ${trialCount} trial` : ''}`,
     intro:
       input.locale === 'my'
         ? 'Plan တစ်ခုကို ရွေးပြီး payment step သို့ ဆက်ပါ။'
@@ -414,18 +420,18 @@ export function buildTelegramBuyCompareMessage(input: {
   const trialPlans = input.plans.filter((plan) => isTelegramTrialPlan(plan));
 
   return buildTelegramCommerceMessage({
-    title: input.locale === 'my' ? `🧭 <b>Plan compare · ${escapeHtml(input.orderCode)}</b>` : `🧭 <b>Plan compare · ${escapeHtml(input.orderCode)}</b>`,
+    title: input.locale === 'my' ? `🧭 <b>Plan နှိုင်းယှဉ်ချက် · ${escapeHtml(input.orderCode)}</b>` : `🧭 <b>Plan compare · ${escapeHtml(input.orderCode)}</b>`,
     intro:
       input.locale === 'my'
         ? 'Flash နှင့် Season သည် standard access အတွက်ဖြစ်ပြီး Dynamic သည် stable route နှင့် region-aware support အတွက်ဖြစ်သည်။'
         : 'Flash and Season are for standard access, while Dynamic focuses on stable routing and region-aware support.',
     cards: [
       buildTelegramCommerceCard(
-        '🔑 <b>Standard (Flash/Season)</b>',
+        input.locale === 'my' ? '🔑 <b>ပုံမှန် (Flash/Season)</b>' : '🔑 <b>Standard (Flash/Season)</b>',
         [
           escapeHtml(
             input.locale === 'my'
-              ? `Normal daily use • ${standardPlans.length} package(s)`
+              ? `နေ့စဉ်ပုံမှန်အသုံးပြုရန် • ${standardPlans.length} package`
               : `Normal daily use • ${standardPlans.length} package(s)`,
           ),
           escapeHtml(
@@ -436,27 +442,27 @@ export function buildTelegramBuyCompareMessage(input: {
         ],
       ),
       buildTelegramCommerceCard(
-        '💎 <b>Premium (Dynamic)</b>',
+        input.locale === 'my' ? '💎 <b>Premium (Dynamic)</b>' : '💎 <b>Premium (Dynamic)</b>',
         [
           escapeHtml(
             input.locale === 'my'
-              ? `Stable premium route • ${premiumPlans.length} package(s)`
+              ? `တည်ငြိမ်သော premium route • ${premiumPlans.length} package`
               : `Stable premium route • ${premiumPlans.length} package(s)`,
           ),
           escapeHtml(
             input.locale === 'my'
-              ? 'Dynamic routing, region-aware support, and better fallback visibility.'
+              ? 'Dynamic routing, region-aware support နှင့် fallback အခြေအနေကို ပိုရှင်းစွာမြင်နိုင်သည်။'
               : 'Dynamic routing, region-aware support, and better fallback visibility.',
           ),
         ],
       ),
       trialPlans.length > 0
         ? buildTelegramCommerceCard(
-            '🎁 <b>Trial</b>',
+            input.locale === 'my' ? '🎁 <b>အစမ်းသုံး</b>' : '🎁 <b>Trial</b>',
             [
               escapeHtml(
                 input.locale === 'my'
-                  ? `Free try-before-you-buy option • ${trialPlans.length} package(s)`
+                  ? `မဝယ်မီ အခမဲ့စမ်းသုံးနိုင်သည် • ${trialPlans.length} package`
                   : `Free try-before-you-buy option • ${trialPlans.length} package(s)`,
               ),
             ],
@@ -481,38 +487,42 @@ export function buildTelegramBuyPlanDetailMessage(input: {
   const label = resolveTelegramSalesPlanLabel(input.plan, input.locale);
   const price = resolveTelegramSalesPriceLabel(input.plan, input.locale);
   const summaryLines = [
-    price ? `${input.locale === 'my' ? 'Price' : 'Price'}: <b>${escapeHtml(price)}</b>` : null,
+    price ? `${input.locale === 'my' ? 'စျေးနှုန်း' : 'Price'}: <b>${escapeHtml(price)}</b>` : null,
     buildTelegramPlanCapacitySummary(input.plan, input.locale)
       ? escapeHtml(buildTelegramPlanCapacitySummary(input.plan, input.locale))
       : null,
-    `${input.locale === 'my' ? 'Type' : 'Type'}: <b>${escapeHtml(buildTelegramPlanTypeSummary(input.plan, input.locale))}</b>`,
+    `${input.locale === 'my' ? 'အမျိုးအစား' : 'Type'}: <b>${escapeHtml(buildTelegramPlanTypeSummary(input.plan, input.locale))}</b>`,
     input.plan.deliveryType === 'DYNAMIC_KEY'
-      ? `${input.locale === 'my' ? 'Best for' : 'Best for'}: ${escapeHtml(getTelegramPremiumPlanBestFor(input.plan, input.locale))}`
+      ? `${input.locale === 'my' ? 'အသုံးပြုရန်သင့်' : 'Best for'}: ${escapeHtml(getTelegramPremiumPlanBestFor(input.plan, input.locale))}`
       : isTelegramTrialPlan(input.plan)
         ? escapeHtml(
-            input.locale === 'my'
-              ? 'Best for first-time testing before a paid purchase.'
+          input.locale === 'my'
+              ? 'paid plan မဝယ်မီ ပထမဆုံးစမ်းသုံးရန် သင့်တော်သည်။'
               : 'Best for first-time testing before a paid purchase.',
-          )
+        )
         : escapeHtml(
-            input.locale === 'my'
-              ? 'Best for normal daily use on one selected server.'
+          input.locale === 'my'
+              ? 'ရွေးထားသော server တစ်ခုတွင် နေ့စဉ်ပုံမှန်အသုံးပြုရန် သင့်တော်သည်။'
               : 'Best for normal daily use on one selected server.',
-          ),
+        ),
     input.plan.deliveryType === 'DYNAMIC_KEY'
-      ? `${input.locale === 'my' ? 'Highlight' : 'Highlight'}: ${escapeHtml(getTelegramPremiumPlanHighlight(input.plan, input.locale))}`
+      ? `${input.locale === 'my' ? 'အထူးချက်' : 'Highlight'}: ${escapeHtml(getTelegramPremiumPlanHighlight(input.plan, input.locale))}`
       : null,
   ];
 
   return buildTelegramCommerceMessage({
-    title: input.locale === 'my' ? `ℹ️ <b>Plan detail ${input.index}/${input.totalPlans}</b>` : `ℹ️ <b>Plan detail ${input.index}/${input.totalPlans}</b>`,
-    statsLine: input.locale === 'my' ? `Order <b>${escapeHtml(input.orderCode)}</b>` : `Order <b>${escapeHtml(input.orderCode)}</b>`,
+    title: input.locale === 'my' ? `ℹ️ <b>Plan အသေးစိတ် ${input.index}/${input.totalPlans}</b>` : `ℹ️ <b>Plan detail ${input.index}/${input.totalPlans}</b>`,
+    statsLine: input.locale === 'my' ? `Order code <b>${escapeHtml(input.orderCode)}</b>` : `Order <b>${escapeHtml(input.orderCode)}</b>`,
     cards: [
       buildTelegramCommerceCard(
         (() => {
           const badgeRaw = input.plan.badge;
           const badgeEmoji = input.plan.deliveryType === 'DYNAMIC_KEY' ? '💎' : isTelegramTrialPlan(input.plan) ? '🎁' : '🔑';
-          const badge = badgeRaw === 'Popular' ? `🔥 Popular` : badgeRaw === 'Best Deal' ? `⭐ Best Deal` : badgeEmoji;
+          const badge = badgeRaw === 'Popular'
+            ? (input.locale === 'my' ? '🔥 လူကြိုက်များ' : '🔥 Popular')
+            : badgeRaw === 'Best Deal'
+              ? (input.locale === 'my' ? '⭐ တန်ဆုံး' : '⭐ Best Deal')
+              : badgeEmoji;
           return `${badge} <b>${escapeHtml(label)}</b>`;
         })(),
         summaryLines,
@@ -520,7 +530,7 @@ export function buildTelegramBuyPlanDetailMessage(input: {
     ],
     footerLines: [
       input.locale === 'my'
-        ? 'Select plan ကိုနှိပ်ပြီး တိုက်ရိုက်ရွေးနိုင်ပါသည်။'
+        ? 'Plan ကိုရွေးရန် Select plan ကိုနှိပ်ပါ။'
         : 'Tap Select plan to choose it directly.',
     ],
   });
@@ -561,7 +571,7 @@ function buildTelegramBuySummaryKeyboard(input: {
   }
 
   rows.push([{
-    text: input.locale === 'my' ? '🧭 Compare' : '🧭 Compare',
+      text: input.locale === 'my' ? '🧭 နှိုင်းယှဉ်မည်' : '🧭 Compare',
     callback_data: buildTelegramCommerceViewCallbackData('buy', 'compare', String(pagination.page)),
   }]);
 
@@ -591,7 +601,7 @@ function buildTelegramBuyCompareKeyboard(input: {
 }) {
   return {
     inline_keyboard: [[{
-      text: input.locale === 'my' ? '← Back to plans' : '← Back to plans',
+      text: input.locale === 'my' ? '← Plan များသို့ ပြန်မည်' : '← Back to plans',
       callback_data: buildTelegramCommerceViewCallbackData('buy', 'home', String(input.page)),
     }]],
   };
@@ -606,11 +616,11 @@ function buildTelegramBuyPlanDetailKeyboard(input: {
   return {
     inline_keyboard: [
       [{
-        text: input.locale === 'my' ? '✅ Select plan' : '✅ Select plan',
+        text: input.locale === 'my' ? '✅ Plan ရွေးမည်' : '✅ Select plan',
         callback_data: buildTelegramOrderActionCallbackData('pl', input.orderId, input.plan.code),
       }],
       [{
-        text: input.locale === 'my' ? '← Back to plans' : '← Back to plans',
+        text: input.locale === 'my' ? '← Plan များသို့ ပြန်မည်' : '← Back to plans',
         callback_data: buildTelegramCommerceViewCallbackData('buy', 'home', String(input.page)),
       }],
     ],
@@ -1215,6 +1225,7 @@ export async function sendTelegramOrderReceiptConfirmation(input: {
           expiryLabel,
           paidLabel,
           keyId,
+          locale: input.locale,
         });
 
         return sendTelegramMessage(
@@ -1676,6 +1687,7 @@ export async function handleTelegramOrderTextMessage(input: {
           0,
           storefrontPlan.priceAmount - coupon.coupon.couponDiscountAmount,
         ),
+        locale,
       });
       await sendTelegramMessage(input.botToken, input.chatId, view.text, {
         parseMode: 'MarkdownV2',

@@ -303,12 +303,14 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
       return handleStoreStatusCommand({
         chatId,
         telegramUserId,
+        locale,
         botToken: config.botToken,
       });
     case 'setup':
       return handleStoreSetupCommand({
         chatId,
         telegramUserId,
+        locale,
         botToken: config.botToken,
       });
     case 'referral':
@@ -330,6 +332,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
     case 'help':
       return handleStoreHelpCommand({
         chatId,
+        locale,
         botToken: config.botToken,
       });
     case 'cancel': {

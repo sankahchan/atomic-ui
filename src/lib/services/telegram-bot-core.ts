@@ -6617,7 +6617,9 @@ export async function handleTelegramCallbackQuery(
             ...(await loadTelegramStoreMainMenuData({
               chatId,
               telegramUserId: callbackQuery.from.id,
+              locale,
             })),
+            locale,
           });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
@@ -6630,10 +6632,15 @@ export async function handleTelegramCallbackQuery(
           return null;
         }
         case 'my_account': {
-          const view = buildTelegramStoreMyAccountView(await loadTelegramStoreAccountData({
+          const accountView = await loadTelegramStoreAccountData({
             chatId,
             telegramUserId: callbackQuery.from.id,
-          }));
+            locale,
+          });
+          const view = buildTelegramStoreMyAccountView({
+            ...accountView,
+            locale,
+          });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,
@@ -6648,16 +6655,17 @@ export async function handleTelegramCallbackQuery(
           const { items } = await loadTelegramStoreActiveKeysData({
             chatId,
             telegramUserId: callbackQuery.from.id,
+            locale,
           });
 
           if (items.length === 0) {
             const text = [
-              '🔑 *Your Active Keys*',
+              locale === 'my' ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
               '━━━━━━━━━━━━━━━━━━━━━━━━━━',
               '',
-              'No active keys right now\\.',
+              locale === 'my' ? 'Active key မရှိသေးပါ\\.' : 'No active keys right now\\.',
               '',
-              'Tap below to buy a new plan\\.',
+              locale === 'my' ? 'အောက်မှ နှိပ်ပြီး plan အသစ်ဝယ်ပါ\\.' : 'Tap below to buy a new plan\\.',
             ].join('\n');
             await sendOrEditTelegramMarkdownView({
               botToken: config.botToken,
@@ -6667,14 +6675,14 @@ export async function handleTelegramCallbackQuery(
               replyMarkup: {
                 inline_keyboard: [[
                   {
-                    text: '➕ Buy New Plan',
+                    text: locale === 'my' ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan',
                     callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
                   },
                 ]],
               },
             });
           } else {
-            const view = buildTelegramStoreActiveKeysView(items);
+            const view = buildTelegramStoreActiveKeysView(items, locale);
             await sendOrEditTelegramMarkdownView({
               botToken: config.botToken,
               chatId,
@@ -6689,7 +6697,7 @@ export async function handleTelegramCallbackQuery(
         case 'show_plans': {
           await cancelStaleTelegramConversationOrders(chatId, callbackQuery.from.id);
           const { plans } = await resolveTelegramStorePlans();
-          const view = buildTelegramStorePlanListView(plans);
+          const view = buildTelegramStorePlanListView(plans, locale);
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,
@@ -6717,6 +6725,7 @@ export async function handleTelegramCallbackQuery(
         }
         case 'help': {
           const view = buildTelegramStoreHelpView({
+            locale,
             supportUrl: await getTelegramSupportLink(),
           });
           await sendOrEditTelegramMarkdownView({
@@ -6741,6 +6750,7 @@ export async function handleTelegramCallbackQuery(
             telegramUserId: callbackQuery.from.id,
             count: summary.fulfilledOrders,
             bonusGb: 0,
+            locale,
           });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
@@ -6760,10 +6770,11 @@ export async function handleTelegramCallbackQuery(
           const { items } = await loadTelegramStoreActiveKeysData({
             chatId,
             telegramUserId: callbackQuery.from.id,
+            locale,
           });
           const view = items.length === 0
-            ? buildTelegramStoreSetupNoKeyView()
-            : buildTelegramStoreSetupHomeView();
+            ? buildTelegramStoreSetupNoKeyView(locale)
+            : buildTelegramStoreSetupHomeView(locale);
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,
@@ -6778,10 +6789,11 @@ export async function handleTelegramCallbackQuery(
           const { items } = await loadTelegramStoreActiveKeysData({
             chatId,
             telegramUserId: callbackQuery.from.id,
+            locale,
           });
 
           if (items.length === 0) {
-            const view = buildTelegramStoreSetupNoKeyView();
+            const view = buildTelegramStoreSetupNoKeyView(locale);
             await sendOrEditTelegramMarkdownView({
               botToken: config.botToken,
               chatId,
@@ -6801,6 +6813,7 @@ export async function handleTelegramCallbackQuery(
                 planName: item.planName,
                 categoryLabel: item.categoryLabel,
               })),
+              locale,
             });
             await sendOrEditTelegramMarkdownView({
               botToken: config.botToken,
@@ -6832,6 +6845,7 @@ export async function handleTelegramCallbackQuery(
             keyId: keyView.id,
             platform: storefrontAction.platform,
             accessKey: keyView.accessKeyText,
+            locale,
           });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
@@ -6885,16 +6899,19 @@ export async function handleTelegramCallbackQuery(
                   renewPriceLabel: keyView.renewPriceLabel,
                   deviceLimitLabel: keyView.deviceLimitLabel,
                   showSwitchButton: keyView.showSwitchButton,
+                  locale,
                 })
               : storefrontAction.action === 'guide_platform'
                 ? buildTelegramStorePlatformGuideView({
                     keyId: keyView.id,
                     platform: storefrontAction.platform,
                     accessKey: keyView.accessKeyText,
+                    locale,
                   })
                 : buildTelegramStorePlatformSelectView({
                     keyId: keyView.id,
                     accessKey: keyView.accessKeyText,
+                    locale,
                   });
 
           await sendOrEditTelegramMarkdownView({
@@ -6938,7 +6955,7 @@ export async function handleTelegramCallbackQuery(
                 : null,
           });
 
-          const view = buildTelegramStoreOrderSummaryView({ plan });
+          const view = buildTelegramStoreOrderSummaryView({ plan, locale });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,
@@ -7190,6 +7207,7 @@ export async function handleTelegramCallbackQuery(
             const limitView = buildTelegramStoreSwitchLimitReachedView({
               max: key.switchesMaxLabel,
               planName: key.planName,
+              locale,
             });
             await sendOrEditTelegramMarkdownView({
               botToken: config.botToken,
@@ -7223,6 +7241,7 @@ export async function handleTelegramCallbackQuery(
             used: serverOptions.switchesUsed,
             maxLabel: key.switchesMaxLabel,
             servers: serverOptions.servers,
+            locale,
           });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
@@ -7270,6 +7289,7 @@ export async function handleTelegramCallbackQuery(
             newServerId: targetServer.id,
             used: serverOptions.switchesUsed,
             maxLabel: key.switchesMaxLabel,
+            locale,
           });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
@@ -7300,6 +7320,7 @@ export async function handleTelegramCallbackQuery(
             const limitView = buildTelegramStoreSwitchLimitReachedView({
               max: key.switchesMaxLabel,
               planName: key.planName,
+              locale,
             });
             await sendOrEditTelegramMarkdownView({
               botToken: config.botToken,
@@ -7387,6 +7408,7 @@ export async function handleTelegramCallbackQuery(
             newServer: `${targetServer.flag} ${targetServer.name}`,
             used: usedCount,
             maxLabel: key.switchesMaxLabel,
+            locale,
           });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
@@ -7836,7 +7858,9 @@ export async function handleTelegramCallbackQuery(
             ...(await loadTelegramStoreMainMenuData({
               chatId,
               telegramUserId: callbackQuery.from.id,
+              locale,
             })),
+            locale,
           });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
@@ -7864,7 +7888,7 @@ export async function handleTelegramCallbackQuery(
 
         if (menuAction.action === 'show_monthly' || menuAction.action === 'show_quarterly' || menuAction.action === 'claim_discount') {
           const { plans } = await resolveTelegramStorePlans();
-          const view = buildTelegramStorePlanListView(plans);
+          const view = buildTelegramStorePlanListView(plans, locale);
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,

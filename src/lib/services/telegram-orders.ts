@@ -347,16 +347,16 @@ function buildTelegramOrderProgressSummary(input: {
   const status = input.order.status;
   const isMyanmar = input.locale === 'my';
   if (status === 'FULFILLED') {
-    return isMyanmar ? 'Step 4/4 • Delivered' : 'Step 4/4 • Delivered';
+    return isMyanmar ? 'အဆင့် 4/4 • ပို့ပြီး' : 'Step 4/4 • Delivered';
   }
   if (status === 'PENDING_REVIEW' || status === 'APPROVED') {
-    return isMyanmar ? 'Step 4/4 • Admin review' : 'Step 4/4 • Admin review';
+    return isMyanmar ? 'အဆင့် 4/4 • Admin စစ်ဆေးနေ' : 'Step 4/4 • Admin review';
   }
   if (status === 'AWAITING_PAYMENT_PROOF') {
-    return isMyanmar ? 'Step 3/4 • Upload screenshot' : 'Step 3/4 • Upload screenshot';
+    return isMyanmar ? 'အဆင့် 3/4 • Screenshot တင်ပါ' : 'Step 3/4 • Upload screenshot';
   }
   if (status === 'AWAITING_PAYMENT_METHOD') {
-    return isMyanmar ? 'Step 2/4 • Choose payment method' : 'Step 2/4 • Choose payment method';
+    return isMyanmar ? 'အဆင့် 2/4 • ငွေပေးချေမှုနည်းလမ်းရွေးပါ' : 'Step 2/4 • Choose payment method';
   }
   if (
     status === 'AWAITING_KEY_SELECTION'
@@ -364,10 +364,10 @@ function buildTelegramOrderProgressSummary(input: {
     || status === 'AWAITING_MONTHS'
     || status === 'AWAITING_SERVER_SELECTION'
   ) {
-    return isMyanmar ? 'Step 1/4 • Setup' : 'Step 1/4 • Setup';
+    return isMyanmar ? 'အဆင့် 1/4 • စတင်ပြင်ဆင်နေ' : 'Step 1/4 • Setup';
   }
   if (status === 'REJECTED' || status === 'CANCELLED') {
-    return isMyanmar ? 'Flow ended • restart available' : 'Flow ended • restart available';
+    return isMyanmar ? 'Flow ပြီးဆုံးပြီး • ပြန်စနိုင်သည်' : 'Flow ended • restart available';
   }
   return null;
 }
