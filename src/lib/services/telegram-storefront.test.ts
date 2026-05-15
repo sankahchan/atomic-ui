@@ -246,7 +246,7 @@ test('storefront views localize Burmese copy for the main menu and setup flow', 
     locale: 'my',
   });
 
-  assert.match(setup.text, /Setup ပြုလုပ်ရန် \*၂ မိနစ်မပြည့်\*/);
+  assert.match(setup.text, /ချိတ်ဆက်ရန် \*၂ မိနစ်မပြည့်\* အချိန်သာလိုသည်/);
   assert.match(setup.text, /သင်၏ Key/);
   assert.equal(setup.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀ ပြန်မည်');
 });
@@ -580,7 +580,7 @@ test('store support and switch confirmation screens localize Burmese copy', () =
     supportUrl: 'https://t.me/example_support',
   });
   assert.match(support.text, /အကူအညီဆက်သွယ်ရန်/);
-  assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💬 အကူအညီ chat ဖွင့်မည်');
+  assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💬 အကူအညီ စကားပြောခန်းဖွင့်မည်');
 
   const confirmation = buildTelegramStoreSwitchConfirmationView({
     keyId: 'key_123',

@@ -840,7 +840,7 @@ export async function sendTelegramStoreSetupGuide(
 
 export function getTelegramStoreSupportAlert(locale: SupportedLocale) {
   return locale === 'my'
-    ? '💬 Support contact ကို ဖွင့်ရန် /support ကို အသုံးပြုပါ။'
+    ? '💬 အကူအညီဆက်သွယ်ရန် /support ကို အသုံးပြုပါ။'
     : '💬 Use /support to open the support contact card.';
 }
 

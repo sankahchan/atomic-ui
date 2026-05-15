@@ -53,12 +53,14 @@ export interface TelegramConfig {
 async function setTelegramMyCommands(
   botToken: string,
   commands: TelegramBotCommandDefinition[],
+  languageCode?: string,
 ) {
   const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/setMyCommands`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       commands,
+      ...(languageCode ? { language_code: languageCode } : {}),
     }),
   });
 
@@ -78,14 +80,27 @@ async function setTelegramMyCommands(
 }
 
 async function ensureTelegramMyCommands(botToken: string) {
-  const commands = getTelegramUserBotCommands();
-  const signature = JSON.stringify(commands);
-  if (TELEGRAM_COMMAND_SYNC_SIGNATURE.get(botToken) === signature) {
-    return;
-  }
+  const commandSets = [
+    { cacheKey: `${botToken}:default`, commands: getTelegramUserBotCommands('en') },
+    { cacheKey: `${botToken}:my`, commands: getTelegramUserBotCommands('my'), languageCode: 'my' },
+  ];
 
-  await setTelegramMyCommands(botToken, commands);
-  TELEGRAM_COMMAND_SYNC_SIGNATURE.set(botToken, signature);
+  for (const commandSet of commandSets) {
+    const signature = JSON.stringify({
+      languageCode: commandSet.languageCode || null,
+      commands: commandSet.commands,
+    });
+    if (TELEGRAM_COMMAND_SYNC_SIGNATURE.get(commandSet.cacheKey) === signature) {
+      continue;
+    }
+
+    await setTelegramMyCommands(
+      botToken,
+      commandSet.commands,
+      commandSet.languageCode,
+    );
+    TELEGRAM_COMMAND_SYNC_SIGNATURE.set(commandSet.cacheKey, signature);
+  }
 }
 
 export interface SendMessageOptions {

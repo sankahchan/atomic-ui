@@ -555,7 +555,7 @@ export function buildTelegramAdminHomeKeyboard(input: {
         callback_data: buildTelegramMenuCallbackData('admin', 'createkey'),
       },
       {
-        text: isMyanmar ? '💎 Dynamic key' : '💎 Dynamic key',
+        text: isMyanmar ? '💎 Dynamic key ဖန်တီး' : '💎 Dynamic key',
         callback_data: buildTelegramMenuCallbackData('admin', 'createdynamic'),
       },
     ]);
@@ -574,21 +574,21 @@ export function buildTelegramAdminHomeKeyboard(input: {
   if (hasTelegramReviewManageScope(input.adminActor.scope)) {
     rows.push([
       {
-        text: withCount(isMyanmar ? '📋 Review queue' : '📋 Review queue', input.pendingReview),
+        text: withCount(isMyanmar ? '📋 စစ်ဆေးရန်' : '📋 Review queue', input.pendingReview),
         callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
       },
       {
-        text: withCount(isMyanmar ? '🛟 Support console' : '🛟 Support console', input.supportOpen),
+        text: withCount(isMyanmar ? '🛟 အကူအညီစာရင်း' : '🛟 Support console', input.supportOpen),
         callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
       },
     ]);
     rows.push([
       {
-        text: withCount(isMyanmar ? '🧵 Customer thread များ' : '🧵 Customer threads', input.customerSupportOpen),
+        text: withCount(isMyanmar ? '🧵 Customer အမှု' : '🧵 Customer threads', input.customerSupportOpen),
         callback_data: buildTelegramMenuCallbackData('admin', 'supportthreads'),
       },
       {
-        text: withCount(isMyanmar ? '💎 Premium queue' : '💎 Premium queue', input.premiumSupportOpen),
+        text: withCount(isMyanmar ? '💎 Premium အမှု' : '💎 Premium queue', input.premiumSupportOpen),
         callback_data: buildTelegramMenuCallbackData('admin', 'supportpremium'),
       },
     ]);
@@ -597,11 +597,11 @@ export function buildTelegramAdminHomeKeyboard(input: {
   if (hasFinanceManageScope(input.adminActor.scope)) {
     rows.push([
       {
-        text: withCount(isMyanmar ? '💸 Refunds' : '💸 Refunds', input.pendingRefunds),
+        text: withCount(isMyanmar ? '💸 ငွေပြန်' : '💸 Refunds', input.pendingRefunds),
         callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
       },
       {
-        text: isMyanmar ? '💼 Finance' : '💼 Finance',
+        text: isMyanmar ? '💼 ငွေကြေး' : '💼 Finance',
         callback_data: buildTelegramMenuCallbackData('admin', 'finance'),
       },
     ]);
@@ -612,7 +612,7 @@ export function buildTelegramAdminHomeKeyboard(input: {
       {
         text: withCount(
           isMyanmar
-            ? `📢 Broadcasts${input.failedDeliveries > 0 ? ' • failed' : ''}`
+            ? `📢 ကြေညာချက်များ${input.failedDeliveries > 0 ? ' • မအောင်မြင်' : ''}`
             : `📢 Broadcasts${input.failedDeliveries > 0 ? ' • failed' : ''}`,
           input.scheduledAnnouncements,
         ),
@@ -624,12 +624,12 @@ export function buildTelegramAdminHomeKeyboard(input: {
   const lastRow: Array<{ text: string; callback_data: string }> = [];
   if (hasOutageManageScope(input.adminActor.scope)) {
     lastRow.push({
-      text: isMyanmar ? '🚨 Server notice များ' : '🚨 Server notices',
+      text: isMyanmar ? '🚨 Server အသိပေး' : '🚨 Server notices',
       callback_data: buildTelegramMenuCallbackData('admin', 'servernotices'),
     });
   }
   lastRow.push({
-    text: isMyanmar ? '📊 Status' : '📊 Status',
+    text: isMyanmar ? '📊 အခြေအနေ' : '📊 Status',
     callback_data: buildTelegramMenuCallbackData('admin', 'status'),
   });
   rows.push(lastRow);
@@ -662,7 +662,7 @@ export function buildTelegramAdminHomeMessage(input: {
         ? `<b>${escapeHtml(input.adminActor.email)}</b> ဖြင့် ဝင်ထားသည်`
         : `Signed in as <b>${escapeHtml(input.adminActor.email)}</b>`
       : isMyanmar
-        ? 'Admin chat access ဖြင့် ဝင်ထားသည်'
+        ? 'Admin chat ခွင့်ပြုချက်ဖြင့် ဝင်ထားသည်'
         : 'Signed in with admin chat access',
     '',
     isMyanmar ? '<b>စစ်ရန်လိုသည်</b>' : '<b>Needs attention</b>',
@@ -671,10 +671,10 @@ export function buildTelegramAdminHomeMessage(input: {
   if (hasTelegramReviewManageScope(input.adminActor.scope)) {
     lines.push(
       isMyanmar
-        ? `📋 Review: ${input.pendingReview} ခု စောင့်နေ • ${input.unclaimedReview} ခု မယူရသေး`
+        ? `📋 စစ်ဆေးရန်: ${input.pendingReview} ခု စောင့်နေ • ${input.unclaimedReview} ခု မယူရသေး`
         : `📋 Review: ${input.pendingReview} pending • ${input.unclaimedReview} unclaimed`,
       isMyanmar
-        ? `🛟 Support: ${needsAdmin} ခု admin စောင့်နေ • customer ${input.customerSupportWaitingAdmin} • premium ${input.premiumSupportWaitingAdmin}`
+        ? `🛟 အကူအညီ: ${needsAdmin} ခု admin စောင့်နေ • customer အမှု ${input.customerSupportWaitingAdmin} ခု • premium အမှု ${input.premiumSupportWaitingAdmin} ခု`
         : `🛟 Support: ${needsAdmin} need admin • ${input.customerSupportWaitingAdmin} customer • ${input.premiumSupportWaitingAdmin} premium`,
     );
   }
@@ -682,7 +682,7 @@ export function buildTelegramAdminHomeMessage(input: {
   if (hasFinanceManageScope(input.adminActor.scope)) {
     lines.push(
       isMyanmar
-        ? `💸 Refunds: ${input.pendingRefunds} ခု စောင့်နေ${input.adminActor.userId ? ` • ${input.myRefunds} ခု ကိုယ်ပိုင်` : ''}`
+        ? `💸 ငွေပြန်တောင်းမှု: ${input.pendingRefunds} ခု စောင့်နေ${input.adminActor.userId ? ` • ${input.myRefunds} ခု ကိုယ်ပိုင်` : ''}`
         : `💸 Refunds: ${input.pendingRefunds} pending${input.adminActor.userId ? ` • ${input.myRefunds} mine` : ''}`,
     );
   }
@@ -690,7 +690,7 @@ export function buildTelegramAdminHomeMessage(input: {
   if (hasTelegramAnnouncementManageScope(input.adminActor.scope)) {
     lines.push(
       isMyanmar
-        ? `📢 Broadcasts: ${input.scheduledAnnouncements} ခု သတ်မှတ်ထား • ${input.failedDeliveries} ခု မအောင်မြင်`
+        ? `📢 ကြေညာချက်များ: ${input.scheduledAnnouncements} ခု သတ်မှတ်ထား • ${input.failedDeliveries} ခု မအောင်မြင်`
         : `📢 Broadcasts: ${input.scheduledAnnouncements} scheduled • ${input.failedDeliveries} failed`,
     );
   }
