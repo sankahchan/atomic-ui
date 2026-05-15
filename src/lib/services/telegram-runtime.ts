@@ -143,12 +143,24 @@ export async function getTelegramUserProfile(
   telegramUserId: string,
   telegramChatId?: string | null,
 ) {
+  const profileByUserId = await db.telegramUserProfile.findUnique({
+    where: { telegramUserId },
+  });
+
+  if (profileByUserId) {
+    return profileByUserId;
+  }
+
+  if (!telegramChatId) {
+    return null;
+  }
+
   return db.telegramUserProfile.findFirst({
     where: {
-      OR: [
-        { telegramUserId },
-        ...(telegramChatId ? [{ telegramChatId }] : []),
-      ],
+      telegramChatId,
+    },
+    orderBy: {
+      updatedAt: 'desc',
     },
   });
 }
@@ -424,6 +436,9 @@ export async function resolveTelegramLocaleForRecipient(input: {
         ? await db.telegramUserProfile.findFirst({
             where: {
               telegramChatId: input.telegramChatId,
+            },
+            orderBy: {
+              updatedAt: 'desc',
             },
           })
         : null;

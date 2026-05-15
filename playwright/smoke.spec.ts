@@ -63,17 +63,14 @@ test('admin smoke journeys stay functional', async ({ page }) => {
   });
 
   await test.step('restore endpoint rejects the wrong content type cleanly', async () => {
-    const response = await page.evaluate(async () => {
-      const res = await fetch('/api/restore', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bad: true }),
-      });
-      return {
-        status: res.status,
-        body: await res.text(),
-      };
+    const res = await page.request.post('/api/restore', {
+      headers: { 'content-type': 'application/json' },
+      data: { bad: true },
     });
+    const response = {
+      status: res.status(),
+      body: await res.text(),
+    };
 
     expect(response.status).toBe(415);
     expect(response.body).toContain('multipart/form-data');
