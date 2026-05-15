@@ -12,6 +12,7 @@ import { handleTelegramSupportReplyMedia, handleTelegramSupportReplyText } from 
 import { copyTelegramMessage } from '@/lib/services/telegram-runtime';
 import {
   handleEmailLink,
+  handleLanguageCommand,
   handleStartCommand,
   handleStoreHelpCommand,
   handleStoreBuyCommand,
@@ -29,6 +30,7 @@ import {
 const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
   'buy',
   'help',
+  'language',
   'mykeys',
   'referral',
   'renew',
@@ -335,6 +337,8 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         locale,
         botToken: config.botToken,
       });
+    case 'language':
+      return handleLanguageCommand(chatId, config.botToken);
     case 'cancel': {
       const currentOrder = activeOrder ?? (await getActiveTelegramOrder(chatId, telegramUserId));
       if (pendingPremiumReply) {

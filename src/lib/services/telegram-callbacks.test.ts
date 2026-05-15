@@ -33,17 +33,20 @@ test('getCommandKeyboard renders localized customer labels', () => {
   assert.equal(english.keyboard.length, 5);
   assert.equal(myanmar.keyboard[0]?.[0]?.text, '🛒 ဝယ်မည်');
   assert.equal(myanmar.keyboard[0]?.[1]?.text, '🗂 Key များ');
-  assert.equal(myanmar.keyboard[4]?.[0]?.text, '❓ Help');
+  assert.equal(myanmar.keyboard[4]?.[0]?.text, '❓ အကူအညီ');
+  assert.equal(myanmar.keyboard[4]?.[1]?.text, '🌐 ဘာသာစကား');
 });
 
 test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back to commands', () => {
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛒 Buy', false), '/buy');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛒 Buy key', false), '/buy');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🗂 Key များ', false), '/mykeys');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🔄 သက်တမ်းတိုး', false), '/renew');
   assert.equal(normalizeTelegramReplyKeyboardCommand('📊 Quick status', false), '/status');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🔄 Switch Server', false), '/switchserver');
   assert.equal(normalizeTelegramReplyKeyboardCommand('📲 Setup Guide', false), '/setup');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🎁 Refer a friend', false), '/referral');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🌐 ဘာသာစကား', false), '/language');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛑 Cancel', false), '/cancel');
 });
 
@@ -61,8 +64,14 @@ test('getTelegramUserBotCommands matches the registered storefront command surfa
       'referral',
       'support',
       'help',
+      'language',
       'cancel',
     ],
+  );
+
+  assert.equal(
+    getTelegramUserBotCommands('my').find((command) => command.command === 'language')?.description,
+    '🌐 ဘာသာစကားပြောင်း',
   );
 });
 
@@ -70,7 +79,9 @@ test('normalizeTelegramReplyKeyboardCommand keeps admin labels admin-only', () =
   assert.equal(normalizeTelegramReplyKeyboardCommand('🧭 Admin home', false), null);
   assert.equal(normalizeTelegramReplyKeyboardCommand('📢 Broadcasts', false), null);
   assert.equal(normalizeTelegramReplyKeyboardCommand('🧭 Admin home', true), '/admin');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('🧭 Admin စင်တာ', true), '/admin');
   assert.equal(normalizeTelegramReplyKeyboardCommand('📋 Review queue', true), '/reviewqueue');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('📋 စစ်ဆေးရန်', true), '/reviewqueue');
   assert.equal(normalizeTelegramReplyKeyboardCommand('📢 Broadcasts', true), '/announcements');
   assert.equal(normalizeTelegramReplyKeyboardCommand('➕ Normal key', true), '/createkey');
   assert.equal(normalizeTelegramReplyKeyboardCommand('💎 Dynamic key', true), '/createdynamic');

@@ -100,51 +100,52 @@ const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
     { command: '/mykeys', labelEn: '🗂 Keys', labelMy: '🗂 Key များ', aliases: ['🔑 My Keys', '🗂 My keys'] },
   ],
   [
-    { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 Renew' },
-    { command: '/status', labelEn: '📊 Status', labelMy: '📊 Status', aliases: ['📊 Quick status'] },
+    { command: '/renew', labelEn: '🔄 Renew', labelMy: '🔄 သက်တမ်းတိုး' },
+    { command: '/status', labelEn: '📊 Status', labelMy: '📊 အခြေအနေ', aliases: ['📊 Quick status'] },
   ],
   [
     { command: '/switchserver', labelEn: '🌍 Switch Server', labelMy: '🌍 Server ပြောင်း', aliases: ['🔄 Switch Server'] },
-    { command: '/setup', labelEn: '📲 Setup', labelMy: '📲 Setup', aliases: ['📲 Setup Guide'] },
+    { command: '/setup', labelEn: '📲 Setup', labelMy: '📲 ချိတ်ဆက်နည်း', aliases: ['📲 Setup Guide'] },
   ],
   [
-    { command: '/referral', labelEn: '🎁 Referral', labelMy: '🎁 Referral', aliases: ['🎁 Refer a friend'] },
-    { command: '/support', labelEn: '💬 Support', labelMy: '💬 Support', aliases: ['🛟 Support', '💬 Contact Support'] },
+    { command: '/referral', labelEn: '🎁 Referral', labelMy: '🎁 မိတ်ဆွေဖိတ်', aliases: ['🎁 Refer a friend'] },
+    { command: '/support', labelEn: '💬 Support', labelMy: '💬 အကူအညီ', aliases: ['🛟 Support', '💬 Contact Support'] },
   ],
   [
-    { command: '/help', labelEn: '❓ Help', labelMy: '❓ Help' },
+    { command: '/help', labelEn: '❓ Help', labelMy: '❓ အကူအညီ' },
+    { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 ဘာသာစကား', aliases: ['🌐 Change language', '🌐 Switch language'] },
   ],
 ];
 
 const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
-  { command: '/start', labelEn: '🏠 Start', labelMy: '🏠 Start' },
-  { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 Cancel' },
+  { command: '/start', labelEn: '🏠 Start', labelMy: '🏠 စတင်' },
+  { command: '/cancel', labelEn: '🛑 Cancel', labelMy: '🛑 ပယ်ဖျက်' },
 ];
 
 const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
   [
-    { command: '/admin', labelEn: '🧭 Admin home', labelMy: '🧭 Admin home' },
-    { command: '/reviewqueue', labelEn: '📋 Review queue', labelMy: '📋 Review queue' },
+    { command: '/admin', labelEn: '🧭 Admin home', labelMy: '🧭 Admin စင်တာ' },
+    { command: '/reviewqueue', labelEn: '📋 Review queue', labelMy: '📋 စစ်ဆေးရန်' },
   ],
   [
-    { command: '/createkey', labelEn: '➕ Normal key', labelMy: '➕ Normal key' },
-    { command: '/createdynamic', labelEn: '💎 Dynamic key', labelMy: '💎 Dynamic key' },
+    { command: '/createkey', labelEn: '➕ Normal key', labelMy: '➕ ပုံမှန် key' },
+    { command: '/createdynamic', labelEn: '💎 Dynamic key', labelMy: '💎 Dynamic ဖန်တီး' },
   ],
   [
-    { command: '/managekey', labelEn: '🛠 Manage key', labelMy: '🛠 Manage key' },
-    { command: '/managedynamic', labelEn: '🧭 Manage dynamic', labelMy: '🧭 Manage dynamic' },
+    { command: '/managekey', labelEn: '🛠 Manage key', labelMy: '🛠 Key စီမံရန်' },
+    { command: '/managedynamic', labelEn: '🧭 Manage dynamic', labelMy: '🧭 Dynamic စီမံရန်' },
   ],
   [
-    { command: '/status', labelEn: '📊 Status', labelMy: '📊 Status' },
-    { command: '/expiring', labelEn: '⏰ Expiring', labelMy: '⏰ Expiring' },
+    { command: '/status', labelEn: '📊 Status', labelMy: '📊 အခြေအနေ' },
+    { command: '/expiring', labelEn: '⏰ Expiring', labelMy: '⏰ သက်တမ်းကုန်မည့်' },
   ],
   [
     { command: '/find', labelEn: '🔎 Find key', labelMy: '🔎 Key ရှာ' },
-    { command: '/announcements', labelEn: '📢 Broadcasts', labelMy: '📢 Broadcasts' },
+    { command: '/announcements', labelEn: '📢 Broadcasts', labelMy: '📢 ကြေညာချက်များ' },
   ],
   [
-    { command: '/finance', labelEn: '💼 Finance', labelMy: '💼 Finance' },
-    { command: '/refunds', labelEn: '💸 Refunds', labelMy: '💸 Refunds' },
+    { command: '/finance', labelEn: '💼 Finance', labelMy: '💼 ငွေကြေး' },
+    { command: '/refunds', labelEn: '💸 Refunds', labelMy: '💸 Refund များ' },
   ],
 ];
 
@@ -174,22 +175,38 @@ export function getCommandKeyboard(isAdmin: boolean, locale: SupportedLocale = '
   };
 }
 
-const TELEGRAM_DEFAULT_BOT_COMMANDS: TelegramBotCommandDefinition[] = [
-  { command: 'start', description: '🏠 Main menu' },
-  { command: 'buy', description: '🛒 Browse plans' },
-  { command: 'mykeys', description: '🔑 My active keys' },
-  { command: 'renew', description: '🔄 Renew a plan' },
-  { command: 'status', description: '📊 Quick status' },
-  { command: 'switchserver', description: '🌍 Switch server' },
-  { command: 'setup', description: '📲 Setup guide' },
-  { command: 'referral', description: '🎁 Refer a friend' },
-  { command: 'support', description: '💬 Contact support' },
-  { command: 'help', description: '❓ Help & FAQ' },
-  { command: 'cancel', description: '✖️ Cancel' },
-];
+export function getTelegramUserBotCommands(locale: SupportedLocale = 'en') {
+  if (locale === 'my') {
+    return [
+      { command: 'start', description: '🏠 ပင်မ menu' },
+      { command: 'buy', description: '🛒 plan များကြည့်' },
+      { command: 'mykeys', description: '🔑 အသုံးပြုနေသော key' },
+      { command: 'renew', description: '🔄 သက်တမ်းတိုး' },
+      { command: 'status', description: '📊 အခြေအနေအမြန်' },
+      { command: 'switchserver', description: '🌍 server ပြောင်း' },
+      { command: 'setup', description: '📲 ချိတ်ဆက်နည်း' },
+      { command: 'referral', description: '🎁 မိတ်ဆွေဖိတ်' },
+      { command: 'support', description: '💬 အကူအညီ' },
+      { command: 'help', description: '❓ အကူအညီ' },
+      { command: 'language', description: '🌐 ဘာသာစကားပြောင်း' },
+      { command: 'cancel', description: '✖️ ပယ်ဖျက်' },
+    ] satisfies TelegramBotCommandDefinition[];
+  }
 
-export function getTelegramUserBotCommands() {
-  return TELEGRAM_DEFAULT_BOT_COMMANDS;
+  return [
+    { command: 'start', description: '🏠 Main menu' },
+    { command: 'buy', description: '🛒 Browse plans' },
+    { command: 'mykeys', description: '🔑 My active keys' },
+    { command: 'renew', description: '🔄 Renew a plan' },
+    { command: 'status', description: '📊 Quick status' },
+    { command: 'switchserver', description: '🌍 Switch server' },
+    { command: 'setup', description: '📲 Setup guide' },
+    { command: 'referral', description: '🎁 Refer a friend' },
+    { command: 'support', description: '💬 Contact support' },
+    { command: 'help', description: '❓ Help & FAQ' },
+    { command: 'language', description: '🌐 Change language' },
+    { command: 'cancel', description: '✖️ Cancel' },
+  ] satisfies TelegramBotCommandDefinition[];
 }
 
 export function normalizeTelegramReplyKeyboardCommand(
