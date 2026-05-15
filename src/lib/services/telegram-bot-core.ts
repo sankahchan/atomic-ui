@@ -322,6 +322,7 @@ import {
   buildTelegramStorePlanListView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
+  buildTelegramStoreQuickStatusView,
   buildTelegramStoreReferralView,
   buildTelegramStoreRenewView,
   buildTelegramStoreSetupHomeView,
@@ -10941,7 +10942,24 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
         adminActor,
       });
     case 'status':
-      return isAdmin ? handleStatusCommand(locale) : ui.adminOnly;
+      if (isAdmin) {
+        return handleStatusCommand(locale);
+      }
+      {
+        const account = await loadTelegramStoreAccountData({
+          chatId,
+          telegramUserId,
+          locale,
+        });
+        const view = buildTelegramStoreQuickStatusView({
+          ...account,
+          locale,
+        });
+        await sendTelegramMessage(config.botToken, chatId, view.text, {
+          parseMode: 'MarkdownV2',
+        });
+        return null;
+      }
     case 'expiring':
       return isAdmin ? handleExpiringCommand(argsText, locale) : ui.adminOnly;
     case 'find':

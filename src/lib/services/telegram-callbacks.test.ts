@@ -8,6 +8,7 @@ import {
   buildTelegramMenuCallbackData,
   buildTelegramOrderReviewCallbackData,
   buildTelegramSupportQueueCallbackData,
+  getTelegramAdminBotCommands,
   getCommandKeyboard,
   getTelegramUserBotCommands,
   parseTelegramAdminKeyCallbackData,
@@ -23,6 +24,7 @@ import {
 test('getCommandKeyboard renders localized customer labels', () => {
   const english = getCommandKeyboard(false, 'en');
   const myanmar = getCommandKeyboard(false, 'my');
+  const adminMyanmar = getCommandKeyboard(true, 'my');
 
   assert.equal(english.keyboard[0]?.[0]?.text, '🛒 Buy');
   assert.equal(english.keyboard[0]?.[1]?.text, '🗂 Keys');
@@ -35,6 +37,9 @@ test('getCommandKeyboard renders localized customer labels', () => {
   assert.equal(myanmar.keyboard[0]?.[1]?.text, '🗂 Key များ');
   assert.equal(myanmar.keyboard[4]?.[0]?.text, '❓ အကူအညီ');
   assert.equal(myanmar.keyboard[4]?.[1]?.text, '🌐 ဘာသာစကား');
+  assert.equal(adminMyanmar.keyboard[5]?.[0]?.text, '🧭 Admin စင်တာ');
+  assert.equal(adminMyanmar.keyboard[6]?.[0]?.text, '➕ ပုံမှန်ကီး');
+  assert.equal(adminMyanmar.keyboard[10]?.[1]?.text, '💸 ငွေပြန်အမ်းများ');
 });
 
 test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back to commands', () => {
@@ -75,6 +80,42 @@ test('getTelegramUserBotCommands matches the registered storefront command surfa
   );
 });
 
+test('getTelegramAdminBotCommands extends the command menu for admin chats', () => {
+  assert.deepEqual(
+    getTelegramAdminBotCommands().map((command) => command.command),
+    [
+      'start',
+      'buy',
+      'mykeys',
+      'renew',
+      'status',
+      'switchserver',
+      'setup',
+      'referral',
+      'support',
+      'help',
+      'language',
+      'cancel',
+      'admin',
+      'reviewqueue',
+      'createkey',
+      'createdynamic',
+      'managekey',
+      'managedynamic',
+      'expiring',
+      'find',
+      'announcements',
+      'finance',
+      'refunds',
+    ],
+  );
+
+  assert.equal(
+    getTelegramAdminBotCommands('my').find((command) => command.command === 'finance')?.description,
+    '💼 ငွေစာရင်း',
+  );
+});
+
 test('normalizeTelegramReplyKeyboardCommand keeps admin labels admin-only', () => {
   assert.equal(normalizeTelegramReplyKeyboardCommand('🧭 Admin home', false), null);
   assert.equal(normalizeTelegramReplyKeyboardCommand('📢 Broadcasts', false), null);
@@ -86,6 +127,7 @@ test('normalizeTelegramReplyKeyboardCommand keeps admin labels admin-only', () =
   assert.equal(normalizeTelegramReplyKeyboardCommand('➕ Normal key', true), '/createkey');
   assert.equal(normalizeTelegramReplyKeyboardCommand('💎 Dynamic key', true), '/createdynamic');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛠 Manage key', true), '/managekey');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('💸 ငွေပြန်အမ်းများ', true), '/refunds');
 });
 
 test('telegram order review callbacks support quick reject presets', () => {

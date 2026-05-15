@@ -17,7 +17,11 @@ import {
 } from '@/lib/services/telegram-domain-types';
 import { getJwtSecretString } from '@/lib/session-secret';
 import { escapeHtml } from '@/lib/services/telegram-ui';
-import { getTelegramUserBotCommands, type TelegramBotCommandDefinition } from '@/lib/services/telegram-callbacks';
+import {
+  getTelegramAdminBotCommands,
+  getTelegramUserBotCommands,
+  type TelegramBotCommandDefinition,
+} from '@/lib/services/telegram-callbacks';
 import {
   resolveTelegramWebhookSecret,
   TELEGRAM_WEBHOOK_SECRET_HEADER,
@@ -30,6 +34,18 @@ import {
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_COMMAND_SYNC_SIGNATURE = new Map<string, string>();
+
+type TelegramCommandScope = {
+  type: string;
+  chat_id?: number;
+};
+
+type TelegramCommandSyncSet = {
+  cacheKey: string;
+  commands: TelegramBotCommandDefinition[];
+  languageCode?: string;
+  scope?: TelegramCommandScope;
+};
 
 export type TelegramParseMode = 'HTML' | 'Markdown' | 'MarkdownV2';
 
@@ -53,14 +69,18 @@ export interface TelegramConfig {
 async function setTelegramMyCommands(
   botToken: string,
   commands: TelegramBotCommandDefinition[],
-  languageCode?: string,
+  options?: {
+    languageCode?: string;
+    scope?: TelegramCommandScope;
+  },
 ) {
   const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/setMyCommands`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       commands,
-      ...(languageCode ? { language_code: languageCode } : {}),
+      ...(options?.languageCode ? { language_code: options.languageCode } : {}),
+      ...(options?.scope ? { scope: options.scope } : {}),
     }),
   });
 
@@ -79,15 +99,38 @@ async function setTelegramMyCommands(
   }
 }
 
-async function ensureTelegramMyCommands(botToken: string) {
-  const commandSets = [
+async function ensureTelegramMyCommands(botToken: string, adminChatIds: string[] = []) {
+  const uniqueAdminChatIds = Array.from(
+    new Set(
+      adminChatIds
+        .map((value) => value.trim())
+        .filter((value) => /^-?\d+$/.test(value))
+        .map((value) => Number.parseInt(value, 10))
+        .filter((value) => Number.isSafeInteger(value)),
+    ),
+  );
+  const commandSets: TelegramCommandSyncSet[] = [
     { cacheKey: `${botToken}:default`, commands: getTelegramUserBotCommands('en') },
     { cacheKey: `${botToken}:my`, commands: getTelegramUserBotCommands('my'), languageCode: 'my' },
+    ...uniqueAdminChatIds.flatMap((chatId) => ([
+      {
+        cacheKey: `${botToken}:admin:${chatId}:default`,
+        commands: getTelegramAdminBotCommands('en'),
+        scope: { type: 'chat', chat_id: chatId },
+      },
+      {
+        cacheKey: `${botToken}:admin:${chatId}:my`,
+        commands: getTelegramAdminBotCommands('my'),
+        languageCode: 'my',
+        scope: { type: 'chat', chat_id: chatId },
+      },
+    ])),
   ];
 
   for (const commandSet of commandSets) {
     const signature = JSON.stringify({
       languageCode: commandSet.languageCode || null,
+      scope: commandSet.scope || null,
       commands: commandSet.commands,
     });
     if (TELEGRAM_COMMAND_SYNC_SIGNATURE.get(commandSet.cacheKey) === signature) {
@@ -97,7 +140,10 @@ async function ensureTelegramMyCommands(botToken: string) {
     await setTelegramMyCommands(
       botToken,
       commandSet.commands,
-      commandSet.languageCode,
+      {
+        languageCode: commandSet.languageCode,
+        scope: commandSet.scope,
+      },
     );
     TELEGRAM_COMMAND_SYNC_SIGNATURE.set(commandSet.cacheKey, signature);
   }
@@ -584,9 +630,14 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
         DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
         config.localizedKeyNotFoundMessages,
       );
+      const adminChatIds = Array.isArray(config.adminChatIds)
+        ? config.adminChatIds.filter(
+            (value): value is string => typeof value === 'string' && value.trim().length > 0,
+          )
+        : [];
 
       const webhookSecretToken = await ensurePersistedTelegramWebhookSecret(config);
-      await ensureTelegramMyCommands(config.botToken);
+      await ensureTelegramMyCommands(config.botToken, adminChatIds);
 
       return {
         botToken: config.botToken,
@@ -595,11 +646,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
             ? config.botUsername
             : undefined,
         webhookSecretToken: webhookSecretToken || getTelegramWebhookSecret(config.botToken),
-        adminChatIds: Array.isArray(config.adminChatIds)
-          ? config.adminChatIds.filter(
-              (value): value is string => typeof value === 'string' && value.trim().length > 0,
-            )
-          : [],
+        adminChatIds,
         welcomeMessage:
           typeof config.welcomeMessage === 'string' && config.welcomeMessage.trim()
             ? config.welcomeMessage
@@ -653,7 +700,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
           : [];
 
       if (botToken && adminChatIds.length > 0) {
-        await ensureTelegramMyCommands(botToken);
+        await ensureTelegramMyCommands(botToken, adminChatIds);
         return {
           botToken,
           botUsername:

@@ -128,11 +128,11 @@ const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
     { command: '/reviewqueue', labelEn: '📋 Review queue', labelMy: '📋 စစ်ဆေးရန်' },
   ],
   [
-    { command: '/createkey', labelEn: '➕ Normal key', labelMy: '➕ ပုံမှန် key' },
-    { command: '/createdynamic', labelEn: '💎 Dynamic key', labelMy: '💎 Dynamic ဖန်တီး' },
+    { command: '/createkey', labelEn: '➕ Normal key', labelMy: '➕ ပုံမှန်ကီး' },
+    { command: '/createdynamic', labelEn: '💎 Dynamic key', labelMy: '💎 Dynamic ကီး' },
   ],
   [
-    { command: '/managekey', labelEn: '🛠 Manage key', labelMy: '🛠 Key စီမံရန်' },
+    { command: '/managekey', labelEn: '🛠 Manage key', labelMy: '🛠 ကီးစီမံရန်' },
     { command: '/managedynamic', labelEn: '🧭 Manage dynamic', labelMy: '🧭 Dynamic စီမံရန်' },
   ],
   [
@@ -144,8 +144,8 @@ const TELEGRAM_ADMIN_COMMAND_ROWS: TelegramCommandShortcut[][] = [
     { command: '/announcements', labelEn: '📢 Broadcasts', labelMy: '📢 ကြေညာချက်များ' },
   ],
   [
-    { command: '/finance', labelEn: '💼 Finance', labelMy: '💼 ငွေကြေး' },
-    { command: '/refunds', labelEn: '💸 Refunds', labelMy: '💸 Refund များ' },
+    { command: '/finance', labelEn: '💼 Finance', labelMy: '💼 ငွေစာရင်း' },
+    { command: '/refunds', labelEn: '💸 Refunds', labelMy: '💸 ငွေပြန်အမ်းများ' },
   ],
 ];
 
@@ -206,6 +206,40 @@ export function getTelegramUserBotCommands(locale: SupportedLocale = 'en') {
     { command: 'help', description: '❓ Help & FAQ' },
     { command: 'language', description: '🌐 Change language' },
     { command: 'cancel', description: '✖️ Cancel' },
+  ] satisfies TelegramBotCommandDefinition[];
+}
+
+export function getTelegramAdminBotCommands(locale: SupportedLocale = 'en') {
+  if (locale === 'my') {
+    return [
+      ...getTelegramUserBotCommands('my'),
+      { command: 'admin', description: '🧭 Admin စင်တာ' },
+      { command: 'reviewqueue', description: '📋 စစ်ဆေးရန်တန်းစီမှု' },
+      { command: 'createkey', description: '➕ ပုံမှန်ကီးဖန်တီး' },
+      { command: 'createdynamic', description: '💎 Dynamic ကီးဖန်တီး' },
+      { command: 'managekey', description: '🛠 ကီးစီမံရန်' },
+      { command: 'managedynamic', description: '🧭 Dynamic ကီးစီမံရန်' },
+      { command: 'expiring', description: '⏰ သက်တမ်းကုန်မည့်များ' },
+      { command: 'find', description: '🔎 ကီးရှာရန်' },
+      { command: 'announcements', description: '📢 ကြေညာချက်များ' },
+      { command: 'finance', description: '💼 ငွေစာရင်း' },
+      { command: 'refunds', description: '💸 ငွေပြန်အမ်းများ' },
+    ] satisfies TelegramBotCommandDefinition[];
+  }
+
+  return [
+    ...getTelegramUserBotCommands('en'),
+    { command: 'admin', description: '🧭 Admin home' },
+    { command: 'reviewqueue', description: '📋 Review queue' },
+    { command: 'createkey', description: '➕ Create normal key' },
+    { command: 'createdynamic', description: '💎 Create dynamic key' },
+    { command: 'managekey', description: '🛠 Manage normal key' },
+    { command: 'managedynamic', description: '🧭 Manage dynamic key' },
+    { command: 'expiring', description: '⏰ Expiring keys' },
+    { command: 'find', description: '🔎 Find key' },
+    { command: 'announcements', description: '📢 Broadcast history' },
+    { command: 'finance', description: '💼 Finance dashboard' },
+    { command: 'refunds', description: '💸 Refund queue' },
   ] satisfies TelegramBotCommandDefinition[];
 }
 
