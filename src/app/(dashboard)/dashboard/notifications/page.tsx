@@ -2485,6 +2485,43 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                   </div>
                 </div>
               </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-border/60 bg-background/45 p-4 md:col-span-2">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {botSettingsDirty
+                      ? isMyanmar
+                        ? 'Welcome နှင့် template ပြောင်းလဲမှုများကို သိမ်းရန် အသင့်ဖြစ်နေပါပြီ'
+                        : 'Welcome and template changes are ready to save'
+                      : isMyanmar
+                        ? 'Welcome နှင့် template setting များကို သိမ်းပြီးပါပြီ'
+                        : 'Welcome and template settings are saved'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {botSettingsDirty
+                      ? isMyanmar
+                        ? 'ဤ section မှနေ၍ တိုက်ရိုက် reset သို့မဟုတ် save လုပ်နိုင်ပါသည်။'
+                        : 'Reset or save directly from this section.'
+                      : isMyanmar
+                        ? 'ပြောင်းလဲမှုလုပ်ပြီးနောက် Save Telegram bot settings ကိုနှိပ်ပါ။'
+                        : 'Edit either message above and the save button will enable here.'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!botSettingsDirty || isSaving}
+                    onClick={handleResetBotSettings}
+                  >
+                    Reset
+                  </Button>
+                  <Button type="button" onClick={handleSave} disabled={isSaving || !botSettingsDirty}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {t('settings.telegram.save')}
+                  </Button>
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-3 rounded-2xl border border-border/60 bg-background/65 p-4 dark:bg-white/[0.02]">
@@ -5503,6 +5540,50 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 salesUi.supportLinkPreviewFallback
               )}
             </p>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-border/60 bg-background/45 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {workflowConfigDirty
+                    ? isMyanmar
+                      ? 'Telegram support account ပြောင်းလဲမှုကို မသိမ်းရသေးပါ'
+                      : 'Telegram support account change is not saved yet'
+                    : isMyanmar
+                      ? 'Telegram support account setting ကို သိမ်းပြီးပါပြီ'
+                      : 'Telegram support account setting is saved'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {workflowConfigDirty
+                    ? isMyanmar
+                      ? 'Premium support tab ထဲကနေတင်ပဲ save သို့မဟုတ် reset လုပ်နိုင်ပါသည်။'
+                      : 'You can save or reset this directly from the Premium support tab.'
+                    : isMyanmar
+                      ? 'ဤ field ကို ပြင်ဆင်ပြီးနောက် Save order settings ကိုနှိပ်ပါ။'
+                      : 'Edit this field and the save button will enable here.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!workflowConfigDirty || saveConfigMutation.isPending}
+                  onClick={handleResetWorkflowConfig}
+                >
+                  Reset
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveConfig}
+                  disabled={!canManageSalesSettings || saveConfigMutation.isPending || !workflowConfigDirty}
+                >
+                  {saveConfigMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  {salesUi.saveConfig}
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'settings' && 'hidden')}>
