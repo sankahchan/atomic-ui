@@ -4,6 +4,7 @@ import test from 'node:test';
 import { db } from '@/lib/db';
 import {
   getTelegramConversationLocale,
+  getTelegramSupportLink,
   getTelegramUserProfile,
 } from '@/lib/services/telegram-runtime';
 
@@ -87,4 +88,37 @@ test('getTelegramUserProfile falls back to the latest chat profile when needed',
       updatedAt: 'desc',
     },
   });
+});
+
+test('getTelegramSupportLink normalizes telegram usernames from sales settings and fallback settings', async (t) => {
+  const settingsDelegate = db.settings as {
+    findUnique: (...args: any[]) => Promise<any>;
+    findMany: (...args: any[]) => Promise<any>;
+  };
+  const originalFindUnique = settingsDelegate.findUnique;
+  const originalFindMany = settingsDelegate.findMany;
+
+  settingsDelegate.findUnique = (async ({ where }: { where: { key: string } }) => {
+    assert.equal(where.key, 'telegram_sales');
+    return {
+      value: JSON.stringify({
+        enabled: true,
+        allowRenewals: true,
+        supportLink: '@outline_sales',
+      }),
+    };
+  }) as typeof settingsDelegate.findUnique;
+
+  settingsDelegate.findMany = (async () => [
+    { key: 'supportLink', value: '@outline_fallback' },
+    { key: 'defaultLanguage', value: 'en' },
+  ]) as typeof settingsDelegate.findMany;
+
+  t.after(() => {
+    settingsDelegate.findUnique = originalFindUnique;
+    settingsDelegate.findMany = originalFindMany;
+  });
+
+  const supportLink = await getTelegramSupportLink();
+  assert.equal(supportLink, 'https://t.me/outline_sales');
 });

@@ -34,22 +34,22 @@ function buildTelegramReviewCustomerSummary(order: TelegramAdminReviewQueueOrder
 function formatTelegramReviewOrderKind(order: TelegramAdminReviewQueueOrder, locale: SupportedLocale) {
   const isMyanmar = locale === 'my';
   if (order.orderMode === 'GIFT') {
-    return isMyanmar ? 'Gift order' : 'Gift order';
+    return isMyanmar ? 'လက်ဆောင် order' : 'Gift order';
   }
   if (order.kind === 'RENEW') {
-    return isMyanmar ? 'Renewal' : 'Renewal';
+    return isMyanmar ? 'သက်တမ်းတိုး' : 'Renewal';
   }
-  return isMyanmar ? 'New order' : 'New order';
+  return isMyanmar ? 'အော်ဒါအသစ်' : 'New order';
 }
 
 function formatTelegramReviewDeliveryLabel(order: TelegramAdminReviewQueueOrder, locale: SupportedLocale) {
   const typeLabel =
     order.deliveryType === 'DYNAMIC_KEY'
       ? locale === 'my'
-        ? 'Premium link'
+        ? 'Dynamic key'
         : 'Premium link'
       : locale === 'my'
-        ? 'Standard key'
+        ? 'ပုံမှန် key'
         : 'Standard key';
   const planLabel = order.planName || order.planCode || null;
   return planLabel ? `${typeLabel} • ${planLabel}` : typeLabel;
@@ -245,13 +245,13 @@ export function buildTelegramReviewQueueSummaryMessage(input: {
   const duplicateLabel =
     input.duplicateWarnings > 0
       ? isMyanmar
-        ? `${input.duplicateWarnings} ခု duplicate-proof သတိပေးချက်`
-        : `${input.duplicateWarnings} duplicate-proof warning${input.duplicateWarnings === 1 ? '' : 's'}`
+        ? `🪞 Duplicate သတိပေးချက် ${input.duplicateWarnings} ခု`
+        : `🪞 ${input.duplicateWarnings} duplicate warning${input.duplicateWarnings === 1 ? '' : 's'}`
       : '';
   const nextHint = input.hasItems
     ? isMyanmar
-      ? 'နောက် item ကို အောက်တွင် ဖွင့်ထားပါသည်။ Filter သို့မဟုတ် Prev/Next ဖြင့် ဆက်ကြည့်နိုင်ပါသည်။'
-      : 'Opening the next item below. Use filters or Prev/Next to move.'
+      ? 'နောက် review card ကို အောက်တွင် ဖွင့်ထားပါသည်။'
+      : 'Opening the next review card below.'
     : '';
 
   return [
@@ -282,46 +282,34 @@ export function buildTelegramOrderReviewAlertMessage(input: {
     : `🧷 <b>${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}</b>`;
   const proofHint = order.paymentMessageId
     ? isMyanmar
-      ? '📎 Screenshot ကို ဤ card အပေါ်တွင် copy လုပ်ထားပါသည်။'
-      : '📎 Screenshot copied above.'
+      ? '📎 Proof screenshot ကို အပေါ်တွင် copy လုပ်ထားပါသည်။'
+      : '📎 Proof screenshot copied above.'
     : isMyanmar
-      ? '📎 Panel မှ screenshot ကို စစ်ပါ။'
+      ? '📎 Screenshot ကို panel မှ စစ်ပါ။'
       : '📎 Review the screenshot from the panel.';
   const requesterHandle = escapeHtml(order.telegramUsername || order.telegramUserId || '—');
   const requesterSummary = order.telegramUserId
     ? `👤 <b>${requesterHandle}</b> • <code>${escapeHtml(order.telegramUserId)}</code>`
     : `👤 <b>${requesterHandle}</b>`;
+  const planSummary = escapeHtml(order.planName || order.planCode || '—');
   const paymentSnapshot = [
-    order.priceLabel ? `💰 <b>${escapeHtml(order.priceLabel)}</b>` : '',
     order.paymentMethodLabel ? escapeHtml(order.paymentMethodLabel) : '',
-    escapeHtml(order.paymentProofType || 'photo'),
+    order.priceLabel ? escapeHtml(order.priceLabel) : '',
+    escapeHtml(order.paymentProofType || 'photo proof'),
   ]
     .filter(Boolean)
     .join(' • ');
-  const serverAndNameSummary = [
-    order.selectedServerName ? `🖥 <b>${escapeHtml(order.selectedServerName)}</b>` : '',
-    order.requestedName ? `🏷 <b>${escapeHtml(order.requestedName)}</b>` : '',
-  ]
-    .filter(Boolean)
-    .join(' • ');
-  const submittedAtSummary = order.paymentSubmittedAt
-    ? `🕒 ${escapeHtml(formatTelegramDateTime(order.paymentSubmittedAt, locale))}`
-    : '';
-  const renewalTargetSummary = order.targetAccessKeyId
-    ? isMyanmar
-      ? '🔁 သက်တမ်းတိုး order'
-      : '🔁 Renewal order'
-    : '';
+  const orderKindSummary = `📦 <b>${planSummary}</b> • ${escapeHtml(
+    formatTelegramReviewOrderKind(order, locale),
+  )}`;
 
   return [
     mode === 'reminder' ? ui.orderReviewReminderTitle : ui.orderReviewAlertTitle,
     '',
-    `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(order.planName || order.planCode || '—')}`,
-    paymentSnapshot,
+    `🧾 <b>${escapeHtml(order.orderCode)}</b>`,
+    orderKindSummary,
+    paymentSnapshot ? `💳 ${paymentSnapshot}` : '',
     requesterSummary,
-    serverAndNameSummary,
-    submittedAtSummary,
-    renewalTargetSummary,
     ownershipLabel,
     order.duplicateProofOrderCode
       ? ui.duplicateProofWarning(escapeHtml(order.duplicateProofOrderCode))
@@ -353,9 +341,11 @@ export function buildTelegramOrderReviewDetailMessage(input: {
   const { order, locale } = input;
   const isMyanmar = locale === 'my';
   const customerSummary = buildTelegramReviewCustomerSummary(order);
-  const customerLine = order.telegramUserId
-    ? `👤 <b>${escapeHtml(customerSummary)}</b> • <code>${escapeHtml(order.telegramUserId)}</code>`
-    : `👤 <b>${escapeHtml(customerSummary)}</b>`;
+  const customerLineParts = [
+    order.telegramUserId ? `<code>${escapeHtml(order.telegramUserId)}</code>` : null,
+    order.requestedEmail ? `<code>${escapeHtml(order.requestedEmail)}</code>` : null,
+    escapeHtml(customerSummary),
+  ].filter(Boolean) as string[];
   const paymentParts = [
     order.priceLabel ? escapeHtml(order.priceLabel) : '',
     order.paymentMethodLabel ? escapeHtml(order.paymentMethodLabel) : '',
@@ -365,15 +355,21 @@ export function buildTelegramOrderReviewDetailMessage(input: {
     order.requestedName ? `${isMyanmar ? 'အမည်' : 'Name'} ${escapeHtml(order.requestedName)}` : '',
   ].filter(Boolean);
   const note = compactTelegramQueueText(order.paymentCaption || order.customerMessage, 88);
+  const submittedAtLine = order.paymentSubmittedAt
+    ? `${isMyanmar ? '🕒 ပို့ခဲ့ချိန်' : '🕒 Submitted'}: ${escapeHtml(
+        formatTelegramDateTime(order.paymentSubmittedAt, locale),
+      )}`
+    : '';
 
   return [
     isMyanmar ? 'ℹ️ <b>Review အသေးစိတ်</b>' : 'ℹ️ <b>Review detail</b>',
     '',
     `🧾 <b>${escapeHtml(order.orderCode)}</b> • ${escapeHtml(formatTelegramReviewOrderKind(order, locale))}`,
-    customerLine,
+    customerLineParts.length > 0 ? `👤 ${customerLineParts.join(' • ')}` : '',
     `📦 ${escapeHtml(formatTelegramReviewDeliveryLabel(order, locale))}`,
     paymentParts.length > 0 ? `💳 ${paymentParts.join(' • ')}` : '',
     serverParts.length > 0 ? `🖥 ${serverParts.join(' • ')}` : '',
+    submittedAtLine,
     input.renewalTargetLabel
       ? `${isMyanmar ? '🔁 Renew target' : '🔁 Renew target'}: <b>${escapeHtml(input.renewalTargetLabel)}</b>`
       : '',

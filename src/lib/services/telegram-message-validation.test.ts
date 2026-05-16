@@ -618,6 +618,7 @@ test('admin queue cards stay compact and button-first', () => {
     order: {
       id: 'ord_1',
       orderCode: 'ORD-123',
+      kind: 'RENEW',
       planName: 'Premium / 1 Month / 200 GB',
       planCode: 'premium_1m_200gb',
       assignedReviewerEmail: null,
@@ -758,16 +759,17 @@ test('admin queue cards stay compact and button-first', () => {
     assert.doesNotMatch(message, /https?:\/\//);
   }
 
-  assert.match(reviewSummary, /Opening the next item below/);
+  assert.match(reviewSummary, /Opening the next review card below/);
   assert.doesNotMatch(reviewSummary, /Showing \d+ item/);
   assertTelegramMessageBudget(reviewSummary, { maxLines: 6, maxChars: 220 });
 
   assert.doesNotMatch(reviewCard, /Proof snapshot/);
   assert.doesNotMatch(reviewCard, /Use the buttons below/);
   assert.doesNotMatch(reviewCard, /Queue:/);
-  assert.match(reviewCard, /Renewal order/);
+  assert.match(reviewCard, /Renewal/);
   assert.doesNotMatch(reviewCard, /key_123/);
-  assertTelegramMessageBudget(reviewCard, { maxLines: 9, maxChars: 360 });
+  assert.doesNotMatch(reviewCard, /SG-2/);
+  assertTelegramMessageBudget(reviewCard, { maxLines: 8, maxChars: 320 });
   assert.match(adminHome, /Needs attention/);
   assert.match(adminHome, /Choose the next admin action from the buttons below/);
   assert.doesNotMatch(adminHome, /Quick next actions/);
@@ -1024,7 +1026,7 @@ test('admin queue detail cards stay compact and keep links out of the text body'
   assert.match(refundDetail, /Refund detail/);
   assert.match(premiumDetail, /Premium support detail/);
   assert.match(supportThreadDetail, /Support thread detail/);
-  assertTelegramMessageBudget(reviewDetail, { maxLines: 8, maxChars: 340 });
+  assertTelegramMessageBudget(reviewDetail, { maxLines: 8, maxChars: 320 });
   assertTelegramMessageBudget(refundDetail, { maxLines: 7, maxChars: 320 });
   assertTelegramMessageBudget(premiumDetail, { maxLines: 9, maxChars: 360 });
   assertTelegramMessageBudget(supportThreadDetail, { maxLines: 8, maxChars: 360 });

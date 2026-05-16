@@ -19,7 +19,6 @@ import {
   truncateTelegramCommerceButtonLabel,
 } from '@/lib/services/telegram-commerce-ui';
 import {
-  buildTelegramOrderTimelineChipRow,
   buildTelegramOrderNextStepText,
   escapeHtml,
   formatTelegramDateTime,
@@ -42,14 +41,28 @@ function buildTelegramOrdersCountsLine(input: {
   reviewCount: number;
   completedCount: number;
   totalCount: number;
+  locale: SupportedLocale;
 }) {
+  const isMyanmar = input.locale === 'my';
   const segments = [
-    input.attentionCount > 0 ? `${input.attentionCount} need action` : null,
-    input.reviewCount > 0 ? `${input.reviewCount} under review` : null,
-    input.completedCount > 0 ? `${input.completedCount} completed` : null,
+    input.attentionCount > 0
+      ? isMyanmar
+        ? `${input.attentionCount} ခု လုပ်ဆောင်ရန်`
+        : `${input.attentionCount} need action`
+      : null,
+    input.reviewCount > 0
+      ? isMyanmar
+        ? `${input.reviewCount} ခု စစ်ဆေးနေ`
+        : `${input.reviewCount} under review`
+      : null,
+    input.completedCount > 0
+      ? isMyanmar
+        ? `${input.completedCount} ခု ပြီးဆုံး`
+        : `${input.completedCount} completed`
+      : null,
   ].filter(Boolean) as string[];
 
-  return segments.join(' • ') || `${input.totalCount} recent`;
+  return segments.join(' • ') || (isMyanmar ? `${input.totalCount} ခု recent` : `${input.totalCount} recent`);
 }
 
 function buildTelegramCompactOrderStateLine(order: TelegramUserOrder, ui: ReturnType<typeof getTelegramUi>) {
@@ -311,11 +324,12 @@ export function buildTelegramOrdersSummaryMessage(input: {
       reviewCount: input.reviewOrders.length,
       completedCount: input.completedOrders.length,
       totalCount: input.filteredOrders.length,
+      locale: input.locale,
     }),
     intro:
       input.locale === 'my'
-        ? 'Filter ကိုပြောင်းပြီး Open ကိုနှိပ်ကာ detail card ကိုဖွင့်နိုင်သည်။'
-        : 'Use filters, then tap Open for the detail card.',
+        ? 'Row တစ်ခုကိုနှိပ်ပြီး လတ်တလော status ကိုဖွင့်ပါ။'
+        : 'Tap a row to open the latest status.',
     cards: cards.length
       ? cards
       : [
@@ -347,16 +361,16 @@ function buildTelegramOrderProgressSummary(input: {
   const status = input.order.status;
   const isMyanmar = input.locale === 'my';
   if (status === 'FULFILLED') {
-    return isMyanmar ? 'အဆင့် 4/4 • ပို့ပြီး' : 'Step 4/4 • Delivered';
+    return isMyanmar ? 'ပြီးဆုံးပြီး' : 'Delivered';
   }
   if (status === 'PENDING_REVIEW' || status === 'APPROVED') {
-    return isMyanmar ? 'အဆင့် 4/4 • Admin စစ်ဆေးနေ' : 'Step 4/4 • Admin review';
+    return isMyanmar ? 'Admin စစ်ဆေးနေ' : 'Admin review';
   }
   if (status === 'AWAITING_PAYMENT_PROOF') {
-    return isMyanmar ? 'အဆင့် 3/4 • Screenshot တင်ပါ' : 'Step 3/4 • Upload screenshot';
+    return isMyanmar ? 'Screenshot တင်ပါ' : 'Upload screenshot';
   }
   if (status === 'AWAITING_PAYMENT_METHOD') {
-    return isMyanmar ? 'အဆင့် 2/4 • ငွေပေးချေမှုနည်းလမ်းရွေးပါ' : 'Step 2/4 • Choose payment method';
+    return isMyanmar ? 'ငွေပေးချေမှုနည်းလမ်းရွေးပါ' : 'Choose payment method';
   }
   if (
     status === 'AWAITING_KEY_SELECTION'
@@ -364,10 +378,10 @@ function buildTelegramOrderProgressSummary(input: {
     || status === 'AWAITING_MONTHS'
     || status === 'AWAITING_SERVER_SELECTION'
   ) {
-    return isMyanmar ? 'အဆင့် 1/4 • စတင်ပြင်ဆင်နေ' : 'Step 1/4 • Setup';
+    return isMyanmar ? 'စတင်ပြင်ဆင်နေ' : 'Setup';
   }
   if (status === 'REJECTED' || status === 'CANCELLED') {
-    return isMyanmar ? 'Flow ပြီးဆုံးပြီး • ပြန်စနိုင်သည်' : 'Flow ended • restart available';
+    return isMyanmar ? 'ပြန်စနိုင်သည်' : 'Restart available';
   }
   return null;
 }
@@ -571,30 +585,29 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   const paymentSummarySegments = [
-    `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
     order.paymentMethodLabel
       ? `${ui.paymentMethodLabel}: <b>${escapeHtml(order.paymentMethodLabel)}</b>`
       : null,
+    `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(order.createdAt, locale))}`,
   ].filter(Boolean) as string[];
-  paymentLines.push(paymentSummarySegments.join(' • '));
+  if (paymentSummarySegments.length > 0) {
+    paymentLines.push(paymentSummarySegments.join(' • '));
+  }
 
-  const reviewTimelineSegments = [
-    order.paymentSubmittedAt
-      ? `${ui.paymentSubmittedLabel}: ${escapeHtml(
-          formatTelegramDateTime(order.paymentSubmittedAt, locale),
-        )}`
-      : null,
-    order.reviewedAt
-      ? `${ui.reviewedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.reviewedAt, locale))}`
-      : null,
-    order.fulfilledAt
-      ? `${ui.fulfilledAtLabel}: ${escapeHtml(formatTelegramDateTime(order.fulfilledAt, locale))}`
-      : order.rejectedAt
-        ? `${ui.rejectedAtLabel}: ${escapeHtml(formatTelegramDateTime(order.rejectedAt, locale))}`
-        : null,
-  ].filter(Boolean) as string[];
-  if (reviewTimelineSegments.length > 0) {
-    paymentLines.push(reviewTimelineSegments.join(' • '));
+  const latestUpdateLabel = order.fulfilledAt
+    ? ui.fulfilledAtLabel
+    : order.rejectedAt
+      ? ui.rejectedAtLabel
+      : order.reviewedAt
+        ? ui.reviewedAtLabel
+        : order.paymentSubmittedAt
+          ? ui.paymentSubmittedLabel
+          : null;
+  const latestUpdateDate = order.fulfilledAt || order.rejectedAt || order.reviewedAt || order.paymentSubmittedAt;
+  if (latestUpdateLabel && latestUpdateDate) {
+    paymentLines.push(
+      `${latestUpdateLabel}: ${escapeHtml(formatTelegramDateTime(latestUpdateDate, locale))}`,
+    );
   }
 
   const refundSegments = [
@@ -642,9 +655,8 @@ export async function buildTelegramOrderStatusMessage(input: {
             `${ui.statusLineLabel}: <b>${escapeHtml(formatTelegramOrderStatusLabel(order.status, ui))}</b>`,
             progressSummary ? escapeHtml(progressSummary) : null,
           ].filter(Boolean).join(' • '),
-          stateLine ? escapeHtml(stateLine) : null,
           nextStep ? `${ui.orderNextStepLabel}: ${escapeHtml(nextStep)}` : null,
-          buildTelegramOrderTimelineChipRow({ order }),
+          stateLine ? escapeHtml(stateLine) : null,
         ],
       ),
   ];
@@ -653,7 +665,7 @@ export async function buildTelegramOrderStatusMessage(input: {
     cards.push(
       buildTelegramCommerceCard(
         '📦 <b>Order detail</b>',
-        detailLines,
+        detailLines.slice(0, 3),
       ),
     );
   }

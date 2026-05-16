@@ -385,8 +385,8 @@ test('orders summary keeps timeline and next-step detail out of the list view', 
   assert.match(message, /Premium \/ 1 Month \/ 200 GB • 1m • Two/);
   assert.match(message, /Status: Awaiting plan selection/);
   assert.match(message, /\nNew\nStatus: Awaiting plan selection/);
-  assert.match(message, /Flow ended • restart available/);
-  assert.match(message, /Step 4\/4 • Delivered/);
+  assert.match(message, /Restart available/);
+  assert.match(message, /\nDelivered\n/);
 });
 
 test('orders keyboard labels show the next action instead of generic open text', () => {
@@ -903,6 +903,7 @@ test('order detail stays compact and keeps links in buttons', async () => {
   assert.doesNotMatch(message, /Customer note/);
   assert.doesNotMatch(message, /What you can do now/i);
   assert.doesNotMatch(message, /Order timeline/i);
+  assert.doesNotMatch(message, /\[Created\]/);
   assert.doesNotMatch(message, /https?:\/\//);
-  assert.ok(message.split('\n').length <= 22);
+  assert.ok(message.split('\n').length <= 19);
 });
