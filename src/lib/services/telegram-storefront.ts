@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import {
+  buildSubscriptionApiUrl,
   buildSharePageUrl,
   buildShortShareUrl,
 } from '@/lib/subscription-links';
@@ -150,6 +151,9 @@ export type TelegramStoreGuideKeyData = {
   deviceLimitLabel: string | null;
   showSwitchButton: boolean;
   accessKeyText: string;
+  sharePageUrl: string | null;
+  subscriptionUrl: string | null;
+  subscriptionButtonLabel: string | null;
 };
 
 export type TelegramStoreCallbackPayload =
@@ -1363,14 +1367,21 @@ export async function loadTelegramStoreGuideKeyData(input: {
       kind: 'access',
       keyId: accessKey.id,
     });
+    const token = await ensureAccessKeySubscriptionToken(accessKey.id, accessKey.subscriptionToken);
     const plan = findTelegramStorePlanByCode(plans, latestOrder?.planCode || null);
     const used = Number(accessKey.usedBytes || BigInt(0));
     const total = accessKey.dataLimitBytes ? Number(accessKey.dataLimitBytes) : 0;
     const bar = progressBar(used, total || 1);
     const [barChars, percent] = bar.split(' ');
+    const protectedInstallOnly = Boolean(accessKey.boundDeviceInstallsOnly && accessKey.maxDevices);
+    const sharePageUrl = accessKey.publicSlug
+      ? buildShortShareUrl(accessKey.publicSlug, { source: 'telegram_key_page', lang: input.locale })
+      : buildSharePageUrl(token, { source: 'telegram_key_page', lang: input.locale });
+    const subscriptionUrl = protectedInstallOnly
+      ? null
+      : buildSubscriptionApiUrl(token, { source: 'telegram_key_page' });
     let accessKeyText = accessKey.accessUrl || '';
-    if (accessKey.boundDeviceInstallsOnly && accessKey.maxDevices) {
-      const token = await ensureAccessKeySubscriptionToken(accessKey.id, accessKey.subscriptionToken);
+    if (protectedInstallOnly) {
       accessKeyText = accessKey.publicSlug
         ? buildShortShareUrl(accessKey.publicSlug, { source: 'telegram_setup_guide', lang: input.locale })
         : buildSharePageUrl(token, { source: 'telegram_setup_guide', lang: input.locale });
@@ -1415,6 +1426,9 @@ export async function loadTelegramStoreGuideKeyData(input: {
       }, input.locale),
       showSwitchButton: accessKey.status === 'ACTIVE' && accessKey.switchesMax !== 0,
       accessKeyText,
+      sharePageUrl,
+      subscriptionUrl,
+      subscriptionButtonLabel: input.locale === 'my' ? '🔗 Subscription URL ဖွင့်မည်' : '🔗 Open Subscription URL',
     } satisfies TelegramStoreGuideKeyData;
   }
 
@@ -1482,6 +1496,9 @@ export async function loadTelegramStoreGuideKeyData(input: {
     }, input.locale),
     showSwitchButton: dynamicKey.status === 'ACTIVE' && dynamicKey.switchesMax !== 0,
     accessKeyText,
+    sharePageUrl: dynamicKey.sharePageEnabled ? urls.sharePageUrl : null,
+    subscriptionUrl: protectedInstallOnly ? null : (urls.subscriptionUrl || urls.outlineClientUrl || null),
+    subscriptionButtonLabel: input.locale === 'my' ? '🔗 Client URL ဖွင့်မည်' : '🔗 Open Client URL',
   } satisfies TelegramStoreGuideKeyData;
 }
 
@@ -2467,12 +2484,15 @@ export function buildTelegramStoreKeyPageView(input: {
   renewPriceLabel?: string | null;
   deviceLimitLabel?: string | null;
   showSwitchButton?: boolean;
+  sharePageUrl?: string | null;
+  subscriptionUrl?: string | null;
+  subscriptionButtonLabel?: string | null;
   locale?: SupportedLocale;
 }) {
   const locale = input.locale || 'en';
   const isTrial = input.variant === 'trial';
   const isMyanmar = locale === 'my';
-  const inlineKeyboard: Array<Array<{ text: string; callback_data: string }>> = [
+  const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
     [{
       text: isMyanmar ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup Guide',
       callback_data: buildTelegramStorefrontCallbackData({
@@ -2480,14 +2500,30 @@ export function buildTelegramStoreKeyPageView(input: {
         keyId: input.keyId,
       }),
     }],
-    [{
-      text: isMyanmar ? '🧩 QR Code' : '🧩 QR Code',
-      callback_data: buildTelegramStorefrontCallbackData({
-        action: 'show_qr',
-        keyId: input.keyId,
-      }),
-    }],
   ];
+
+  if (input.sharePageUrl) {
+    inlineKeyboard.push([{
+      text: isMyanmar ? '🌐 Share Page ဖွင့်မည်' : '🌐 Open Share Page',
+      url: input.sharePageUrl,
+    }]);
+  }
+
+  if (input.subscriptionUrl) {
+    inlineKeyboard.push([{
+      text: input.subscriptionButtonLabel
+        || (isMyanmar ? '🔗 Subscription URL ဖွင့်မည်' : '🔗 Open Subscription URL'),
+      url: input.subscriptionUrl,
+    }]);
+  }
+
+  inlineKeyboard.push([{
+    text: isMyanmar ? '🧩 QR Code' : '🧩 QR Code',
+    callback_data: buildTelegramStorefrontCallbackData({
+      action: 'show_qr',
+      keyId: input.keyId,
+    }),
+  }]);
 
   if (isTrial) {
     inlineKeyboard.push([{
