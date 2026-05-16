@@ -71,7 +71,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     openSharePage: isMyanmar ? 'Share Page ဖွင့်မည်' : 'Open Share Page',
     openSubscriptionUrl: isMyanmar ? 'Subscription URL ဖွင့်မည်' : 'Open Subscription URL',
     openClientEndpoint: isMyanmar ? 'Client Endpoint ဖွင့်မည်' : 'Open Client Endpoint',
-    getSupport: isMyanmar ? 'အကူအညီ ရယူမည်' : 'Get Support',
+    getSupport: isMyanmar ? 'အကူအညီ' : 'Support',
     premiumLabel: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
     premiumStableLink: isMyanmar
       ? 'တည်ငြိမ်သော premium link တစ်ခုဖြင့် ဆက်သွယ်နိုင်ပါသည်။'
@@ -88,10 +88,10 @@ export function getTelegramUi(locale: SupportedLocale) {
         ? `ဦးစားပေး server pool: ${label}`
         : `Preferred server pool: ${label}`,
     premiumSupportActionsTitle: isMyanmar
-      ? 'Premium support shortcut များ'
-      : 'Premium support shortcuts',
-    premiumChangeRegion: isMyanmar ? 'Preferred region ပြောင်းရန်' : 'Change preferred region',
-    premiumReportRouteIssue: isMyanmar ? 'Premium route issue တိုင်ကြားရန်' : 'Report premium route issue',
+      ? 'Premium shortcut များ'
+      : 'Premium shortcuts',
+    premiumChangeRegion: isMyanmar ? 'Region ပြောင်းမည်' : 'Change region',
+    premiumReportRouteIssue: isMyanmar ? 'Route issue တိုင်မည်' : 'Report issue',
     premiumRegionPrompt: (keyName: string, available: string) =>
       isMyanmar
         ? `🌍 <b>${keyName}</b> အတွက် ဦးစားပေး region ကို ရွေးပါ။\nAvailable: ${available}\nရွေးချယ်ပြီးနောက် admin review စောင့်ပါ။`
@@ -108,24 +108,24 @@ export function getTelegramUi(locale: SupportedLocale) {
         ? `🚨 <b>${keyName}</b> အတွက် premium route issue ကို ပို့ပြီးပါပြီ။\nလိုအပ်ပါက Reply သို့မဟုတ် /support ကို အသုံးပြုပါ။`
         : `🚨 Premium route issue sent for <b>${keyName}</b>.\nUse Reply or /support if you need to add detail.`,
     premiumSupportRequestSent: isMyanmar
-      ? 'Premium support request ကို ပို့ပြီးပါပြီ။'
-      : 'Premium support request sent.',
+      ? 'Support request ကို ပို့ပြီးပါပြီ။'
+      : 'Support request sent.',
     premiumSupportRequestNotFound: isMyanmar
       ? '❌ Premium key ကို မတွေ့ပါ။ /mykeys မှ ပြန်ရွေးပေးပါ။'
       : '❌ Premium key not found. Choose it again from /mykeys.',
     premiumSupportCancelled: isMyanmar
-      ? 'Premium support action ကို ပယ်ဖျက်လိုက်ပါပြီ။'
-      : 'Premium support action cancelled.',
+      ? 'Support action ကို ပယ်ဖျက်လိုက်ပါပြီ။'
+      : 'Support action cancelled.',
     premiumRegionUnknown: isMyanmar ? 'Auto / admin စစ်ဆေးမှု' : 'Auto / admin review',
     premiumReviewAlertTitle: isMyanmar
       ? '💎 <b>Premium dynamic key support request</b>'
       : '💎 <b>Premium dynamic key support request</b>',
-    premiumIssueTypeRegion: isMyanmar ? 'Preferred region ပြောင်းရန်' : 'Preferred region change',
-    premiumIssueTypeRoute: isMyanmar ? 'Premium route ပြဿနာ' : 'Premium route issue',
+    premiumIssueTypeRegion: isMyanmar ? 'Region ပြောင်းရန်' : 'Region change',
+    premiumIssueTypeRoute: isMyanmar ? 'Route ပြဿနာ' : 'Route issue',
     premiumRequestType: isMyanmar ? 'တောင်းဆိုချက်အမျိုးအစား' : 'Request type',
-    premiumCurrentPoolLabel: isMyanmar ? 'လက်ရှိ premium pool' : 'Current premium pool',
+    premiumCurrentPoolLabel: isMyanmar ? 'လက်ရှိ pool' : 'Current pool',
     premiumRequestedRegionLabel: isMyanmar ? 'တောင်းဆိုထားသော region' : 'Requested region',
-    premiumResolvedServer: isMyanmar ? 'ဖြေရှင်းထားသော server' : 'Resolved server',
+    premiumResolvedServer: isMyanmar ? 'လက်ရှိ server' : 'Resolved server',
     premiumNoRequestedRegion: isMyanmar ? 'Auto / admin စစ်ဆေးမှု' : 'Auto / admin review',
     premiumCurrentPin: isMyanmar ? 'လက်ရှိ pin' : 'Current pin',
     premiumReviewPanelLabel: isMyanmar ? 'Dynamic key page ဖွင့်ရန်' : 'Open dynamic key page',
@@ -134,7 +134,7 @@ export function getTelegramUi(locale: SupportedLocale) {
       isMyanmar
         ? `ℹ️ Premium support request <b>${requestCode}</b> သည် ဖွင့်ထားပြီးဖြစ်ပါသည်။\nAdmin update ကို ဒီ chat မှာ စောင့်ပါ။`
         : `ℹ️ Premium support request <b>${requestCode}</b> is already open.\nWait for the admin update here.`,
-    premiumReplyToRequest: isMyanmar ? 'Reply ပို့ရန်' : 'Reply',
+    premiumReplyToRequest: isMyanmar ? 'Reply' : 'Reply',
     premiumFollowUpPrompt: (requestCode: string, keyName: string) =>
       isMyanmar
         ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် reply ကို ပို့ပါ။\nRoute, region, error detail ကို ထည့်နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။`
@@ -215,23 +215,23 @@ export function getTelegramUi(locale: SupportedLocale) {
             .join('\n'),
     premiumHubTitle: isMyanmar ? '💎 <b>Premium စင်တာ</b>' : '💎 <b>Premium center</b>',
     premiumHubEmpty: isMyanmar
-      ? 'ချိတ်ထားသော premium dynamic key မရှိသေးပါ။ Premium plan ရယူပြီးနောက် /premium ကို ပြန်ဖွင့်ပါ။ Premium plan များကို ကြည့်ရန် /buy ကို အသုံးပြုနိုင်ပါသည်။'
-      : 'No premium dynamic key is linked yet. Open /premium again after you receive a premium plan, or use /buy to compare Premium packages.',
+      ? 'ချိတ်ထားသော premium key မရှိသေးပါ။ Plan ရပြီးနောက် /premium ကို ပြန်ဖွင့်ပါ၊ သို့မဟုတ် /buy ဖြင့် plan များကို ကြည့်ပါ။'
+      : 'No premium key is linked yet. Open /premium again after you receive a plan, or use /buy to compare packages.',
     premiumHubHint: isMyanmar
-      ? 'Preferred region ပြောင်းခြင်း၊ route issue တင်ခြင်း၊ request progress စစ်ခြင်းနှင့် live region health ကြည့်ခြင်းတို့ကို ဒီနေရာမှ တစ်နေရာတည်းမှာ လုပ်နိုင်ပါသည်။'
-      : 'This is your one place for preferred-region changes, route issues, request progress, and live region health.',
+      ? 'Region, issue, status ကို ဒီနေရာမှ တစ်ခါတည်း ဆက်လုပ်နိုင်ပါသည်။'
+      : 'Use this hub for region, issue, and status actions.',
     premiumThreadStatusLabel: isMyanmar ? 'Thread အခြေအနေ' : 'Thread status',
     premiumStatusTitle: isMyanmar ? '🧾 <b>Premium support အခြေအနေ</b>' : '🧾 <b>Premium support status</b>',
     premiumStatusEmpty: isMyanmar
-      ? 'သင့်အတွက် premium support request မရှိသေးပါ။ Premium key အတွက် /premium သို့မဟုတ် /mykeys ကို အသုံးပြုပြီး request စတင်နိုင်ပါသည်။'
-      : 'There are no premium support requests for you yet. Use /premium or /mykeys to start one for your premium key.',
+      ? 'သင့်အတွက် premium request မရှိသေးပါ။ /premium သို့မဟုတ် /mykeys မှ request စတင်နိုင်ပါသည်။'
+      : 'There are no premium requests for you yet. Use /premium or /mykeys to start one.',
     premiumRegionStatusTitle: isMyanmar ? '🌍 <b>Premium region အခြေအနေ</b>' : '🌍 <b>Premium region status</b>',
     premiumRegionStatusEmpty: isMyanmar
-      ? 'ချိတ်ထားသော premium dynamic key မရှိသေးပါ။ Premium plan ရယူပြီးနောက် /premiumregion ကို အသုံးပြုပါ။'
-      : 'No premium dynamic key is linked yet. Use /premiumregion after you receive a premium plan.',
+      ? 'ချိတ်ထားသော premium key မရှိသေးပါ။ Plan ရပြီးနောက် /premiumregion ကို အသုံးပြုပါ။'
+      : 'No premium key is linked yet. Use /premiumregion after you receive a premium plan.',
     premiumRegionStatusHint: isMyanmar
-      ? 'Preferred region၊ လက်ရှိ route၊ fallback နှင့် region အလိုက် health ကို အောက်တွင် တိုက်ရိုက် စစ်နိုင်ပါသည်။'
-      : 'Use this view to check your preferred region, current route, fallback, and health by region.',
+      ? 'Preferred region, လက်ရှိ route နှင့် health ကို ဒီနေရာမှ တိုက်ရိုက် စစ်နိုင်ပါသည်။'
+      : 'Use this view to check your preferred region, route, and health.',
     premiumRegionCurrentRouteLabel: isMyanmar ? 'လက်ရှိ route' : 'Current route',
     premiumRegionPreferredLabel: isMyanmar ? 'ဦးစားပေး region များ' : 'Preferred regions',
     premiumRegionAttachedLabel: isMyanmar ? 'ချိတ်ထားသော server များ' : 'Attached servers',
@@ -269,8 +269,8 @@ export function getTelegramUi(locale: SupportedLocale) {
       ? 'လိုအပ်ပါက အောက်ပါ region ခလုတ်ကို နှိပ်ပြီး preferred region သို့ ပြန်ပြောင်းရန် တောင်းဆိုနိုင်ပါသည်။'
       : 'If you want to move back to the preferred region, tap one of the region buttons below.',
     premiumStatusHint: isMyanmar
-      ? 'အသစ် request တစ်ခု စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
-      : 'Use /premium to start a new premium support request.',
+      ? 'အသစ် request စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
+      : 'Use /premium to start a new request.',
     premiumOpenRequestLabel: isMyanmar ? 'ဖွင့်ထားသော request' : 'Open request',
     premiumLatestReplyLabel: isMyanmar ? 'နောက်ဆုံး reply' : 'Last reply',
     premiumAwaitingAdminReply: isMyanmar ? 'Admin စစ်နေ' : 'Admin reviewing',
@@ -307,6 +307,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     dynamicQrCaption: isMyanmar
       ? 'Direct import မရပါက Outline သို့မဟုတ် compatible client ဖြင့် ဤ QR code ကို scan လုပ်ပါ။'
       : 'Scan this QR code with Outline or another compatible client if direct import is unavailable.',
+    showQrCode: isMyanmar ? 'QR Code ပြမည်' : 'Show QR Code',
     accessReasonTitle: (reason?: string) =>
       reason === 'CREATED'
         ? (isMyanmar ? '🎉 <b>သင့် access key အသင့်ဖြစ်ပါပြီ</b>' : '🎉 <b>Your access key is ready</b>')
@@ -391,7 +392,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     myKeysTypePremium: isMyanmar ? 'Premium dynamic key' : 'Premium dynamic key',
     myKeysCurrentPoolLabel: isMyanmar ? 'လက်ရှိ pool' : 'Current pool',
     myKeysServerIssue: isMyanmar ? 'Server ပြဿနာ' : 'Server issue',
-    myKeysPremiumStatus: isMyanmar ? 'Support အခြေအနေ' : 'Support status',
+    myKeysPremiumStatus: isMyanmar ? 'အခြေအနေ' : 'Status',
     myKeysOpenSupport: isMyanmar ? 'Support' : 'Support',
     subEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော active key မရှိပါ။' : '❌ No active keys are linked to this Telegram account.',
     subSent: (count: number) => isMyanmar

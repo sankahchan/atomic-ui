@@ -200,8 +200,8 @@ export function buildTelegramPremiumSupportQueueSummaryMessage(input: {
     : `${input.totalOpen} open • ${input.waitingAdmin} need admin • ${input.waitingUser} waiting for user`;
   const nextHint = input.hasItems
     ? isMyanmar
-      ? 'နောက် request ကို အောက်တွင် ဖွင့်ထားပါသည်။'
-      : 'Opening the next request below.'
+      ? 'နောက် request ကို အောက်တွင် ဖွင့်ပါမည်။'
+      : 'Next request opens below.'
     : '';
 
   return [
@@ -250,17 +250,14 @@ export function buildTelegramPremiumSupportQueueCardMessage(input: {
     maxLength: 100,
   }).map((line) => escapeHtml(line));
   const statusSnapshot = `🕒 <b>${escapeHtml(state.label)}</b> • ${escapeHtml(age)}${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`;
-  const replyLine = `💬 <b>${escapeHtml(replyStateLabel)}</b>`;
-
   return [
     input.locale === 'my'
       ? '💎 <b>Premium support</b>'
       : '💎 <b>Premium support thread</b>',
     '',
     `<b>${escapeHtml(input.request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}`,
-    `🔑 <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b>`,
-    statusSnapshot,
-    replyLine,
+    `🔑 <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b> • ${escapeHtml(state.label)}`,
+    `${statusSnapshot} • ${escapeHtml(replyStateLabel)}`,
     ...latestReplyPreview,
   ]
     .filter(Boolean)
@@ -280,11 +277,11 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '👀 စစ်နေ' : '👀 Working on it',
+          text: isMyanmar ? '👀 စစ်မည်' : '👀 Review',
           callback_data: buildTelegramSupportQueueCallbackData('wk', input.requestId, input.mode),
         },
         {
-          text: isMyanmar ? '❓ Detail လို' : '❓ Need details',
+          text: isMyanmar ? '❓ မေးမည်' : '❓ Ask',
           callback_data: buildTelegramSupportQueueCallbackData('nd', input.requestId, input.mode),
         },
         {
@@ -331,12 +328,12 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
               callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
             },
             {
-              text: isMyanmar ? '🧾 Dashboard' : '🧾 Panel',
+              text: isMyanmar ? '🧾 Panel' : '🧾 Panel',
               url: input.panelUrl,
             },
           ],
       ...(includeDetail
-        ? [[{ text: isMyanmar ? '🧾 Dashboard' : '🧾 Panel', url: input.panelUrl }]]
+        ? [[{ text: isMyanmar ? '🧾 Panel' : '🧾 Panel', url: input.panelUrl }]]
         : []),
     ],
   };

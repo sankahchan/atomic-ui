@@ -553,7 +553,10 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
     `${escapeHtml(currentState)} • ${escapeHtml(followUpIndicator)}`,
-  ];
+    request.customerMessage?.trim()
+      ? `${isMyanmar ? '📝 မှတ်စု' : '📝 Note'}: ${escapeHtml(compactPremiumText(request.customerMessage, 96) || '')}`
+      : null,
+  ].filter(Boolean) as string[];
 
   if (request.appliedPinServerName) {
     const pinSummary = request.appliedPinExpiresAt
@@ -576,20 +579,10 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
     ),
   ];
 
-  if (request.customerMessage?.trim()) {
-    cards.push(
-      buildTelegramCommerceCard(
-        isMyanmar ? '✍️ <b>သင့်မှတ်စု</b>' : '✍️ <b>Your note</b>',
-        [escapeHtml(request.customerMessage.trim())],
-      ),
-    );
-  }
-
   if (latestReply) {
     const replySenderLabel =
       latestReply.senderType === 'ADMIN' ? ui.premiumFollowUpFromAdmin : ui.premiumFollowUpFromYou;
-    const replyMessage = latestReply.message.trim();
-    const replyPreview = replyMessage.length > 120 ? `${replyMessage.slice(0, 117)}...` : replyMessage;
+    const replyPreview = compactPremiumText(latestReply.message, 120) || '';
     cards.push(
       buildTelegramCommerceCard(
         isMyanmar ? '💬 <b>နောက်ဆုံး reply</b>' : '💬 <b>Last reply</b>',
@@ -688,8 +681,13 @@ function buildTelegramPremiumHeroCaption(input: {
   ].join('\n');
 }
 
-function resolveTelegramPremiumDetailButtonLabel(locale: SupportedLocale) {
-  return locale === 'my' ? 'အသေးစိတ်' : 'Details';
+function compactPremiumText(value?: string | null, maxLength = 96) {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 3)}...` : normalized;
 }
 
 function selectPremiumRegionSnapshotSummaries(analysis: PremiumRegionAnalysis) {
@@ -738,10 +736,9 @@ export function buildTelegramPremiumHubMessage(input: {
       [
         escapeHtml(item.summaryLine),
         `${ui.premiumRegionCurrentRouteLabel}: ${escapeHtml(item.currentRouteLabel)}`,
-        `${ui.premiumCurrentPoolLabel}: ${escapeHtml(item.poolSummary)}`,
         item.latestRequestCode && item.latestRequestState
           ? `${ui.premiumThreadStatusLabel}: ${escapeHtml(`${item.latestRequestCode} • ${item.latestRequestState}`)}`
-          : null,
+          : `${ui.premiumCurrentPoolLabel}: ${escapeHtml(item.poolSummary)}`,
       ],
     ),
   );
@@ -757,7 +754,7 @@ export function buildTelegramPremiumHubMessage(input: {
     )}`,
     intro:
       input.locale === 'my'
-        ? 'အောက်က key တစ်ခုကိုရွေးပြီး region, issue, status ကို ဆက်လုပ်နိုင်သည်။'
+        ? 'အောက်က key ကိုရွေးပြီး region, issue, status ကို ဆက်လုပ်နိုင်သည်။'
         : 'Choose a key below, then use the buttons for region, issue, or status.',
     cards,
   });
@@ -786,8 +783,8 @@ export function buildTelegramPremiumDetailMessage(input: {
     statsLine: `<b>${escapeHtml(input.item.name)}</b>`,
     intro:
       isMyanmar
-        ? 'Open, region, issue, status ကို အောက်က button များဖြင့် ဆက်လုပ်ပါ။'
-        : 'Use the buttons below for open, region, issue, or status.',
+        ? 'အောက်က button များဖြင့် ဆက်လုပ်ပါ။'
+        : 'Use the buttons below for the next step.',
     cards: [
       buildTelegramCommerceCard(
         isMyanmar ? '💎 <b>Premium အနှစ်ချုပ်</b>' : '💎 <b>Premium summary</b>',
@@ -809,8 +806,8 @@ export function buildTelegramPremiumSupportListMessage(input: {
       `🧾 <b>${escapeHtml(item.requestCode)}</b>`,
       [
         `${escapeHtml(item.keyName)} • ${escapeHtml(item.requestTypeLabel)}`,
-        `${ui.statusLineLabel}: ${escapeHtml(item.statusLabel)} • ${escapeHtml(item.threadStateLabel)}`,
-        `${escapeHtml(item.replyStateLabel)} • ${ui.createdAtLabel}: ${escapeHtml(item.createdAtLabel)}`,
+        `${escapeHtml(item.statusLabel)} • ${escapeHtml(item.threadStateLabel)}`,
+        `${escapeHtml(item.replyStateLabel)} • ${escapeHtml(item.createdAtLabel)}`,
       ],
     ),
   );
@@ -826,8 +823,8 @@ export function buildTelegramPremiumSupportListMessage(input: {
     ),
     intro:
       input.locale === 'my'
-        ? 'Open thread ကို နှိပ်ပြီး request တစ်ခုချင်းစီကို ကြည့်နိုင်သည်။'
-        : 'Open a request below for the compact thread card.',
+        ? 'အောက်က request ကို နှိပ်ပြီး card ကို ဖွင့်ပါ။'
+        : 'Open a request below for its compact card.',
     cards,
   });
 }
@@ -904,23 +901,23 @@ function buildTelegramPremiumHubKeyboard(input: {
   for (const item of pagination.pageItems) {
     rows.push([
       {
-        text: getTelegramUi(input.locale).premiumChangeRegion,
+        text: input.locale === 'my' ? '🌍 Region' : '🌍 Region',
         callback_data: buildTelegramDynamicSupportActionCallbackData('rg', item.id),
       },
       {
-        text: getTelegramUi(input.locale).premiumReportRouteIssue,
+        text: input.locale === 'my' ? '🚨 Issue' : '🚨 Issue',
         callback_data: buildTelegramDynamicSupportActionCallbackData('is', item.id),
       },
     ]);
     rows.push([
       {
-        text: getTelegramUi(input.locale).myKeysPremiumStatus,
+        text: input.locale === 'my' ? '🧾 အခြေအနေ' : '🧾 Status',
         callback_data: item.latestRequestId
           ? buildTelegramDynamicSupportActionCallbackData('st', item.latestRequestId)
           : buildTelegramDynamicSupportActionCallbackData('is', item.id),
       },
       {
-        text: resolveTelegramPremiumDetailButtonLabel(input.locale),
+        text: input.locale === 'my' ? 'ℹ️ အပို' : 'ℹ️ More',
         callback_data: buildTelegramCommerceViewCallbackData(
           'premium',
           'detail',
@@ -942,7 +939,7 @@ function buildTelegramPremiumHubKeyboard(input: {
   }
 
   if (input.supportLink) {
-    rows.push([{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }]);
+    rows.push([{ text: input.locale === 'my' ? '💬 အကူအညီ' : '💬 Support', url: input.supportLink }]);
   }
 
   return { inline_keyboard: rows };
@@ -957,29 +954,29 @@ function buildTelegramPremiumDetailKeyboard(input: {
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   if (input.item.sharePageUrl) {
-    rows.push([{ text: getTelegramUi(input.locale).openSharePage, url: input.item.sharePageUrl }]);
+    rows.push([{ text: input.locale === 'my' ? '🔗 Share page' : '🔗 Share page', url: input.item.sharePageUrl }]);
   }
   rows.push([
     {
-      text: getTelegramUi(input.locale).premiumChangeRegion,
+      text: input.locale === 'my' ? '🌍 Region' : '🌍 Region',
       callback_data: buildTelegramDynamicSupportActionCallbackData('rg', input.item.id),
     },
     {
-      text: getTelegramUi(input.locale).premiumReportRouteIssue,
+      text: input.locale === 'my' ? '🚨 Issue' : '🚨 Issue',
       callback_data: buildTelegramDynamicSupportActionCallbackData('is', input.item.id),
     },
   ]);
   rows.push([
     {
-      text: getTelegramUi(input.locale).myKeysPremiumStatus,
+      text: input.locale === 'my' ? '🧾 အခြေအနေ' : '🧾 Status',
       callback_data: input.item.latestRequestId
         ? buildTelegramDynamicSupportActionCallbackData('st', input.item.latestRequestId)
         : buildTelegramDynamicSupportActionCallbackData('is', input.item.id),
     },
-    ...(input.supportLink ? [{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }] : []),
+    ...(input.supportLink ? [{ text: input.locale === 'my' ? '💬 အကူအညီ' : '💬 Support', url: input.supportLink }] : []),
   ]);
   rows.push([{
-    text: input.locale === 'my' ? '← Back to premium' : '← Back to premium',
+    text: input.locale === 'my' ? '← Premium သို့' : '← Back to premium',
     callback_data: buildTelegramCommerceViewCallbackData('premium', 'home', String(input.page)),
   }]);
 
@@ -995,8 +992,8 @@ function buildTelegramPremiumSupportListKeyboard(input: {
   const pagination = paginateTelegramCommerce(input.items, input.page);
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = pagination.pageItems.map((item) => [{
     text: truncateTelegramCommerceButtonLabel(
-      `${getTelegramUi(input.locale).orderActionCheckStatus}: ${item.requestCode}`,
-      36,
+      `🧾 ${item.requestCode}`,
+      24,
     ),
     callback_data: buildTelegramCommerceViewCallbackData(
       'supportstatus',
@@ -1017,7 +1014,7 @@ function buildTelegramPremiumSupportListKeyboard(input: {
   }
 
   if (input.supportLink) {
-    rows.push([{ text: getTelegramUi(input.locale).getSupport, url: input.supportLink }]);
+    rows.push([{ text: input.locale === 'my' ? '💬 အကူအညီ' : '💬 Support', url: input.supportLink }]);
   }
 
   rows.push([{

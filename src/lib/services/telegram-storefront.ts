@@ -163,6 +163,7 @@ export type TelegramStoreCallbackPayload =
   | { action: 'setup_platform'; platform: TelegramStoreGuidePlatform }
   | { action: 'referral' }
   | { action: 'setup_guide'; keyId: string }
+  | { action: 'show_qr'; keyId: string }
   | { action: 'platform_select'; keyId: string }
   | { action: 'guide_platform'; keyId: string; platform: TelegramStoreGuidePlatform }
   | { action: 'key_page'; keyId: string }
@@ -943,6 +944,8 @@ export function buildTelegramStorefrontCallbackData(payload: TelegramStoreCallba
       return 'referral';
     case 'setup_guide':
       return `setup_guide_${payload.keyId}`;
+    case 'show_qr':
+      return `qr_${payload.keyId}`;
     case 'platform_select':
       return `platform_select_${payload.keyId}`;
     case 'guide_platform':
@@ -1018,6 +1021,13 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
     const keyId = data.slice('setup_guide_'.length).trim();
     if (keyId) {
       return { action: 'setup_guide', keyId };
+    }
+  }
+
+  if (data.startsWith('qr_')) {
+    const keyId = data.slice('qr_'.length).trim();
+    if (keyId) {
+      return { action: 'show_qr', keyId };
     }
   }
 
@@ -2470,6 +2480,13 @@ export function buildTelegramStoreKeyPageView(input: {
         keyId: input.keyId,
       }),
     }],
+    [{
+      text: isMyanmar ? '🧩 QR Code' : '🧩 QR Code',
+      callback_data: buildTelegramStorefrontCallbackData({
+        action: 'show_qr',
+        keyId: input.keyId,
+      }),
+    }],
   ];
 
   if (isTrial) {
@@ -2603,6 +2620,13 @@ export function buildTelegramStoreTrialKeyPageView(input: {
             keyId: input.keyId,
           }),
         }],
+        [{
+          text: isMyanmar ? '🧩 QR Code' : '🧩 QR Code',
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'show_qr',
+            keyId: input.keyId,
+          }),
+        }],
         [
           {
             text: '🤖 Android',
@@ -2668,6 +2692,13 @@ export function buildTelegramStoreOrderConfirmedView(input: {
       text: isMyanmar ? '📲  ချိတ်ဆက်နည်း' : '📲  Setup Guide',
       callback_data: buildTelegramStorefrontCallbackData({
         action: 'platform_select',
+        keyId: input.keyId,
+      }),
+    }],
+    [{
+      text: isMyanmar ? '🧩 QR Code' : '🧩 QR Code',
+      callback_data: buildTelegramStorefrontCallbackData({
+        action: 'show_qr',
         keyId: input.keyId,
       }),
     }],
