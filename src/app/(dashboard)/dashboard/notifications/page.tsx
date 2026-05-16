@@ -5496,14 +5496,9 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <p className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{salesUi.supportLinkPreview}:</span>{' '}
               {normalizedSupportLinkPreview ? (
-                <a
-                  href={normalizedSupportLinkPreview}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-foreground underline-offset-4 hover:underline"
-                >
+                <span className="font-mono text-foreground">
                   {normalizedSupportLinkPreview}
-                </a>
+                </span>
               ) : (
                 salesUi.supportLinkPreviewFallback
               )}
