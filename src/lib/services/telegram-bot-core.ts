@@ -6797,6 +6797,9 @@ export async function handleTelegramCallbackQuery(
                   renewPriceLabel: keyView.renewPriceLabel,
                   deviceLimitLabel: keyView.deviceLimitLabel,
                   showSwitchButton: keyView.showSwitchButton,
+                  sharePageUrl: keyView.sharePageUrl,
+                  subscriptionUrl: keyView.subscriptionUrl,
+                  subscriptionButtonLabel: keyView.subscriptionButtonLabel,
                   locale,
                 })
               : storefrontAction.action === 'guide_platform'

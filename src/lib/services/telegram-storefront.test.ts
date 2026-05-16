@@ -426,6 +426,9 @@ test('store paid key detail screen becomes a persistent hub', () => {
     renewPriceLabel: '7,000 Ks',
     deviceLimitLabel: '1 device on protected install',
     showSwitchButton: true,
+    sharePageUrl: 'https://share.example/key_123',
+    subscriptionUrl: 'https://share.example/sub/key_123',
+    subscriptionButtonLabel: '🔗 Open Subscription URL',
   });
 
   assert.match(paid.text, /Key Details/);
@@ -436,16 +439,18 @@ test('store paid key detail screen becomes a persistent hub', () => {
     paid.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
   );
+  assert.equal(paid.replyMarkup.inline_keyboard[1]?.[0]?.url, 'https://share.example/key_123');
+  assert.equal(paid.replyMarkup.inline_keyboard[2]?.[0]?.url, 'https://share.example/sub/key_123');
   assert.equal(
-    paid.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    paid.replyMarkup.inline_keyboard[3]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'show_qr', keyId: 'key_123' }),
   );
   assert.equal(
-    paid.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    paid.replyMarkup.inline_keyboard[4]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'renew_plan', planId: 'plan_pro', keyId: 'key_123', kind: 'access' }),
   );
   assert.equal(
-    paid.replyMarkup.inline_keyboard[3]?.[0]?.callback_data,
+    paid.replyMarkup.inline_keyboard[5]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
   );
 });
