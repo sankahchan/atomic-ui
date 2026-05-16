@@ -129,6 +129,31 @@ export type TelegramSalesPlan = z.infer<typeof telegramSalesPlanSchema>;
 export type TelegramSalesPaymentMethod = z.infer<typeof telegramSalesPaymentMethodSchema>;
 export type TelegramSalesSettings = z.infer<typeof telegramSalesSettingsSchema>;
 
+export function normalizeTelegramSupportLink(value: string | null | undefined) {
+  const trimmed = value?.trim() || '';
+  if (!trimmed) {
+    return '';
+  }
+
+  if (/^tg:\/\/resolve\?/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const withoutScheme = trimmed.replace(/^https?:\/\//i, '');
+  const telegramMatch = withoutScheme.match(/^(?:t|telegram)\.me\/(.+)$/i);
+  if (telegramMatch) {
+    const path = telegramMatch[1]?.trim().replace(/^\/+/, '');
+    return path ? `https://t.me/${path}` : '';
+  }
+
+  const handle = trimmed.replace(/^@/, '');
+  if (/^[A-Za-z0-9_]{5,32}$/.test(handle)) {
+    return `https://t.me/${handle}`;
+  }
+
+  return trimmed;
+}
+
 export const TELEGRAM_ORDER_ACTIVE_STATUSES = [
   'AWAITING_KEY_SELECTION',
   'AWAITING_PLAN',
@@ -732,7 +757,7 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
   return {
     enabled: next.enabled,
     allowRenewals: next.allowRenewals,
-    supportLink: next.supportLink?.trim() || '',
+    supportLink: normalizeTelegramSupportLink(next.supportLink),
     dailySalesDigestEnabled: Boolean(next.dailySalesDigestEnabled),
     dailySalesDigestHour:
       typeof next.dailySalesDigestHour === 'number' && Number.isFinite(next.dailySalesDigestHour)

@@ -2155,35 +2155,86 @@ export function buildTelegramStoreMyAccountView(input: {
     `${isMyanmar ? '📶 ကျန်ရှိသေးသော Data :  ' : '📶 Data left     :  '}${escapeTelegramMarkdownV2(input.dataLeftLabel)}`,
   ];
 
+  const inlineKeyboard: Array<Array<{ text: string; callback_data: string }>> = [];
   if (input.primaryKey) {
     const primaryBar = input.primaryKey.totalBytes && input.primaryKey.totalBytes > 0
       ? usageBar(input.primaryKey.usedBytes || 0, input.primaryKey.totalBytes)
       : `${input.primaryKey.progressBar}  ${input.primaryKey.percentLabel}`;
     lines.push(
       '',
+      isMyanmar ? '📌 *အဓိက key*' : '📌 *Primary key*',
       `📦 *${escapeTelegramMarkdownV2(input.primaryKey.planName)}*  ·  ${escapeTelegramMarkdownV2(input.primaryKey.categoryLabel)}`,
+      `${isMyanmar ? '🌍 Server      :  ' : '🌍 Server      :  '}${escapeTelegramMarkdownV2(input.primaryKey.currentServerName)}`,
       `📶 ${escapeTelegramMarkdownV2(input.primaryKey.usedLabel)} / ${escapeTelegramMarkdownV2(input.primaryKey.totalLabel)}`,
       `   ${escapeTelegramMarkdownV2(primaryBar)}`,
       `${isMyanmar ? '🕐 သက်တမ်းကုန်မည့်နေ့:' : '🕐 Expires:'} ${escapeTelegramMarkdownV2(input.primaryKey.expiryLabel)}`,
     );
+
+    inlineKeyboard.push([
+      {
+        text: isMyanmar ? '📄 Key ဖွင့်မည်' : '📄 Open Key',
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'key_page', keyId: input.primaryKey.id }),
+      },
+      {
+        text: isMyanmar ? '🔑 Key များ' : '🔑 My Keys',
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
+      },
+    ]);
+    inlineKeyboard.push([
+      {
+        text: isMyanmar ? '🔄 သက်တမ်းတိုးမည်' : '🔄 Renew',
+        callback_data: input.primaryKey.planId
+          ? buildTelegramStorefrontCallbackData({
+              action: 'renew_plan',
+              keyId: input.primaryKey.id,
+              kind: input.primaryKey.kind,
+              planId: input.primaryKey.planId,
+            })
+          : buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+      },
+      {
+        text: isMyanmar ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup',
+        callback_data: buildTelegramStorefrontCallbackData({
+          action: 'platform_select',
+          keyId: input.primaryKey.id,
+        }),
+      },
+    ]);
   } else {
     lines.push('', isMyanmar ? 'အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'No active keys yet\\.');
+    inlineKeyboard.push([
+      {
+        text: isMyanmar ? '🛒 Plan များကြည့်မည်' : '🛒 View Plans',
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+      },
+      {
+        text: isMyanmar ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup',
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }),
+      },
+    ]);
   }
+
+  inlineKeyboard.push([
+    {
+      text: isMyanmar ? '🎁 မိတ်ဆွေဖိတ်မည်' : '🎁 Referral',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'referral' }),
+    },
+    {
+      text: isMyanmar ? '💬 အကူအညီ' : '💬 Support',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
+    },
+  ]);
+  inlineKeyboard.push([
+    {
+      text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Main Menu',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
+    },
+  ]);
 
   return {
     text: lines.join('\n'),
     replyMarkup: {
-      inline_keyboard: [
-        [
-          { text: isMyanmar ? '🔑 Key များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
-          { text: isMyanmar ? '🔄 သက်တမ်းတိုးမည်' : '🔄 Renew', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
-        ],
-        [
-          { text: isMyanmar ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }) },
-          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
-        ],
-        [{ text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Main Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
-      ],
+      inline_keyboard: inlineKeyboard,
     },
   };
 }
@@ -3010,20 +3061,13 @@ export function buildTelegramStoreHelpView(input?: {
       isMyanmar ? '❓ *အကူအညီ & FAQ*' : '❓ *Help & FAQ*',
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      isMyanmar ? '*ဘယ်လိုချိတ်ဆက်ရမလဲ?*' : '*How do I connect?*',
-      isMyanmar ? '/setup ကိုနှိပ်ပြီး အဆင့်လိုက်ကြည့်ပါ\\.' : 'Tap /setup for step\\-by\\-step guide\\.',
+      isMyanmar ? '📲 ချိတ်ဆက်နည်း   :  /setup' : '📲 Connect      :  /setup',
+      isMyanmar ? '🔑 Key များ        :  /mykeys' : '🔑 My keys      :  /mykeys',
+      isMyanmar ? '🔄 သက်တမ်းတိုး    :  /renew' : '🔄 Renew        :  /renew',
+      isMyanmar ? '🌍 Server ပြောင်း :  /switchserver' : '🌍 Switch       :  /switchserver',
+      isMyanmar ? `💬 အကူအညီ        :  ${escapeTelegramMarkdownV2(supportHandle)}` : `💬 Support      :  ${escapeTelegramMarkdownV2(supportHandle)}`,
       '',
-      isMyanmar ? '*Key မအလုပ်လုပ်ဘူးလား?*' : "*My key isn't working?*",
-      isMyanmar ? `${escapeTelegramMarkdownV2(supportHandle)} ကို ဆက်သွယ်ပါ\\.` : `Contact ${escapeTelegramMarkdownV2(supportHandle)}\\.`,
-      '',
-      isMyanmar ? '*Data အသုံးပြုမှုကို ဘယ်လိုစစ်မလဲ?*' : '*How do I check my data?*',
-      isMyanmar ? '/mykeys ကိုနှိပ်ပြီး အသုံးပြုမှုကိုကြည့်ပါ\\.' : 'Tap /mykeys to see usage\\.',
-      '',
-      isMyanmar ? '*Device အများအပြားတွင် သုံးလို့ရပါသလား?*' : '*Can I use on multiple devices?*',
-      isMyanmar ? 'ရပါသည်\\! Plan အားလုံးတွင် device အကန့်အသတ်မရှိ အသုံးပြုနိုင်သည်\\.' : 'Yes\\! Unlimited devices on all plans\\.',
-      '',
-      isMyanmar ? '*Server ကို ဘယ်လိုပြောင်းမလဲ?*' : '*How do I switch server?*',
-      isMyanmar ? '/switchserver ကိုနှိပ်ပြီး server နေရာကိုပြောင်းပါ\\.' : 'Tap /switchserver to change region\\.',
+      isMyanmar ? 'အောက်မှ shortcut ကိုနှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည် 👇' : 'Tap a shortcut below to continue 👇',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
@@ -3032,9 +3076,10 @@ export function buildTelegramStoreHelpView(input?: {
           { text: isMyanmar ? '🔑 Key များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
         ],
         [
+          { text: isMyanmar ? '🛒 Plan များ' : '🛒 View Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
           { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
-          { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
         ],
+        [{ text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
       ],
     },
   };
