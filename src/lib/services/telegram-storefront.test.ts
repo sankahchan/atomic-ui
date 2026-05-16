@@ -438,10 +438,14 @@ test('store paid key detail screen becomes a persistent hub', () => {
   );
   assert.equal(
     paid.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
-    buildTelegramStorefrontCallbackData({ action: 'renew_plan', planId: 'plan_pro', keyId: 'key_123', kind: 'access' }),
+    buildTelegramStorefrontCallbackData({ action: 'show_qr', keyId: 'key_123' }),
   );
   assert.equal(
     paid.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'renew_plan', planId: 'plan_pro', keyId: 'key_123', kind: 'access' }),
+  );
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[3]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
   );
 });
@@ -460,10 +464,14 @@ test('store order confirmed and trial activated screens keep direct setup shortc
   assert.match(paid.text, /Tap Setup Guide to connect in 2 minutes/);
   assert.equal(
     paid.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_qr', keyId: 'key_123' }),
+  );
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'guide_platform', keyId: 'key_123', platform: 'android' }),
   );
   assert.equal(
-    paid.replyMarkup.inline_keyboard[3]?.[0]?.callback_data,
+    paid.replyMarkup.inline_keyboard[4]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
   );
 
@@ -477,7 +485,11 @@ test('store order confirmed and trial activated screens keep direct setup shortc
   assert.match(trial.text, /Trial Activated/);
   assert.match(trial.text, /FREE/);
   assert.equal(
-    trial.replyMarkup.inline_keyboard[3]?.[0]?.callback_data,
+    trial.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_qr', keyId: 'trial_123' }),
+  );
+  assert.equal(
+    trial.replyMarkup.inline_keyboard[4]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
   );
 });
@@ -530,6 +542,10 @@ test('storefront callback parser handles setup-guide platform routes', () => {
   assert.deepEqual(
     parseTelegramStorefrontCallbackData('setup_guide_key_123'),
     { action: 'setup_guide', keyId: 'key_123' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData('qr_key_123'),
+    { action: 'show_qr', keyId: 'key_123' },
   );
   assert.deepEqual(
     parseTelegramStorefrontCallbackData('platform_select_key_123'),

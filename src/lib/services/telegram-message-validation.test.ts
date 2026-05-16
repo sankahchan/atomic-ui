@@ -779,7 +779,7 @@ test('admin queue cards stay compact and button-first', () => {
   assertTelegramMessageBudget(supportThreadSummary, { maxLines: 6, maxChars: 220 });
   assert.doesNotMatch(supportThreadCard, /Use the buttons below/);
   assertTelegramMessageBudget(supportThreadCard, { maxLines: 8, maxChars: 320 });
-  assert.match(premiumQueueSummary, /Opening the next request below/);
+  assert.match(premiumQueueSummary, /Next request opens below/);
   assertTelegramMessageBudget(premiumQueueSummary, { maxLines: 5, maxChars: 220 });
   assert.doesNotMatch(premiumQueueCard, /Use the buttons below/);
   assert.match(premiumQueueCard, /နောက်ဆုံး reply/);
@@ -910,6 +910,7 @@ test('myanmar premium queue helpers stay localized and compact', () => {
   assert.doesNotMatch(refundCard, /Claimed by|Unclaimed|Reason:/);
   assert.doesNotMatch(premiumReplyFirstRow, /Working on it|Need details|Handled/);
   assert.doesNotMatch(premiumReplySecondRow, /Next|Panel/);
+  assert.match(premiumReplyFirstRow, /စစ်မည်|မေးမည်|ပြီးပြီ/);
   assert.doesNotMatch(reviewActionThirdRow, /Duplicate|Blurry|Amount/);
   assert.doesNotMatch(refundSummaryFirstRow, /Refresh|Reviews/);
   assert.doesNotMatch(refundSummarySecondRow, /Admin home/);

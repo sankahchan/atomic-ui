@@ -5598,14 +5598,22 @@ export async function sendAccessKeySharePageToTelegram(input: {
       '',
       '🔒 Protected install is enabled for this key.',
       'Install from the share page on each device. The reusable raw config is hidden to reduce sharing.',
-      '',
-      `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`,
     );
   } else {
     lines.push(
       '',
-      `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`,
-      `🔄 ${ui.subscriptionUrlLabel}: ${subscriptionUrl}`,
+      locale === 'my'
+        ? 'အောက်ပါ button များမှ share page၊ Subscription URL နှင့် QR code ကို ဖွင့်နိုင်ပါသည်။'
+        : 'Use the buttons below to open the share page, subscription URL, or QR code.',
+    );
+  }
+
+  if (protectedInstallOnly) {
+    lines.push(
+      '',
+      locale === 'my'
+        ? 'အောက်ပါ button များမှ share page နှင့် QR code ကို ဖွင့်နိုင်ပါသည်။'
+        : 'Use the buttons below to open the share page or QR code.',
     );
   }
 
@@ -5615,6 +5623,16 @@ export async function sendAccessKeySharePageToTelegram(input: {
 
   if (!protectedInstallOnly) {
     inlineKeyboard.push([{ text: ui.openSubscriptionUrl, url: subscriptionUrl }]);
+  }
+
+  if (input.includeQr ?? true) {
+    inlineKeyboard.push([{
+      text: ui.showQrCode,
+      callback_data: buildTelegramStorefrontCallbackData({
+        action: 'show_qr',
+        keyId: key.id,
+      }),
+    }]);
   }
 
   if (salesSettings.enabled && salesSettings.allowRenewals) {
@@ -5640,20 +5658,6 @@ export async function sendAccessKeySharePageToTelegram(input: {
   await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
     replyMarkup: { inline_keyboard: inlineKeyboard },
   });
-
-  if (input.includeQr ?? true) {
-    try {
-      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(protectedInstallOnly ? sharePageUrl : (key.accessUrl || sharePageUrl));
-      await sendTelegramPhoto(
-        config.botToken,
-        destinationChatId,
-        qrBuffer,
-        ui.accessQrCaption,
-      );
-    } catch (error) {
-      console.error('Failed to generate Telegram QR code:', error);
-    }
-  }
 
   await recordSubscriptionPageEvent({
     accessKeyId: key.id,
@@ -5805,18 +5809,31 @@ export async function sendDynamicKeySharePageToTelegram(input: {
         : ui.dynamicShareDisabledFallback,
   ];
 
-  if (key.sharePageEnabled && sharePageUrl) {
-    lines.push('', `🌐 ${ui.sharePageLabel}: ${sharePageUrl}`);
-  }
-
   if (protectedInstallOnly) {
     lines.push(
+      '',
       '🔒 Protected install is enabled for this key.',
       'Install from the share page on each device. The reusable direct endpoint is hidden to reduce sharing.',
+      '',
+      locale === 'my'
+        ? 'အောက်ပါ button များမှ share page နှင့် QR code ကို ဖွင့်နိုင်ပါသည်။'
+        : 'Use the buttons below to open the share page or QR code.',
     );
   } else {
-    lines.push(`🔄 ${ui.clientEndpointLabel}: ${subscriptionUrl}`);
-    lines.push(`⚡ ${ui.outlineClientUrlLabel}: ${outlineClientUrl}`);
+    lines.push(
+      '',
+      key.sharePageEnabled && sharePageUrl
+        ? (
+          locale === 'my'
+            ? 'အောက်ပါ button များမှ share page၊ client URL နှင့် QR code ကို ဖွင့်နိုင်ပါသည်။'
+            : 'Use the buttons below to open the share page, client URL, or QR code.'
+        )
+        : (
+          locale === 'my'
+            ? 'Outline app သို့မဟုတ် compatible client အတွက် client URL နှင့် QR code ကို အောက်ပါ button များမှ ဖွင့်ပါ။'
+            : 'Use the buttons below to open the client URL or QR code for Outline or another compatible client.'
+        ),
+    );
   }
 
   const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [];
@@ -5825,6 +5842,15 @@ export async function sendDynamicKeySharePageToTelegram(input: {
   }
   if (!protectedInstallOnly && subscriptionUrl) {
     inlineKeyboard.push([{ text: ui.openClientEndpoint, url: subscriptionUrl }]);
+  }
+  if (input.includeQr ?? true) {
+    inlineKeyboard.push([{
+      text: ui.showQrCode,
+      callback_data: buildTelegramStorefrontCallbackData({
+        action: 'show_qr',
+        keyId: key.id,
+      }),
+    }]);
   }
 
   const salesSettings = await getTelegramSalesSettings();
@@ -5874,20 +5900,6 @@ export async function sendDynamicKeySharePageToTelegram(input: {
   await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
     replyMarkup: { inline_keyboard: inlineKeyboard },
   });
-
-  if (input.includeQr ?? true) {
-    try {
-      const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(protectedInstallOnly ? sharePageUrl! : outlineClientUrl);
-      await sendTelegramPhoto(
-        config.botToken,
-        destinationChatId,
-        qrBuffer,
-        ui.dynamicQrCaption,
-      );
-    } catch (error) {
-      console.error('Failed to generate Telegram QR code for dynamic key:', error);
-    }
-  }
 
   await recordSubscriptionPageEvent({
     dynamicAccessKeyId: key.id,
@@ -6718,6 +6730,7 @@ export async function handleTelegramCallbackQuery(
           return null;
         }
         case 'setup_guide':
+        case 'show_qr':
         case 'platform_select':
         case 'guide_platform':
         case 'key_page': {
@@ -6733,6 +6746,31 @@ export async function handleTelegramCallbackQuery(
               callbackQuery.id,
               locale === 'my' ? 'Key ကို မတွေ့ပါ။' : 'Key not found.',
             );
+            return null;
+          }
+
+          if (storefrontAction.action === 'show_qr') {
+            try {
+              const qrBuffer = await generateTelegramQrBufferWithAtomicLogo(keyView.accessKeyText);
+              await sendTelegramPhoto(
+                config.botToken,
+                chatId,
+                qrBuffer,
+                keyView.kind === 'dynamic' ? ui.dynamicQrCaption : ui.accessQrCaption,
+              );
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                locale === 'my' ? 'QR Code ကို အောက်တွင်ပို့လိုက်ပါပြီ။' : 'Sent the QR code below.',
+              );
+            } catch (error) {
+              console.error('Failed to generate storefront QR code:', error);
+              await answerTelegramCallbackQuery(
+                config.botToken,
+                callbackQuery.id,
+                locale === 'my' ? 'QR Code ကို မထုတ်ပေးနိုင်သေးပါ။' : 'Unable to generate the QR code right now.',
+              );
+            }
             return null;
           }
 
