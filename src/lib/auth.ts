@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
 import { getJwtSecretBytes } from './session-secret';
@@ -53,12 +53,45 @@ function getConfiguredSessionOrigin() {
   );
 }
 
-export function shouldUseSecureSessionCookie() {
-  return process.env.NODE_ENV === 'production' && getConfiguredSessionOrigin().startsWith('https://');
+type SessionCookieSecuritySignals = {
+  nodeEnv?: string;
+  configuredOrigin?: string;
+  forwardedProto?: string | null;
+};
+
+function normalizeForwardedProto(forwardedProto: string | null | undefined) {
+  return forwardedProto?.split(',')[0]?.trim().toLowerCase() || null;
 }
 
-export function buildSessionCookieOptions() {
-  const secure = shouldUseSecureSessionCookie();
+export function shouldUseSecureSessionCookie(signals: SessionCookieSecuritySignals = {}) {
+  const nodeEnv = signals.nodeEnv ?? process.env.NODE_ENV;
+  if (nodeEnv !== 'production') {
+    return false;
+  }
+
+  const configuredOrigin = (signals.configuredOrigin ?? getConfiguredSessionOrigin()).trim();
+  if (configuredOrigin.startsWith('https://')) {
+    return true;
+  }
+
+  if (configuredOrigin.startsWith('http://')) {
+    return false;
+  }
+
+  const forwardedProto = normalizeForwardedProto(signals.forwardedProto);
+  if (forwardedProto === 'https') {
+    return true;
+  }
+
+  if (forwardedProto === 'http') {
+    return false;
+  }
+
+  return true;
+}
+
+export function buildSessionCookieOptions(signals: SessionCookieSecuritySignals = {}) {
+  const secure = shouldUseSecureSessionCookie(signals);
 
   return {
     httpOnly: true,
@@ -68,6 +101,26 @@ export function buildSessionCookieOptions() {
     maxAge: SESSION_EXPIRY_DAYS * 24 * 60 * 60,
     path: '/',
   };
+}
+
+async function resolveSessionCookieOptions() {
+  const requestHeaders = await headers();
+  return buildSessionCookieOptions({
+    forwardedProto:
+      requestHeaders.get('x-forwarded-proto') ||
+      (() => {
+        const referer = requestHeaders.get('referer');
+        if (!referer) {
+          return null;
+        }
+
+        try {
+          return new URL(referer).protocol.replace(':', '');
+        } catch {
+          return null;
+        }
+      })(),
+  });
 }
 
 function isExpectedSessionVerificationError(error: unknown) {
@@ -224,7 +277,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  */
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, buildSessionCookieOptions());
+  cookieStore.set(SESSION_COOKIE_NAME, token, await resolveSessionCookieOptions());
 }
 
 /**
@@ -240,7 +293,10 @@ export async function getSessionToken(): Promise<string | undefined> {
  */
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
+  cookieStore.set(SESSION_COOKIE_NAME, '', {
+    ...(await resolveSessionCookieOptions()),
+    maxAge: 0,
+  });
 }
 
 /**

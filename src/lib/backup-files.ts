@@ -10,6 +10,17 @@ function normalizeBackupFilename(filename: string) {
   return filename.trim().toLowerCase();
 }
 
+export function sanitizeBackupFilename(filename: string, fallback = '') {
+  const sanitized = filename
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop()
+    ?.replace(/[\r\n"]/g, '_')
+    .trim();
+
+  return sanitized || fallback;
+}
+
 export function inferBackupFileKind(filename: string, header?: string | null): BackupFileKind {
   const normalizedFilename = normalizeBackupFilename(filename);
   const normalizedHeader = (header || '').trim();

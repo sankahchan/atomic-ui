@@ -5,7 +5,12 @@ import { NextRequest } from 'next/server';
 
 import { TELEGRAM_WEBHOOK_SECRET_HEADER } from '@/lib/telegram-webhook-secret';
 
-import { handleTelegramWebhookPost, type TelegramWebhookRouteDeps } from './route';
+import {
+  handleTelegramWebhookGet,
+  handleTelegramWebhookPost,
+  handleTelegramWebhookSetup,
+  type TelegramWebhookRouteDeps,
+} from './route';
 
 const baseWebhookDeps: TelegramWebhookRouteDeps = {
   getTelegramConfig: async () => ({
@@ -88,4 +93,57 @@ test('telegram webhook accepts requests with the correct webhook secret header',
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true });
   assert.deepEqual(handledUpdate, { update_id: 42 });
+});
+
+test('telegram webhook setup must use POST instead of GET', async () => {
+  const request = new NextRequest('https://example.com/api/telegram/webhook?setWebhook=true', {
+    method: 'GET',
+  });
+
+  const response = await handleTelegramWebhookGet(request, baseWebhookDeps);
+
+  assert.equal(response.status, 405);
+  assert.deepEqual(await response.json(), {
+    status: 'method_not_allowed',
+    message: 'Use POST /api/telegram/webhook?setWebhook=true to configure the Telegram webhook.',
+  });
+});
+
+test('telegram webhook reports an error when webhook info lookup fails', async () => {
+  const request = new NextRequest('https://example.com/api/telegram/webhook', {
+    method: 'GET',
+  });
+
+  const response = await handleTelegramWebhookGet(request, {
+    ...baseWebhookDeps,
+    fetchImpl: async () => {
+      throw new Error('telegram unreachable');
+    },
+  });
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), {
+    status: 'error',
+    message: 'telegram unreachable',
+  });
+});
+
+test('telegram webhook setup accepts authenticated POST requests', async () => {
+  const request = new NextRequest('https://example.com/api/telegram/webhook?setWebhook=true', {
+    method: 'POST',
+  });
+
+  const response = await handleTelegramWebhookSetup(request, {
+    ...baseWebhookDeps,
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ ok: true, result: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+  });
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.status, 'webhook_set');
+  assert.equal(body.webhookUrl, 'https://example.com/panel/api/telegram/webhook');
 });

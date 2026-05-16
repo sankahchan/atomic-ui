@@ -54,3 +54,29 @@ test('http bootstrap installs keep session cookies compatible', () => {
   assert.equal(buildSessionCookieOptions().secure, false);
   assert.equal(buildSessionCookieOptions().sameSite, 'lax');
 });
+
+test('secure session cookies stay enabled for proxied https requests without an app origin', () => {
+  (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+  delete process.env.APP_URL;
+  delete process.env.NEXT_PUBLIC_APP_URL;
+  delete process.env.NEXTAUTH_URL;
+
+  assert.equal(
+    shouldUseSecureSessionCookie({ forwardedProto: 'https' }),
+    true,
+  );
+  assert.equal(
+    buildSessionCookieOptions({ forwardedProto: 'https' }).secure,
+    true,
+  );
+});
+
+test('production session cookies default to secure when the origin is missing', () => {
+  (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
+  delete process.env.APP_URL;
+  delete process.env.NEXT_PUBLIC_APP_URL;
+  delete process.env.NEXTAUTH_URL;
+
+  assert.equal(shouldUseSecureSessionCookie(), true);
+  assert.equal(buildSessionCookieOptions().sameSite, 'strict');
+});

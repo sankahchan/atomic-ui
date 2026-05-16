@@ -118,3 +118,33 @@ test('subscription settings POST allows owner-scoped admins', async () => {
   assert.equal(writes.some((entry) => entry.key === 'defaultSubscriptionTheme'), true);
   assert.equal(writes.some((entry) => entry.key === 'defaultLanguage'), true);
 });
+
+test('subscription settings POST rejects invalid payloads', async () => {
+  const request = new NextRequest('https://example.com/api/settings/subscription', {
+    method: 'POST',
+    body: JSON.stringify({
+      defaultLanguage: 'ko',
+      branding: {
+        logoSize: 'huge',
+      },
+    }),
+    headers: { 'content-type': 'application/json' },
+  });
+
+  const response = await handleSubscriptionSettingsPost(request, {
+    requireAdminRouteScope: async () => ({
+      user: { id: 'owner-1', email: 'owner@example.com', role: 'ADMIN', adminScope: 'OWNER' },
+      response: null,
+    }),
+    settings: {
+      findMany: async () => [],
+      upsert: async () => undefined,
+      deleteMany: async () => ({ count: 0 }),
+    },
+    logError: () => undefined,
+  });
+
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.equal(body.error, 'Invalid subscription settings payload');
+});

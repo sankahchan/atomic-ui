@@ -58,6 +58,86 @@ const defaultDeps: TelegramWebhookRouteDeps = {
   logError: console.error,
 };
 
+export async function handleTelegramWebhookSetup(
+  request: NextRequest,
+  deps: TelegramWebhookRouteDeps = defaultDeps,
+) {
+  const { response } = await deps.requireAdminRouteScope({
+    canAccess: hasTelegramAnnouncementManageScope,
+    forbiddenMessage: 'You do not have permission to manage the Telegram webhook.',
+  });
+  if (response) {
+    return response;
+  }
+
+  const config = await deps.getTelegramConfig();
+  if (!config) {
+    return NextResponse.json({
+      status: 'not_configured',
+      message: 'Telegram bot not configured. Add a TELEGRAM notification channel in Settings.',
+    });
+  }
+
+  const appOrigin = deps.getConfiguredPublicAppOrigin();
+  if (!appOrigin) {
+    return NextResponse.json(
+      {
+        status: 'error',
+        message: 'APP_URL or NEXT_PUBLIC_APP_URL must be configured before setting the Telegram webhook.',
+      },
+      { status: 500 },
+    );
+  }
+
+  const webhookUrl = `${appOrigin}${deps.getPublicBasePath()}/api/telegram/webhook`;
+
+  try {
+    const response = await deps.fetchImpl(
+      `https://api.telegram.org/bot${config.botToken}/setWebhook`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl,
+          allowed_updates: ['message', 'callback_query'],
+          secret_token: config.webhookSecretToken,
+        }),
+      },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || result?.ok === false) {
+      return NextResponse.json(
+        {
+          status: 'error',
+          webhookUrl,
+          telegramResponse: result,
+          message:
+            typeof result?.description === 'string' && result.description.trim()
+              ? result.description.trim()
+              : 'Failed to set Telegram webhook.',
+        },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({
+      status: 'webhook_set',
+      webhookUrl,
+      telegramResponse: result,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Failed to set webhook',
+      },
+      { status: 500 },
+    );
+  }
+}
+
 /**
  * POST /api/telegram/webhook
  * 
@@ -120,14 +200,17 @@ export async function handleTelegramWebhookPost(
 }
 
 export async function POST(request: NextRequest) {
+  if (request.nextUrl.searchParams.get('setWebhook') === 'true') {
+    return handleTelegramWebhookSetup(request);
+  }
+
   return handleTelegramWebhookPost(request);
 }
 
 /**
  * GET /api/telegram/webhook
  * 
- * Used to set up or check the webhook status.
- * Add ?setWebhook=true to register the webhook with Telegram.
+ * Used to check the webhook status.
  */
 export async function handleTelegramWebhookGet(
   request: NextRequest,
@@ -144,55 +227,22 @@ export async function handleTelegramWebhookGet(
   const searchParams = request.nextUrl.searchParams;
   const setWebhook = searchParams.get('setWebhook') === 'true';
 
+  if (setWebhook) {
+    return NextResponse.json(
+      {
+        status: 'method_not_allowed',
+        message: 'Use POST /api/telegram/webhook?setWebhook=true to configure the Telegram webhook.',
+      },
+      { status: 405 },
+    );
+  }
+
   const config = await deps.getTelegramConfig();
   if (!config) {
     return NextResponse.json({
       status: 'not_configured',
       message: 'Telegram bot not configured. Add a TELEGRAM notification channel in Settings.'
     });
-  }
-
-  if (setWebhook) {
-    const appOrigin = deps.getConfiguredPublicAppOrigin();
-    if (!appOrigin) {
-      return NextResponse.json(
-        {
-          status: 'error',
-          message: 'APP_URL or NEXT_PUBLIC_APP_URL must be configured before setting the Telegram webhook.',
-        },
-        { status: 500 },
-      );
-    }
-
-    const webhookUrl = `${appOrigin}${deps.getPublicBasePath()}/api/telegram/webhook`;
-
-    try {
-      const response = await deps.fetchImpl(
-        `https://api.telegram.org/bot${config.botToken}/setWebhook`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: webhookUrl,
-            allowed_updates: ['message', 'callback_query'],
-            secret_token: config.webhookSecretToken,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      return NextResponse.json({
-        status: result.ok ? 'webhook_set' : 'error',
-        webhookUrl,
-        telegramResponse: result,
-      });
-    } catch (error) {
-      return NextResponse.json({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Failed to set webhook'
-      }, { status: 500 });
-    }
   }
 
   // Get current webhook info
@@ -202,15 +252,31 @@ export async function handleTelegramWebhookGet(
     );
     const result = await response.json();
 
+    if (!response.ok || result?.ok === false) {
+      return NextResponse.json(
+        {
+          status: 'error',
+          message:
+            typeof result?.description === 'string' && result.description.trim()
+              ? result.description.trim()
+              : 'Failed to fetch Telegram webhook info.',
+        },
+        { status: 502 },
+      );
+    }
+
     return NextResponse.json({
       status: 'configured',
       webhookInfo: result.result,
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json({
-      status: 'configured',
-      message: 'Bot token configured but could not fetch webhook info',
-    });
+      status: 'error',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Bot token configured but could not fetch webhook info',
+    }, { status: 502 });
   }
 }
 

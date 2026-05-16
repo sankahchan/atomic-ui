@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildOfflineRestoreCommand, inferBackupFileKind } from './backup-files';
+import { buildOfflineRestoreCommand, inferBackupFileKind, sanitizeBackupFilename } from './backup-files';
 
 test('inferBackupFileKind detects sqlite files', () => {
   assert.equal(inferBackupFileKind('backup-2026-04-15.db'), 'sqlite');
@@ -35,4 +35,10 @@ test('buildOfflineRestoreCommand returns engine-specific commands', () => {
     buildOfflineRestoreCommand('backup.postgres.zip', '/tmp/backup.postgres.zip'),
     'Upload /tmp/backup.postgres.zip in the dashboard and use Restore. The bundle contains the Postgres dump plus restore encryption metadata.',
   );
+});
+
+test('sanitizeBackupFilename strips traversal segments and control characters', () => {
+  assert.equal(sanitizeBackupFilename('../nested/backup.dump'), 'backup.dump');
+  assert.equal(sanitizeBackupFilename('..\\nested\\backup.dump'), 'backup.dump');
+  assert.equal(sanitizeBackupFilename('bad\r\nname.db'), 'bad__name.db');
 });

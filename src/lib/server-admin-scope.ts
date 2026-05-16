@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 
 let legacyAdminScopeNormalizationPromise: Promise<void> | null = null;
+let legacyAdminScopeNormalizationSettled = false;
 
 async function normalizeLegacyAdminScopesInternal() {
   const legacyAdmins = await db.user.findMany({
@@ -45,8 +46,13 @@ async function normalizeLegacyAdminScopesInternal() {
 }
 
 export async function normalizeLegacyAdminScopes() {
+  if (legacyAdminScopeNormalizationSettled) {
+    return;
+  }
+
   if (!legacyAdminScopeNormalizationPromise) {
     legacyAdminScopeNormalizationPromise = normalizeLegacyAdminScopesInternal().finally(() => {
+      legacyAdminScopeNormalizationSettled = true;
       legacyAdminScopeNormalizationPromise = null;
     });
   }
