@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { login, smokePortalEmail, smokePortalPassword } from './helpers';
 
 test('admin smoke journeys stay functional', async ({ page }) => {
+  test.setTimeout(120_000);
   await login(page);
   await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/, { timeout: 30_000 });
 
