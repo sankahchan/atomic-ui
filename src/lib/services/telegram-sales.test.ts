@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getDefaultTelegramSalesSettings,
+  normalizeTelegramSupportLink,
   normalizeTelegramSalesSettings,
   resolveTelegramSalesPriceLabel,
 } from '@/lib/services/telegram-sales';
@@ -106,4 +107,27 @@ test('built-in storefront plans render MMK fallback labels with Ks in english', 
   const plan = defaults.plans.find((item) => item.code === '1m_200gb');
   assert.ok(plan);
   assert.equal(resolveTelegramSalesPriceLabel(plan!, 'en'), '7,000 Ks');
+});
+
+test('telegram support link normalization accepts @username shortcuts', () => {
+  assert.equal(normalizeTelegramSupportLink('@outlineadmin_support'), 'https://t.me/outlineadmin_support');
+  assert.equal(normalizeTelegramSupportLink('outlineadmin_support'), 'https://t.me/outlineadmin_support');
+});
+
+test('telegram support link normalization canonicalizes telegram hostnames', () => {
+  assert.equal(normalizeTelegramSupportLink('t.me/outlineadmin_support'), 'https://t.me/outlineadmin_support');
+  assert.equal(
+    normalizeTelegramSupportLink('https://telegram.me/outlineadmin_support'),
+    'https://t.me/outlineadmin_support',
+  );
+});
+
+test('telegram sales settings normalize support link before runtime reads it', () => {
+  const defaults = getDefaultTelegramSalesSettings();
+  const normalized = normalizeTelegramSalesSettings({
+    ...defaults,
+    supportLink: '@outlineadmin_support',
+  });
+
+  assert.equal(normalized.supportLink, 'https://t.me/outlineadmin_support');
 });

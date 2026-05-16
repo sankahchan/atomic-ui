@@ -39,6 +39,7 @@ import {
 } from '@/lib/telegram-presets';
 import {
   getDefaultTelegramSalesSettings,
+  normalizeTelegramSupportLink,
   type TelegramSalesPlanCode,
 } from '@/lib/services/telegram-sales';
 import { trpc } from '@/lib/trpc';
@@ -3853,6 +3854,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
 
     return JSON.stringify(form) !== JSON.stringify(savedWorkflowSnapshot);
   }, [form, savedWorkflowSnapshot]);
+  const normalizedSupportLinkPreview = useMemo(
+    () => normalizeTelegramSupportLink(form.supportLink),
+    [form.supportLink],
+  );
 
   const salesUi = {
     title: isMyanmar ? 'Telegram အော်ဒါ flow' : 'Telegram order workflow',
@@ -3861,10 +3866,14 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
       : 'Let users pick a plan, upload payment proof, and wait for admin approval before a key is delivered.',
     enableOrders: isMyanmar ? 'Telegram order flow ကို ဖွင့်မည်' : 'Enable Telegram order flow',
     allowRenewals: isMyanmar ? 'Renewal order များကို ခွင့်ပြုမည်' : 'Allow renewal orders',
-    supportLink: isMyanmar ? 'Telegram support link' : 'Telegram support link',
+    supportLink: isMyanmar ? 'Telegram support account' : 'Telegram support account',
     supportLinkDesc: isMyanmar
-      ? 'Bot အတွင်း /support command နှင့် payment prompt များတွင် ဤ link ကို အသုံးပြုမည်။ မထည့်ပါက Subscription Page support link ကို fallback အဖြစ် သုံးမည်။'
-      : 'Use this link for the bot /support command and payment prompts. If left empty, the Subscription Page support link is used as a fallback.',
+      ? 'Bot အတွင်း /support command နှင့် payment prompt များတွင် ဤ Telegram account ကို အသုံးပြုမည်။ @username သို့မဟုတ် https://t.me/... ကို ထည့်နိုင်ပြီး မထည့်ပါက Subscription Page support link ကို fallback အဖြစ် သုံးမည်။'
+      : 'Use this Telegram account for the bot /support command and payment prompts. You can enter either @username or a full https://t.me/... link. If left empty, the Subscription Page support link is used as a fallback.',
+    supportLinkPreview: isMyanmar ? 'Preview' : 'Preview',
+    supportLinkPreviewFallback: isMyanmar
+      ? 'Telegram support account မသတ်မှတ်ရသေးပါ။ Subscription Page support link ကို fallback အဖြစ် သုံးပါမည်။'
+      : 'No Telegram support account set yet. The bot will fall back to the Subscription Page support link.',
     paymentAutomation: isMyanmar ? 'Unpaid order automation' : 'Unpaid order automation',
     paymentAutomationDesc: isMyanmar
       ? 'Payment method မရွေးသေးသော သို့မဟုတ် screenshot မပို့ရသေးသော order များကို reminder ပို့ပြီး အချိန်ကျော်လျှင် အလိုအလျောက် cancel လုပ်ပါမည်။'
@@ -4894,7 +4903,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     return {
       enabled: form.enabled,
       allowRenewals: form.allowRenewals,
-      supportLink: form.supportLink.trim(),
+      supportLink: normalizeTelegramSupportLink(form.supportLink),
       dailySalesDigestEnabled: form.dailySalesDigestEnabled,
       dailySalesDigestHour: form.dailySalesDigestHour,
       dailySalesDigestMinute: form.dailySalesDigestMinute,
@@ -5481,9 +5490,19 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                   supportLink: event.target.value,
                 }))
               }
-              placeholder="https://t.me/your_support"
+              placeholder="@your_support"
             />
             <p className="text-xs text-muted-foreground">{salesUi.supportLinkDesc}</p>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{salesUi.supportLinkPreview}:</span>{' '}
+              {normalizedSupportLinkPreview ? (
+                <span className="font-mono text-foreground">
+                  {normalizedSupportLinkPreview}
+                </span>
+              ) : (
+                salesUi.supportLinkPreviewFallback
+              )}
+            </p>
           </div>
 
           <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'settings' && 'hidden')}>

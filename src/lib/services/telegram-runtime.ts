@@ -10,7 +10,10 @@ import {
   DEFAULT_TELEGRAM_WELCOME_MESSAGES,
 } from '@/lib/services/telegram-copy';
 import { sanitizeTelegramHtmlMessage } from '@/lib/services/telegram-message-validation';
-import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
+import {
+  getTelegramSalesSettings,
+  normalizeTelegramSupportLink,
+} from '@/lib/services/telegram-sales';
 import {
   type SendTelegramMessageResult,
   type TelegramNotificationPreferenceKey,
@@ -533,7 +536,11 @@ export async function getTelegramSupportLink() {
     getSubscriptionDefaults(),
   ]);
 
-  return salesSettings.supportLink?.trim() || defaults.supportLink || null;
+  return (
+    normalizeTelegramSupportLink(salesSettings.supportLink) ||
+    normalizeTelegramSupportLink(defaults.supportLink) ||
+    null
+  );
 }
 
 export async function getTelegramBotUsername(

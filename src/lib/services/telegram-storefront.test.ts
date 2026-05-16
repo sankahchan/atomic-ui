@@ -15,6 +15,7 @@ import {
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
   buildTelegramStoreQuickStatusView,
+  buildTelegramStoreHelpView,
   buildTelegramStoreSupportContactView,
   buildTelegramStorefrontCallbackData,
   parseTelegramStorefrontCallbackData,
@@ -285,9 +286,15 @@ test('store usage bars use color semantics and account summary stays compact', (
   assert.match(account.text, /👤 \*My Account\*/);
   assert.match(account.text, /🔑 Active keys   :  1/);
   assert.match(account.text, /📶 Data left     :  120 GB/);
+  assert.match(account.text, /📌 \*Primary key\*/);
+  assert.match(account.text, /🌍 Server      :  SG 🇸🇬/);
   assert.match(account.text, /🟩🟩🟩🟩░░░░░░  80 GB\/200 GB/);
-  assert.equal(account.replyMarkup.inline_keyboard[0]?.[0]?.text, '🔑 My Keys');
-  assert.equal(account.replyMarkup.inline_keyboard[1]?.[0]?.text, '📲 Setup');
+  assert.equal(account.replyMarkup.inline_keyboard[0]?.[0]?.text, '📄 Open Key');
+  assert.equal(account.replyMarkup.inline_keyboard[0]?.[1]?.text, '🔑 My Keys');
+  assert.equal(account.replyMarkup.inline_keyboard[1]?.[0]?.text, '🔄 Renew');
+  assert.equal(account.replyMarkup.inline_keyboard[1]?.[1]?.text, '📲 Setup');
+  assert.equal(account.replyMarkup.inline_keyboard[2]?.[0]?.text, '🎁 Referral');
+  assert.equal(account.replyMarkup.inline_keyboard[2]?.[1]?.text, '💬 Support');
 
   const status = buildTelegramStoreQuickStatusView({
     activeKeyCount: 1,
@@ -296,6 +303,30 @@ test('store usage bars use color semantics and account summary stays compact', (
   });
   assert.match(status.text, /📊 \*Your Status\*/);
   assert.match(status.text, /📶 Data left     :  120 GB/);
+});
+
+test('store help view stays short and action-oriented', () => {
+  const help = buildTelegramStoreHelpView({
+    locale: 'en',
+    supportUrl: 'https://t.me/outlineadminsupport',
+  });
+
+  assert.match(help.text, /📲 Connect\s+:  \/setup/);
+  assert.match(help.text, /🔑 My keys\s+:  \/mykeys/);
+  assert.match(help.text, /🔄 Renew\s+:  \/renew/);
+  assert.match(help.text, /🌍 Switch\s+:  \/switchserver/);
+  assert.match(help.text, /💬 Support\s+:  @outlineadminsupport/);
+  assert.doesNotMatch(help.text, /How do I connect\?/);
+  assert.ok(help.text.split('\n').length <= 10);
+  assert.equal(help.replyMarkup.inline_keyboard[1]?.[0]?.text, '🛒 View Plans');
+
+  const helpMyanmar = buildTelegramStoreHelpView({
+    locale: 'my',
+    supportUrl: 'https://t.me/outlineadminsupport',
+  });
+  assert.match(helpMyanmar.text, /📲 ချိတ်ဆက်နည်း/);
+  assert.match(helpMyanmar.text, /🔄 သက်တမ်းတိုး/);
+  assert.match(helpMyanmar.text, /💬 အကူအညီ/);
 });
 
 test('store plan list keeps the fixed 9-plan catalog and dynamic ultra pricing', () => {
