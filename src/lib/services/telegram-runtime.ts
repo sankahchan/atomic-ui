@@ -37,6 +37,8 @@ import {
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_COMMAND_SYNC_SIGNATURE = new Map<string, string>();
+const TELEGRAM_COMMAND_SYNC_FAILURE_SIGNATURE = new Set<string>();
+const TELEGRAM_MALFORMED_CHANNEL_WARNINGS = new Set<string>();
 
 type TelegramCommandScope = {
   type: string;
@@ -149,6 +151,19 @@ async function ensureTelegramMyCommands(botToken: string, adminChatIds: string[]
       },
     );
     TELEGRAM_COMMAND_SYNC_SIGNATURE.set(commandSet.cacheKey, signature);
+  }
+}
+
+async function ensureTelegramMyCommandsSafely(botToken: string, adminChatIds: string[] = []) {
+  const failureKey = `${botToken}:${adminChatIds.map((value) => value.trim()).sort().join(',')}`;
+  try {
+    await ensureTelegramMyCommands(botToken, adminChatIds);
+    TELEGRAM_COMMAND_SYNC_FAILURE_SIGNATURE.delete(failureKey);
+  } catch (error) {
+    if (!TELEGRAM_COMMAND_SYNC_FAILURE_SIGNATURE.has(failureKey)) {
+      TELEGRAM_COMMAND_SYNC_FAILURE_SIGNATURE.add(failureKey);
+      console.error('Failed to sync Telegram command menus:', error);
+    }
   }
 }
 
@@ -644,7 +659,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
         : [];
 
       const webhookSecretToken = await ensurePersistedTelegramWebhookSecret(config);
-      await ensureTelegramMyCommands(config.botToken, adminChatIds);
+      await ensureTelegramMyCommandsSafely(config.botToken, adminChatIds);
 
       return {
         botToken: config.botToken,
@@ -707,7 +722,7 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
           : [];
 
       if (botToken && adminChatIds.length > 0) {
-        await ensureTelegramMyCommands(botToken, adminChatIds);
+        await ensureTelegramMyCommandsSafely(botToken, adminChatIds);
         return {
           botToken,
           botUsername:
@@ -724,8 +739,15 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
           showLanguageSelectorOnStart: true,
         };
       }
-    } catch {
-      // Ignore malformed channels and keep looking.
+    } catch (error) {
+      const warningKey = channel.id;
+      if (!TELEGRAM_MALFORMED_CHANNEL_WARNINGS.has(warningKey)) {
+        TELEGRAM_MALFORMED_CHANNEL_WARNINGS.add(warningKey);
+        console.error('Ignoring malformed Telegram notification channel config:', {
+          channelId: channel.id,
+          error,
+        });
+      }
     }
   }
 

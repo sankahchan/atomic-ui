@@ -1,4 +1,4 @@
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 import { router, adminProcedure } from '../trpc';
 import { z } from 'zod';
 import fs from 'fs';
@@ -12,7 +12,7 @@ import { verifyBackupFile } from '@/lib/services/backup-verification';
 import { createRuntimeBackup } from '@/lib/services/runtime-backup';
 import { ensureBackupDirectory, resolveAppRootDir } from '@/lib/backup-storage';
 import { hasBackupManageScope, hasRestoreManageScope } from '@/lib/admin-scope';
-import { inferBackupFileKind } from '@/lib/backup-files';
+import { inferBackupFileKind, sanitizeBackupFilename } from '@/lib/backup-files';
 import {
     createRestoreJobRecord,
     hasActiveRestoreJob,
@@ -36,6 +36,60 @@ function assertRestoreManageScope(scope?: string | null) {
             message: 'Only owner-scoped admins can restore backups.',
         });
     }
+}
+
+function getManagedBackupFilename(filename: string) {
+    const sanitized = sanitizeBackupFilename(filename);
+    if (!sanitized) {
+        throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Backup filename is required.',
+        });
+    }
+
+    return sanitized;
+}
+
+async function scheduleRestoreProcess(args: string[]) {
+    return await new Promise<{
+        status: number | null;
+        stdout: string;
+        stderr: string;
+        error?: Error;
+    }>((resolve) => {
+        const child = spawn('systemd-run', args, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout?.setEncoding('utf8');
+        child.stdout?.on('data', (chunk) => {
+            stdout += chunk;
+        });
+        child.stderr?.setEncoding('utf8');
+        child.stderr?.on('data', (chunk) => {
+            stderr += chunk;
+        });
+
+        child.once('error', (error) => {
+            resolve({
+                status: null,
+                stdout,
+                stderr,
+                error,
+            });
+        });
+
+        child.once('close', (status) => {
+            resolve({
+                status,
+                stdout,
+                stderr,
+            });
+        });
+    });
 }
 
 function parseVerificationDetails(details: string | null) {
@@ -220,7 +274,8 @@ export const backupRouter = router({
         .input(z.object({ filename: z.string() }))
         .mutation(async ({ ctx, input }) => {
             assertBackupManageScope(ctx.user.adminScope);
-            return verifyBackupFile(input.filename, {
+            const filename = getManagedBackupFilename(input.filename);
+            return verifyBackupFile(filename, {
                 userId: ctx.user.id,
                 ip: ctx.clientIp,
                 triggeredBy: 'admin',
@@ -237,7 +292,8 @@ export const backupRouter = router({
 
             try {
                 const backupDir = ensureBackupDirectory();
-                const backupPath = path.join(backupDir, input.filename);
+                const filename = getManagedBackupFilename(input.filename);
+                const backupPath = path.join(backupDir, filename);
 
                 if (!fs.existsSync(backupPath)) {
                     throw new TRPCError({
@@ -246,7 +302,7 @@ export const backupRouter = router({
                     });
                 }
 
-                const verification = await verifyBackupFile(input.filename, {
+                const verification = await verifyBackupFile(filename, {
                     userId: ctx.user.id,
                     ip: ctx.clientIp,
                     triggeredBy: 'restore-precheck',
@@ -269,7 +325,7 @@ export const backupRouter = router({
                 const safetyBackup = await createRuntimeBackup(backupDir);
                 const appRoot = resolveAppRootDir(process.cwd());
                 const restoreJob = createRestoreJobRecord({
-                    backupFilename: input.filename,
+                    backupFilename: filename,
                     backupPath,
                     requestedByUserId: ctx.user.id,
                     requestedByEmail: ctx.user.email,
@@ -279,36 +335,30 @@ export const backupRouter = router({
                 const restoreJobFile = writeRestoreJob(restoreJob, appRoot);
                 const runnerScript = path.join(appRoot, 'scripts', 'run-dashboard-restore.js');
 
-                const scheduleResult = spawnSync(
-                    'systemd-run',
-                    [
-                        '--unit',
-                        restoreJob.unitName,
-                        '--collect',
-                        '--on-active=5s',
-                        '--property',
-                        'Type=oneshot',
-                        '--property',
-                        `WorkingDirectory=${appRoot}`,
-                        '--description',
-                        `Atomic-UI restore ${input.filename}`,
-                        process.execPath,
-                        runnerScript,
-                        '--app-root',
-                        appRoot,
-                        '--job-file',
-                        restoreJobFile,
-                        '--job-id',
-                        restoreJob.jobId,
-                        '--backup',
-                        backupPath,
-                        '--backup-filename',
-                        input.filename,
-                    ],
-                    {
-                        encoding: 'utf8',
-                    },
-                );
+                const scheduleResult = await scheduleRestoreProcess([
+                    '--unit',
+                    restoreJob.unitName,
+                    '--collect',
+                    '--on-active=5s',
+                    '--property',
+                    'Type=oneshot',
+                    '--property',
+                    `WorkingDirectory=${appRoot}`,
+                    '--description',
+                    `Atomic-UI restore ${filename}`,
+                    process.execPath,
+                    runnerScript,
+                    '--app-root',
+                    appRoot,
+                    '--job-file',
+                    restoreJobFile,
+                    '--job-id',
+                    restoreJob.jobId,
+                    '--backup',
+                    backupPath,
+                    '--backup-filename',
+                    filename,
+                ]);
 
                 if (scheduleResult.error || scheduleResult.status !== 0) {
                     const errorMessage =
@@ -338,9 +388,9 @@ export const backupRouter = router({
                     ip: ctx.clientIp,
                     action: 'BACKUP_RESTORE_SCHEDULED',
                     entity: 'BACKUP',
-                    entityId: input.filename,
+                    entityId: filename,
                     details: {
-                        filename: input.filename,
+                        filename,
                         verificationStatus: verification.status,
                         restoreJobId: restoreJob.jobId,
                         restoreUnitName: restoreJob.unitName,
@@ -351,7 +401,7 @@ export const backupRouter = router({
                 return {
                     success: true,
                     scheduled: true,
-                    filename: input.filename,
+                    filename,
                     safetyBackupFilename: safetyBackup.filename,
                     job: restoreJob,
                 };
@@ -376,7 +426,8 @@ export const backupRouter = router({
             assertBackupManageScope(ctx.user.adminScope);
 
             try {
-                const backupPath = path.join(ensureBackupDirectory(), input.filename);
+                const filename = getManagedBackupFilename(input.filename);
+                const backupPath = path.join(ensureBackupDirectory(), filename);
 
                 if (fs.existsSync(backupPath)) {
                     fs.unlinkSync(backupPath);
@@ -387,9 +438,9 @@ export const backupRouter = router({
                     ip: ctx.clientIp,
                     action: 'BACKUP_DELETE',
                     entity: 'BACKUP',
-                    entityId: input.filename,
+                    entityId: filename,
                     details: {
-                        filename: input.filename,
+                        filename,
                     },
                 });
 

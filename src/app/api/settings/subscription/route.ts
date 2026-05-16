@@ -6,10 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasSubscriptionSettingsManageScope } from '@/lib/admin-scope';
 import { defaultBranding } from '@/lib/subscription-themes';
+import { supportedLocales } from '@/lib/i18n/config';
 import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
 
 // All branding setting keys
@@ -57,6 +59,54 @@ const defaultDeps: SubscriptionSettingsDeps = {
   settings: db.settings,
   logError: console.error,
 };
+
+const supportedLocaleSchema = z.enum(supportedLocales);
+const localizedTextMapSchema = z.record(z.string(), z.string());
+const customAppSchema = z.object({
+  id: z.string().min(1).max(100),
+  name: z.string().min(1).max(120),
+  icon: z.string().min(1).max(120),
+  platforms: z.array(z.enum(['android', 'ios', 'windows', 'macos', 'linux'])).max(5),
+  urlScheme: z.string().min(1).max(2000),
+  storeUrl: z.string().url().max(2000).optional(),
+});
+
+const subscriptionBrandingSchema = z.object({
+  logoUrl: z.string().max(2000).optional(),
+  logoSize: z.number().int().min(1).max(100).optional(),
+  brandName: z.string().max(120).optional(),
+  footerText: z.string().max(2000).optional(),
+  localizedFooterTexts: localizedTextMapSchema.optional(),
+  showPoweredBy: z.boolean().optional(),
+  welcomeMessage: z.string().max(4000).optional(),
+  localizedWelcomeMessages: localizedTextMapSchema.optional(),
+  showWelcome: z.boolean().optional(),
+  fontFamily: z.string().max(200).optional(),
+  fontUrl: z.string().url().max(2000).optional(),
+  layout: z.enum(['default', 'compact', 'detailed', 'minimal']).optional(),
+  cardStyle: z.enum(['rounded', 'sharp', 'pill']).optional(),
+  enableAnimations: z.boolean().optional(),
+  animatedBackground: z.enum(['none', 'gradient', 'particles', 'waves']).optional(),
+  showUsageAlerts: z.boolean().optional(),
+  usageAlertThresholds: z.array(z.number().int().min(1).max(100)).max(10).optional(),
+  showConnectionSummary: z.boolean().optional(),
+  showCompatibleApps: z.boolean().optional(),
+  showShareLinks: z.boolean().optional(),
+  showHelpContact: z.boolean().optional(),
+  showManualSetupButton: z.boolean().optional(),
+  showUsageChips: z.boolean().optional(),
+  enabledApps: z.array(z.string().min(1).max(120)).max(32).optional(),
+  primaryAppId: z.string().max(120).optional(),
+  customApps: z.array(customAppSchema).max(32).optional(),
+}).strict();
+
+const subscriptionSettingsPostSchema = z.object({
+  supportLink: z.string().max(2000).optional(),
+  defaultSubscriptionTheme: z.string().max(120).optional(),
+  defaultLanguage: supportedLocaleSchema.optional(),
+  unsplashApiKey: z.string().max(2000).optional(),
+  branding: subscriptionBrandingSchema.optional(),
+}).strict();
 
 export async function handleSubscriptionSettingsGet(
   deps: SubscriptionSettingsDeps = defaultDeps,
@@ -194,14 +244,25 @@ export async function handleSubscriptionSettingsPost(
       return response;
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    const parsedBody = subscriptionSettingsPostSchema.safeParse(body);
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        {
+          error: 'Invalid subscription settings payload',
+          details: parsedBody.error.flatten(),
+        },
+        { status: 400 },
+      );
+    }
+
     const {
       supportLink,
       defaultSubscriptionTheme,
       defaultLanguage,
       unsplashApiKey,
       branding,
-    } = body;
+    } = parsedBody.data;
 
     // Build upsert operations
     const operations: Promise<unknown>[] = [

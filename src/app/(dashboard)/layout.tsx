@@ -358,11 +358,23 @@ export default function DashboardLayout({
           <Atom className="h-12 w-12 text-primary animate-spin" />
           <p className="text-muted-foreground">Loading...</p>
           <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-3000 fill-mode-forwards opacity-0" style={{ animationDelay: '3s' }}>
-            <Button variant="ghost" size="sm" onClick={() => {
-              document.cookie = 'atomic-session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-              router.replace('/login');
-              router.refresh();
-            }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                  });
+                } catch {
+                  // Redirect to login even if the explicit logout request fails.
+                } finally {
+                  router.replace('/login');
+                  router.refresh();
+                }
+              }}
+            >
               Taking too long? Sign out
             </Button>
           </div>

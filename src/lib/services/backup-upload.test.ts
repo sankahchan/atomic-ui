@@ -6,6 +6,7 @@ import test from 'node:test';
 import {
   buildUploadedBackupFilename,
   INVALID_BACKUP_UPLOAD_MESSAGE,
+  streamUploadedBackupFile,
   storeUploadedBackupFile,
 } from './backup-upload';
 
@@ -57,6 +58,20 @@ test('storeUploadedBackupFile stores portable postgres archive uploads', () => {
   const result = storeUploadedBackupFile({
     filename: 'atomic-backup.postgres.zip',
     buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04]),
+    outputDir,
+  });
+
+  assert.equal(result.fileKind, 'postgres_archive');
+  assert.equal(fs.existsSync(result.filePath), true);
+});
+
+test('streamUploadedBackupFile stores uploads without buffering them first', async () => {
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'atomic-ui-upload-'));
+  const file = new File([Uint8Array.from([0x50, 0x4b, 0x03, 0x04, 0x00])], 'streamed-backup.postgres.zip');
+
+  const result = await streamUploadedBackupFile({
+    filename: file.name,
+    file,
     outputDir,
   });
 

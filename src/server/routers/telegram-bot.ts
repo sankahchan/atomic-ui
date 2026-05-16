@@ -1783,6 +1783,19 @@ export const telegramBotRouter = router({
       const response = await fetch(`https://api.telegram.org/bot${parsed.botToken}/getWebhookInfo`);
       const data = await response.json();
 
+      if (!response.ok || !data?.ok) {
+        return {
+          webhookSet: false,
+          webhookUrl: null,
+          pendingUpdateCount: 0,
+          lastErrorDate: null,
+          lastErrorMessage:
+            typeof data?.description === 'string' && data.description.trim()
+              ? data.description.trim()
+              : `Failed to fetch Telegram webhook info (${response.status})`,
+        };
+      }
+
       return {
         webhookSet: !!data.result?.url,
         webhookUrl: data.result?.url || null,
@@ -1790,8 +1803,14 @@ export const telegramBotRouter = router({
         lastErrorDate: data.result?.last_error_date || null,
         lastErrorMessage: data.result?.last_error_message || null,
       };
-    } catch {
-      return { webhookSet: false };
+    } catch (error) {
+      return {
+        webhookSet: false,
+        webhookUrl: null,
+        pendingUpdateCount: 0,
+        lastErrorDate: null,
+        lastErrorMessage: error instanceof Error ? error.message : 'Failed to fetch Telegram webhook info',
+      };
     }
   }),
 

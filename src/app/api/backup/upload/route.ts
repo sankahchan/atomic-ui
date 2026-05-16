@@ -6,9 +6,13 @@ import { ensureBackupDirectory } from '@/lib/backup-storage';
 import { verifyBackupFile } from '@/lib/services/backup-verification';
 import {
   INVALID_BACKUP_UPLOAD_MESSAGE,
-  storeUploadedBackupFile,
+  streamUploadedBackupFile,
 } from '@/lib/services/backup-upload';
-import { parseRestoreUploadFormData } from '@/lib/services/restore-upload';
+import {
+  BACKUP_UPLOAD_TOO_LARGE_ERROR,
+  isBackupUploadWithinLimit,
+  parseRestoreUploadFormData,
+} from '@/lib/services/restore-upload';
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,9 +40,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = storeUploadedBackupFile({
+    if (!isBackupUploadWithinLimit(uploadedBackup.size)) {
+      return NextResponse.json(
+        { error: BACKUP_UPLOAD_TOO_LARGE_ERROR.error },
+        { status: BACKUP_UPLOAD_TOO_LARGE_ERROR.status },
+      );
+    }
+
+    const result = await streamUploadedBackupFile({
       filename: uploadedBackup.name,
-      buffer: Buffer.from(await uploadedBackup.arrayBuffer()),
+      file: uploadedBackup,
       outputDir: ensureBackupDirectory(),
     });
     const verification = await verifyBackupFile(result.filename, {

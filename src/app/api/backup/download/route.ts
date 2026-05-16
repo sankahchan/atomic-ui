@@ -5,6 +5,7 @@ import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasBackupManageScope } from '@/lib/admin-scope';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
 import { BACKUP_DIR, ensureBackupDirectory } from '@/lib/backup-storage';
+import { sanitizeBackupFilename } from '@/lib/backup-files';
 
 export async function GET(req: NextRequest) {
     try {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Prevent directory traversal
-        const safeFilename = path.basename(filename).replace(/[\r\n"]/g, '_');
+        const safeFilename = sanitizeBackupFilename(filename);
         const filePath = path.join(BACKUP_DIR, safeFilename);
 
         if (!fs.existsSync(filePath)) {
