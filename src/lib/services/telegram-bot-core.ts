@@ -112,10 +112,6 @@ import {
   sendTelegramRefundRequestAlert,
 } from '@/lib/services/telegram-finance';
 import {
-  getTelegramBrandMediaUrl,
-  getTelegramProofExampleUrls,
-} from '@/lib/services/telegram-branding';
-import {
   dispatchTelegramAnnouncement,
   getTelegramAnnouncementAudienceMap,
   type TelegramAnnouncementAudience,
@@ -474,7 +470,7 @@ export function buildTelegramSalesPlanPromptText(locale: SupportedLocale, lines:
   return [lines.join('\n'), '', ui.orderSupportHint].join('\n');
 }
 
-function buildTelegramSalesPaymentPrompt(input: {
+export function buildTelegramSalesPaymentPrompt(input: {
   locale: SupportedLocale;
   orderCode: string;
   planSummary: string;
@@ -532,16 +528,16 @@ function buildTelegramSalesPaymentPrompt(input: {
 
   lines.push(
     '',
-    isMyanmar ? '<b>What to do now</b>' : '<b>What to do now</b>',
+    isMyanmar ? '<b>ပြီးစီးရန် အဆင့်များ</b>' : '<b>How to finish</b>',
     isMyanmar
-      ? '1. အောက်ပါ payment method ထဲမှ သင်သုံးမည့်နည်းလမ်းကို ရွေးပါ။'
-      : '1. Choose the payment method you will use below.',
+      ? '1. အောက်ပါ account သို့ ငွေလွှဲပေးပါ။'
+      : '1. Send the payment to the account below.',
     isMyanmar
-      ? '2. ပေးချေပြီးနောက် screenshot ကို ဤ chat ထဲသို့ ပြန်ပို့ပါ။'
-      : '2. Complete the payment and send the screenshot back in this chat.',
+      ? '2. ငွေပေးချေပြီးနောက် screenshot တစ်ပုံကို ဒီ chat ထဲပို့ပါ။'
+      : '2. After payment, send one screenshot in this chat.',
     isMyanmar
-      ? '3. Admin approval ပြီးသည်နှင့် access details ကို ဤနေရာတွင် ပို့ပေးပါမည်။'
-      : '3. After admin approval, your access details will be delivered here.',
+      ? '3. Review ပြီးသွားလျှင် access details ကို ဒီနေရာမှာ ပို့ပေးပါမည်။'
+      : '3. After review, your access details will be delivered here.',
   );
 
   const paymentMethods = input.paymentMethod
@@ -567,41 +563,15 @@ function buildTelegramSalesPaymentPrompt(input: {
     lines.push('', `<b>${ui.paymentMethodLabel}</b>: <b>${escapeHtml(input.paymentMethodLabel.trim())}</b>`);
   }
 
-  lines.push('', `<b>${ui.paymentInstructionsLabel}</b>`, escapeHtml(input.paymentInstructions));
+  if (input.paymentInstructions.trim()) {
+    lines.push('', `<b>${ui.paymentInstructionsLabel}</b>`, escapeHtml(input.paymentInstructions));
+  }
+
   lines.push(
     '',
-    isMyanmar ? '<b>Screenshot checklist</b>' : '<b>Screenshot checklist</b>',
     isMyanmar
-      ? '• Good screenshot: Amount, transfer ID, payment time ကို တစ်ပုံတည်းတွင် ရှင်းလင်းစွာ မြင်ရပါမည်။'
-      : '• Make sure the amount, transfer ID, and payment time are clearly visible.',
-    isMyanmar
-      ? '• Photo သို့မဟုတ် document အဖြစ် ပို့နိုင်ပါသည်။'
-      : '• You can send it as a photo or a document.',
-    isMyanmar
-      ? '• Account name သို့မဟုတ် payment account number ပါပါက ပိုကောင်းပါသည်။'
-      : '• It is even better if the account name or account number is visible too.',
-    isMyanmar
-      ? '• Bad screenshot: မရှင်းလင်းသော crop, amount မပါခြင်း, duplicate screenshot များကို မပို့ပါနှင့်။'
-      : '• Avoid blurry crops, missing amounts, or reusing an old screenshot.',
-    isMyanmar
-      ? '• Visual example လိုပါက အောက်ရှိ Good example / Bad example button များကို နှိပ်ပြီး ကြည့်နိုင်ပါသည်။'
-      : '• Need a visual reference? Use the Good example / Bad example buttons below.',
-    isMyanmar
-      ? '• Screenshot ပို့ပြီးနောက် ထပ်မံမပို့ဘဲ review စောင့်ပါ။'
-      : '• After uploading, wait for review instead of sending duplicates.',
-    '',
-    isMyanmar ? '<b>ပို့ပြီးနောက်</b>' : '<b>After upload</b>',
-    isMyanmar
-      ? '• Order status ကို ဤ chat ထဲမှာ update ပို့ပေးပါမည်။'
-      : '• We will update the order status in this chat.',
-    isMyanmar
-      ? '• လိုအပ်ပါက admin က screenshot အသစ် သို့မဟုတ် အသေးစိတ်ထပ်တောင်းနိုင်ပါသည်။'
-      : '• If needed, the admin may ask for a clearer screenshot or more details.',
-    isMyanmar
-      ? '• အခြေအနေကို စစ်ရန် /orders သို့မဟုတ် /order ORDER-CODE ကို သုံးနိုင်ပါသည်။'
-      : '• Use /orders or /order ORDER-CODE to check progress any time.',
-    '',
-    ui.paymentProofRequired,
+      ? '🧾 Screenshot တစ်ပုံတည်းပို့ပေးပါ။ Amount နှင့် transfer details ကို ရှင်းလင်းစွာ မြင်ရပါမည်။'
+      : '🧾 Send one clear screenshot showing the amount and transfer details.',
   );
 
   if (input.supportLink) {
@@ -613,46 +583,6 @@ function buildTelegramSalesPaymentPrompt(input: {
   }
 
   return lines.join('\n');
-}
-
-async function sendTelegramPaymentMethodMedia(input: {
-  botToken: string;
-  chatId: number | string;
-  paymentMethod?: TelegramSalesPaymentMethod | null;
-  orderCode: string;
-  locale: SupportedLocale;
-}) {
-  const paymentMethod = input.paymentMethod;
-  const ui = getTelegramUi(input.locale);
-  const label = paymentMethod
-    ? resolveTelegramSalesPaymentMethodLabel(paymentMethod, input.locale)
-    : input.locale === 'my'
-      ? 'Available methods'
-      : 'Available methods';
-  const imageUrl = paymentMethod?.imageUrl?.trim() || getTelegramBrandMediaUrl('paymentGuide');
-  const note = paymentMethod ? resolveTelegramSalesPaymentMethodNote(paymentMethod, input.locale) : null;
-  await sendTelegramPhotoUrl(
-    input.botToken,
-    input.chatId,
-    imageUrl,
-    [
-      ui.paymentMethodImageCaption(escapeHtml(label)),
-      '',
-      `${ui.orderCodeLabel}: <b>${escapeHtml(input.orderCode)}</b>`,
-      paymentMethod?.accountName?.trim()
-        ? `${ui.accountNameLabel}: <b>${escapeHtml(paymentMethod.accountName.trim())}</b>`
-        : '',
-      paymentMethod?.accountNumber?.trim()
-        ? `${ui.accountNumberLabel}: <code>${escapeHtml(paymentMethod.accountNumber.trim())}</code>`
-        : '',
-      note ? escapeHtml(note) : '',
-      input.locale === 'my'
-        ? 'Atomic-UI payment guide • QR / account details • screenshot ready'
-        : 'Atomic-UI payment guide • QR / account details • screenshot ready',
-    ]
-      .filter(Boolean)
-      .join('\n'),
-  );
 }
 
 export async function sendTelegramOrderPaymentPromptCard(input: {
@@ -709,14 +639,6 @@ export async function sendTelegramOrderPaymentPromptCard(input: {
       }),
     },
   );
-
-  await sendTelegramPaymentMethodMedia({
-    botToken: input.botToken,
-    chatId: input.chatId,
-    paymentMethod: input.paymentMethod,
-    orderCode: input.orderCode,
-    locale: input.locale,
-  });
 }
 
 export async function retryTelegramOrderForUser(input: {
@@ -1251,51 +1173,15 @@ export function buildTelegramPaymentMethodSelectionPromptText(input: {
   lines.push(
     '',
     isMyanmar
-      ? '<b>Choose how you will pay</b>\nအောက်ပါနည်းလမ်းထဲမှ တစ်ခုကို နှိပ်ပါ။ Button မသုံးနိုင်ပါက နံပါတ်ဖြင့် reply လုပ်နိုင်ပါသည်။'
-      : '<b>Choose how you will pay</b>\nTap one of the methods below. If buttons are not available, reply with the method number.',
+      ? '<b>Payment method ရွေးပါ</b>\nအောက်ပါနည်းလမ်းထဲမှ တစ်ခုကို နှိပ်ပါ။ Button မသုံးနိုင်ပါက နံပါတ်ဖြင့် reply လုပ်နိုင်ပါသည်။'
+      : '<b>Choose a payment method</b>\nTap one of the methods below. If buttons are not available, reply with the method number.',
   );
-
-  if (input.savedMethods && input.savedMethods.length > 0) {
-    lines.push(
-      '',
-      isMyanmar ? '<b>Used before</b>' : '<b>Used before</b>',
-      ...input.savedMethods.slice(0, 3).map((method, index) =>
-        `${index + 1}. ⭐ <b>${escapeHtml(method.label)}</b>${method.lastUsedAt ? ` • ${escapeHtml(formatTelegramDateTime(method.lastUsedAt, input.locale))}` : ''}`,
-      ),
-      isMyanmar
-        ? '⭐ ဖြင့်ပြထားသော method များသည် မကြာသေးမီ order များတွင် သင်အသုံးပြုခဲ့သည့်နည်းလမ်းများဖြစ်ပါသည်။'
-        : 'Methods marked with ⭐ are the ones you used in recent successful orders.',
-    );
-  }
 
   lines.push(
     '',
     ...input.methods.flatMap((method, index) => {
       const label = resolveTelegramSalesPaymentMethodLabel(method, input.locale);
-      const note = resolveTelegramSalesPaymentMethodNote(method, input.locale);
-      const methodLines = [`${index + 1}. <b>${escapeHtml(label)}</b>`];
-
-      if (method.accountName?.trim()) {
-        methodLines.push(`   ${ui.accountNameLabel}: ${escapeHtml(method.accountName.trim())}`);
-      }
-
-      if (method.accountNumber?.trim()) {
-        methodLines.push(`   ${ui.accountNumberLabel}: <code>${escapeHtml(method.accountNumber.trim())}</code>`);
-      }
-
-      if (note) {
-        methodLines.push(`   ${escapeHtml(note)}`);
-      }
-
-      methodLines.push(
-        `   ${escapeHtml(
-          input.locale === 'my'
-            ? 'ရွေးပြီးနောက် screenshot တင်ရန် နောက်အဆင့်ကို ပြပါမည်။'
-            : 'After selection, we will show the next screenshot step.',
-        )}`,
-      );
-
-      return methodLines;
+      return [`${index + 1}. <b>${escapeHtml(label)}</b>`];
     }),
   );
 
@@ -1359,7 +1245,7 @@ async function listTelegramSavedPaymentMethods(input: {
   );
 }
 
-function buildTelegramOrderActionKeyboard(input: {
+export function buildTelegramOrderActionKeyboard(input: {
   order: {
     id: string;
     status: string;
@@ -1393,7 +1279,6 @@ function buildTelegramOrderActionKeyboard(input: {
     input.order.status === 'AWAITING_PAYMENT_PROOF' ||
     input.order.status === 'PENDING_REVIEW'
   ) {
-    const proofExamples = getTelegramProofExampleUrls();
     rows.push([
       {
         text:
@@ -1402,55 +1287,29 @@ function buildTelegramOrderActionKeyboard(input: {
             : ui.orderActionUploadProof,
         callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
       },
-      {
-        text: input.order.paymentMethodCode
-          ? ui.orderActionViewPaymentGuide
-          : ui.orderActionChoosePaymentMethod,
-        callback_data: buildTelegramOrderActionCallbackData(
-          input.order.paymentMethodCode ? 'pay' : 'pm',
-          input.order.id,
-        ),
-      },
+      ...(input.order.paymentMethodCode
+        ? [{
+            text: ui.orderActionSwitchPaymentMethod,
+            callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
+          }]
+        : [{
+            text: ui.orderActionChoosePaymentMethod,
+            callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
+          }]),
     ]);
 
     if (input.order.paymentMethodCode) {
-      rows.push(
-        [
+      if (input.order.status !== 'PENDING_REVIEW') {
+        rows.push([
           {
-            text: ui.orderActionSwitchPaymentMethod,
-            callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
+            text: ui.orderActionRestartSamePlan,
+            callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
           },
-          ...(input.order.status !== 'PENDING_REVIEW'
-            ? [
-                {
-                  text: ui.orderActionRestartSamePlan,
-                  callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
-                },
-              ]
-            : supportButton
-              ? [supportButton]
-              : []),
-        ],
-      );
-      if (input.order.status !== 'PENDING_REVIEW' && supportButton) {
+          ...(supportButton ? [supportButton] : []),
+        ]);
+      } else if (supportButton) {
         rows.push([supportButton]);
       }
-      rows.push([
-        {
-          text: input.locale === 'my' ? '✅ Good example' : '✅ Good example',
-          url: proofExamples.good,
-        },
-        {
-          text: input.locale === 'my' ? '❌ Bad example' : '❌ Bad example',
-          url: proofExamples.bad,
-        },
-      ]);
-      rows.push([
-        {
-          text: input.locale === 'my' ? '⚠️ Common mistake' : '⚠️ Common mistake',
-          url: proofExamples.common,
-        },
-      ]);
     } else if (supportButton) {
       rows.push([supportButton]);
     }

@@ -42,6 +42,11 @@ import {
   buildTelegramOrderReviewAlertMessage,
 } from '@/lib/services/telegram-review-queue';
 import {
+  buildTelegramOrderActionKeyboard,
+  buildTelegramPaymentMethodSelectionPromptText,
+  buildTelegramSalesPaymentPrompt,
+} from '@/lib/services/telegram-bot-core';
+import {
   buildTelegramPremiumSupportQueueDetailMessage,
   buildTelegramPremiumSupportQueueSummaryMessage,
   buildTelegramPremiumSupportQueueCardMessage,
@@ -221,6 +226,67 @@ test('telegram payment and refund reply strings stay compact and HTML-safe', () 
   assert.doesNotMatch(ui.paymentProofRequired, /Make sure the amount, transfer ID, and time are clearly visible, then wait for review\./);
   assert.doesNotMatch(ui.orderProofPending('ORD-123'), /It is now waiting for admin review/);
   assert.doesNotMatch(ui.refundRequested('ORD-123'), /after admin review/);
+});
+
+test('telegram payment prompts stay clean and remove screenshot-guide clutter', () => {
+  const method = {
+    code: 'kpay',
+    label: 'KPay',
+    note: 'Send to the account below.',
+    accountName: 'Atomic-UI',
+    accountNumber: '09255713720',
+    enabled: true,
+    localizedLabels: { en: 'KPay', my: 'KPay' },
+    localizedNotes: { en: 'Send to the account below.', my: 'အောက်ပါ account သို့ ပို့ပါ။' },
+  } as any;
+
+  const selectionPrompt = buildTelegramPaymentMethodSelectionPromptText({
+    orderCode: 'ORD-123',
+    locale: 'en',
+    methods: [method],
+    savedMethods: [{
+      code: 'kpay',
+      label: 'KPay',
+      lastUsedAt: new Date('2026-05-01T00:00:00Z'),
+      useCount: 2,
+    }],
+    planSummary: 'Basic • 150 GB • 5,000 Ks',
+  });
+  const paymentPrompt = buildTelegramSalesPaymentPrompt({
+    locale: 'en',
+    orderCode: 'ORD-123',
+    planSummary: 'Basic • 150 GB • 5,000 Ks',
+    paymentInstructions: 'Send the exact amount and then upload the screenshot here.',
+    paymentMethod: method,
+    supportLink: 'https://t.me/support',
+  });
+  const paymentKeyboard = buildTelegramOrderActionKeyboard({
+    order: {
+      id: 'ord_123',
+      status: 'AWAITING_PAYMENT_PROOF',
+      paymentMethodCode: 'kpay',
+    },
+    locale: 'en',
+    supportLink: 'https://t.me/support',
+  });
+  const keyboardTexts = ((paymentKeyboard?.inline_keyboard) || [])
+    .flat()
+    .map((button) => button.text)
+    .join(' | ');
+
+  assert.deepEqual(validateTelegramHtmlMessage(selectionPrompt), { valid: true, invalidTags: [] });
+  assert.deepEqual(validateTelegramHtmlMessage(paymentPrompt), { valid: true, invalidTags: [] });
+  assert.doesNotMatch(selectionPrompt, /Used before/);
+  assert.doesNotMatch(selectionPrompt, /After selection, we will show the next screenshot step/);
+  assert.doesNotMatch(paymentPrompt, /Screenshot checklist/);
+  assert.doesNotMatch(paymentPrompt, /After upload/);
+  assert.doesNotMatch(paymentPrompt, /Good example/);
+  assert.doesNotMatch(paymentPrompt, /Bad example/);
+  assert.doesNotMatch(paymentPrompt, /Payment Guide/);
+  assert.doesNotMatch(keyboardTexts, /Payment guide/);
+  assert.doesNotMatch(keyboardTexts, /Good example/);
+  assert.doesNotMatch(keyboardTexts, /Bad example/);
+  assert.doesNotMatch(keyboardTexts, /Common mistake/);
 });
 
 test('telegram premium prompts and order outcomes stay compact and HTML-safe', () => {
