@@ -2787,7 +2787,7 @@ export const keysRouter = router({
         action: 'ACCESS_KEY_SHARE_TOKEN_REGENERATED',
         entity: 'ACCESS_KEY',
         entityId: input.id,
-        details: { token },
+        details: { rotated: true },
       });
 
       return {

@@ -131,7 +131,7 @@ export async function handleTelegramWebhookSetup(
     return NextResponse.json(
       {
         status: 'error',
-        message: error instanceof Error ? error.message : 'Failed to set webhook',
+        message: 'Failed to set webhook.',
       },
       { status: 500 },
     );
@@ -272,10 +272,7 @@ export async function handleTelegramWebhookGet(
   } catch (error) {
     return NextResponse.json({
       status: 'error',
-      message:
-        error instanceof Error
-          ? error.message
-          : 'Bot token configured but could not fetch webhook info',
+      message: 'Bot token configured but could not fetch webhook info.',
     }, { status: 502 });
   }
 }

@@ -67,6 +67,7 @@ import {
   recordSuccessfulAdminLogin,
 } from '@/lib/services/admin-login-protection';
 import { isAdmin2FARequired } from '@/lib/admin-2fa-policy';
+import { consumeRateLimit, resetRateLimit } from '@/lib/rate-limit';
 
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
 const RP_ORIGIN = process.env.NEXTAUTH_URL || process.env.APP_URL || 'http://localhost:3000';
@@ -153,6 +154,23 @@ const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const ipBudget = consumeRateLimit(
+        `auth-login-ip:${ctx.clientIp ?? 'unknown'}`,
+        { limit: 60, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
+      );
+      const identityBudget = consumeRateLimit(
+        `auth-login-identity:${ctx.clientIp ?? 'unknown'}:${normalizedEmail}`,
+        { limit: 10, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
+      );
+
+      if (!ipBudget.allowed || !identityBudget.allowed) {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Too many login attempts. Please try again later.',
+        });
+      }
+
       const user = await authenticateUser(input.email, input.password);
 
       if (!user) {
@@ -179,6 +197,8 @@ const authRouter = router({
           message: 'Invalid email or password',
         });
       }
+
+      resetRateLimit(`auth-login-identity:${ctx.clientIp ?? 'unknown'}:${normalizedEmail}`);
 
       const challengeDecision = await getAdminLoginChallengeDecision(ctx.clientIp, input.email);
 

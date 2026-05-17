@@ -28,7 +28,6 @@ interface ServerStatus {
   latencyMs: number | null;
   uptimePercent: number;
   lastCheckedAt: string | null;
-  keyCount: number;
 }
 
 interface HealthData {

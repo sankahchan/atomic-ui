@@ -44,8 +44,6 @@ export async function GET(req: NextRequest) {
 
         // Define files to backup
         const dbPath = resolveSqliteDbPath();
-        const envPath = path.join(process.cwd(), '.env');
-
         if (!fs.existsSync(dbPath)) {
             return NextResponse.json({ error: 'Database file not found' }, { status: 404 });
         }
@@ -56,11 +54,6 @@ export async function GET(req: NextRequest) {
 
         // Keep a stable filename for restore compatibility.
         archive.file(dbPath, { name: 'atomic-ui.db' });
-
-        // Add .env
-        if (fs.existsSync(envPath)) {
-            archive.file(envPath, { name: '.env' });
-        }
 
         archive.on('error', (error) => {
             console.error('Archive error:', error);

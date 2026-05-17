@@ -6,8 +6,6 @@ export const POSTGRES_BACKUP_BUNDLE_DUMP = 'backup.dump';
 export const POSTGRES_BACKUP_RESTORE_ENV_KEYS = [
   'SETTINGS_ENCRYPTION_KEY',
   'TOTP_ENCRYPTION_KEY',
-  'JWT_SECRET',
-  'TELEGRAM_WEBHOOK_SECRET',
 ] as const;
 
 export type PostgresBackupRestoreEnvKey = (typeof POSTGRES_BACKUP_RESTORE_ENV_KEYS)[number];

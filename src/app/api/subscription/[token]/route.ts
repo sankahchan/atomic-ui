@@ -28,6 +28,7 @@ import {
   SUBSCRIPTION_EVENT_TYPES,
 } from '@/lib/services/subscription-events';
 import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 function getClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
@@ -84,6 +85,25 @@ export async function GET(
   const platform = request.nextUrl.searchParams.get('platform')
     || (platformHeader ? platformHeader.replace(/"/g, '') : null);
 
+  const budget = consumeRateLimit(`public-subscription:${clientIp}`, {
+    limit: 180,
+    windowMs: 60_000,
+    blockMs: 60_000,
+  });
+
+  if (!budget.allowed) {
+    return NextResponse.json(
+      { error: 'Not available' },
+      {
+        status: 429,
+        headers: {
+          'Cache-Control': 'no-store',
+          'Retry-After': String(Math.max(1, Math.ceil(budget.retryAfterMs / 1000))),
+        },
+      },
+    );
+  }
+
   if (!token) {
     return NextResponse.json(
       { error: 'Token is required' },
@@ -136,7 +156,7 @@ export async function GET(
 
       if (!dak) {
         return NextResponse.json(
-          { error: 'Invalid subscription token' },
+          { error: 'Not available' },
           { status: 404 }
         );
       }
