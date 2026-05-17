@@ -29,7 +29,7 @@ test('buildPostgresBackupRestoreEnvFile includes only portable restore keys', ()
 
   assert.match(envFile, /SETTINGS_ENCRYPTION_KEY="settings-secret"/);
   assert.match(envFile, /TOTP_ENCRYPTION_KEY="totp-secret"/);
-  assert.match(envFile, /JWT_SECRET="jwt-secret"/);
-  assert.match(envFile, /TELEGRAM_WEBHOOK_SECRET="telegram-secret"/);
+  assert.doesNotMatch(envFile, /JWT_SECRET/);
+  assert.doesNotMatch(envFile, /TELEGRAM_WEBHOOK_SECRET/);
   assert.doesNotMatch(envFile, /DATABASE_URL/);
 });

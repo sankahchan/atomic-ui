@@ -10,7 +10,7 @@ import {
   handleTelegramWebhookPost,
   handleTelegramWebhookSetup,
   type TelegramWebhookRouteDeps,
-} from './route';
+} from './route-helpers';
 
 const baseWebhookDeps: TelegramWebhookRouteDeps = {
   getTelegramConfig: async () => ({
@@ -124,7 +124,7 @@ test('telegram webhook reports an error when webhook info lookup fails', async (
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), {
     status: 'error',
-    message: 'telegram unreachable',
+    message: 'Bot token configured but could not fetch webhook info.',
   });
 });
 

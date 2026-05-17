@@ -27,10 +27,8 @@ const nextConfig = {
     NEXT_PUBLIC_BASE_PATH: panelPath,
   },
 
-  // Skip linting and type-checking during build to reduce memory usage
-  // (these are run separately in development)
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: false },
+  typescript: { ignoreBuildErrors: false },
 
   // External packages for server components (required for Prisma and native modules)
   serverExternalPackages: ['@prisma/client', 'bcryptjs', 'systeminformation'],
@@ -91,7 +89,34 @@ const nextConfig = {
       },
     ];
   },
+
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'same-origin' },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'none'",
+              "object-src 'none'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data: https:",
+              "style-src 'self' 'unsafe-inline' https:",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+              "connect-src 'self' https: wss: ws:",
+              "media-src 'self' data: blob: https:",
+            ].join('; '),
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
-

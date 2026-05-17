@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db as prisma } from '@/lib/db';
 import { OutlineClient } from '@/lib/outline-api';
 import { getCurrentUser } from '@/lib/auth';
+import { hasValidRequestSecret } from '@/lib/request-secret-auth';
 import {
   channelSupportsEvent,
   parseNotificationChannelRecord,
@@ -74,20 +75,19 @@ const CHECK_TIMEOUT_MS = 10000;
  * 
  * Query Parameters:
  * - serverId: Optional - Check only a specific server
- * - secret: Optional - API secret for cron authentication
+ * - serverId: Optional - Check only a specific server
  */
 export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const specificServerId = searchParams.get('serverId');
-    const cronSecret = searchParams.get('secret');
 
     // Verify cron secret / admin session
     const expectedSecret = process.env.CRON_SECRET;
-    const hasValidSecret = !!expectedSecret && cronSecret === expectedSecret;
+    const hasAuthorizedCronSecret = hasValidRequestSecret(request.headers, expectedSecret);
 
     if (expectedSecret) {
-      if (!hasValidSecret) {
+      if (!hasAuthorizedCronSecret) {
         const user = await getCurrentUser();
         if (!user || user.role !== 'ADMIN') {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Health check error:', error);
     return NextResponse.json(
-      { error: 'Health check failed', details: String(error) },
+      { error: 'Health check failed' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
@@ -174,9 +174,6 @@ export async function GET() {
       where: { isActive: true },
       include: {
         healthCheck: true,
-        _count: {
-          select: { accessKeys: true },
-        },
       },
     });
 
@@ -187,7 +184,6 @@ export async function GET() {
       latencyMs: server.healthCheck?.lastLatencyMs || null,
       uptimePercent: server.healthCheck?.uptimePercent || 0,
       lastCheckedAt: server.healthCheck?.lastCheckedAt || null,
-      keyCount: server._count.accessKeys,
     }));
 
     return NextResponse.json(

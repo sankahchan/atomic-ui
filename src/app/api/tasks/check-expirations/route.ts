@@ -4,15 +4,14 @@ import { snapshotTraffic } from '@/lib/services/analytics';
 import { checkExpirations } from '@/lib/services/expiration';
 import { checkBandwidthAlerts } from '@/lib/services/bandwidth-alerts';
 import { getRequestIpFromHeaders, writeAuditLog } from '@/lib/audit';
+import { hasValidRequestSecret } from '@/lib/request-secret-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const cronSecret = searchParams.get('secret');
     const expectedSecret = process.env.CRON_SECRET;
 
     let user = null;
-    const hasValidSecret = !!expectedSecret && cronSecret === expectedSecret;
+    const hasValidSecret = hasValidRequestSecret(request.headers, expectedSecret);
 
     if (expectedSecret) {
       if (!hasValidSecret) {
@@ -77,7 +76,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Expiration check error:', error);
     return NextResponse.json(
-      { error: 'Expiration check failed', details: String(error) },
+      { error: 'Expiration check failed' },
       { status: 500 }
     );
   }
