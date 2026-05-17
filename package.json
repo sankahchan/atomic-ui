@@ -75,7 +75,7 @@
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "date-fns": "^3.3.1",
+    "date-fns": "^4.1.0",
     "geist": "^1.2.2",
     "geoip-lite": "^2.0.2",
     "ip-range-check": "^0.2.0",
