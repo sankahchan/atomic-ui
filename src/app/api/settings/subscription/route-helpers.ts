@@ -1,0 +1,382 @@
+/**
+ * Subscription Settings API helpers
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { db } from '@/lib/db';
+import { requireAdminRouteScope } from '@/lib/admin-route-guard';
+import { hasSubscriptionSettingsManageScope } from '@/lib/admin-scope';
+import { defaultBranding } from '@/lib/subscription-themes';
+import { supportedLocales } from '@/lib/i18n/config';
+import { normalizeLocalizedTemplateMap } from '@/lib/localized-templates';
+
+const brandingKeys = [
+  'subscriptionLogoUrl',
+  'subscriptionLogoSize',
+  'subscriptionBrandName',
+  'subscriptionFooterText',
+  'subscriptionLocalizedFooterTexts',
+  'subscriptionShowPoweredBy',
+  'subscriptionWelcomeMessage',
+  'subscriptionLocalizedWelcomeMessages',
+  'subscriptionShowWelcome',
+  'subscriptionFontFamily',
+  'subscriptionFontUrl',
+  'subscriptionLayout',
+  'subscriptionCardStyle',
+  'subscriptionEnableAnimations',
+  'subscriptionAnimatedBackground',
+  'subscriptionShowUsageAlerts',
+  'subscriptionUsageAlertThresholds',
+  'subscriptionShowConnectionSummary',
+  'subscriptionShowCompatibleApps',
+  'subscriptionShowShareLinks',
+  'subscriptionShowHelpContact',
+  'subscriptionShowManualSetupButton',
+  'subscriptionShowUsageChips',
+  'subscriptionEnabledApps',
+  'subscriptionPrimaryAppId',
+  'subscriptionCustomApps',
+];
+
+export type SubscriptionSettingsDeps = {
+  requireAdminRouteScope: typeof requireAdminRouteScope;
+  settings: {
+    findMany: (args: Parameters<typeof db.settings.findMany>[0]) => Promise<Array<{ key: string; value: string }>>;
+    upsert: (args: Parameters<typeof db.settings.upsert>[0]) => Promise<unknown>;
+    deleteMany: (args: Parameters<typeof db.settings.deleteMany>[0]) => Promise<unknown>;
+  };
+  logError: typeof console.error;
+};
+
+const defaultDeps: SubscriptionSettingsDeps = {
+  requireAdminRouteScope,
+  settings: db.settings,
+  logError: console.error,
+};
+
+const supportedLocaleSchema = z.enum(supportedLocales);
+const localizedTextMapSchema = z.record(z.string(), z.string());
+const customAppSchema = z.object({
+  id: z.string().min(1).max(100),
+  name: z.string().min(1).max(120),
+  icon: z.string().min(1).max(120),
+  platforms: z.array(z.enum(['android', 'ios', 'windows', 'macos', 'linux'])).max(5),
+  urlScheme: z.string().min(1).max(2000),
+  storeUrl: z.string().url().max(2000).optional(),
+});
+
+const subscriptionBrandingSchema = z.object({
+  logoUrl: z.string().max(2000).optional(),
+  logoSize: z.number().int().min(1).max(100).optional(),
+  brandName: z.string().max(120).optional(),
+  footerText: z.string().max(2000).optional(),
+  localizedFooterTexts: localizedTextMapSchema.optional(),
+  showPoweredBy: z.boolean().optional(),
+  welcomeMessage: z.string().max(4000).optional(),
+  localizedWelcomeMessages: localizedTextMapSchema.optional(),
+  showWelcome: z.boolean().optional(),
+  fontFamily: z.string().max(200).optional(),
+  fontUrl: z.string().url().max(2000).optional(),
+  layout: z.enum(['default', 'compact', 'detailed', 'minimal']).optional(),
+  cardStyle: z.enum(['rounded', 'sharp', 'pill']).optional(),
+  enableAnimations: z.boolean().optional(),
+  animatedBackground: z.enum(['none', 'gradient', 'particles', 'waves']).optional(),
+  showUsageAlerts: z.boolean().optional(),
+  usageAlertThresholds: z.array(z.number().int().min(1).max(100)).max(10).optional(),
+  showConnectionSummary: z.boolean().optional(),
+  showCompatibleApps: z.boolean().optional(),
+  showShareLinks: z.boolean().optional(),
+  showHelpContact: z.boolean().optional(),
+  showManualSetupButton: z.boolean().optional(),
+  showUsageChips: z.boolean().optional(),
+  enabledApps: z.array(z.string().min(1).max(120)).max(32).optional(),
+  primaryAppId: z.string().max(120).optional(),
+  customApps: z.array(customAppSchema).max(32).optional(),
+}).strict();
+
+const subscriptionSettingsPostSchema = z.object({
+  supportLink: z.string().max(2000).optional(),
+  defaultSubscriptionTheme: z.string().max(120).optional(),
+  defaultLanguage: supportedLocaleSchema.optional(),
+  unsplashApiKey: z.string().max(2000).optional(),
+  branding: subscriptionBrandingSchema.optional(),
+}).strict();
+
+export async function handleSubscriptionSettingsGet(
+  deps: SubscriptionSettingsDeps = defaultDeps,
+) {
+  try {
+    const { response } = await deps.requireAdminRouteScope({
+      canAccess: hasSubscriptionSettingsManageScope,
+      forbiddenMessage: 'Only owner-scoped admins can manage subscription branding.',
+    });
+    if (response) {
+      return response;
+    }
+
+    const allKeys = [
+      'supportLink',
+      'defaultSubscriptionTheme',
+      'defaultLanguage',
+      'unsplashApiKey',
+      ...brandingKeys,
+    ];
+
+    const settings = await deps.settings.findMany({
+      where: { key: { in: allKeys } },
+    });
+
+    const settingsMap = new Map(settings.map((setting) => [setting.key, setting.value]));
+
+    const parseJson = <T>(value: string | undefined, fallback: T): T => {
+      if (!value) return fallback;
+      try {
+        return JSON.parse(value) as T;
+      } catch {
+        return fallback;
+      }
+    };
+
+    const hasUnsplashKey = !!settingsMap.get('unsplashApiKey');
+
+    const branding = {
+      logoUrl: settingsMap.get('subscriptionLogoUrl') || '',
+      logoSize: settingsMap.get('subscriptionLogoSize')
+        ? parseInt(settingsMap.get('subscriptionLogoSize')!, 10)
+        : 25,
+      brandName: settingsMap.get('subscriptionBrandName') || defaultBranding.brandName,
+      footerText: settingsMap.get('subscriptionFooterText') || '',
+      localizedFooterTexts: normalizeLocalizedTemplateMap(
+        parseJson(settingsMap.get('subscriptionLocalizedFooterTexts'), {}),
+      ),
+      showPoweredBy: settingsMap.get('subscriptionShowPoweredBy')
+        ? settingsMap.get('subscriptionShowPoweredBy') === 'true'
+        : defaultBranding.showPoweredBy,
+      welcomeMessage: settingsMap.get('subscriptionWelcomeMessage') || '',
+      localizedWelcomeMessages: normalizeLocalizedTemplateMap(
+        parseJson(settingsMap.get('subscriptionLocalizedWelcomeMessages'), {}),
+      ),
+      showWelcome: settingsMap.get('subscriptionShowWelcome')
+        ? settingsMap.get('subscriptionShowWelcome') === 'true'
+        : defaultBranding.showWelcome,
+      customCss: '',
+      fontFamily: settingsMap.get('subscriptionFontFamily') || '',
+      fontUrl: settingsMap.get('subscriptionFontUrl') || '',
+      layout: settingsMap.get('subscriptionLayout') || defaultBranding.layout,
+      cardStyle: settingsMap.get('subscriptionCardStyle') || defaultBranding.cardStyle,
+      enableAnimations: settingsMap.get('subscriptionEnableAnimations')
+        ? settingsMap.get('subscriptionEnableAnimations') === 'true'
+        : defaultBranding.enableAnimations,
+      animatedBackground:
+        settingsMap.get('subscriptionAnimatedBackground') || defaultBranding.animatedBackground,
+      showUsageAlerts: settingsMap.get('subscriptionShowUsageAlerts')
+        ? settingsMap.get('subscriptionShowUsageAlerts') === 'true'
+        : defaultBranding.showUsageAlerts,
+      showConnectionSummary: settingsMap.get('subscriptionShowConnectionSummary')
+        ? settingsMap.get('subscriptionShowConnectionSummary') === 'true'
+        : defaultBranding.showConnectionSummary,
+      showCompatibleApps: settingsMap.get('subscriptionShowCompatibleApps')
+        ? settingsMap.get('subscriptionShowCompatibleApps') === 'true'
+        : defaultBranding.showCompatibleApps,
+      showShareLinks: settingsMap.get('subscriptionShowShareLinks')
+        ? settingsMap.get('subscriptionShowShareLinks') === 'true'
+        : defaultBranding.showShareLinks,
+      showHelpContact: settingsMap.get('subscriptionShowHelpContact')
+        ? settingsMap.get('subscriptionShowHelpContact') === 'true'
+        : defaultBranding.showHelpContact,
+      showManualSetupButton: settingsMap.get('subscriptionShowManualSetupButton')
+        ? settingsMap.get('subscriptionShowManualSetupButton') === 'true'
+        : defaultBranding.showManualSetupButton,
+      showUsageChips: settingsMap.get('subscriptionShowUsageChips')
+        ? settingsMap.get('subscriptionShowUsageChips') === 'true'
+        : defaultBranding.showUsageChips,
+      usageAlertThresholds: parseJson(
+        settingsMap.get('subscriptionUsageAlertThresholds'),
+        defaultBranding.usageAlertThresholds!,
+      ),
+      enabledApps: parseJson(
+        settingsMap.get('subscriptionEnabledApps'),
+        defaultBranding.enabledApps!,
+      ),
+      primaryAppId: settingsMap.get('subscriptionPrimaryAppId') || defaultBranding.primaryAppId,
+      customApps: parseJson(settingsMap.get('subscriptionCustomApps'), []),
+    };
+
+    return NextResponse.json({
+      supportLink: settingsMap.get('supportLink') || '',
+      defaultSubscriptionTheme: settingsMap.get('defaultSubscriptionTheme') || 'dark',
+      defaultLanguage: settingsMap.get('defaultLanguage') || 'en',
+      unsplashApiKey: hasUnsplashKey ? '********' : '',
+      branding,
+    });
+  } catch (error) {
+    deps.logError('Failed to fetch settings:', error);
+    return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
+  }
+}
+
+export async function handleSubscriptionSettingsPost(
+  request: NextRequest,
+  deps: SubscriptionSettingsDeps = defaultDeps,
+) {
+  try {
+    const { response } = await deps.requireAdminRouteScope({
+      canAccess: hasSubscriptionSettingsManageScope,
+      forbiddenMessage: 'Only owner-scoped admins can manage subscription branding.',
+    });
+    if (response) {
+      return response;
+    }
+
+    const body = await request.json().catch(() => null);
+    const parsedBody = subscriptionSettingsPostSchema.safeParse(body);
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        {
+          error: 'Invalid subscription settings payload',
+          details: parsedBody.error.flatten(),
+        },
+        { status: 400 },
+      );
+    }
+
+    const {
+      supportLink,
+      defaultSubscriptionTheme,
+      defaultLanguage,
+      unsplashApiKey,
+      branding,
+    } = parsedBody.data;
+
+    const operations: Promise<unknown>[] = [
+      deps.settings.upsert({
+        where: { key: 'supportLink' },
+        update: { value: supportLink || '' },
+        create: { key: 'supportLink', value: supportLink || '' },
+      }),
+      deps.settings.upsert({
+        where: { key: 'defaultSubscriptionTheme' },
+        update: { value: defaultSubscriptionTheme || 'dark' },
+        create: { key: 'defaultSubscriptionTheme', value: defaultSubscriptionTheme || 'dark' },
+      }),
+      deps.settings.upsert({
+        where: { key: 'defaultLanguage' },
+        update: { value: defaultLanguage || 'en' },
+        create: { key: 'defaultLanguage', value: defaultLanguage || 'en' },
+      }),
+    ];
+
+    if (unsplashApiKey && !unsplashApiKey.includes('*')) {
+      operations.push(
+        deps.settings.upsert({
+          where: { key: 'unsplashApiKey' },
+          update: { value: JSON.stringify(unsplashApiKey) },
+          create: { key: 'unsplashApiKey', value: JSON.stringify(unsplashApiKey) },
+        }),
+      );
+    } else if (unsplashApiKey === '') {
+      operations.push(
+        deps.settings.deleteMany({
+          where: { key: 'unsplashApiKey' },
+        }),
+      );
+    }
+
+    if (branding) {
+      const stringSettings: Record<string, string | undefined> = {
+        subscriptionLogoUrl: branding.logoUrl,
+        subscriptionBrandName: branding.brandName,
+        subscriptionFooterText: branding.footerText,
+        subscriptionWelcomeMessage: branding.welcomeMessage,
+        subscriptionFontFamily: branding.fontFamily,
+        subscriptionFontUrl: branding.fontUrl,
+        subscriptionLayout: branding.layout,
+        subscriptionCardStyle: branding.cardStyle,
+        subscriptionAnimatedBackground: branding.animatedBackground,
+        subscriptionPrimaryAppId: branding.primaryAppId,
+      };
+
+      if (branding.logoSize !== undefined) {
+        operations.push(
+          deps.settings.upsert({
+            where: { key: 'subscriptionLogoSize' },
+            update: { value: String(branding.logoSize) },
+            create: { key: 'subscriptionLogoSize', value: String(branding.logoSize) },
+          }),
+        );
+      }
+
+      const booleanSettings: Record<string, boolean | undefined> = {
+        subscriptionShowPoweredBy: branding.showPoweredBy,
+        subscriptionShowWelcome: branding.showWelcome,
+        subscriptionEnableAnimations: branding.enableAnimations,
+        subscriptionShowUsageAlerts: branding.showUsageAlerts,
+        subscriptionShowConnectionSummary: branding.showConnectionSummary,
+        subscriptionShowCompatibleApps: branding.showCompatibleApps,
+        subscriptionShowShareLinks: branding.showShareLinks,
+        subscriptionShowHelpContact: branding.showHelpContact,
+        subscriptionShowManualSetupButton: branding.showManualSetupButton,
+        subscriptionShowUsageChips: branding.showUsageChips,
+      };
+
+      const jsonSettings: Record<string, unknown> = {
+        subscriptionLocalizedFooterTexts: branding.localizedFooterTexts,
+        subscriptionLocalizedWelcomeMessages: branding.localizedWelcomeMessages,
+        subscriptionUsageAlertThresholds: branding.usageAlertThresholds,
+        subscriptionEnabledApps: branding.enabledApps,
+        subscriptionCustomApps: branding.customApps,
+      };
+
+      for (const [key, value] of Object.entries(stringSettings)) {
+        if (value !== undefined) {
+          operations.push(
+            deps.settings.upsert({
+              where: { key },
+              update: { value: value || '' },
+              create: { key, value: value || '' },
+            }),
+          );
+        }
+      }
+
+      for (const [key, value] of Object.entries(booleanSettings)) {
+        if (value !== undefined) {
+          operations.push(
+            deps.settings.upsert({
+              where: { key },
+              update: { value: String(value) },
+              create: { key, value: String(value) },
+            }),
+          );
+        }
+      }
+
+      for (const [key, value] of Object.entries(jsonSettings)) {
+        if (value !== undefined) {
+          operations.push(
+            deps.settings.upsert({
+              where: { key },
+              update: { value: JSON.stringify(value) },
+              create: { key, value: JSON.stringify(value) },
+            }),
+          );
+        }
+      }
+    }
+
+    operations.push(
+      deps.settings.deleteMany({
+        where: { key: 'subscriptionCustomCss' },
+      }),
+    );
+
+    await Promise.all(operations);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    deps.logError('Failed to save settings:', error);
+    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 });
+  }
+}

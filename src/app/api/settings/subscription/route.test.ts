@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   handleSubscriptionSettingsGet,
   handleSubscriptionSettingsPost,
-} from './route';
+} from './route-helpers';
 
 function createDeniedDeps() {
   return {

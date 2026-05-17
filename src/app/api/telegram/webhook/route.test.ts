@@ -10,7 +10,7 @@ import {
   handleTelegramWebhookPost,
   handleTelegramWebhookSetup,
   type TelegramWebhookRouteDeps,
-} from './route';
+} from './route-helpers';
 
 const baseWebhookDeps: TelegramWebhookRouteDeps = {
   getTelegramConfig: async () => ({
