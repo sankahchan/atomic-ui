@@ -105,3 +105,33 @@ test('client build query marker takes precedence over a refreshed build cookie o
   assert.equal(response.status, 409);
   assert.equal(response.headers.get('x-atomic-stale-build'), '1');
 });
+
+test('app-version checks do not refresh the build cookie', async () => {
+  process.env.NEXT_PUBLIC_APP_VERSION = 'new-build';
+  const request = new NextRequest('https://example.com/api/app-version', {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+    },
+  });
+
+  const response = await middleware(request);
+
+  assert.equal(response.headers.get('set-cookie'), null);
+});
+
+test('document navigations still receive the current build cookie', async () => {
+  process.env.NEXT_PUBLIC_APP_VERSION = 'new-build';
+  const request = new NextRequest('https://example.com/status', {
+    method: 'GET',
+    headers: {
+      accept: 'text/html',
+    },
+  });
+
+  const response = await middleware(request);
+  const cookieHeader = response.headers.get('set-cookie');
+
+  assert.notEqual(cookieHeader, null);
+  assert.match(cookieHeader!, new RegExp(`${APP_BUILD_COOKIE_NAME}=new-build`));
+});
