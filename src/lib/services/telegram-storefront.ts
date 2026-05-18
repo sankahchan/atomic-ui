@@ -18,6 +18,7 @@ import {
   type TelegramSalesPlanCode,
   type TelegramSalesSettings,
 } from '@/lib/services/telegram-sales';
+import { buildTelegramSupportThreadCallbackData } from '@/lib/services/telegram-callbacks';
 import {
   getFlagEmoji,
   getTelegramAccessKeyCategory,
@@ -3084,27 +3085,52 @@ export function buildTelegramStoreSupportContactView(input: {
   const supportHandle = extractTelegramHandleFromUrl(input.supportUrl) || '@YourSupportHandle';
   const supportText = input.locale === 'my'
     ? [
-        '💬 *အကူအညီဆက်သွယ်ရန်*',
+        '🛟 *Support Center*',
         '━━━━━━━━━━━━━━━━━━━━━━━━━━',
         '',
-        'ကျွန်ုပ်တို့၏ အဖွဲ့သည် သင့်ကို ကူညီရန် အဆင်သင့်ရှိပါသည်\\.',
+        'အောက်က လမ်းကြောင်းထဲမှ သင့်အတွက် အမြန်ဆုံးကို ရွေးပါ\\.',
         '',
-        `👤 အကူအညီ: ${escapeTelegramMarkdownV2(supportHandle)}`,
-        '⏰ အချိန်: 9am – 11pm \\(MMT\\)',
+        '🧾 Payment  : proof, review, coupon',
+        '🔑 Key      : connect, renew, usage',
+        '🛠 Server   : route, region, slow',
+        `👤 Admin    : ${escapeTelegramMarkdownV2(supportHandle)}`,
       ]
     : [
-        '💬 *Contact Support*',
+        '🛟 *Support Center*',
         '━━━━━━━━━━━━━━━━━━━━━━━━━━',
         '',
-        'Our team is ready to help you\\.',
+        'Pick the fastest path below for your issue\\.',
         '',
-        `👤 Support: ${escapeTelegramMarkdownV2(supportHandle)}`,
-        '⏰ Hours: 9am – 11pm \\(MMT\\)',
+        '🧾 Payment  : proof, review, coupon',
+        '🔑 Key      : connect, renew, usage',
+        '🛠 Server   : route, region, slow',
+        `👤 Admin    : ${escapeTelegramMarkdownV2(supportHandle)}`,
       ];
 
-  const rows: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [];
+  const rows: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [
+    [
+      {
+        text: input.locale === 'my' ? '💳 Payment' : '💳 Payment',
+        callback_data: buildTelegramSupportThreadCallbackData('new', 'order'),
+      },
+      {
+        text: input.locale === 'my' ? '🔑 Key' : '🔑 Key',
+        callback_data: buildTelegramSupportThreadCallbackData('new', 'key'),
+      },
+    ],
+    [
+      {
+        text: input.locale === 'my' ? '🖥 Server' : '🖥 Server',
+        callback_data: buildTelegramSupportThreadCallbackData('new', 'server'),
+      },
+      {
+        text: input.locale === 'my' ? '🧵 My Threads' : '🧵 My Threads',
+        callback_data: buildTelegramSupportThreadCallbackData('status', 'list'),
+      },
+    ],
+  ];
   if (input.supportUrl?.trim()) {
-    rows.push([{ text: input.locale === 'my' ? '💬 အကူအညီ စကားပြောခန်းဖွင့်မည်' : '💬 Open Support Chat', url: input.supportUrl.trim() }]);
+    rows.push([{ text: input.locale === 'my' ? '💬 Admin Chat ဖွင့်မည်' : '💬 Open Admin Chat', url: input.supportUrl.trim() }]);
   }
   rows.push([{ text: input.locale === 'my' ? '🏠 ပင်မမီနူး' : '🏠 Back to Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }]);
 

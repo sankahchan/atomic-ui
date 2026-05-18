@@ -446,8 +446,8 @@ test('telegram support intake messages stay compact and HTML-safe', () => {
   assert.doesNotMatch(submitted, /as soon as it is available/i);
   assert.doesNotMatch(submitted, /Wait here for the admin reply/i);
   assert.doesNotMatch(closed, /can no longer accept replies/i);
-  assert.match(start, /Admin will reply in this chat\./);
-  assert.match(submitted, /Admin will reply here\./);
+  assert.match(start, /Wait for the admin reply in this chat\./);
+  assert.match(submitted, /Wait for the admin reply here\./);
   assert.match(closed, /This thread is closed\./);
 });
 

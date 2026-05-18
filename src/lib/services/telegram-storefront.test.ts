@@ -631,8 +631,10 @@ test('store support and switch confirmation screens localize Burmese copy', () =
     locale: 'my',
     supportUrl: 'https://t.me/example_support',
   });
-  assert.match(support.text, /အကူအညီဆက်သွယ်ရန်/);
-  assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💬 အကူအညီ စကားပြောခန်းဖွင့်မည်');
+  assert.match(support.text, /Support Center/);
+  assert.match(support.text, /Payment/);
+  assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💳 Payment');
+  assert.equal(support.replyMarkup.inline_keyboard[2]?.[0]?.text, '💬 Admin Chat ဖွင့်မည်');
 
   const confirmation = buildTelegramStoreSwitchConfirmationView({
     keyId: 'key_123',
