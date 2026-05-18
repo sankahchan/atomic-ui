@@ -6,6 +6,7 @@ import {
   getTelegramConversationLocale,
   getTelegramSupportLink,
   getTelegramUserProfile,
+  sendTelegramMessageDetailed,
 } from '@/lib/services/telegram-runtime';
 
 test('getTelegramConversationLocale prefers the exact telegramUserId profile', async (t) => {
@@ -121,4 +122,50 @@ test('getTelegramSupportLink normalizes telegram usernames from sales settings a
 
   const supportLink = await getTelegramSupportLink();
   assert.equal(supportLink, 'https://t.me/outline_sales');
+});
+
+test('sendTelegramMessageDetailed retries one transient timeout and succeeds', async (t) => {
+  const originalFetch = global.fetch;
+  let calls = 0;
+
+  global.fetch = (async () => {
+    calls += 1;
+    if (calls === 1) {
+      const error = new Error('fetch failed') as Error & { cause?: { code: string } };
+      error.cause = { code: 'ETIMEDOUT' };
+      throw error;
+    }
+
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as typeof global.fetch;
+
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+
+  const result = await sendTelegramMessageDetailed('token', 'chat-id', 'Hello');
+  assert.equal(result.success, true);
+  assert.equal(calls, 2);
+});
+
+test('sendTelegramMessageDetailed does not retry non-retryable failures', async (t) => {
+  const originalFetch = global.fetch;
+  let calls = 0;
+
+  global.fetch = (async () => {
+    calls += 1;
+    throw new Error('permission denied');
+  }) as typeof global.fetch;
+
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+
+  const result = await sendTelegramMessageDetailed('token', 'chat-id', 'Hello');
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'permission denied');
+  assert.equal(calls, 1);
 });

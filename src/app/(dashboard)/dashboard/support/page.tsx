@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import {
@@ -589,9 +590,12 @@ export default function SupportCenterPage() {
                               rel="noreferrer"
                               className="block overflow-hidden rounded-[0.7rem]"
                             >
-                              <img
+                              <Image
                                 src={thread.latestReply.mediaUrl}
                                 alt={getLatestReplyAttachmentLabel(thread.latestReply) || 'Support attachment'}
+                                width={640}
+                                height={256}
+                                unoptimized
                                 className="h-32 w-full rounded-[0.7rem] object-cover"
                               />
                             </a>
