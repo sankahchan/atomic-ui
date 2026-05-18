@@ -779,7 +779,7 @@ test('admin queue cards stay compact and button-first', () => {
   assertTelegramMessageBudget(supportThreadSummary, { maxLines: 6, maxChars: 220 });
   assert.doesNotMatch(supportThreadCard, /Use the buttons below/);
   assertTelegramMessageBudget(supportThreadCard, { maxLines: 8, maxChars: 320 });
-  assert.match(premiumQueueSummary, /Next request opens below/);
+  assert.match(premiumQueueSummary, /Use Review, Ask, or Handled on the next card/);
   assertTelegramMessageBudget(premiumQueueSummary, { maxLines: 5, maxChars: 220 });
   assert.doesNotMatch(premiumQueueCard, /Use the buttons below/);
   assert.match(premiumQueueCard, /နောက်ဆုံး reply/);

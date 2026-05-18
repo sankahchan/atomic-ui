@@ -91,6 +91,67 @@ function getLatestReplyAttachmentLabel(reply: {
   return reply.mediaFilename?.trim() || 'File attachment';
 }
 
+function getSupportThreadContextSummary(thread: {
+  relatedOrderCode?: string | null;
+  relatedKeyName?: string | null;
+  relatedServerName?: string | null;
+}) {
+  return thread.relatedOrderCode || thread.relatedKeyName || thread.relatedServerName || 'General help';
+}
+
+function getSupportThreadNextAction(thread: {
+  status: string;
+  waitingOn: string | null;
+  assignedAdminName?: string | null;
+  isOverdue?: boolean | null;
+}) {
+  if (thread.status === 'HANDLED') {
+    return {
+      label: 'Thread is handled',
+      helper: 'No immediate follow-up is needed unless the customer replies again.',
+      tone: 'default' as const,
+    };
+  }
+
+  if (thread.status === 'ESCALATED') {
+    return {
+      label: 'Review the escalation',
+      helper: 'Confirm the blocker, decide owner, and send the next update.',
+      tone: 'warning' as const,
+    };
+  }
+
+  if (!thread.assignedAdminName) {
+    return {
+      label: 'Claim an owner',
+      helper: 'Take ownership before replying so the thread stays accountable.',
+      tone: 'warning' as const,
+    };
+  }
+
+  if ((thread.waitingOn || '').toUpperCase() === 'USER') {
+    return {
+      label: 'Waiting for customer reply',
+      helper: 'No admin action is needed until the customer answers.',
+      tone: 'default' as const,
+    };
+  }
+
+  if (thread.isOverdue) {
+    return {
+      label: 'Reply now',
+      helper: 'This thread has missed first-response SLA and needs an admin update.',
+      tone: 'danger' as const,
+    };
+  }
+
+  return {
+    label: 'Send the next admin update',
+    helper: 'Open the thread, review the latest reply, and respond or resolve it.',
+    tone: 'warning' as const,
+  };
+}
+
 function SupportStatCard({
   label,
   value,
@@ -499,7 +560,7 @@ export default function SupportCenterPage() {
             Thread queue
           </CardTitle>
           <CardDescription>
-            Open the full thread, claim ownership, or jump straight into the linked customer CRM.
+            Scan the latest customer context, see the next action, and jump into the full thread only when needed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -516,6 +577,8 @@ export default function SupportCenterPage() {
               const isMine = Boolean(currentUserId && thread.assignedAdminUserId === currentUserId);
               const customerLabel = thread.customer?.email || thread.telegramUsername || thread.threadCode;
               const latestPreview = getLatestReplyPreview(thread.latestReply);
+              const nextAction = getSupportThreadNextAction(thread);
+              const linkedContext = getSupportThreadContextSummary(thread);
               const threadHref = withBasePath(`/dashboard/support/threads/${thread.id}`);
               const customerHref = thread.customer ? withBasePath(`/dashboard/users/${thread.customer.id}`) : null;
 
@@ -623,39 +686,40 @@ export default function SupportCenterPage() {
                         </div>
                       ) : null}
                     </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                      <div className="rounded-[0.95rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
-                        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                          <UserCheck className="h-3.5 w-3.5" />
-                          Owner
-                        </p>
-                        <p className="mt-2 text-sm font-medium">{thread.assignedAdminName || 'Unassigned'}</p>
-                      </div>
-                      <div className="rounded-[0.95rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
-                        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                          <Clock3 className="h-3.5 w-3.5" />
-                          SLA
-                        </p>
-                        <p className="mt-2 text-sm font-medium">
-                          {thread.firstResponseDueAt ? formatDateTime(thread.firstResponseDueAt) : 'Handled / no SLA'}
-                        </p>
-                      </div>
-                      <div className="rounded-[0.95rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
-                        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                          <AlertTriangle className="h-3.5 w-3.5" />
-                          Related
-                        </p>
-                        <p className="mt-2 text-sm font-medium">
-                          {thread.relatedOrderCode || thread.relatedKeyName || thread.relatedServerName || 'General help'}
-                        </p>
-                      </div>
-                      <div className="rounded-[0.95rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
+                    <div
+                      className={[
+                        'space-y-3 rounded-[0.95rem] border p-3',
+                        nextAction.tone === 'danger'
+                          ? 'border-red-500/25 bg-red-500/10'
+                          : nextAction.tone === 'warning'
+                            ? 'border-amber-500/25 bg-amber-500/10'
+                            : 'border-border/60 bg-background/50 dark:bg-white/[0.025]',
+                      ].join(' ')}
+                    >
+                      <div>
                         <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                           <ShieldAlert className="h-3.5 w-3.5" />
-                          Age
+                          Next action
                         </p>
-                        <p className="mt-2 text-sm font-medium">{formatRelativeTime(thread.createdAt)}</p>
+                        <p className="mt-2 text-sm font-medium">{nextAction.label}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{nextAction.helper}</p>
+                      </div>
+                      <div className="grid gap-2 text-sm text-muted-foreground">
+                        <p>
+                          <span className="font-medium text-foreground">Owner:</span>{' '}
+                          {thread.assignedAdminName || 'Unassigned'}
+                        </p>
+                        <p>
+                          <span className="font-medium text-foreground">SLA:</span>{' '}
+                          {thread.firstResponseDueAt ? formatDateTime(thread.firstResponseDueAt) : 'Handled / no SLA'}
+                        </p>
+                        <p>
+                          <span className="font-medium text-foreground">Context:</span> {linkedContext}
+                        </p>
+                        <p>
+                          <span className="font-medium text-foreground">Opened:</span>{' '}
+                          {formatRelativeTime(thread.createdAt)}
+                        </p>
                       </div>
                     </div>
                   </div>
