@@ -200,16 +200,15 @@ export function buildTelegramPremiumSupportQueueSummaryMessage(input: {
     : `${input.totalOpen} open • ${input.waitingAdmin} need admin • ${input.waitingUser} waiting for user`;
   const nextHint = input.hasItems
     ? isMyanmar
-      ? 'နောက် request ကို အောက်တွင် ဖွင့်ပါမည်။'
-      : 'Next request opens below.'
+      ? 'နောက်ကတ်တွင် Review, Ask, သို့မဟုတ် Handled ကို ရွေးနိုင်ပါသည်။'
+      : 'Use Review, Ask, or Handled on the next card.'
     : '';
 
   return [
     isMyanmar ? '💎 <b>Premium support စစ်ရန်</b>' : '💎 <b>Premium support queue</b>',
     '',
-    modeLabel,
+    `<b>${modeLabel}</b>`,
     stats,
-    '',
     nextHint,
   ]
     .filter(Boolean)
@@ -247,8 +246,16 @@ export function buildTelegramPremiumSupportQueueCardMessage(input: {
   const latestReplyPreview = buildTelegramLatestReplyPreviewLines({
     reply: latestReply,
     locale: input.locale,
-    maxLength: 100,
+    maxLength: 84,
   }).map((line) => escapeHtml(line));
+  const routeSummary = [
+    input.request.requestedRegionCode
+      ? `${input.locale === 'my' ? 'Region' : 'Region'} ${escapeHtml(input.request.requestedRegionCode)}`
+      : '',
+    input.request.currentResolvedServerName
+      ? `${input.locale === 'my' ? 'Route' : 'Route'} ${escapeHtml(input.request.currentResolvedServerName)}`
+      : '',
+  ].filter(Boolean);
   const statusSnapshot = `🕒 <b>${escapeHtml(state.label)}</b> • ${escapeHtml(age)}${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`;
   return [
     input.locale === 'my'
@@ -256,7 +263,8 @@ export function buildTelegramPremiumSupportQueueCardMessage(input: {
       : '💎 <b>Premium support thread</b>',
     '',
     `<b>${escapeHtml(input.request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}`,
-    `🔑 <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b> • ${escapeHtml(state.label)}`,
+    `🔑 <b>${escapeHtml(input.request.dynamicAccessKey.name)}</b>`,
+    routeSummary.length > 0 ? `🌍 ${routeSummary.join(' • ')}` : '',
     `${statusSnapshot} • ${escapeHtml(replyStateLabel)}`,
     ...latestReplyPreview,
   ]

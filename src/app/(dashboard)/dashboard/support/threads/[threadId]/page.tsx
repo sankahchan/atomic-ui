@@ -89,6 +89,75 @@ function getTemplateActionLabel(action: 'WORKING' | 'NEED_DETAILS' | 'ESCALATE' 
   }
 }
 
+function getSupportThreadRecommendedAction(thread: {
+  status: string;
+  waitingOn: string | null;
+  assignedAdminName?: string | null;
+  isOverdue?: boolean | null;
+}) {
+  if (thread.status === 'HANDLED') {
+    return {
+      label: 'Handled',
+      helper: 'Keep this open only if you expect another customer reply.',
+    };
+  }
+
+  if (!thread.assignedAdminName) {
+    return {
+      label: 'Assign an owner',
+      helper: 'Claim or assign this thread before sending the next update.',
+    };
+  }
+
+  if (thread.status === 'ESCALATED') {
+    return {
+      label: 'Review escalation',
+      helper: 'Decide the blocker, pick the owner, and send the next admin reply.',
+    };
+  }
+
+  if ((thread.waitingOn || '').toUpperCase() === 'USER') {
+    return {
+      label: 'Waiting for customer',
+      helper: 'No admin reply is needed until the customer responds again.',
+    };
+  }
+
+  if (thread.isOverdue) {
+    return {
+      label: 'Reply now',
+      helper: 'This thread is overdue and needs a customer-facing update.',
+    };
+  }
+
+  return {
+    label: 'Send next admin update',
+    helper: 'Use a workflow or manual reply to keep the thread moving.',
+  };
+}
+
+const SUPPORT_MACROS: Array<{
+  id: 'WORKING' | 'NEED_DETAILS' | 'ESCALATE' | 'HANDLED';
+  helper: string;
+}> = [
+  {
+    id: 'WORKING',
+    helper: 'Acknowledge the issue and tell the customer you are checking it.',
+  },
+  {
+    id: 'NEED_DETAILS',
+    helper: 'Ask for one missing detail, screenshot, or reproduction step.',
+  },
+  {
+    id: 'ESCALATE',
+    helper: 'Mark the thread for deeper review or cross-team follow-up.',
+  },
+  {
+    id: 'HANDLED',
+    helper: 'Send the closing update after the issue is resolved.',
+  },
+];
+
 export default function SupportThreadDetailPage() {
   const params = useParams<{ threadId: string }>();
   const threadId = Array.isArray(params?.threadId) ? params.threadId[0] : params?.threadId || '';
@@ -263,6 +332,7 @@ export default function SupportThreadDetailPage() {
   const adminReplyCount = thread.replies.filter((reply) => reply.senderType === 'ADMIN').length;
   const customerReplyCount = thread.replies.length - adminReplyCount;
   const participantLabel = thread.customer?.email || thread.telegramUsername || thread.telegramUserId || 'Telegram user';
+  const recommendedAction = getSupportThreadRecommendedAction(thread);
   const contextItems = [
     thread.relatedOrderCode ? `Order ${thread.relatedOrderCode}` : null,
     thread.relatedKeyName ? `Key ${thread.relatedKeyName}` : null,
@@ -303,7 +373,7 @@ export default function SupportThreadDetailPage() {
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{thread.threadCode}</h1>
                   <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                    Telegram support thread with ownership, SLA, saved replies, and attachment-aware history in one workspace.
+                    Keep the latest customer context, assignment, and saved replies in one reply workspace.
                   </p>
                 </div>
 
@@ -377,6 +447,12 @@ export default function SupportThreadDetailPage() {
                 <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{latestReply.message}</p>
               </DetailNoteBlock>
             ) : null}
+
+            <DetailNoteBlock>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recommended action</p>
+              <p className="mt-3 text-sm font-medium text-foreground">{recommendedAction.label}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{recommendedAction.helper}</p>
+            </DetailNoteBlock>
           </DetailHeroAside>
         </DetailHeroGrid>
       </DetailHero>
@@ -588,19 +664,22 @@ export default function SupportThreadDetailPage() {
                 <Clock3 className="h-5 w-5 text-primary" />
                 Quick workflows
               </CardTitle>
-              <CardDescription>Use macros for common support moves, or send a manual customer reply.</CardDescription>
+              <CardDescription>Choose the next support move quickly, then send a manual reply only when you need custom wording.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-2 sm:grid-cols-2">
-                {(['WORKING', 'NEED_DETAILS', 'ESCALATE', 'HANDLED'] as const).map((macro) => (
+                {SUPPORT_MACROS.map((macro) => (
                   <Button
-                    key={macro}
+                    key={macro.id}
                     variant="outline"
                     disabled={isBusy}
-                    onClick={() => macroMutation.mutate({ threadId, macro })}
+                    onClick={() => macroMutation.mutate({ threadId, macro: macro.id })}
                     className="h-auto justify-start rounded-[1rem] px-4 py-3 text-left"
                   >
-                    {getMacroLabel(macro)}
+                    <div className="space-y-1">
+                      <p className="font-medium">{getMacroLabel(macro.id)}</p>
+                      <p className="text-xs leading-5 text-muted-foreground">{macro.helper}</p>
+                    </div>
                   </Button>
                 ))}
               </div>
