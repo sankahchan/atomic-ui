@@ -36,6 +36,19 @@ import {
 } from '@/lib/telegram-bot-settings';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
+const TELEGRAM_API_TIMEOUT_MS = 15_000;
+const TELEGRAM_API_RETRY_DELAY_MS = 750;
+const TELEGRAM_API_RETRYABLE_CODES = new Set([
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EAI_AGAIN',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_SOCKET',
+]);
 const TELEGRAM_COMMAND_SYNC_SIGNATURE = new Map<string, string>();
 const TELEGRAM_COMMAND_SYNC_FAILURE_SIGNATURE = new Set<string>();
 const TELEGRAM_MALFORMED_CHANNEL_WARNINGS = new Set<string>();
@@ -51,6 +64,97 @@ type TelegramCommandSyncSet = {
   languageCode?: string;
   scope?: TelegramCommandScope;
 };
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function extractTelegramErrorCode(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+
+  const directCode = (error as { code?: unknown }).code;
+  if (typeof directCode === 'string' && directCode.trim()) {
+    return directCode.trim();
+  }
+
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause && typeof cause === 'object') {
+    const causeCode = (cause as { code?: unknown }).code;
+    if (typeof causeCode === 'string' && causeCode.trim()) {
+      return causeCode.trim();
+    }
+  }
+
+  return null;
+}
+
+function isRetryableTelegramTransportError(error: unknown) {
+  const code = extractTelegramErrorCode(error);
+  return code ? TELEGRAM_API_RETRYABLE_CODES.has(code) : false;
+}
+
+function summarizeTelegramTransportError(error: unknown) {
+  if (error instanceof Error) {
+    const code = extractTelegramErrorCode(error);
+    if (code) {
+      return `${error.message} (${code})`;
+    }
+    return error.message;
+  }
+
+  const code = extractTelegramErrorCode(error);
+  if (code) {
+    return `Telegram request failed (${code})`;
+  }
+
+  return 'Telegram request failed';
+}
+
+function withTelegramRequestTimeout(init: RequestInit = {}) {
+  return {
+    ...init,
+    signal: init.signal ?? AbortSignal.timeout(TELEGRAM_API_TIMEOUT_MS),
+  } satisfies RequestInit;
+}
+
+async function fetchTelegramApi(
+  url: string,
+  init: RequestInit,
+  options?: {
+    retries?: number;
+  },
+) {
+  const retries = options?.retries ?? 1;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await fetch(url, withTelegramRequestTimeout(init));
+    } catch (error) {
+      if (attempt >= retries || !isRetryableTelegramTransportError(error)) {
+        throw error;
+      }
+      await sleep(TELEGRAM_API_RETRY_DELAY_MS * (attempt + 1));
+    }
+  }
+
+  throw new Error('Telegram request failed');
+}
+
+async function getTelegramErrorDescription(response: Response, fallback: string) {
+  let description = fallback;
+  try {
+    const data = (await response.json()) as { description?: unknown };
+    if (typeof data.description === 'string' && data.description.trim().length > 0) {
+      description = data.description;
+    }
+  } catch {
+    // Keep the fallback description.
+  }
+
+  return description;
+}
 
 export type TelegramParseMode = 'HTML' | 'Markdown' | 'MarkdownV2';
 
@@ -79,7 +183,7 @@ async function setTelegramMyCommands(
     scope?: TelegramCommandScope;
   },
 ) {
-  const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/setMyCommands`, {
+  const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/setMyCommands`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -90,16 +194,7 @@ async function setTelegramMyCommands(
   });
 
   if (!response.ok) {
-    let description = `setMyCommands failed with status ${response.status}`;
-    try {
-      const payload = (await response.json()) as { description?: string };
-      if (typeof payload.description === 'string' && payload.description.trim()) {
-        description = payload.description.trim();
-      }
-    } catch {
-      // Keep the fallback description.
-    }
-
+    const description = await getTelegramErrorDescription(response, `setMyCommands failed with status ${response.status}`);
     throw new Error(description);
   }
 }
@@ -783,7 +878,7 @@ export async function sendTelegramMessageDetailed(
   }
 
   try {
-    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendMessage`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -796,16 +891,7 @@ export async function sendTelegramMessageDetailed(
     });
 
     if (!response.ok) {
-      let description = `Telegram request failed with status ${response.status}`;
-      try {
-        const data = (await response.json()) as { description?: unknown };
-        if (typeof data.description === 'string' && data.description.trim().length > 0) {
-          description = data.description;
-        }
-      } catch {
-        // Keep the fallback description.
-      }
-
+      const description = await getTelegramErrorDescription(response, `Telegram request failed with status ${response.status}`);
       console.error(`Failed to send Telegram message to ${chatId}:`, description);
       return {
         success: false,
@@ -819,11 +905,12 @@ export async function sendTelegramMessageDetailed(
       status: response.status,
     };
   } catch (error) {
-    console.error('Failed to send Telegram message:', error);
+    const description = summarizeTelegramTransportError(error);
+    console.error('Failed to send Telegram message:', description);
     return {
       success: false,
       status: null,
-      error: error instanceof Error ? error.message : 'Failed to send Telegram message',
+      error: description,
     };
   }
 }
@@ -848,7 +935,7 @@ export async function editTelegramMessageText(
   }
 
   try {
-    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/editMessageText`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/editMessageText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -862,16 +949,7 @@ export async function editTelegramMessageText(
     });
 
     if (!response.ok) {
-      let description = `Telegram edit request failed with status ${response.status}`;
-      try {
-        const data = (await response.json()) as { description?: unknown };
-        if (typeof data.description === 'string' && data.description.trim().length > 0) {
-          description = data.description;
-        }
-      } catch {
-        // Keep the fallback description.
-      }
-
+      const description = await getTelegramErrorDescription(response, `Telegram edit request failed with status ${response.status}`);
       console.error(`Failed to edit Telegram message ${chatId}/${messageId}:`, description);
       return {
         success: false,
@@ -885,11 +963,12 @@ export async function editTelegramMessageText(
       status: response.status,
     };
   } catch (error) {
-    console.error('Failed to edit Telegram message:', error);
+    const description = summarizeTelegramTransportError(error);
+    console.error('Failed to edit Telegram message:', description);
     return {
       success: false,
       status: null,
-      error: error instanceof Error ? error.message : 'Failed to edit Telegram message',
+      error: description,
     };
   }
 }
@@ -911,7 +990,7 @@ export async function answerTelegramCallbackQuery(
         };
 
   try {
-    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/answerCallbackQuery`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/answerCallbackQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -923,7 +1002,7 @@ export async function answerTelegramCallbackQuery(
 
     return response.ok;
   } catch (error) {
-    console.error('Failed to answer Telegram callback query:', error);
+    console.error('Failed to answer Telegram callback query:', summarizeTelegramTransportError(error));
     return false;
   }
 }
@@ -1018,17 +1097,17 @@ export async function sendTelegramPhoto(
       formData.append('parse_mode', 'HTML');
     }
 
-    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
       method: 'POST',
       body: formData,
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      console.error(`Failed to send Telegram photo to ${chatId}:`, data.description);
+      const description = await getTelegramErrorDescription(response, `Telegram photo request failed with status ${response.status}`);
+      console.error(`Failed to send Telegram photo to ${chatId}:`, description);
     }
   } catch (error) {
-    console.error(`Error sending Telegram photo to ${chatId}:`, error);
+    console.error(`Error sending Telegram photo to ${chatId}:`, summarizeTelegramTransportError(error));
   }
 }
 
@@ -1058,7 +1137,7 @@ export async function sendTelegramPhotoUrl(
   }
 
   try {
-    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1073,13 +1152,13 @@ export async function sendTelegramPhotoUrl(
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      console.error(`Failed to send Telegram photo URL to ${chatId}:`, data.description);
+      const description = await getTelegramErrorDescription(response, `Telegram photo URL request failed with status ${response.status}`);
+      console.error(`Failed to send Telegram photo URL to ${chatId}:`, description);
       return false;
     }
     return true;
   } catch (error) {
-    console.error(`Error sending Telegram photo URL to ${chatId}:`, error);
+    console.error(`Error sending Telegram photo URL to ${chatId}:`, summarizeTelegramTransportError(error));
     return false;
   }
 }
@@ -1119,19 +1198,19 @@ export async function sendTelegramDocument(
       formData.append('reply_markup', JSON.stringify(options.replyMarkup));
     }
 
-    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/sendDocument`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendDocument`, {
       method: 'POST',
       body: formData,
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      console.error(`Failed to send Telegram document to ${chatId}:`, data.description);
+      const description = await getTelegramErrorDescription(response, `Telegram document request failed with status ${response.status}`);
+      console.error(`Failed to send Telegram document to ${chatId}:`, description);
       return false;
     }
     return true;
   } catch (error) {
-    console.error(`Error sending Telegram document to ${chatId}:`, error);
+    console.error(`Error sending Telegram document to ${chatId}:`, summarizeTelegramTransportError(error));
     return false;
   }
 }
@@ -1143,7 +1222,7 @@ export async function copyTelegramMessage(
   toChatId: number | string,
 ) {
   try {
-    const response = await fetch(`${TELEGRAM_API_BASE}${botToken}/copyMessage`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/copyMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1154,14 +1233,14 @@ export async function copyTelegramMessage(
     });
 
     if (!response.ok) {
-      const data = await response.json();
-      console.error(`Failed to copy Telegram message to ${toChatId}:`, data.description);
+      const description = await getTelegramErrorDescription(response, `Telegram copy request failed with status ${response.status}`);
+      console.error(`Failed to copy Telegram message to ${toChatId}:`, description);
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error('Failed to copy Telegram message:', error);
+    console.error('Failed to copy Telegram message:', summarizeTelegramTransportError(error));
     return false;
   }
 }

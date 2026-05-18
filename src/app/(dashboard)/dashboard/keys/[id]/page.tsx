@@ -2681,16 +2681,20 @@ export default function KeyDetailPage() {
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const telegramDeliveryEnabled = Boolean(key?.telegramDeliveryEnabled);
+  const rotationEnabled = Boolean((key as any)?.rotationEnabled);
+  const rotationInterval =
+    ((key as any)?.rotationInterval as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY') || 'NEVER';
 
   useEffect(() => {
     setReplacementServerId('none');
-    setNotifyOnReplacement(Boolean(key?.telegramDeliveryEnabled));
-  }, [key?.id, key?.telegramDeliveryEnabled]);
+    setNotifyOnReplacement(telegramDeliveryEnabled);
+  }, [key?.id, telegramDeliveryEnabled]);
 
   useEffect(() => {
-    setRotationEnabledDraft(Boolean((key as any)?.rotationEnabled));
-    setRotationIntervalDraft(((key as any)?.rotationInterval as 'NEVER' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY') || 'NEVER');
-  }, [key?.id, (key as any)?.rotationEnabled, (key as any)?.rotationInterval]);
+    setRotationEnabledDraft(rotationEnabled);
+    setRotationIntervalDraft(rotationInterval);
+  }, [key?.id, rotationEnabled, rotationInterval]);
 
   const handleDelete = () => {
     setDeleteDialogOpen(true);
