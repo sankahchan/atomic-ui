@@ -174,7 +174,32 @@ function buildRedirectUrl(
   return url;
 }
 
-function applyBuildCookie(response: NextResponse) {
+function shouldSetBuildCookie(request: NextRequest, normalizedPath: string) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return false;
+  }
+
+  if (normalizedPath.startsWith('/api/')) {
+    return false;
+  }
+
+  if (request.headers.has('next-action') || request.headers.has('rsc') || request.nextUrl.searchParams.has('_rsc')) {
+    return false;
+  }
+
+  const accept = request.headers.get('accept') || '';
+  if (accept && !accept.includes('text/html')) {
+    return false;
+  }
+
+  return true;
+}
+
+function applyBuildCookie(request: NextRequest, normalizedPath: string, response: NextResponse) {
+  if (!shouldSetBuildCookie(request, normalizedPath)) {
+    return response;
+  }
+
   const currentBuildId = getCurrentBuildId();
   if (!currentBuildId) {
     return response;
@@ -226,7 +251,7 @@ export async function middleware(request: NextRequest) {
       )
       : new NextResponse('STALE_BUILD', { status: 409 });
     response.headers.set('x-atomic-stale-build', '1');
-    return applyBuildCookie(response);
+    return applyBuildCookie(request, normalizedPath, response);
   }
 
   // The public share host must never expose admin/login routes.
@@ -235,12 +260,12 @@ export async function middleware(request: NextRequest) {
       return new NextResponse(null, { status: 404 });
     }
 
-    return applyBuildCookie(NextResponse.next());
+    return applyBuildCookie(request, normalizedPath, NextResponse.next());
   }
 
   // Allow public routes without authentication
   if (isPublicRoute(normalizedPath)) {
-    return applyBuildCookie(NextResponse.next());
+    return applyBuildCookie(request, normalizedPath, NextResponse.next());
   }
 
   // Check for the session cookie
@@ -250,7 +275,7 @@ export async function middleware(request: NextRequest) {
   if (!sessionToken) {
     // For API routes, return 401 instead of redirecting
     if (normalizedPath.startsWith('/api/')) {
-      return applyBuildCookie(NextResponse.json(
+      return applyBuildCookie(request, normalizedPath, NextResponse.json(
         { error: 'Unauthorized', message: 'Please log in to continue.' },
         { status: 401 }
       ));
@@ -258,7 +283,7 @@ export async function middleware(request: NextRequest) {
 
     // For page routes, redirect to login with return URL
     // For page routes, redirect to login with return URL
-    return applyBuildCookie(NextResponse.redirect(
+    return applyBuildCookie(request, normalizedPath, NextResponse.redirect(
       buildRedirectUrl(request, '/login', { from: normalizedPath })
     ));
   }
@@ -274,26 +299,26 @@ export async function middleware(request: NextRequest) {
     // Role-based Access Control (RBAC)
     // Redirect USER/CLIENT role trying to access admin dashboard
     if ((role === 'USER' || role === 'CLIENT') && normalizedPath.startsWith('/dashboard')) {
-      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/portal')));
+      return applyBuildCookie(request, normalizedPath, NextResponse.redirect(buildRedirectUrl(request, '/portal')));
     }
 
     // Redirect ADMIN role trying to access user portal (optional, but keeps things clean)
     if (role === 'ADMIN' && normalizedPath.startsWith('/portal')) {
-      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/dashboard')));
+      return applyBuildCookie(request, normalizedPath, NextResponse.redirect(buildRedirectUrl(request, '/dashboard')));
     }
 
     // Redirect USER/CLIENT accessing root to portal
     if ((role === 'USER' || role === 'CLIENT') && normalizedPath === '/') {
-      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/portal')));
+      return applyBuildCookie(request, normalizedPath, NextResponse.redirect(buildRedirectUrl(request, '/portal')));
     }
 
     // Redirect ADMIN accessing root to dashboard
     if (role === 'ADMIN' && normalizedPath === '/') {
-      return applyBuildCookie(NextResponse.redirect(buildRedirectUrl(request, '/dashboard')));
+      return applyBuildCookie(request, normalizedPath, NextResponse.redirect(buildRedirectUrl(request, '/dashboard')));
     }
 
     // Token is valid, allow the request to proceed
-    return applyBuildCookie(NextResponse.next());
+    return applyBuildCookie(request, normalizedPath, NextResponse.next());
   } catch (error) {
     // Token is invalid or expired
     console.error('Middleware: Invalid session token');
@@ -309,7 +334,7 @@ export async function middleware(request: NextRequest) {
       })();
 
     response.cookies.delete('atomic-session');
-    return applyBuildCookie(response);
+    return applyBuildCookie(request, normalizedPath, response);
   }
 }
 
