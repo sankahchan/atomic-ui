@@ -627,7 +627,7 @@ test('support status summary shows a short thread list instead of only the lates
   assert.match(message, /SUP-AAA111/);
   assert.match(message, /SUP-BBB222/);
   assert.match(message, /PRM-111/);
-  assert.match(message, /Tap a thread below to open it/);
+  assert.match(message, /Open a thread below or start a new one\./);
   assert.ok(message.split('\n').length <= 18);
 });
 
@@ -658,10 +658,10 @@ test('support hub summary stays compact and removes the old bullet wall', () => 
   assert.match(message, /1 open • 2 recent • 1 premium/);
   assert.match(message, /Open thread/);
   assert.match(message, /Latest premium request/);
-  assert.match(message, /Fast lanes/);
+  assert.match(message, /Fast lane/);
   assert.doesNotMatch(message, /Best path/);
   assert.doesNotMatch(message, /https?:\/\//);
-  assert.ok(message.split('\n').length <= 18);
+  assert.ok(message.split('\n').length <= 20);
 });
 
 test('support thread detail stays compact and keeps actions out of the text body', () => {
@@ -695,14 +695,15 @@ test('support thread detail stays compact and keeps actions out of the text body
 
   assert.match(message, /SUP-AAA111/);
   assert.match(message, /Thread snapshot/);
+  assert.match(message, /Next step/);
   assert.match(message, /Last reply/);
   assert.match(message, /button below/);
-  assert.match(message, /Admin will reply in this chat\./);
+  assert.match(message, /Wait for the admin reply in this chat\./);
   assert.doesNotMatch(message, /Attachment is ready below/);
   assert.doesNotMatch(message, /Latest reply: Admin/);
   assert.doesNotMatch(message, /SLA:/);
   assert.doesNotMatch(message, /Wait here for the admin reply in this chat\./);
-  assert.ok(message.split('\n').length <= 15);
+  assert.ok(message.split('\n').length <= 16);
 });
 
 test('premium support detail stays compact and avoids timeline dumps', () => {
