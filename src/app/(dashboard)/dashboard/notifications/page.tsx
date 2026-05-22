@@ -1671,11 +1671,18 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   };
 
   const saveSettingsMutation = trpc.telegramBot.updateSettings.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (_, variables) => {
       await Promise.all([
         utils.telegramBot.getSettings.invalidate(),
         utils.telegramBot.getWebhookInfo.invalidate(),
       ]);
+
+      // Automatically register the webhook if a token is present
+      if (variables.botToken?.trim() && typeof window !== 'undefined') {
+        const webhookUrl = `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
+        setWebhookMutation.mutate({ webhookUrl });
+      }
+
       toast({
         title: telegramUi.settingsSaved,
         description: telegramUi.settingsSavedDesc,
