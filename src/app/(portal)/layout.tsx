@@ -142,9 +142,8 @@ export default function PortalLayout({
 
     if (isLoading) {
         return (
-            <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background">
-                <GradientMeshBackground />
-                <div className="relative z-10 flex items-center gap-3 rounded-full border border-white/45 bg-white/55 px-5 py-3 text-sm font-medium shadow-[0_20px_42px_rgba(148,163,184,0.22)] backdrop-blur-[24px] dark:border-white/10 dark:bg-white/[0.05] dark:shadow-[0_26px_52px_rgba(0,0,0,0.34)]">
+            <div className="relative flex min-h-screen items-center justify-center bg-background">
+                <div className="relative z-10 flex items-center gap-3 rounded-full border border-border bg-card px-5 py-3 text-sm font-medium shadow-sm">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     Loading portal
                 </div>
@@ -154,11 +153,10 @@ export default function PortalLayout({
 
     if (hasError) {
         return (
-            <div className="relative flex min-h-screen flex-col items-center justify-center gap-4 overflow-hidden bg-background px-4">
-                <GradientMeshBackground />
-                <div className="ops-empty-state relative z-10 max-w-md">
+            <div className="relative flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4">
+                <div className="relative z-10 max-w-md text-center">
                     <p className="text-destructive">Failed to load user session.</p>
-                    <Button onClick={() => router.refresh()}>Retry</Button>
+                    <Button onClick={() => router.refresh()} className="mt-4">Retry</Button>
                 </div>
             </div>
         );
