@@ -208,6 +208,8 @@ function EditKeyDialog({
   };
   onSuccess: () => void;
 }) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: keyData.name,
@@ -233,15 +235,15 @@ function EditKeyDialog({
   const updateMutation = trpc.keys.update.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Key updated',
-        description: 'The access key has been updated successfully.',
+        title: isMyanmar ? 'သော့ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Key updated',
+        description: isMyanmar ? 'အသုံးပြုခွင့်သော့ကို အောင်မြင်စွာ အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The access key has been updated successfully.',
       });
       onSuccess();
       onOpenChange(false);
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: isMyanmar ? 'အပ်ဒိတ် မအောင်မြင်ပါ' : 'Update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -253,8 +255,8 @@ function EditKeyDialog({
 
     if (!formData.name.trim()) {
       toast({
-        title: 'Validation error',
-        description: 'Please enter a key name.',
+        title: isMyanmar ? 'အချက်အလက် မမှန်ကန်ပါ' : 'Validation error',
+        description: isMyanmar ? 'သော့အမည်ကို ထည့်ပါ။' : 'Please enter a key name.',
         variant: 'destructive',
       });
       return;
@@ -288,9 +290,9 @@ function EditKeyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(760px,calc(100vw-2rem))]">
         <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
-          <DialogTitle>Edit Access Key</DialogTitle>
+          <DialogTitle>{isMyanmar ? 'အသုံးပြုခွင့်သော့ကို ပြင်ဆင်မည်' : 'Edit Access Key'}</DialogTitle>
           <DialogDescription>
-            Update the key configuration. Name changes will sync to Outline.
+            {isMyanmar ? 'သော့၏ သတ်မှတ်ချက်များကို ပြင်ဆင်ပါ။ အမည်ပြောင်းလဲမှုကို Outline ထံ တစ်ပြိုင်နက် ချိန်ညှိမည်။' : 'Update the key configuration. Name changes will sync to Outline.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -298,14 +300,14 @@ function EditKeyDialog({
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Identity</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'အခြေခံ အချက်အလက်' : 'Identity'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Update the visible key details used across the admin panel, CRM, and share flows.
+                  {isMyanmar ? 'အက်မင် panel၊ CRM နှင့် မျှဝေမှု flow များတစ်လျှောက် ပြသမည့် သော့အချက်အလက်များကို ပြင်ဆင်ပါ။' : 'Update the visible key details used across the admin panel, CRM, and share flows.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="editName">Name</Label>
+                  <Label htmlFor="editName">{isMyanmar ? 'အမည်' : 'Name'}</Label>
                   <Input
                     id="editName"
                     value={formData.name}
@@ -314,7 +316,7 @@ function EditKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editEmail">Email</Label>
+                  <Label htmlFor="editEmail">{isMyanmar ? 'အီးမေးလ်' : 'Email'}</Label>
                   <Input
                     id="editEmail"
                     type="email"
@@ -324,7 +326,7 @@ function EditKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editTelegram">Telegram ID</Label>
+                  <Label htmlFor="editTelegram">{isMyanmar ? 'Telegram ID' : 'Telegram ID'}</Label>
                   <Input
                     id="editTelegram"
                     value={formData.telegramId}
@@ -336,18 +338,18 @@ function EditKeyDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Quota and lifecycle</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'ကန့်သတ်ချက်နှင့် သက်တမ်း' : 'Quota and lifecycle'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Set usage limits, expiration rules, and device controls without leaving the detail page.
+                  {isMyanmar ? 'ဤစာမျက်နှာကို မထွက်ဘဲ အသုံးပြုမှုကန့်သတ်ချက်၊ သက်တမ်းကုန်စည်းမျဉ်းနှင့် စက်ထိန်းချုပ်မှုများကို သတ်မှတ်ပါ။' : 'Set usage limits, expiration rules, and device controls without leaving the detail page.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="editDataLimit">Data limit (GB)</Label>
+                  <Label htmlFor="editDataLimit">{isMyanmar ? 'ဒေတာ ကန့်သတ်ချက် (GB)' : 'Data limit (GB)'}</Label>
                   <Input
                     id="editDataLimit"
                     type="number"
-                    placeholder="Leave empty for unlimited"
+                    placeholder={isMyanmar ? 'အကန့်အသတ်မရှိလိုပါက ဗလာထားပါ' : 'Leave empty for unlimited'}
                     value={formData.dataLimitGB}
                     onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
                     min="0"
@@ -356,13 +358,13 @@ function EditKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editMaxDevices">Soft device limit (estimated)</Label>
+                  <Label htmlFor="editMaxDevices">{isMyanmar ? 'ခန့်မှန်း စက်ကန့်သတ်ချက်' : 'Soft device limit (estimated)'}</Label>
                   <Input
                     id="editMaxDevices"
                     type="number"
                     min="1"
                     max="20"
-                    placeholder="Leave empty for no device limit"
+                    placeholder={isMyanmar ? 'စက်ကန့်သတ်ချက် မရှိစေလိုပါက ဗလာထားပါ' : 'Leave empty for no device limit'}
                     value={formData.maxDevices}
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
@@ -374,7 +376,7 @@ function EditKeyDialog({
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
                   <div className="space-y-0.5">
                     <Label htmlFor="editBoundDeviceInstallsOnly" className="text-sm font-medium">
-                      Hide raw config on official install screens
+                      {isMyanmar ? 'တရားဝင် ထည့်သွင်းစာမျက်နှာများတွင် မူရင်းဆက်တင်ကို ဖျောက်မည်' : 'Hide raw config on official install screens'}
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       {ACCESS_KEY_PROTECTED_INSTALL_HINT}
@@ -393,7 +395,7 @@ function EditKeyDialog({
                 {formData.dataLimitGB && (
                   <>
                     <div className="space-y-2">
-                      <Label>Reset strategy</Label>
+                      <Label>{isMyanmar ? 'ပြန်လည်စတင်နည်း' : 'Reset strategy'}</Label>
                       <Select
                         value={formData.dataLimitResetStrategy}
                         onValueChange={(value: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'NEVER') =>
@@ -404,16 +406,16 @@ function EditKeyDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="NEVER">Never reset</SelectItem>
-                          <SelectItem value="DAILY">Daily (every 24h)</SelectItem>
-                          <SelectItem value="WEEKLY">Weekly (every 7 days)</SelectItem>
-                          <SelectItem value="MONTHLY">Monthly (every 30 days)</SelectItem>
+                          <SelectItem value="NEVER">{isMyanmar ? 'မပြန်လည်စတင်ပါ' : 'Never reset'}</SelectItem>
+                          <SelectItem value="DAILY">{isMyanmar ? 'နေ့စဉ် (၂၄ နာရီတိုင်း)' : 'Daily (every 24h)'}</SelectItem>
+                          <SelectItem value="WEEKLY">{isMyanmar ? 'အပတ်စဉ် (၇ ရက်တိုင်း)' : 'Weekly (every 7 days)'}</SelectItem>
+                          <SelectItem value="MONTHLY">{isMyanmar ? 'လစဉ် (၃၀ ရက်တိုင်း)' : 'Monthly (every 30 days)'}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="editQuotaThresholds">Quota alert thresholds (%)</Label>
+                      <Label htmlFor="editQuotaThresholds">{isMyanmar ? 'ကန့်သတ်ချက် အသိပေးချက် သတ်မှတ်ချက်များ (%)' : 'Quota alert thresholds (%)'}</Label>
                       <Input
                         id="editQuotaThresholds"
                         placeholder="80,90"
@@ -424,9 +426,9 @@ function EditKeyDialog({
 
                     <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
                       <div className="space-y-0.5">
-                        <Label htmlFor="autoDisable" className="text-sm font-medium">Auto-disable on limit</Label>
+                        <Label htmlFor="autoDisable" className="text-sm font-medium">{isMyanmar ? 'ကန့်သတ်ချက်ရောက်လျှင် အလိုအလျောက် ပိတ်မည်' : 'Auto-disable on limit'}</Label>
                         <p className="text-xs text-muted-foreground">
-                          Automatically disable the key when its quota is fully consumed. Threshold alerts stay manual.
+                          {isMyanmar ? 'ကန့်သတ်ချက် ပြည့်သွားသည်နှင့် သော့ကို အလိုအလျောက် ပိတ်ပါမည်။ အဆင့်သတ်မှတ်ချက် အသိပေးချက်များကိုတော့ ကိုယ်တိုင်သာ ပို့ပါမည်။' : 'Automatically disable the key when its quota is fully consumed. Threshold alerts stay manual.'}
                         </p>
                       </div>
                       <Switch
@@ -441,22 +443,22 @@ function EditKeyDialog({
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="editDuration">Duration (days)</Label>
+                  <Label htmlFor="editDuration">{isMyanmar ? 'သက်တမ်း (ရက်)' : 'Duration (days)'}</Label>
                   <Input
                     id="editDuration"
                     type="number"
-                    placeholder="e.g., 30, 45, 60"
+                    placeholder={isMyanmar ? 'ဥပမာ 30၊ 45၊ 60' : 'e.g., 30, 45, 60'}
                     value={formData.durationDays}
                     onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
                     min="1"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Recalculates the expiration date from the duration you set here.
+                    {isMyanmar ? 'ဤနေရာတွင် သတ်မှတ်ထားသော ရက်အရေအတွက်အတိုင်း သက်တမ်းကုန်မည့်ရက်ကို ပြန်တွက်မည်။' : 'Recalculates the expiration date from the duration you set here.'}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editExpiration">Expiration date</Label>
+                  <Label htmlFor="editExpiration">{isMyanmar ? 'သက်တမ်းကုန်မည့်ရက်' : 'Expiration date'}</Label>
                   <Input
                     id="editExpiration"
                     type="date"
@@ -464,15 +466,15 @@ function EditKeyDialog({
                     onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Or set a fixed date directly if the key does not use a simple duration.
+                    {isMyanmar ? 'ရိုးရိုးသက်တမ်းမသုံးသော သော့များအတွက် သတ်မှတ်ရက်ကို တိုက်ရိုက်ရွေးနိုင်သည်။' : 'Or set a fixed date directly if the key does not use a simple duration.'}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
                   <div className="space-y-0.5">
-                    <Label htmlFor="autoDisableOnExpire" className="text-sm font-medium">Auto-disable on expiry</Label>
+                    <Label htmlFor="autoDisableOnExpire" className="text-sm font-medium">{isMyanmar ? 'သက်တမ်းကုန်လျှင် အလိုအလျောက် ပိတ်မည်' : 'Auto-disable on expiry'}</Label>
                     <p className="text-xs text-muted-foreground">
-                      Remove the key from Outline automatically after it expires.
+                      {isMyanmar ? 'သက်တမ်းကုန်သွားလျှင် Outline မှ သော့ကို အလိုအလျောက် ဖယ်ရှားပါမည်။' : 'Remove the key from Outline automatically after it expires.'}
                     </p>
                   </div>
                   <Switch
@@ -485,7 +487,7 @@ function EditKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="autoArchiveAfterDays">Auto-archive after (days)</Label>
+                  <Label htmlFor="autoArchiveAfterDays">{isMyanmar ? 'အလိုအလျောက် မှတ်တမ်းသို့ ရွှေ့မည့် ကြာချိန် (ရက်)' : 'Auto-archive after (days)'}</Label>
                   <Input
                     id="autoArchiveAfterDays"
                     type="number"
@@ -499,14 +501,14 @@ function EditKeyDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Renewal and notes</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'သက်တမ်းတိုးခြင်းနှင့် မှတ်စုများ' : 'Renewal and notes'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Control whether this key can auto-extend and keep an internal note for support or operations.
+                  {isMyanmar ? 'ဤသော့ကို အလိုအလျောက် သက်တမ်းတိုးနိုင်မလားနှင့် အတွင်းသုံး မှတ်စုကို သိမ်းထားမလားကို စီမံပါ။' : 'Control whether this key can auto-extend and keep an internal note for support or operations.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Auto-renew policy</Label>
+                  <Label>{isMyanmar ? 'အလိုအလျောက် သက်တမ်းတိုး မူဝါဒ' : 'Auto-renew policy'}</Label>
                   <Select
                     value={formData.autoRenewPolicy}
                     onValueChange={(value: 'NONE' | 'EXTEND_DURATION') =>
@@ -517,15 +519,15 @@ function EditKeyDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="NONE">Do not auto-renew</SelectItem>
-                      <SelectItem value="EXTEND_DURATION">Extend by fixed duration</SelectItem>
+                      <SelectItem value="NONE">{isMyanmar ? 'အလိုအလျောက် မတိုးပါ' : 'Do not auto-renew'}</SelectItem>
+                      <SelectItem value="EXTEND_DURATION">{isMyanmar ? 'သတ်မှတ်ထားသော ရက်အတိုင်း တိုးမည်' : 'Extend by fixed duration'}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {formData.autoRenewPolicy === 'EXTEND_DURATION' ? (
                   <div className="space-y-2">
-                    <Label htmlFor="autoRenewDurationDays">Auto-renew duration (days)</Label>
+                    <Label htmlFor="autoRenewDurationDays">{isMyanmar ? 'အလိုအလျောက် သက်တမ်းတိုးမည့် ရက်' : 'Auto-renew duration (days)'}</Label>
                     <Input
                       id="autoRenewDurationDays"
                       type="number"
@@ -537,7 +539,7 @@ function EditKeyDialog({
                 ) : null}
 
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="editNotes">Notes</Label>
+                  <Label htmlFor="editNotes">{isMyanmar ? 'မှတ်စု' : 'Notes'}</Label>
                   <Input
                     id="editNotes"
                     value={formData.notes}
@@ -550,11 +552,11 @@ function EditKeyDialog({
 
           <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>
               {updateMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
+              {isMyanmar ? 'အပြောင်းအလဲများကို သိမ်းမည်' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </form>
@@ -581,33 +583,35 @@ function DeleteKeyDialog({
   onConfirm: () => void;
   isPending: boolean;
 }) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-md">
         <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
-          <DialogTitle>Delete Access Key</DialogTitle>
+          <DialogTitle>{isMyanmar ? 'အသုံးပြုခွင့်သော့ကို ဖျက်မည်' : 'Delete Access Key'}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete &quot;{keyName}&quot;?
+            {isMyanmar ? `“${keyName}” ကို ဖျက်မည်မှာ သေချာပါသလား။` : `Are you sure you want to delete "${keyName}"?`}
             <br />
-            This action cannot be undone. The key will be permanently removed from the server.
+            {isMyanmar ? 'ဤလုပ်ဆောင်ချက်ကို နောက်ပြန်မလှည့်နိုင်ပါ။ သော့ကို ဆာဗာမှ အပြီးတိုင် ဖယ်ရှားပါမည်။' : 'This action cannot be undone. The key will be permanently removed from the server.'}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <DialogSection>
             <div className="ops-modal-note-danger">
-              This permanently removes the key from Atomic-UI and Outline. Existing clients will stop connecting immediately.
+              {isMyanmar ? 'ဤလုပ်ဆောင်ချက်သည် သော့ကို Atomic-UI နှင့် Outline မှ အပြီးတိုင် ဖယ်ရှားမည်ဖြစ်သည်။ လက်ရှိ ကလိုင်းယင့်များသည် ချက်ချင်း ချိတ်ဆက်မရတော့ပါ။' : 'This permanently removes the key from Atomic-UI and Outline. Existing clients will stop connecting immediately.'}
             </div>
           </DialogSection>
         </DialogBody>
         <DialogFooter className="ops-modal-sticky-footer">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
           </Button>
           <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Delete
+            {isMyanmar ? 'ဖျက်မည်' : 'Delete'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -672,102 +676,102 @@ function SubscriptionShareCard({
   const isMyanmar = locale === 'my';
   const shareUi = {
     title: isMyanmar ? 'မျှဝေရန် စာမျက်နှာ' : 'Share Page',
-    description: isMyanmar ? 'အသုံးပြုသူထံသို့ လှပသော subscription စာမျက်နှာကို မျှဝေပါ' : 'Share a beautiful subscription page with your user',
-    theme: isMyanmar ? 'စာမျက်နှာ Theme' : 'Page Theme',
-    selectTheme: isMyanmar ? 'Theme ကို ရွေးပါ' : 'Select theme',
-    shortSlug: isMyanmar ? 'Short Link Slug' : 'Short Link Slug',
+    description: isMyanmar ? 'အသုံးပြုသူထံသို့ လှပသော စာရင်းသွင်းမှု စာမျက်နှာကို မျှဝေပါ' : 'Share a beautiful subscription page with your user',
+    theme: isMyanmar ? 'စာမျက်နှာ အပြင်အဆင်' : 'Page Theme',
+    selectTheme: isMyanmar ? 'အပြင်အဆင်ကို ရွေးပါ' : 'Select theme',
+    shortSlug: isMyanmar ? 'အတိုလင့်ခ် အမည်' : 'Short Link Slug',
     slugPlaceholder: isMyanmar ? 'my-access-key' : 'my-access-key',
-    slugHelp: isMyanmar ? 'Short share page URL နှင့် Outline client URL အတွက် အသုံးပြုသည်။' : 'Used for the short share page and short Outline client URL.',
+    slugHelp: isMyanmar ? 'အတို မျှဝေစာမျက်နှာ URL နှင့် Outline ကလိုင်းယင့် ချိတ်ဆက်လင့်ခ်အတွက် အသုံးပြုသည်။' : 'Used for the short share page and short Outline client URL.',
     save: isMyanmar ? 'သိမ်းမည်' : 'Save',
-    regenerateShortSlug: isMyanmar ? 'Short slug ကို ပြန်ဖန်တီးမည်' : 'Regenerate short slug',
+    regenerateShortSlug: isMyanmar ? 'အတိုလင့်ခ် အမည်ကို ပြန်ဖန်တီးမည်' : 'Regenerate short slug',
     backgroundImage: isMyanmar ? 'နောက်ခံပုံ (ရွေးချယ်နိုင်သည်)' : 'Background Image (Optional)',
-    backgroundImageHelp: isMyanmar ? 'ပုံထည့်ပါက အပြည့်စုံ နောက်ခံပုံစံအဖြစ် အသုံးပြုမည်။ Theme အရောင်ကို အစားထိုးနိုင်သည်။' : 'Use image as full-page background theme. Overrides color theme when set.',
-    contactLinks: isMyanmar ? 'ဆက်သွယ်ရန် Link များ' : 'Contact Links',
-    contactPlaceholder: isMyanmar ? 'Link သို့မဟုတ် ID ထည့်ပါ' : 'Enter link or ID',
-    welcomeOverride: isMyanmar ? 'ကြိုဆိုစာ Override' : 'Welcome Message Override',
-    welcomePlaceholder: isMyanmar ? 'ဤ key ၏ share page အပေါ်ဘက်တွင် ပြသမည့် စာသား။ မဖြည့်ပါက global message ကို အသုံးပြုမည်။' : "Shown near the top of this key's share page. Leave empty to use the global message.",
-    welcomeHelp: isMyanmar ? 'ဤ key အတွက်သာ global subscription page welcome message ကို အစားထိုးမည်။' : 'This overrides the global subscription page welcome message for this key only.',
+    backgroundImageHelp: isMyanmar ? 'ပုံထည့်ပါက အပြည့်အစုံ နောက်ခံပုံစံအဖြစ် အသုံးပြုမည်။ အပြင်အဆင် အရောင်ကို အစားထိုးနိုင်သည်။' : 'Use image as full-page background theme. Overrides color theme when set.',
+    contactLinks: isMyanmar ? 'ဆက်သွယ်ရန် လင့်ခ်များ' : 'Contact Links',
+    contactPlaceholder: isMyanmar ? 'လင့်ခ် သို့မဟုတ် ID ကို ထည့်ပါ' : 'Enter link or ID',
+    welcomeOverride: isMyanmar ? 'ကြိုဆိုစာ အစားထိုးသတ်မှတ်ချက်' : 'Welcome Message Override',
+    welcomePlaceholder: isMyanmar ? 'ဤသော့၏ မျှဝေစာမျက်နှာ အပေါ်ဘက်တွင် ပြသမည့် စာသား။ မဖြည့်ပါက မူလစာကို အသုံးပြုမည်။' : "Shown near the top of this key's share page. Leave empty to use the global message.",
+    welcomeHelp: isMyanmar ? 'ဤသော့အတွက်သာ မူလ စာရင်းသွင်းမှု စာမျက်နှာ ကြိုဆိုစာကို အစားထိုးမည်။' : 'This overrides the global subscription page welcome message for this key only.',
     preview: isMyanmar ? 'အကြိုကြည့်မည်' : 'Preview',
     previewImage: isMyanmar ? 'ပုံနောက်ခံကို ဖွင့်ထားသည်' : 'Image Background',
-    previewColorOnly: isMyanmar ? 'အရောင် Theme သာ' : 'Color theme only',
+    previewColorOnly: isMyanmar ? 'အရောင်အပြင်အဆင်သာ' : 'Color theme only',
     previewCustomWelcome: isMyanmar ? 'ကိုယ်ပိုင်ကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Custom welcome message enabled',
-    previewGlobalWelcome: isMyanmar ? 'Global ကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Using global welcome message',
-    previewContacts: isMyanmar ? 'ဆက်သွယ်ရန် shortcut များ' : 'Contact shortcuts',
+    previewGlobalWelcome: isMyanmar ? 'မူလကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Using global welcome message',
+    previewContacts: isMyanmar ? 'ဆက်သွယ်ရန် အမြန်ခလုတ်များ' : 'Contact shortcuts',
     previewAddToOutline: isMyanmar ? 'Outline ထဲသို့ ထည့်မည်' : 'Add to Outline',
-    copyLink: isMyanmar ? 'Link ကို ကူးယူမည်' : 'Copy Link',
-    copyClientUrl: isMyanmar ? 'Client URL ကို ကူးယူမည်' : 'Copy Client URL',
-    connectTelegram: isMyanmar ? 'Telegram ချိတ်ဆက်မည်' : 'Connect Telegram',
-    sendTelegram: isMyanmar ? 'Telegram ဖြင့် ပို့မည်' : 'Send via Telegram',
-    regenerateLink: isMyanmar ? 'Link ကို ပြန်ဖန်တီးမည်' : 'Regenerate Link',
-    sharePageUrl: isMyanmar ? 'Share Page URL' : 'Share Page URL',
-    clientUrl: isMyanmar ? 'Client URL' : 'Client URL',
+    copyLink: isMyanmar ? 'လင့်ခ်ကို ကူးယူမည်' : 'Copy Link',
+    copyClientUrl: isMyanmar ? 'ကလိုင်းယင့် ချိတ်ဆက်လင့်ခ်ကို ကူးယူမည်' : 'Copy Client URL',
+    connectTelegram: isMyanmar ? 'တယ်လီဂရမ်နှင့် ချိတ်ဆက်မည်' : 'Connect Telegram',
+    sendTelegram: isMyanmar ? 'တယ်လီဂရမ်ဖြင့် ပို့မည်' : 'Send via Telegram',
+    regenerateLink: isMyanmar ? 'လင့်ခ်ကို ပြန်ဖန်တီးမည်' : 'Regenerate Link',
+    sharePageUrl: isMyanmar ? 'မျှဝေစာမျက်နှာ URL' : 'Share Page URL',
+    clientUrl: isMyanmar ? 'ကလိုင်းယင့် ချိတ်ဆက်လင့်ခ်' : 'Client URL',
     pageViews: isMyanmar ? 'စာမျက်နှာကြည့်ရှုမှု' : 'Page Views',
-    inviteOpens: isMyanmar ? 'Invite ဖွင့်ထားမှု' : 'Invite Opens',
-    copyClicks: isMyanmar ? 'Copy အကြိမ်ရေ' : 'Copy Clicks',
-    qrDownloads: isMyanmar ? 'QR download' : 'QR Downloads',
-    configDownloads: isMyanmar ? 'Config download' : 'Config Downloads',
-    clientFetches: isMyanmar ? 'Client fetches' : 'Client Fetches',
-    telegramSends: isMyanmar ? 'Telegram ပို့ထားမှု' : 'Telegram Sends',
-    lastViewed: isMyanmar ? 'နောက်ဆုံးကြည့်ရှုချိန်' : 'Last Viewed',
+    inviteOpens: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် ဖွင့်မှု' : 'Invite Opens',
+    copyClicks: isMyanmar ? 'ကူးယူခံရသော အကြိမ်ရေ' : 'Copy Clicks',
+    qrDownloads: isMyanmar ? 'QR ဒေါင်းလုဒ်များ' : 'QR Downloads',
+    configDownloads: isMyanmar ? 'ဆက်တင်ဖိုင် ဒေါင်းလုဒ်များ' : 'Config Downloads',
+    clientFetches: isMyanmar ? 'ကလိုင်းယင့် ခေါ်ယူမှုများ' : 'Client Fetches',
+    telegramSends: isMyanmar ? 'တယ်လီဂရမ် ပေးပို့မှုများ' : 'Telegram Sends',
+    lastViewed: isMyanmar ? 'နောက်ဆုံး ကြည့်ရှုချိန်' : 'Last Viewed',
     never: isMyanmar ? 'မရှိသေးပါ' : 'Never',
     copied: isMyanmar ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
-    copiedShareUrl: isMyanmar ? 'Subscription page URL ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Subscription page URL copied to clipboard.',
-    copiedClientUrl: isMyanmar ? 'Client URL ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Client URL copied to clipboard.',
-    copiedConnectLink: isMyanmar ? 'Telegram connect link ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Telegram connect link copied to clipboard.',
-    copiedNewShareUrl: isMyanmar ? 'Share page link အသစ်ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'New share page link copied to clipboard.',
-    copiedNewShortLink: isMyanmar ? 'Short share link အသစ်ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'New short share link copied to clipboard.',
+    copiedShareUrl: isMyanmar ? 'စာရင်းသွင်းမှု စာမျက်နှာ URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Subscription page URL copied to clipboard.',
+    copiedClientUrl: isMyanmar ? 'ကလိုင်းယင့် ချိတ်ဆက်လင့်ခ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Client URL copied to clipboard.',
+    copiedConnectLink: isMyanmar ? 'တယ်လီဂရမ် ချိတ်ဆက်လင့်ခ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Telegram connect link copied to clipboard.',
+    copiedNewShareUrl: isMyanmar ? 'မျှဝေစာမျက်နှာ လင့်ခ်အသစ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'New share page link copied to clipboard.',
+    copiedNewShortLink: isMyanmar ? 'အတို မျှဝေလင့်ခ်အသစ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'New short share link copied to clipboard.',
     updatedTitle: isMyanmar ? 'အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Updated',
     updateFailed: isMyanmar ? 'အပ်ဒိတ် မအောင်မြင်ပါ' : 'Update failed',
-    themeUpdated: isMyanmar ? 'Subscription page theme ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The subscription page theme has been updated.',
-    shortLinkUpdated: isMyanmar ? 'Short share link ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The short share link has been updated.',
+    themeUpdated: isMyanmar ? 'စာရင်းသွင်းမှု စာမျက်နှာ အပြင်အဆင်ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The subscription page theme has been updated.',
+    shortLinkUpdated: isMyanmar ? 'အတို မျှဝေလင့်ခ်ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The short share link has been updated.',
     coverUpdated: isMyanmar ? 'နောက်ခံပုံကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The cover image has been updated.',
-    contactsUpdated: isMyanmar ? 'ဆက်သွယ်ရန် link များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Contact links have been updated.',
+    contactsUpdated: isMyanmar ? 'ဆက်သွယ်ရန် လင့်ခ်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Contact links have been updated.',
     welcomeUpdatedTitle: isMyanmar ? 'ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Welcome message updated',
-    welcomeUpdatedDesc: isMyanmar ? 'Share page ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The share page welcome message has been updated.',
-    shareRegeneratedTitle: isMyanmar ? 'Share link ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Share link regenerated',
-    shareRegeneratedDesc: isMyanmar ? 'အဟောင်း shared link သည် မအသုံးပြုနိုင်တော့ပါ။' : 'The old shared link is no longer valid.',
-    shortRegeneratedTitle: isMyanmar ? 'Short link ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Short link regenerated',
-    shortRegeneratedDesc: isMyanmar ? 'Short share link အသစ်ကို အသုံးပြုနိုင်ပါပြီ။' : 'The new short share link is ready to use.',
+    welcomeUpdatedDesc: isMyanmar ? 'မျှဝေစာမျက်နှာ ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The share page welcome message has been updated.',
+    shareRegeneratedTitle: isMyanmar ? 'မျှဝေလင့်ခ်ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Share link regenerated',
+    shareRegeneratedDesc: isMyanmar ? 'အဟောင်း မျှဝေလင့်ခ်သည် မအသုံးပြုနိုင်တော့ပါ။' : 'The old shared link is no longer valid.',
+    shortRegeneratedTitle: isMyanmar ? 'အတိုလင့်ခ်ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Short link regenerated',
+    shortRegeneratedDesc: isMyanmar ? 'အတို မျှဝေလင့်ခ်အသစ်ကို အသုံးပြုနိုင်ပါပြီ။' : 'The new short share link is ready to use.',
     slugRegenerationFailed: isMyanmar ? 'Slug ပြန်ဖန်တီးမှု မအောင်မြင်ပါ' : 'Slug regeneration failed',
-    shareSentTitle: isMyanmar ? 'Share page ကို ပို့ပြီးပါပြီ' : 'Share page sent',
-    shareSentDesc: isMyanmar ? 'နောက်ဆုံး share page ကို Telegram မှတစ်ဆင့် ပို့ပြီးပါပြီ။' : 'The latest share page was sent through Telegram.',
-    telegramFailed: isMyanmar ? 'Telegram ပို့မှု မအောင်မြင်ပါ' : 'Telegram send failed',
-    connectFailed: isMyanmar ? 'Connect link ဖန်တီးမှု မအောင်မြင်ပါ' : 'Connect link failed',
+    shareSentTitle: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပို့ပြီးပါပြီ' : 'Share page sent',
+    shareSentDesc: isMyanmar ? 'နောက်ဆုံး မျှဝေစာမျက်နှာကို တယ်လီဂရမ်မှတစ်ဆင့် ပို့ပြီးပါပြီ။' : 'The latest share page was sent through Telegram.',
+    telegramFailed: isMyanmar ? 'တယ်လီဂရမ် ပို့မှု မအောင်မြင်ပါ' : 'Telegram send failed',
+    connectFailed: isMyanmar ? 'ချိတ်ဆက်လင့်ခ် ဖန်တီးမှု မအောင်မြင်ပါ' : 'Connect link failed',
     errorTitle: isMyanmar ? 'အမှား' : 'Error',
     contactRequired: isMyanmar ? 'ဆက်သွယ်ရန် တန်ဖိုးတစ်ခု ထည့်ပါ။' : 'Please enter a contact value.',
     limitReached: isMyanmar ? 'အများဆုံး အရေအတွက် ပြည့်သွားပါပြီ' : 'Limit reached',
     limitDesc: isMyanmar ? 'ဆက်သွယ်ရန် ၃ ခုအထိသာ ထည့်နိုင်ပါသည်။' : 'Maximum 3 contacts allowed.',
-    missingSlug: isMyanmar ? 'Slug မပြည့်စုံပါ' : 'Missing slug',
+    missingSlug: isMyanmar ? 'အတိုလင့်ခ် အမည် မပြည့်စုံပါ' : 'Missing slug',
     missingSlugDesc: isMyanmar ? 'သိမ်းမီ အနည်းဆုံး တရားဝင် စာလုံး ၃ လုံး ထည့်ပါ။' : 'Enter at least 3 valid characters before saving.',
-    generatingNewToken: isMyanmar ? 'Subscription token အသစ်ကို ဖန်တီးနေသည်...' : 'Generating new subscription token...',
-    generatingToken: isMyanmar ? 'Subscription token ကို ဖန်တီးနေသည်...' : 'Generating subscription token...',
-    slugStatus: isMyanmar ? 'Short link အခြေအနေ' : 'Short link status',
+    generatingNewToken: isMyanmar ? 'စာရင်းသွင်းမှု တိုကင်အသစ်ကို ဖန်တီးနေသည်...' : 'Generating new subscription token...',
+    generatingToken: isMyanmar ? 'စာရင်းသွင်းမှု တိုကင်ကို ဖန်တီးနေသည်...' : 'Generating subscription token...',
+    slugStatus: isMyanmar ? 'အတိုလင့်ခ် အခြေအနေ' : 'Short link status',
     slugChecking: isMyanmar ? 'စစ်ဆေးနေသည်...' : 'Checking availability...',
     slugAvailable: isMyanmar ? 'အသုံးပြုနိုင်ပါသည်' : 'Available',
     slugUnavailable: isMyanmar ? 'မရနိုင်ပါ' : 'Unavailable',
-    slugSuggestions: isMyanmar ? 'အကြံပြု slug များ' : 'Suggested slugs',
-    slugHistory: isMyanmar ? 'Slug အဟောင်းများ' : 'Slug history',
-    slugHistoryHelp: isMyanmar ? 'အောက်ပါ short links အဟောင်းများသည် လက်ရှိ link သို့ ပြန်ညွှန်မည်။' : 'Older short links below will redirect to the current link.',
-    deliveryUpdated: isMyanmar ? 'Public access controls ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Public access controls have been updated.',
-    sharePageToggle: isMyanmar ? 'Share page' : 'Share page',
-    sharePageToggleHelp: isMyanmar ? 'Public page ကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Public page availability.',
-    clientLinkToggle: isMyanmar ? 'Client URL' : 'Client URL',
-    clientLinkToggleHelp: isMyanmar ? 'Client import နှင့် fetch ကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Allow app imports and client fetches.',
-    telegramToggle: isMyanmar ? 'Telegram delivery' : 'Telegram delivery',
-    telegramToggleHelp: isMyanmar ? 'Telegram ပို့ခြင်းနှင့် connect link များကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Allow Telegram delivery and link generation.',
-    shareDisabled: isMyanmar ? 'Share page ကို ပိတ်ထားသည်' : 'Share page disabled',
-    clientDisabled: isMyanmar ? 'Client URL ကို ပိတ်ထားသည်' : 'Client URL disabled',
+    slugSuggestions: isMyanmar ? 'အကြံပြု အတိုလင့်ခ် အမည်များ' : 'Suggested slugs',
+    slugHistory: isMyanmar ? 'အဟောင်း အတိုလင့်ခ်များ' : 'Slug history',
+    slugHistoryHelp: isMyanmar ? 'အောက်ပါ အတိုလင့်ခ်အဟောင်းများသည် လက်ရှိ လင့်ခ်သို့ ပြန်ညွှန်မည်။' : 'Older short links below will redirect to the current link.',
+    deliveryUpdated: isMyanmar ? 'အများသုံး အသုံးပြုခွင့် ထိန်းချုပ်မှုများကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Public access controls have been updated.',
+    sharePageToggle: isMyanmar ? 'မျှဝေစာမျက်နှာ' : 'Share page',
+    sharePageToggleHelp: isMyanmar ? 'အများသုံး စာမျက်နှာကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Public page availability.',
+    clientLinkToggle: isMyanmar ? 'ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်' : 'Client URL',
+    clientLinkToggleHelp: isMyanmar ? 'ကလိုင်းယင့် ထည့်သွင်းမှုနှင့် ခေါ်ယူမှုကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Allow app imports and client fetches.',
+    telegramToggle: isMyanmar ? 'တယ်လီဂရမ် ပေးပို့မှု' : 'Telegram delivery',
+    telegramToggleHelp: isMyanmar ? 'တယ်လီဂရမ် ပို့ခြင်းနှင့် ချိတ်ဆက်လင့်ခ် ဖန်တီးမှုကို ဖွင့်/ပိတ် လုပ်ပါ။' : 'Allow Telegram delivery and link generation.',
+    shareDisabled: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပိတ်ထားသည်' : 'Share page disabled',
+    clientDisabled: isMyanmar ? 'ကလိုင်းယင့် ချိတ်ဆက်လင့်ခ်ကို ပိတ်ထားသည်' : 'Client URL disabled',
   };
   const getContactTypeLabel = (type: ContactLink['type']) =>
     locale === 'my'
       ? ({
-          telegram: 'Telegram',
-          discord: 'Discord',
-          whatsapp: 'WhatsApp',
+          telegram: 'တယ်လီဂရမ်',
+          discord: 'ဒစ်စကော့ဒ်',
+          whatsapp: 'ဝတ်စ်အက်ပ်',
           phone: 'ဖုန်း',
           email: 'အီးမေးလ်',
           website: 'ဝဘ်ဆိုက်',
-          facebook: 'Facebook',
+          facebook: 'ဖေ့စ်ဘွတ်ခ်',
         } as const)[type]
       : CONTACT_TYPES.find((item) => item.value === type)?.label || type;
   const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'dark');
@@ -1664,43 +1668,43 @@ function AccessDistributionSecurityCard({
   const { toast } = useToast();
   const isMyanmar = locale === 'my';
   const ui = {
-    title: isMyanmar ? 'Share လုံခြုံရေးနှင့် Invite Link များ' : 'Share Protection & Invite Links',
-    description: isMyanmar ? 'Public share page ကို password, expiry, နှင့် invite links ဖြင့် ထိန်းချုပ်ပါ။' : 'Protect the public share page with a password, expiry, and one-time invite links.',
-    protection: isMyanmar ? 'Share page လုံခြုံရေး' : 'Share page protection',
-    protectionDesc: isMyanmar ? 'လိုအပ်လျှင် password တပ်ပြီး share page အသုံးပြုခွင့် သတ်မှတ်ချိန်တစ်ခု သတ်မှတ်နိုင်သည်။' : 'Add an optional password and access expiry for the public share page.',
-    password: isMyanmar ? 'Share page password' : 'Share page password',
+    title: isMyanmar ? 'မျှဝေစာမျက်နှာ လုံခြုံရေးနှင့် ဖိတ်ခေါ်လင့်ခ်များ' : 'Share Protection & Invite Links',
+    description: isMyanmar ? 'အများသုံး မျှဝေစာမျက်နှာကို စကားဝှက်၊ သက်တမ်းကုန်ချိန်နှင့် ဖိတ်ခေါ်လင့်ခ်များဖြင့် ထိန်းချုပ်ပါ။' : 'Protect the public share page with a password, expiry, and one-time invite links.',
+    protection: isMyanmar ? 'မျှဝေစာမျက်နှာ လုံခြုံရေး' : 'Share page protection',
+    protectionDesc: isMyanmar ? 'လိုအပ်လျှင် စကားဝှက်တပ်ပြီး မျှဝေစာမျက်နှာ အသုံးပြုခွင့် သက်တမ်းကုန်ချိန်တစ်ခု သတ်မှတ်နိုင်သည်။' : 'Add an optional password and access expiry for the public share page.',
+    password: isMyanmar ? 'မျှဝေစာမျက်နှာ စကားဝှက်' : 'Share page password',
     passwordPlaceholder: isMyanmar ? 'အသစ်တစ်ခု သတ်မှတ်ရန် စကားဝှက် ထည့်ပါ' : 'Enter a password to protect the page',
-    expiresAt: isMyanmar ? 'Public access expiry' : 'Public access expiry',
+    expiresAt: isMyanmar ? 'အများသုံး အသုံးပြုခွင့် သက်တမ်းကုန်ချိန်' : 'Public access expiry',
     saveProtection: isMyanmar ? 'လုံခြုံရေး သိမ်းမည်' : 'Save Protection',
-    clearPassword: isMyanmar ? 'Password ဖျက်မည်' : 'Clear Password',
-    protectedOn: isMyanmar ? 'Password ကာကွယ်မှု ဖွင့်ထားသည်' : 'Password protection enabled',
-    protectedOff: isMyanmar ? 'Password ကာကွယ်မှု မရှိပါ' : 'No password currently set',
-    inviteTitle: isMyanmar ? 'Invite link များ' : 'Invite links',
-    inviteDesc: isMyanmar ? 'သတ်မှတ်အသုံးပြုခွင့်ရှိသော invite links ဖန်တီးပြီး copy သို့မဟုတ် revoke လုပ်နိုင်သည်။' : 'Create limited invite links that can be copied or revoked anytime.',
-    label: isMyanmar ? 'Label' : 'Label',
+    clearPassword: isMyanmar ? 'စကားဝှက် ဖျက်မည်' : 'Clear Password',
+    protectedOn: isMyanmar ? 'စကားဝှက် ကာကွယ်မှု ဖွင့်ထားသည်' : 'Password protection enabled',
+    protectedOff: isMyanmar ? 'လက်ရှိ စကားဝှက် မသတ်မှတ်ထားပါ' : 'No password currently set',
+    inviteTitle: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ်များ' : 'Invite links',
+    inviteDesc: isMyanmar ? 'သတ်မှတ်အသုံးပြုခွင့်ရှိသော ဖိတ်ခေါ်လင့်ခ်များကို ဖန်တီးပြီး ကူးယူခြင်း သို့မဟုတ် ရုပ်သိမ်းခြင်း ပြုလုပ်နိုင်သည်။' : 'Create limited invite links that can be copied or revoked anytime.',
+    label: isMyanmar ? 'အမည်' : 'Label',
     labelPlaceholder: isMyanmar ? 'ဥပမာ - Reseller batch' : 'For example: Reseller batch',
-    note: isMyanmar ? 'Note' : 'Note',
+    note: isMyanmar ? 'မှတ်ချက်' : 'Note',
     notePlaceholder: isMyanmar ? 'လိုအပ်ပါက အသေးစိတ် မှတ်ချက် ထည့်ပါ' : 'Optional internal note',
-    inviteExpiry: isMyanmar ? 'Invite expiry' : 'Invite expiry',
-    maxUses: isMyanmar ? 'Max uses' : 'Max uses',
+    inviteExpiry: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် သက်တမ်းကုန်ချိန်' : 'Invite expiry',
+    maxUses: isMyanmar ? 'အများဆုံး အသုံးပြုခွင့်' : 'Max uses',
     unlimited: isMyanmar ? 'အကန့်အသတ်မရှိ' : 'Unlimited',
-    createInvite: isMyanmar ? 'Invite ဖန်တီးမည်' : 'Create Invite',
-    copyInvite: isMyanmar ? 'Invite copy' : 'Copy Invite',
-    openInvite: isMyanmar ? 'Invite ဖွင့်မည်' : 'Open Invite',
-    revokeInvite: isMyanmar ? 'Revoke' : 'Revoke',
-    noInvites: isMyanmar ? 'Invite link မရှိသေးပါ' : 'No invite links yet',
+    createInvite: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် ဖန်တီးမည်' : 'Create Invite',
+    copyInvite: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် ကူးယူမည်' : 'Copy Invite',
+    openInvite: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် ဖွင့်မည်' : 'Open Invite',
+    revokeInvite: isMyanmar ? 'ရုပ်သိမ်းမည်' : 'Revoke',
+    noInvites: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် မရှိသေးပါ' : 'No invite links yet',
     inviteUses: isMyanmar ? 'အသုံးပြုပြီး' : 'Uses',
     lastOpened: isMyanmar ? 'နောက်ဆုံးဖွင့်ထားချိန်' : 'Last opened',
     never: isMyanmar ? 'မရှိသေးပါ' : 'Never',
-    copySuccess: isMyanmar ? 'Invite link ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Invite link copied to clipboard.',
-    protectionSaved: isMyanmar ? 'Share page လုံခြုံရေးကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Share page protection has been updated.',
-    passwordCleared: isMyanmar ? 'Share page password ကို ဖျက်ပြီးပါပြီ။' : 'Share page password has been cleared.',
-    inviteCreated: isMyanmar ? 'Invite link အသစ် ဖန်တီးပြီးပါပြီ။' : 'New invite link created.',
-    inviteRevoked: isMyanmar ? 'Invite link ကို revoke လုပ်ပြီးပါပြီ။' : 'Invite link revoked.',
+    copySuccess: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Invite link copied to clipboard.',
+    protectionSaved: isMyanmar ? 'မျှဝေစာမျက်နှာ လုံခြုံရေးကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Share page protection has been updated.',
+    passwordCleared: isMyanmar ? 'မျှဝေစာမျက်နှာ စကားဝှက်ကို ဖျက်ပြီးပါပြီ။' : 'Share page password has been cleared.',
+    inviteCreated: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် အသစ် ဖန်တီးပြီးပါပြီ။' : 'New invite link created.',
+    inviteRevoked: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ်ကို ရုပ်သိမ်းပြီးပါပြီ။' : 'Invite link revoked.',
     actionFailed: isMyanmar ? 'လုပ်ဆောင်မှု မအောင်မြင်ပါ' : 'Action failed',
-    auditTitle: isMyanmar ? 'Audit trail' : 'Audit trail',
-    auditDesc: isMyanmar ? 'share, protection, နှင့် support လုပ်ဆောင်ချက်များ၏ လတ်တလော မှတ်တမ်း' : 'Recent share, protection, and support actions for this key.',
-    noAudit: isMyanmar ? 'Audit မှတ်တမ်း မရှိသေးပါ' : 'No audit entries yet',
+    auditTitle: isMyanmar ? 'စစ်ဆေးမှတ်တမ်း' : 'Audit trail',
+    auditDesc: isMyanmar ? 'ဤသော့အတွက် မျှဝေခြင်း၊ လုံခြုံရေးနှင့် အကူအညီ လုပ်ဆောင်ချက်များ၏ လတ်တလော မှတ်တမ်း' : 'Recent share, protection, and support actions for this key.',
+    noAudit: isMyanmar ? 'စစ်ဆေးမှတ်တမ်း မရှိသေးပါ' : 'No audit entries yet',
   };
 
   const toDateTimeLocalValue = (value?: string | Date | null) => {
@@ -1835,7 +1839,7 @@ function AccessDistributionSecurityCard({
       case 'ACCESS_KEY_SHARE_TOKEN_REGENERATED':
         return isMyanmar ? 'Share token ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated share token';
       case 'ACCESS_KEY_PUBLIC_SLUG_REGENERATED':
-        return isMyanmar ? 'Short slug ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated short slug';
+        return isMyanmar ? 'အတိုအမည် ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated short slug';
       case 'ACCESS_KEY_ACCESS_RESENT':
       case 'TELEGRAM_SHARE_SENT':
         return isMyanmar ? 'Access ကို ထပ်ပို့ခဲ့သည်' : 'Resent access';
@@ -2149,14 +2153,14 @@ function SupportWorkflowCard({
     errorTitle: isMyanmar ? 'လုပ်ဆောင်မှု မအောင်မြင်ပါ' : 'Action failed',
     supportDialogTitle: isMyanmar ? 'Support message ပို့ရန်' : 'Send support message',
     supportDialogDesc: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့မည့် support message ကို ရေးပါ။' : 'Write the support message to send to this user.',
-    supportMacrosTitle: isMyanmar ? 'Quick reply macros' : 'Quick reply macros',
+    supportMacrosTitle: isMyanmar ? 'အမြန် reply စာပုံစံများ' : 'Quick reply macros',
     supportMacrosDesc: isMyanmar
       ? 'မကြာခဏပို့လေ့ရှိသော reply template များကို ရွေးပြီး message ထဲသို့ ထည့်နိုင်သည်။'
       : 'Load a common support reply into the message box, then adjust it if needed.',
     supportPlaceholder: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့လိုသော message ကို ရေးပါ...' : 'Write the message you want to send to this user...',
     supportRequired: isMyanmar ? 'Support message ကို ရေးပါ။' : 'Enter a support message.',
     reportDialogTitle: isMyanmar ? 'ပြဿနာ တင်ပြရန်' : 'Report a problem',
-    reportDialogDesc: isMyanmar ? 'ဤ access key အတွက် ပြဿနာအသေးစိတ်ကို မှတ်တမ်းတင်ပါ။' : 'Capture the issue details for this access key.',
+    reportDialogDesc: isMyanmar ? 'ဤအသုံးပြုခွင့်သော့အတွက် ပြဿနာအသေးစိတ်ကို မှတ်တမ်းတင်ပါ။' : 'Capture the issue details for this access key.',
     reportPlaceholder: isMyanmar ? 'ဥပမာ - အသုံးပြုသူက subscription fetch မရကြောင်း အကြောင်းကြားထားသည်...' : 'For example: User reported that subscription fetch is failing...',
     reportRequired: isMyanmar ? 'ပြဿနာအကျဉ်းကို ရေးပါ။' : 'Enter a problem summary.',
     severity: isMyanmar ? 'အရေးကြီးမှု' : 'Severity',
@@ -2165,7 +2169,7 @@ function SupportWorkflowCard({
     severityCritical: isMyanmar ? 'Critical' : 'Critical',
     cancel: isMyanmar ? 'မလုပ်တော့' : 'Cancel',
     send: isMyanmar ? 'ပို့မည်' : 'Send',
-    createIncident: isMyanmar ? 'Incident ဖန်တီးမည်' : 'Create Incident',
+    createIncident: isMyanmar ? 'Incident တစ်ခု ဖန်တီးမည်' : 'Create Incident',
     recentActivity: isMyanmar ? 'မကြာသေးမီ လုပ်ဆောင်ချက်' : 'Recent Activity',
     openIncidents: isMyanmar ? 'ဖွင့်ထားသော Incident များ' : 'Open Incidents',
     none: isMyanmar ? 'မရှိသေးပါ' : 'None yet',
@@ -2174,6 +2178,10 @@ function SupportWorkflowCard({
     actionRenewal: isMyanmar ? 'Renewal reminder ပို့ခဲ့သည်' : 'Renewal reminder sent',
     actionSupport: isMyanmar ? 'Support message ပို့ခဲ့သည်' : 'Support message sent',
     actionProblem: isMyanmar ? 'ပြဿနာ တင်ပြခဲ့သည်' : 'Problem reported',
+    supportMessageTitle: isMyanmar ? 'မက်ဆေ့ချ်' : 'Message',
+    supportMessageDesc: isMyanmar
+      ? 'ဤ key အတွက် support update ပို့ရန် သို့မဟုတ် admin queue ထံ အကူအညီတောင်းရန် message ရေးပါ။'
+      : 'Send a support update or request help from the admin queue for this key.',
   };
 
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
@@ -2423,10 +2431,8 @@ function SupportWorkflowCard({
             </DialogSection>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Message</DialogSectionTitle>
-                <DialogSectionDescription>
-                  Send a support update or request help from the admin queue for this key.
-                </DialogSectionDescription>
+                <DialogSectionTitle>{supportUi.supportMessageTitle}</DialogSectionTitle>
+                <DialogSectionDescription>{supportUi.supportMessageDesc}</DialogSectionDescription>
               </DialogSectionHeader>
               <Textarea
                 value={supportMessage}
@@ -2599,7 +2605,7 @@ export default function KeyDetailPage() {
   const replaceServerMutation = trpc.keys.replaceServer.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: 'Server replaced',
+        title: isMyanmar ? 'ဆာဗာကို ပြောင်းပြီးပါပြီ' : 'Server replaced',
         description: `${result.keyName} moved to ${result.targetServerName}. ${result.remainingChanges} change${result.remainingChanges === 1 ? '' : 's'} remaining.`,
       });
       setReplacementServerId('none');
@@ -2607,7 +2613,7 @@ export default function KeyDetailPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Server replacement failed',
+        title: isMyanmar ? 'ဆာဗာ ပြောင်းလဲမှု မအောင်မြင်ပါ' : 'Server replacement failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -2727,14 +2733,14 @@ export default function KeyDetailPage() {
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <Key className="w-16 h-16 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Key not found</h3>
+          <h3 className="text-lg font-semibold mb-2">{isMyanmar ? 'သော့ မတွေ့ပါ' : 'Key not found'}</h3>
           <p className="text-muted-foreground mb-6">
-            The requested access key could not be found.
+            {isMyanmar ? 'တောင်းဆိုထားသော အသုံးပြုခွင့်သော့ကို မတွေ့ပါ။' : 'The requested access key could not be found.'}
           </p>
           <Button asChild>
             <Link href="/dashboard/keys">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Keys
+              {isMyanmar ? 'သော့များသို့ ပြန်မည်' : 'Back to Keys'}
             </Link>
           </Button>
         </CardContent>
@@ -2894,8 +2900,9 @@ export default function KeyDetailPage() {
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{key.name}</h1>
                   <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                    Created {formatRelativeTime(key.createdAt)}
-                    {keyRecord.server ? ` on ${keyRecord.server.name}` : ''}
+                    {isMyanmar
+                      ? `${formatRelativeTime(key.createdAt)} တွင် ဖန်တီးခဲ့သည်${keyRecord.server ? ` · ${keyRecord.server.name}` : ''}`
+                      : `Created ${formatRelativeTime(key.createdAt)}${keyRecord.server ? ` on ${keyRecord.server.name}` : ''}`}
                   </p>
                 </div>
               </div>
@@ -2903,12 +2910,12 @@ export default function KeyDetailPage() {
               <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
                 <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {isMyanmar ? 'ပြင်ဆင်မည်' : 'Edit'}
                 </Button>
                 <Button asChild variant="outline" className="h-11 rounded-full px-5">
                   <Link href={keyRecord.server ? `/dashboard/servers/${keyRecord.server.id}` : '/dashboard/servers'}>
                     <Server className="mr-2 h-4 w-4" />
-                    View Server
+                    {isMyanmar ? 'ဆာဗာ ကြည့်မည်' : 'View Server'}
                   </Link>
                 </Button>
                 <Button
@@ -2922,65 +2929,65 @@ export default function KeyDetailPage() {
                   ) : (
                     <Trash2 className="mr-2 h-4 w-4" />
                   )}
-                  Delete
+                  {isMyanmar ? 'ဖျက်မည်' : 'Delete'}
                 </Button>
               </div>
             </div>
 
             <DetailMetricGrid>
               <DetailKpiTile
-                label="Total Usage"
+                label={isMyanmar ? 'စုစုပေါင်း အသုံးပြုမှု' : 'Total Usage'}
                 value={formatBytes(key.usedBytes)}
-                meta={key.dataLimitBytes ? `of ${formatBytes(key.dataLimitBytes)}` : 'Unlimited quota'}
+                meta={key.dataLimitBytes ? (isMyanmar ? `${formatBytes(key.dataLimitBytes)} ထဲမှ` : `of ${formatBytes(key.dataLimitBytes)}`) : (isMyanmar ? 'ကန့်သတ်ချက် မရှိပါ' : 'Unlimited quota')}
               />
               <DetailKpiTile
-                label="Devices"
+                label={isMyanmar ? 'စက်များ' : 'Devices'}
                 value={estimatedDevices}
-                meta={`${activeSessions} active session${activeSessions === 1 ? '' : 's'}`}
+                meta={isMyanmar ? `လက်ရှိ session ${activeSessions} ခု` : `${activeSessions} active session${activeSessions === 1 ? '' : 's'}`}
               />
               <DetailKpiTile
-                label="Expires"
-                value={key.expiresAt ? formatRelativeTime(key.expiresAt) : 'Never'}
+                label={isMyanmar ? 'သက်တမ်းကုန်' : 'Expires'}
+                value={key.expiresAt ? formatRelativeTime(key.expiresAt) : (isMyanmar ? 'မကုန်ဆုံးပါ' : 'Never')}
                 meta={key.expirationType.replace(/_/g, ' ')}
               />
               <DetailKpiTile
-                label="Last Seen"
-                value={lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : 'Never'}
-                meta={`Outline ID ${key.outlineKeyId}`}
+                label={isMyanmar ? 'နောက်ဆုံး မြင်တွေ့မှု' : 'Last Seen'}
+                value={lastMeaningfulUsageAt ? formatRelativeTime(lastMeaningfulUsageAt) : (isMyanmar ? 'မရှိသေးပါ' : 'Never')}
+                meta={isMyanmar ? `Outline ID ${key.outlineKeyId}` : `Outline ID ${key.outlineKeyId}`}
               />
             </DetailMetricGrid>
           </div>
 
           <DetailHeroAside
-            title="Key summary"
-            description="Keep customer delivery, quota, and server linkage visible while you move through usage, delivery, or support actions."
+            title={isMyanmar ? 'သော့ အကျဉ်းချုပ်' : 'Key summary'}
+            description={isMyanmar ? 'အသုံးပြုမှု၊ ပို့ဆောင်မှု သို့မဟုတ် အကူအညီ လုပ်ဆောင်ချက်များ ပြုလုပ်စဉ် ဖောက်သည်ချိတ်ဆက်မှု၊ ကန့်သတ်ချက်နှင့် ဆာဗာချိတ်ဆက်မှုကို အမြဲ မြင်နိုင်စေရန် ပြထားသည်။' : 'Keep customer delivery, quota, and server linkage visible while you move through usage, delivery, or support actions.'}
           >
             <DetailMiniTileGrid>
               <DetailMiniTile
-                label="Customer link"
-                value={key.email || key.telegramId || 'Not linked'}
+                label={isMyanmar ? 'ဖောက်သည် ချိတ်ဆက်မှု' : 'Customer link'}
+                value={key.email || key.telegramId || (isMyanmar ? 'မချိတ်ထားပါ' : 'Not linked')}
                 valueClassName="break-words"
               />
               <DetailMiniTile
-                label="Server route"
-                value={keyRecord.server?.name || 'Unassigned server'}
-                meta={(keyRecord.server as { country?: string | null })?.country || 'No server country'}
+                label={isMyanmar ? 'ဆာဗာ လမ်းကြောင်း' : 'Server route'}
+                value={keyRecord.server?.name || (isMyanmar ? 'ဆာဗာ မချိတ်ထားသေးပါ' : 'Unassigned server')}
+                meta={(keyRecord.server as { country?: string | null })?.country || (isMyanmar ? 'ဆာဗာ နိုင်ငံ မရှိပါ' : 'No server country')}
               />
               <DetailMiniTile
-                label="Delivery state"
-                value={keyRecord.sharePageEnabled === false ? 'Share page off' : 'Share page on'}
-                meta={`${keyRecord.clientLinkEnabled === false ? 'Client link off' : 'Client link on'} • ${keyRecord.telegramDeliveryEnabled === false ? 'Telegram off' : 'Telegram on'}`}
+                label={isMyanmar ? 'ပို့ဆောင်မှု အခြေအနေ' : 'Delivery state'}
+                value={keyRecord.sharePageEnabled === false ? (isMyanmar ? 'မျှဝေစာမျက်နှာ ပိတ်ထားသည်' : 'Share page off') : (isMyanmar ? 'မျှဝေစာမျက်နှာ ဖွင့်ထားသည်' : 'Share page on')}
+                meta={`${keyRecord.clientLinkEnabled === false ? (isMyanmar ? 'ကလိုင်းယင့် လင့်ခ် ပိတ်ထားသည်' : 'Client link off') : (isMyanmar ? 'ကလိုင်းယင့် လင့်ခ် ဖွင့်ထားသည်' : 'Client link on')} • ${keyRecord.telegramDeliveryEnabled === false ? (isMyanmar ? 'Telegram ပို့ဆောင်မှု ပိတ်ထားသည်' : 'Telegram off') : (isMyanmar ? 'Telegram ပို့ဆောင်မှု ဖွင့်ထားသည်' : 'Telegram on')}`}
               />
               <DetailMiniTile
-                label="Quota watch"
-                value={key.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
-                meta={key.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
+                label={isMyanmar ? 'ကန့်သတ်ချက် စောင့်ကြည့်မှု' : 'Quota watch'}
+                value={key.dataLimitBytes ? (isMyanmar ? `အသုံးပြုမှု ${usagePercent.toFixed(0)}%` : `${usagePercent.toFixed(0)}% used`) : (isMyanmar ? 'ကန့်သတ်ချက် မရှိပါ' : 'Unlimited quota')}
+                meta={key.dataLimitBytes ? (isMyanmar ? `အသိပေးချက် ${bandwidthThresholdLabel}` : `Alerts ${bandwidthThresholdLabel}`) : (isMyanmar ? 'ကန့်သတ်ချက် အသိပေးချက် မသတ်မှတ်ထားပါ' : 'No quota alerts applied')}
               />
             </DetailMiniTileGrid>
 
             {key.notes ? (
               <DetailNoteBlock>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Notes</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'မှတ်စု' : 'Notes'}</p>
                 <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{key.notes}</p>
               </DetailNoteBlock>
             ) : null}
@@ -2991,18 +2998,18 @@ export default function KeyDetailPage() {
       <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'delivery' | 'activity' | 'support')} className="space-y-4">
         <div className="ops-panel space-y-3 p-3 sm:p-4">
           <div className="space-y-1">
-            <p className="ops-section-heading">Access key workspace</p>
+            <p className="ops-section-heading">{isMyanmar ? 'အသုံးပြုခွင့်သော့ workspace' : 'Access key workspace'}</p>
             <p className="text-sm text-muted-foreground">{detailTabCopy[detailTab]}</p>
           </div>
           <TabsList className={cn(
             'grid h-auto gap-2 rounded-[1.2rem] border border-border/60 bg-background/45 p-1 dark:bg-white/[0.03]',
             isAdmin ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-3',
           )}>
-            <TabsTrigger value="overview" className="rounded-[0.95rem] px-3 py-2 text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="delivery" className="rounded-[0.95rem] px-3 py-2 text-sm">Delivery</TabsTrigger>
-            <TabsTrigger value="activity" className="rounded-[0.95rem] px-3 py-2 text-sm">Activity</TabsTrigger>
+            <TabsTrigger value="overview" className="rounded-[0.95rem] px-3 py-2 text-sm">{isMyanmar ? 'အနှစ်ချုပ်' : 'Overview'}</TabsTrigger>
+            <TabsTrigger value="delivery" className="rounded-[0.95rem] px-3 py-2 text-sm">{isMyanmar ? 'ပို့ဆောင်မှု' : 'Delivery'}</TabsTrigger>
+            <TabsTrigger value="activity" className="rounded-[0.95rem] px-3 py-2 text-sm">{isMyanmar ? 'လှုပ်ရှားမှု' : 'Activity'}</TabsTrigger>
             {isAdmin ? (
-              <TabsTrigger value="support" className="rounded-[0.95rem] px-3 py-2 text-sm">Support</TabsTrigger>
+              <TabsTrigger value="support" className="rounded-[0.95rem] px-3 py-2 text-sm">{isMyanmar ? 'အကူအညီ' : 'Support'}</TabsTrigger>
             ) : null}
           </TabsList>
         </div>
@@ -3015,7 +3022,7 @@ export default function KeyDetailPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Server className="h-5 w-5 text-primary" />
-                      Server & Access
+                      {isMyanmar ? 'ဆာဗာ နှင့် အသုံးပြုခွင့်' : 'Server & Access'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -3037,14 +3044,14 @@ export default function KeyDetailPage() {
                         </div>
                         <Link href={`/dashboard/servers/${keyRecord.server.id}`}>
                           <Button variant="ghost" size="sm" className="rounded-full">
-                            View Server
+                            {isMyanmar ? 'ဆာဗာ ကြည့်မည်' : 'View Server'}
                           </Button>
                         </Link>
                       </div>
                     )}
 
                     <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Access URL</Label>
+                      <Label className="text-sm text-muted-foreground">{isMyanmar ? 'အသုံးပြုခွင့် URL' : 'Access URL'}</Label>
                       {key.maxDevices && key.boundDeviceInstallsOnly ? (
                         <p className="text-xs text-amber-500">{ACCESS_KEY_RAW_COPY_WARNING}</p>
                       ) : null}
@@ -3055,7 +3062,11 @@ export default function KeyDetailPage() {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
+                          onClick={() => copyToClipboard(
+                            decoratedAccessUrl,
+                            isMyanmar ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
+                            isMyanmar ? 'အသုံးပြုခွင့် URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Access URL copied to clipboard.'
+                          )}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -3064,16 +3075,16 @@ export default function KeyDetailPage() {
 
                     <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Port</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'port' : 'Port'}</p>
                         <p className="font-mono">{key.port}</p>
                       </div>
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Encryption</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'လျှို့ဝှက်စနစ်' : 'Encryption'}</p>
                         <p className="font-mono">{key.method}</p>
                       </div>
                       {key.prefix ? (
                         <div className="ops-inline-stat sm:col-span-2">
-                          <p className="text-sm text-muted-foreground">Prefix (Obfuscation)</p>
+                          <p className="text-sm text-muted-foreground">{isMyanmar ? 'Prefix (ဖုံးကွယ်မှု)' : 'Prefix (Obfuscation)'}</p>
                           <p className="font-mono">{key.prefix}</p>
                         </div>
                       ) : null}
@@ -3085,27 +3096,27 @@ export default function KeyDetailPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Clock className="h-5 w-5 text-primary" />
-                      Expiration
+                      {isMyanmar ? 'သက်တမ်း' : 'Expiration'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Type</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'အမျိုးအစား' : 'Type'}</p>
                         <p className="font-medium">{key.expirationType.replace(/_/g, ' ')}</p>
                       </div>
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Expires</p>
-                        <p className="font-medium">{key.expiresAt ? formatDateTime(key.expiresAt) : 'Never'}</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'သက်တမ်းကုန်ချိန်' : 'Expires'}</p>
+                        <p className="font-medium">{key.expiresAt ? formatDateTime(key.expiresAt) : (isMyanmar ? 'မကုန်ဆုံးပါ' : 'Never')}</p>
                       </div>
                       {key.firstUsedAt ? (
                         <div className="ops-inline-stat">
-                          <p className="text-sm text-muted-foreground">First Used</p>
+                          <p className="text-sm text-muted-foreground">{isMyanmar ? 'ပထမအသုံးပြုချိန်' : 'First Used'}</p>
                           <p className="font-medium">{formatDateTime(key.firstUsedAt)}</p>
                         </div>
                       ) : null}
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Updated</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ပြင်ဆင်ချိန်' : 'Updated'}</p>
                         <p className="font-medium">{formatDateTime(key.updatedAt)}</p>
                       </div>
                     </div>
@@ -3115,10 +3126,10 @@ export default function KeyDetailPage() {
 
               <Card className="ops-detail-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-primary" />
-                    Traffic Usage
-                  </CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-primary" />
+                      {isMyanmar ? 'ဒေတာ အသုံးပြုမှု' : 'Traffic Usage'}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -3126,7 +3137,7 @@ export default function KeyDetailPage() {
                       <div className="ops-inline-stat">
                         <p className="text-3xl font-bold">{formatBytes(key.usedBytes)}</p>
                         <p className="text-sm text-muted-foreground">
-                          of {key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'unlimited'}
+                          {isMyanmar ? `${key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'အကန့်အသတ်မရှိ'} ထဲမှ` : `of ${key.dataLimitBytes ? formatBytes(key.dataLimitBytes) : 'unlimited'}`}
                         </p>
                       </div>
                       {key.dataLimitBytes ? (
@@ -3151,20 +3162,20 @@ export default function KeyDetailPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         {(key as any).autoDisableOnLimit ? (
                           <Badge variant="outline" className="text-xs">
-                            Auto-disable on limit
+                            {isMyanmar ? 'ကန့်သတ်ချက်ရောက်လျှင် အလိုအလျောက် ပိတ်မည်' : 'Auto-disable on limit'}
                           </Badge>
                         ) : null}
                         <Badge variant="outline" className="text-xs">
-                          Manual alerts · {bandwidthThresholdLabel}
+                          {isMyanmar ? 'ကိုယ်တိုင် အသိပေးချက်' : 'Manual alerts'} · {bandwidthThresholdLabel}
                         </Badge>
                         {(key as any).bandwidthAlertAt80 ? (
                           <Badge variant="outline" className="border-yellow-500 text-xs text-yellow-600">
-                            80% alert sent
+                            {isMyanmar ? '80% အသိပေးချက် ပို့ပြီး' : '80% alert sent'}
                           </Badge>
                         ) : null}
                         {(key as any).bandwidthAlertAt90 ? (
                           <Badge variant="outline" className="border-red-500 text-xs text-red-600">
-                            90% alert sent
+                            {isMyanmar ? '90% အသိပေးချက် ပို့ပြီး' : '90% alert sent'}
                           </Badge>
                         ) : null}
                       </div>
@@ -3174,20 +3185,20 @@ export default function KeyDetailPage() {
                       <div className="rounded-[1rem] border border-border/60 bg-background/45 p-3 text-sm dark:bg-white/[0.03]">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                           <div className="space-y-1">
-                            <p className="font-medium text-foreground">Bandwidth alerts are manual-only</p>
+                            <p className="font-medium text-foreground">{isMyanmar ? 'အသုံးပြုမှုပမာဏ အသိပေးချက်များကို ကိုယ်တိုင်သာ ပို့မည်' : 'Bandwidth alerts are manual-only'}</p>
                             <p className="text-muted-foreground">
-                              No quota warning is sent automatically. Review usage here and trigger Telegram notices yourself.
+                              {isMyanmar ? 'ကန့်သတ်ချက် အသိပေးချက်များကို အလိုအလျောက် မပို့ပါ။ အသုံးပြုမှုကို ဤနေရာတွင် စစ်ဆေးပြီး Telegram အသိပေးချက်ကို ကိုယ်တိုင် ပို့နိုင်သည်။' : 'No quota warning is sent automatically. Review usage here and trigger Telegram notices yourself.'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {manualBandwidthLevel === 'DISABLED'
-                                ? 'This key is at or above 100%. You can send a limit-reached notice manually.'
+                                ? isMyanmar ? 'ဤသော့သည် ၁၀၀% သို့မဟုတ် ထို့ထက်ကျော်နေပါသည်။ ကန့်သတ်ချက်ပြည့် အသိပေးချက်ကို ကိုယ်တိုင် ပို့နိုင်သည်။' : 'This key is at or above 100%. You can send a limit-reached notice manually.'
                                 : manualBandwidthLevel
                                   ? quotaAlertState?.pendingThresholds.length
-                                    ? `Ready to send the ${manualBandwidthLevel}% alert now.`
-                                    : `The ${manualBandwidthLevel}% alert was already sent. You can resend it manually.`
+                                    ? isMyanmar ? `${manualBandwidthLevel}% အသိပေးချက်ကို ယခုပို့ရန် အဆင်သင့်ဖြစ်နေသည်။` : `Ready to send the ${manualBandwidthLevel}% alert now.`
+                                    : isMyanmar ? `${manualBandwidthLevel}% အသိပေးချက်ကို ယခင်က ပို့ထားပြီးဖြစ်သည်။ ကိုယ်တိုင် ပြန်ပို့နိုင်သည်။` : `The ${manualBandwidthLevel}% alert was already sent. You can resend it manually.`
                                   : quotaAlertState?.nextThreshold
-                                    ? `Next threshold: ${quotaAlertState.nextThreshold}%`
-                                    : 'No threshold reached yet.'}
+                                    ? isMyanmar ? `နောက်သတ်မှတ်ချက်: ${quotaAlertState.nextThreshold}%` : `Next threshold: ${quotaAlertState.nextThreshold}%`
+                                    : isMyanmar ? 'သတ်မှတ်ကန့်သတ်ချက် မရောက်သေးပါ။' : 'No threshold reached yet.'}
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
@@ -3198,10 +3209,10 @@ export default function KeyDetailPage() {
                             >
                               {sendBandwidthAlertMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                               {manualBandwidthLevel === 'DISABLED'
-                                ? 'Send limit notice'
+                                ? isMyanmar ? 'ကန့်သတ်ချက်ပြည့် အသိပေးချက် ပို့မည်' : 'Send limit notice'
                                 : manualBandwidthLevel
-                                  ? `Send ${manualBandwidthLevel}% alert`
-                                  : 'Threshold not reached'}
+                                  ? isMyanmar ? `${manualBandwidthLevel}% အသိပေးချက် ပို့မည်` : `Send ${manualBandwidthLevel}% alert`
+                                  : isMyanmar ? 'သတ်မှတ်ကန့်သတ်ချက် မရောက်သေးပါ' : 'Threshold not reached'}
                             </Button>
                             <Button
                               variant="ghost"
@@ -3212,7 +3223,7 @@ export default function KeyDetailPage() {
                               }
                             >
                               {resetBandwidthAlertStateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                              Reset alert history
+                              {isMyanmar ? 'အသိပေးချက် မှတ်တမ်းကို ပြန်စမည်' : 'Reset alert history'}
                             </Button>
                           </div>
                         </div>
@@ -3223,9 +3234,11 @@ export default function KeyDetailPage() {
                       <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
                         <RefreshCw className="h-4 w-4" />
                         <span>
-                          Resets {(key as any).dataLimitResetStrategy.toLowerCase()}
+                          {isMyanmar ? 'ပြန်လည်စတင်ချိန်' : 'Resets'} {(key as any).dataLimitResetStrategy.toLowerCase()}
                           {(key as any).lastDataLimitReset
-                            ? ` (Last reset: ${formatRelativeTime((key as any).lastDataLimitReset)})`
+                            ? isMyanmar
+                              ? ` (${formatRelativeTime((key as any).lastDataLimitReset)} တွင် နောက်ဆုံး ပြန်စတင်သည်)`
+                              : ` (Last reset: ${formatRelativeTime((key as any).lastDataLimitReset)})`
                             : ''}
                         </span>
                       </div>
@@ -3233,7 +3246,7 @@ export default function KeyDetailPage() {
                   </div>
 
                   <div className="border-t border-border/50 pt-4">
-                    <p className="mb-2 text-sm font-medium">Live Activity</p>
+                    <p className="mb-2 text-sm font-medium">{isMyanmar ? 'တိုက်ရိုက် လှုပ်ရှားမှု' : 'Live Activity'}</p>
                     {keyRecord.server ? (
                       <TrafficGraph serverId={keyRecord.server.id} outlineKeyId={key.outlineKeyId} />
                     ) : null}
@@ -3282,28 +3295,36 @@ export default function KeyDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Share2 className="h-5 w-5 text-primary" />
-                    Delivery & Share Links
+                    {locale === 'my' ? 'ပို့ဆောင်မှုနှင့် မျှဝေခြင်း လင့်များ' : 'Delivery & Share Links'}
                   </CardTitle>
                   <CardDescription>
-                    Use the subscription endpoint, short links, and share page controls without hunting across the page.
+                    {locale === 'my'
+                      ? 'စာမျက်နှာတစ်လျှောက် ရှာဖွေရန်မလိုဘဲ subscription endpoint၊ short link များနှင့် share page controls များကို ဤနေရာမှ အသုံးပြုပါ။'
+                      : 'Use the subscription endpoint, short links, and share page controls without hunting across the page.'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Subscription URL</Label>
+                    <Label className="text-sm text-muted-foreground">{locale === 'my' ? 'Subscription လင့်ခ်' : 'Subscription URL'}</Label>
                     <p className="text-xs text-muted-foreground">
-                      Share this URL with the user. Clients can fetch the latest config automatically.
+                      {locale === 'my'
+                        ? 'ဤ URL ကို အသုံးပြုသူနှင့် မျှဝေပါ။ Client များက နောက်ဆုံး config ကို အလိုအလျောက် ရယူနိုင်သည်။'
+                        : 'Share this URL with the user. Clients can fetch the latest config automatically.'}
                     </p>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
-                        {subscriptionApiUrl || 'Loading subscription token...'}
+                        {subscriptionApiUrl || (locale === 'my' ? 'Subscription token ကို တင်နေသည်...' : 'Loading subscription token...')}
                       </div>
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => {
                           if (subscriptionApiUrl) {
-                            copyToClipboard(subscriptionApiUrl, 'Copied!', 'Subscription URL copied to clipboard.');
+                            copyToClipboard(
+                              subscriptionApiUrl,
+                              locale === 'my' ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
+                              locale === 'my' ? 'စာရင်းသွင်း URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Subscription URL copied to clipboard.',
+                            );
                           }
                         }}
                         disabled={!subscriptionApiUrl}
@@ -3315,23 +3336,27 @@ export default function KeyDetailPage() {
 
                   <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
                     <div className="ops-inline-stat">
-                      <p className="text-sm text-muted-foreground">Short client link</p>
+                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'အတို ကလိုင်းယင့်လင့်ခ်' : 'Short client link'}</p>
                       <p className="font-mono text-xs break-all">
                         {key.publicSlug
                           ? buildShortClientUrl(key.publicSlug, {
                               origin: typeof window !== 'undefined' ? window.location.origin : undefined,
                             })
-                          : 'Available after enabling public slug'}
+                          : locale === 'my'
+                            ? 'Public slug ကို ဖွင့်ပြီးနောက် ရရှိနိုင်ပါသည်'
+                            : 'Available after enabling public slug'}
                       </p>
                     </div>
                     <div className="ops-inline-stat">
-                      <p className="text-sm text-muted-foreground">Share page</p>
+                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'Share page' : 'Share page'}</p>
                       <p className="font-mono text-xs break-all">
                         {key.publicSlug
                           ? buildSharePageUrl(key.publicSlug, {
                               origin: typeof window !== 'undefined' ? window.location.origin : undefined,
                             })
-                          : 'Available after enabling public slug'}
+                          : locale === 'my'
+                            ? 'Public slug ကို ဖွင့်ပြီးနောက် ရရှိနိုင်ပါသည်'
+                            : 'Available after enabling public slug'}
                       </p>
                     </div>
                   </div>
@@ -3341,8 +3366,8 @@ export default function KeyDetailPage() {
               <ClientEndpointTestCard
                 endpointUrl={subscriptionApiUrl}
                 probeUrl={subscriptionProbeUrl}
-                title="Client URL Test"
-                description="Probe the live Outline client endpoint and confirm the subscription payload resolves cleanly."
+                title={locale === 'my' ? 'ကလိုင်းယင့် URL စမ်းသပ်မှု' : 'Client URL Test'}
+                description={locale === 'my' ? 'အသုံးပြုနေသော Outline ကလိုင်းယင့်လိပ်စာကို စမ်းသပ်ပြီး စာရင်းသွင်းဒေတာ မှန်ကန်စွာ ရရှိကြောင်း အတည်ပြုပါ။' : 'Probe the live Outline client endpoint and confirm the subscription payload resolves cleanly.'}
               />
 
               <SubscriptionShareCard
@@ -3502,7 +3527,7 @@ export default function KeyDetailPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <RotateCw className="h-5 w-5 text-primary" />
-                      Server Replacement
+                      {isMyanmar ? 'ဆာဗာ ပြောင်းလဲမှု' : 'Server Replacement'}
                     </CardTitle>
                     <CardDescription>
                       Move this key to another server while keeping its usage and expiry unchanged.
@@ -3533,7 +3558,7 @@ export default function KeyDetailPage() {
 
                     {keyRecord.lastServerChangeAt ? (
                       <div className="rounded-[1.05rem] border border-border/60 bg-background/45 px-4 py-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                        Last moved {formatRelativeTime(keyRecord.lastServerChangeAt)}
+                        {isMyanmar ? `နောက်ဆုံး ပြောင်းရွှေ့ခဲ့သည် ${formatRelativeTime(keyRecord.lastServerChangeAt)}` : `Last moved ${formatRelativeTime(keyRecord.lastServerChangeAt)}`}
                       </div>
                     ) : null}
 
@@ -3612,7 +3637,7 @@ export default function KeyDetailPage() {
                       ) : (
                         <RotateCw className="mr-2 h-4 w-4" />
                       )}
-                      Replace on selected server
+                      {isMyanmar ? 'ရွေးထားသော ဆာဗာသို့ ပြောင်းမည်' : 'Replace on selected server'}
                     </Button>
 
                     {remainingServerChanges <= 0 ? (
@@ -3629,7 +3654,7 @@ export default function KeyDetailPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Activity className="h-5 w-5 text-primary" />
-                      Key Health
+                      {isMyanmar ? 'သော့ အခြေအနေ' : 'Key Health'}
                     </CardTitle>
                     <CardDescription>
                       Recent share, client, and delivery activity for this key.
@@ -3640,7 +3665,7 @@ export default function KeyDetailPage() {
                       <div>
                         <p className="text-sm text-muted-foreground">Usage state</p>
                         <p className="mt-1 text-sm font-medium">
-                          {healthDiagnostics?.isActivelyUsed ? 'Recently active' : 'Idle'}
+                          {healthDiagnostics?.isActivelyUsed ? (isMyanmar ? 'မကြာသေးခင်က အသုံးပြုထားသည်' : 'Recently active') : (isMyanmar ? 'မလှုပ်ရှားသေးပါ' : 'Idle')}
                         </p>
                       </div>
                       <Badge
@@ -3658,25 +3683,25 @@ export default function KeyDetailPage() {
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Last client fetch</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ကလိုင်းယင့် ရယူချိန်' : 'Last client fetch'}</p>
                         <p className="font-medium">
                           {healthDiagnostics?.lastClientFetchAt ? formatRelativeTime(healthDiagnostics.lastClientFetchAt) : 'Never'}
                         </p>
                       </div>
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Last QR scan</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး QR scan' : 'Last QR scan'}</p>
                         <p className="font-medium">
                           {healthDiagnostics?.lastQrScanAt ? formatRelativeTime(healthDiagnostics.lastQrScanAt) : 'Never'}
                         </p>
                       </div>
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Last share page visit</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး မျှဝေစာမျက်နှာ ဝင်ကြည့်မှု' : 'Last share page visit'}</p>
                         <p className="font-medium">
                           {healthDiagnostics?.lastSharePageVisitAt ? formatRelativeTime(healthDiagnostics.lastSharePageVisitAt) : 'Never'}
                         </p>
                       </div>
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">Last Telegram send</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး Telegram ပို့မှု' : 'Last Telegram send'}</p>
                         <p className="font-medium">
                           {healthDiagnostics?.lastTelegramSendAt ? formatRelativeTime(healthDiagnostics.lastTelegramSendAt) : 'Never'}
                         </p>
@@ -3684,7 +3709,7 @@ export default function KeyDetailPage() {
                     </div>
 
                     <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-3 dark:border-cyan-400/16">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last seen device</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'နောက်ဆုံးတွေ့ရသည့် စက်' : 'Last seen device'}</p>
                       <div className="mt-3 space-y-2 text-sm">
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-muted-foreground">IP</span>
@@ -3703,7 +3728,7 @@ export default function KeyDetailPage() {
                           <span>{healthDiagnostics?.lastSeenPlatform || '-'}</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                          <span className="text-muted-foreground">Active sessions</span>
+                          <span className="text-muted-foreground">{isMyanmar ? 'လက်ရှိ session များ' : 'Active sessions'}</span>
                           <span>{healthDiagnostics?.activeSessionCount ?? 0}</span>
                         </div>
                       </div>
@@ -3836,10 +3861,10 @@ export default function KeyDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <QrCode className="h-5 w-5 text-primary" />
-                  QR Code
+                  {isMyanmar ? 'QR ကုဒ်' : 'QR Code'}
                 </CardTitle>
                 <CardDescription>
-                  Scan with a Shadowsocks client to connect
+                  {isMyanmar ? 'ချိတ်ဆက်ရန် Shadowsocks ကလိုင်းယင့်ဖြင့် စကင်လုပ်ပါ' : 'Scan with a Shadowsocks client to connect'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center">
@@ -3853,7 +3878,7 @@ export default function KeyDetailPage() {
                   />
                 ) : (
                   <div className="ops-chart-empty h-[200px] w-[200px]">
-                    <p className="text-sm text-muted-foreground">Failed to generate</p>
+                    <p className="text-sm text-muted-foreground">{isMyanmar ? 'မဖန်တီးနိုင်ပါ' : 'Failed to generate'}</p>
                   </div>
                 )}
 
@@ -3864,18 +3889,24 @@ export default function KeyDetailPage() {
                   <Button
                     variant="outline"
                     className="h-auto w-full justify-start px-4 py-3 text-left"
-                    onClick={() => copyToClipboard(decoratedAccessUrl, 'Copied!', 'Access URL copied to clipboard.')}
+                    onClick={() => copyToClipboard(
+                      decoratedAccessUrl,
+                      isMyanmar ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
+                      isMyanmar ? 'အသုံးပြုခွင့် URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Access URL copied to clipboard.'
+                    )}
                   >
                     <Copy className="mr-2 h-4 w-4" />
-                    {key.maxDevices && key.boundDeviceInstallsOnly ? 'Copy raw URL' : 'Copy URL'}
+                    {key.maxDevices && key.boundDeviceInstallsOnly
+                      ? isMyanmar ? 'မူရင်း URL ကို ကူးမည်' : 'Copy raw URL'
+                      : isMyanmar ? 'URL ကို ကူးမည်' : 'Copy URL'}
                   </Button>
                   <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left" onClick={handleDownloadQr}>
                     <QrCode className="mr-2 h-4 w-4" />
-                    Download QR
+                    {isMyanmar ? 'QR ကို ဒေါင်းလုဒ်လုပ်မည်' : 'Download QR'}
                   </Button>
                   <Button variant="outline" className="h-auto w-full justify-start px-4 py-3 text-left md:col-span-2" onClick={handleDownloadConfig}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download Config
+                    {isMyanmar ? 'ဆက်တင်ကို ဒေါင်းလုဒ်လုပ်မည်' : 'Download Config'}
                   </Button>
                 </div>
               </CardContent>
@@ -3883,35 +3914,35 @@ export default function KeyDetailPage() {
 
             <Card className="ops-detail-card">
               <CardHeader>
-                <CardTitle>Snapshot</CardTitle>
+                <CardTitle>{isMyanmar ? 'အမြန် အကျဉ်းချုပ်' : 'Snapshot'}</CardTitle>
                 <CardDescription>
-                  Core identifiers and assignment details that should always stay visible while you work.
+                  {isMyanmar ? 'အလုပ်လုပ်နေစဉ် အမြဲမြင်နိုင်စေရန် အဓိက identifier များနှင့် ခွဲဝေသတ်မှတ်မှု အသေးစိတ်များကို ပြထားသည်။' : 'Core identifiers and assignment details that should always stay visible while you work.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Outline Key ID</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Outline သော့ ID' : 'Outline Key ID'}</p>
                   <p className="mt-2 break-all font-mono text-xs text-foreground">{key.outlineKeyId}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public slug</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အများသုံး အတိုအမည်' : 'Public slug'}</p>
                   <p className="mt-2 break-all font-mono text-xs text-foreground">{key.publicSlug || '-'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Created</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဖန်တီးချိန်' : 'Created'}</p>
                   <p className="mt-2 text-sm font-medium">{formatDateTime(key.createdAt)}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Updated</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ပြင်ဆင်ချိန်' : 'Updated'}</p>
                   <p className="mt-2 text-sm font-medium">{formatDateTime(key.updatedAt)}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Server</p>
-                  <p className="mt-2 text-sm font-medium">{keyRecord.server?.name || 'Unassigned'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဆာဗာ' : 'Server'}</p>
+                  <p className="mt-2 text-sm font-medium">{keyRecord.server?.name || (isMyanmar ? 'မချိတ်ထားပါ' : 'Unassigned')}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quota policy</p>
-                  <p className="mt-2 text-sm font-medium">{key.dataLimitBytes ? 'Limited' : 'Unlimited'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ကန့်သတ်ချက် မူဝါဒ' : 'Quota policy'}</p>
+                  <p className="mt-2 text-sm font-medium">{key.dataLimitBytes ? (isMyanmar ? 'ကန့်သတ်ထားသည်' : 'Limited') : (isMyanmar ? 'အကန့်အသတ်မရှိ' : 'Unlimited')}</p>
                 </div>
               </CardContent>
             </Card>
@@ -4064,6 +4095,7 @@ function TrafficGraph({
 function ConnectionSessionsCard({ keyId }: { keyId: string }) {
   const utils = trpc.useUtils();
   const { toast } = useToast();
+  const { locale } = useLocale();
   const { data, isLoading } = trpc.keys.getConnectionSessions.useQuery(
     { keyId, limit: 10 },
     { refetchInterval: 30000 } // Refresh every 30 seconds
@@ -4150,7 +4182,7 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-primary" />
-            Connections
+            {locale === 'my' ? 'ချိတ်ဆက်မှုများ' : 'Connections'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -4165,10 +4197,10 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Smartphone className="w-5 h-5 text-primary" />
-          Connections
+          {locale === 'my' ? 'ချိတ်ဆက်မှုများ' : 'Connections'}
         </CardTitle>
         <CardDescription>
-          Estimated device usage based on traffic patterns
+          {locale === 'my' ? 'အသုံးပြုမှု လှုပ်ရှားမှုပုံစံအရ ခန့်မှန်းထားသော စက်အသုံးပြုမှု' : 'Estimated device usage based on traffic patterns'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -4183,11 +4215,11 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
               )}
               <span className="text-2xl font-bold">{data?.estimatedDevices || 0}</span>
             </div>
-            <p className="text-xs text-muted-foreground">Active Devices</p>
+            <p className="text-xs text-muted-foreground">{locale === 'my' ? 'လက်ရှိ အသုံးပြုနေသော စက်များ' : 'Active Devices'}</p>
           </div>
           <div className="ops-inline-stat text-center">
             <div className="text-2xl font-bold">{data?.peakDevices || 0}</div>
-            <p className="text-xs text-muted-foreground">Peak Devices</p>
+            <p className="text-xs text-muted-foreground">{locale === 'my' ? 'အများဆုံး စက်အရေအတွက်' : 'Peak Devices'}</p>
           </div>
         </div>
 
@@ -4204,15 +4236,21 @@ function ConnectionSessionsCard({ keyId }: { keyId: string }) {
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-medium">Soft device limit</p>
+                <p className="font-medium">{locale === 'my' ? 'ခန့်မှန်း စက်ကန့်သတ်ချက်' : 'Soft device limit'}</p>
                 <p className="text-xs text-muted-foreground">
-                  Estimated devices: {data.deviceLimitObservedDevices ?? data.estimatedDevices ?? 0} / {data.maxDevices}
+                  {locale === 'my'
+                    ? `ခန့်မှန်းထားသော စက်အရေအတွက်: ${data.deviceLimitObservedDevices ?? data.estimatedDevices ?? 0} / ${data.maxDevices}`
+                    : `Estimated devices: ${data.deviceLimitObservedDevices ?? data.estimatedDevices ?? 0} / ${data.maxDevices}`}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Install gating: {data.boundDeviceInstallsOnly ? 'Share page / client URL only' : 'Raw config still allowed'}
+                  {locale === 'my'
+                    ? `Install gating: ${data.boundDeviceInstallsOnly ? 'Share page / client URL only' : 'Raw config ကို အသုံးပြုခွင့်ရှိသေးသည်'}`
+                    : `Install gating: ${data.boundDeviceInstallsOnly ? 'Share page / client URL only' : 'Raw config still allowed'}`}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  For stronger anti-sharing, deliver this user through a dynamic key instead of a reusable standard access key.
+                  {locale === 'my'
+                    ? 'မျှဝေခြင်းတားဆီးမှု ပိုမိုကောင်းစေရန်၊ ပြန်လည်အသုံးပြုနိုင်သော standard access key အစား dynamic key ဖြင့် ပို့ဆောင်ပါ။'
+                    : 'For stronger anti-sharing, deliver this user through a dynamic key instead of a reusable standard access key.'}
                 </p>
               </div>
               <Badge

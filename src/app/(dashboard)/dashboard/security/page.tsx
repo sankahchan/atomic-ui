@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { BackButton } from '@/components/ui/back-button';
+import { useLocale } from '@/hooks/use-locale';
 
 function CreateRuleDialog({
     open,
@@ -36,6 +37,7 @@ function CreateRuleDialog({
     onSuccess: () => void;
 }) {
     const { toast } = useToast();
+    const { locale } = useLocale();
     const [formData, setFormData] = useState({
         type: 'BLOCK',
         targetType: 'IP',
@@ -45,12 +47,20 @@ function CreateRuleDialog({
 
     const createMutation = trpc.security.createRule.useMutation({
         onSuccess: () => {
-            toast({ title: 'Rule created', description: 'Security rule has been added.' });
+            toast({
+                title: locale === 'my' ? 'စည်းမျဉ်းကို ဖန်တီးပြီးပါပြီ' : 'Rule created',
+                description: locale === 'my' ? 'လုံခြုံရေး စည်းမျဉ်းအသစ်ကို ထည့်ပြီးပါပြီ။' : 'Security rule has been added.',
+            });
             setFormData({ type: 'BLOCK', targetType: 'IP', targetValue: '', description: '' });
             onSuccess();
             onOpenChange(false);
         },
-        onError: (err) => toast({ title: 'Failed to create', description: err.message, variant: 'destructive' }),
+        onError: (err) =>
+            toast({
+                title: locale === 'my' ? 'စည်းမျဉ်းကို မဖန်တီးနိုင်ပါ' : 'Failed to create',
+                description: err.message,
+                variant: 'destructive',
+            }),
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -62,16 +72,18 @@ function CreateRuleDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add Security Rule</DialogTitle>
+                    <DialogTitle>{locale === 'my' ? 'လုံခြုံရေး စည်းမျဉ်း ထည့်မည်' : 'Add Security Rule'}</DialogTitle>
                     <DialogDescription>
-                        Control access to the dashboard by IP, CIDR, or Country.
+                        {locale === 'my'
+                            ? 'IP၊ CIDR သို့မဟုတ် နိုင်ငံအလိုက် dashboard ဝင်ခွင့်ကို ထိန်းချုပ်ပါ။'
+                            : 'Control access to the dashboard by IP, CIDR, or Country.'}
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>Action</Label>
+                            <Label>{locale === 'my' ? 'လုပ်ဆောင်ချက်' : 'Action'}</Label>
                             <Select
                                 value={formData.type}
                                 onValueChange={(val) => setFormData({ ...formData, type: val })}
@@ -80,13 +92,13 @@ function CreateRuleDialog({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="BLOCK">Block (Deny)</SelectItem>
-                                    <SelectItem value="ALLOW">Allow (Whitelist)</SelectItem>
+                                    <SelectItem value="BLOCK">{locale === 'my' ? 'ပိတ်မည် (ငြင်းပယ်)' : 'Block (Deny)'}</SelectItem>
+                                    <SelectItem value="ALLOW">{locale === 'my' ? 'ခွင့်ပြုမည် (စာရင်းဖြူ)' : 'Allow (Whitelist)'}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Target Type</Label>
+                            <Label>{locale === 'my' ? 'ဦးတည်အမျိုးအစား' : 'Target Type'}</Label>
                             <Select
                                 value={formData.targetType}
                                 onValueChange={(val) => setFormData({ ...formData, targetType: val })}
@@ -95,9 +107,9 @@ function CreateRuleDialog({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="IP">IP Address</SelectItem>
-                                    <SelectItem value="CIDR">CIDR Range</SelectItem>
-                                    <SelectItem value="COUNTRY">Country Code</SelectItem>
+                                    <SelectItem value="IP">{locale === 'my' ? 'IP လိပ်စာ' : 'IP Address'}</SelectItem>
+                                    <SelectItem value="CIDR">{locale === 'my' ? 'CIDR အကွာအဝေး' : 'CIDR Range'}</SelectItem>
+                                    <SelectItem value="COUNTRY">{locale === 'my' ? 'နိုင်ငံကုဒ်' : 'Country Code'}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -105,9 +117,11 @@ function CreateRuleDialog({
 
                     <div className="space-y-2">
                         <Label>
-                            {formData.targetType === 'IP' ? 'IP Address' :
-                                formData.targetType === 'CIDR' ? 'CIDR Range (e.g. 10.0.0.0/24)' :
-                                    'Country Code (2-letter ISO, e.g. US, CN)'}
+                            {formData.targetType === 'IP'
+                                ? (locale === 'my' ? 'IP လိပ်စာ' : 'IP Address')
+                                : formData.targetType === 'CIDR'
+                                    ? (locale === 'my' ? 'CIDR အကွာအဝေး (ဥပမာ 10.0.0.0/24)' : 'CIDR Range (e.g. 10.0.0.0/24)')
+                                    : (locale === 'my' ? 'နိုင်ငံကုဒ် (၂ လုံး ISO, ဥပမာ US, CN)' : 'Country Code (2-letter ISO, e.g. US, CN)')}
                         </Label>
                         <Input
                             value={formData.targetValue}
@@ -122,19 +136,19 @@ function CreateRuleDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Description</Label>
+                        <Label>{locale === 'my' ? 'ဖော်ပြချက်' : 'Description'}</Label>
                         <Input
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            placeholder="e.g. Block suspicious subnet"
+                            placeholder={locale === 'my' ? 'ဥပမာ - သံသယရှိ subnet ကို ပိတ်မည်' : 'e.g. Block suspicious subnet'}
                         />
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{locale === 'my' ? 'မလုပ်တော့ပါ' : 'Cancel'}</Button>
                         <Button type="submit" disabled={createMutation.isPending}>
-                            {createMutation.isPending && 'Adding...'}
-                            {!createMutation.isPending && 'Add Rule'}
+                            {createMutation.isPending && (locale === 'my' ? 'ထည့်သွင်းနေသည်...' : 'Adding...')}
+                            {!createMutation.isPending && (locale === 'my' ? 'စည်းမျဉ်း ထည့်မည်' : 'Add Rule')}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -189,6 +203,8 @@ function SecurityScoreRing({ score }: { score: number }) {
 }
 
 function DashboardSecurityCard() {
+    const { locale } = useLocale();
+    const isMyanmar = locale === 'my';
     const { data: dashboardStatus, isLoading } = trpc.security.getDashboardSecurityStatus.useQuery();
 
     if (isLoading) {
@@ -197,7 +213,7 @@ function DashboardSecurityCard() {
                 <CardHeader className="px-0 pt-0">
                     <CardTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5" />
-                        Dashboard Security
+                        {isMyanmar ? 'ဒက်ရှ်ဘုတ် လုံခြုံရေး' : 'Dashboard Security'}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
@@ -216,14 +232,14 @@ function DashboardSecurityCard() {
                 <CardHeader className="px-0 pt-0">
                     <CardTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5" />
-                        Dashboard Security
+                        {isMyanmar ? 'ဒက်ရှ်ဘုတ် လုံခြုံရေး' : 'Dashboard Security'}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
                     <div className="text-center py-8 text-muted-foreground">
                         <AlertCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>Security probe has not run yet.</p>
-                        <p className="text-sm">Start the security worker to enable monitoring.</p>
+                        <p>{isMyanmar ? 'လုံခြုံရေး စစ်ဆေးမှု မစတင်ရသေးပါ။' : 'Security probe has not run yet.'}</p>
+                        <p className="text-sm">{isMyanmar ? 'စောင့်ကြည့်မှုကို ဖွင့်ရန် လုံခြုံရေး ဝန်ဆောင်မှုကို စတင်ပါ။' : 'Start the security worker to enable monitoring.'}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -235,10 +251,10 @@ function DashboardSecurityCard() {
             <CardHeader className="px-0 pt-0">
                 <CardTitle className="flex items-center gap-2">
                     <Shield className="h-5 w-5" />
-                    Dashboard Security
+                    {isMyanmar ? 'ဒက်ရှ်ဘုတ် လုံခြုံရေး' : 'Dashboard Security'}
                 </CardTitle>
                 <CardDescription>
-                    Security assessment of this management panel
+                    {isMyanmar ? 'ဤစီမံခန့်ခွဲမှု မျက်နှာပြင်၏ လုံခြုံရေးအကဲဖြတ်ချက်' : 'Security assessment of this management panel'}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 px-0 pb-0">
@@ -252,7 +268,7 @@ function DashboardSecurityCard() {
                                 <Unlock className="h-4 w-4 text-red-500" />
                             )}
                             <span className="text-sm">
-                                {dashboardStatus.scheme?.toUpperCase() || 'Unknown'} connection
+                                {dashboardStatus.scheme?.toUpperCase() || (isMyanmar ? 'မသိ' : 'Unknown')} {isMyanmar ? 'ချိတ်ဆက်မှု' : 'connection'}
                             </span>
                             {dashboardStatus.tlsVersion && (
                                 <Badge variant="outline" className="text-xs">{dashboardStatus.tlsVersion}</Badge>
@@ -263,32 +279,32 @@ function DashboardSecurityCard() {
                             <SecurityCheckItem
                                 label="HSTS"
                                 enabled={dashboardStatus.hasHsts}
-                                description="HTTP Strict Transport Security"
+                                description={isMyanmar ? 'HTTP Strict Transport Security ကာကွယ်မှု' : 'HTTP Strict Transport Security'}
                             />
                             <SecurityCheckItem
                                 label="CSP"
                                 enabled={dashboardStatus.hasCsp}
-                                description="Content Security Policy"
+                                description={isMyanmar ? 'Content Security Policy ကာကွယ်မှု' : 'Content Security Policy'}
                             />
                             <SecurityCheckItem
                                 label="Secure Cookies"
                                 enabled={dashboardStatus.hasSecureCookies}
-                                description="Cookies with Secure flag"
+                                description={isMyanmar ? 'Secure flag ပါသော ကွတ်ကီးများ' : 'Cookies with Secure flag'}
                             />
                             <SecurityCheckItem
                                 label="HttpOnly Cookies"
                                 enabled={dashboardStatus.hasHttpOnlyCookies}
-                                description="Cookies with HttpOnly flag"
+                                description={isMyanmar ? 'HttpOnly flag ပါသော ကွတ်ကီးများ' : 'Cookies with HttpOnly flag'}
                             />
                             <SecurityCheckItem
                                 label="SameSite Cookies"
                                 enabled={dashboardStatus.hasSameSiteCookies}
-                                description="Cookies with SameSite attribute"
+                                description={isMyanmar ? 'SameSite attribute ပါသော ကွတ်ကီးများ' : 'Cookies with SameSite attribute'}
                             />
                             <SecurityCheckItem
                                 label="X-Frame-Options"
                                 enabled={dashboardStatus.hasXFrameOptions}
-                                description="Clickjacking protection"
+                                description={isMyanmar ? 'Clickjacking ကာကွယ်မှု' : 'Clickjacking protection'}
                             />
                         </div>
                     </div>
@@ -297,7 +313,8 @@ function DashboardSecurityCard() {
                 {dashboardStatus.lastCheckedAt && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        Last checked {formatDistanceToNow(new Date(dashboardStatus.lastCheckedAt), { addSuffix: true })}
+                        {isMyanmar ? 'နောက်ဆုံး စစ်ဆေးခဲ့ချိန် ' : 'Last checked '}
+                        {formatRelativeTime(dashboardStatus.lastCheckedAt, isMyanmar)}
                     </p>
                 )}
             </CardContent>
@@ -328,6 +345,8 @@ function SecurityCheckItem({ label, enabled, description }: { label: string; ena
 }
 
 function ServerSecurityCard() {
+    const { locale } = useLocale();
+    const isMyanmar = locale === 'my';
     const { data: serverProbes, isLoading } = trpc.security.getServerSecurityProbes.useQuery();
 
     if (isLoading) {
@@ -336,7 +355,7 @@ function ServerSecurityCard() {
                 <CardHeader className="px-0 pt-0">
                     <CardTitle className="flex items-center gap-2">
                         <Server className="h-5 w-5" />
-                        Server Certificates
+                        {isMyanmar ? 'ဆာဗာ လက်မှတ်များ' : 'Server Certificates'}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
@@ -353,18 +372,18 @@ function ServerSecurityCard() {
             <CardHeader className="px-0 pt-0">
                 <CardTitle className="flex items-center gap-2">
                     <Server className="h-5 w-5" />
-                    Server Certificates
+                    {isMyanmar ? 'ဆာဗာ လက်မှတ်များ' : 'Server Certificates'}
                 </CardTitle>
                 <CardDescription>
-                    TLS certificate status for managed Outline servers
+                    {isMyanmar ? 'စီမံထားသော Outline ဆာဗာများအတွက် TLS certificate အခြေအနေ' : 'TLS certificate status for managed Outline servers'}
                 </CardDescription>
             </CardHeader>
             <CardContent className="px-0 pb-0">
                 {!serverProbes || serverProbes.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                         <Server className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>No server security probes available.</p>
-                        <p className="text-sm">Start the security worker to monitor server certificates.</p>
+                        <p>{isMyanmar ? 'ဆာဗာ လုံခြုံရေး probe မရှိသေးပါ။' : 'No server security probes available.'}</p>
+                        <p className="text-sm">{isMyanmar ? 'ဆာဗာ certificate များကို စောင့်ကြည့်ရန် security worker ကို စတင်ပါ။' : 'Start the security worker to monitor server certificates.'}</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -386,7 +405,7 @@ function ServerSecurityCard() {
                                         )}
                                     </div>
                                     <div>
-                                        <div className="font-medium">{probe.server?.name || 'Unknown Server'}</div>
+                                        <div className="font-medium">{probe.server?.name || (isMyanmar ? 'မသိသော ဆာဗာ' : 'Unknown Server')}</div>
                                         <div className="text-sm text-muted-foreground flex items-center gap-2">
                                             {probe.tlsVersion && <span>{probe.tlsVersion}</span>}
                                             {probe.certSubject && <span>- {probe.certSubject}</span>}
@@ -401,9 +420,9 @@ function ServerSecurityCard() {
                                                 probe.certDaysLeft < 14 ? 'text-yellow-500' :
                                                 'text-green-500'
                                             }`}>
-                                                {probe.certDaysLeft < 0 ? 'Expired' : `${probe.certDaysLeft} days`}
+                                                {probe.certDaysLeft < 0 ? (isMyanmar ? 'သက်တမ်းကုန်' : 'Expired') : isMyanmar ? `${probe.certDaysLeft} ရက်` : `${probe.certDaysLeft} days`}
                                             </div>
-                                            <div className="text-xs text-muted-foreground">until expiry</div>
+                                            <div className="text-xs text-muted-foreground">{isMyanmar ? 'သက်တမ်းကုန်ရန် ကျန်' : 'until expiry'}</div>
                                         </div>
                                     )}
                                     <Badge variant={
@@ -424,6 +443,8 @@ function ServerSecurityCard() {
 }
 
 function SecuritySummaryCards() {
+    const { locale } = useLocale();
+    const isMyanmar = locale === 'my';
     const { data: summary, isLoading } = trpc.security.getSecuritySummary.useQuery();
 
     if (isLoading || !summary) {
@@ -434,7 +455,7 @@ function SecuritySummaryCards() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <Card className="ops-kpi-tile">
                 <CardHeader className="px-0 pb-2 pt-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Security Score</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'လုံခြုံရေး အမှတ်' : 'Security Score'}</CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
                     <div className="flex items-center gap-2">
@@ -453,37 +474,37 @@ function SecuritySummaryCards() {
 
             <Card className="ops-kpi-tile">
                 <CardHeader className="px-0 pb-2 pt-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Server Status</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'ဆာဗာ အခြေအနေ' : 'Server Status'}</CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
                     <div className="text-2xl font-bold">
                         {summary.healthyServers}/{summary.serverCount}
                     </div>
-                    <p className="text-xs text-muted-foreground">servers healthy</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'အခြေအနေကောင်းသော ဆာဗာများ' : 'servers healthy'}</p>
                 </CardContent>
             </Card>
 
             <Card className="ops-kpi-tile">
                 <CardHeader className="px-0 pb-2 pt-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Certificate Warnings</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'လက်မှတ် သတိပေးချက်များ' : 'Certificate Warnings'}</CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
                     <div className={`text-2xl font-bold ${summary.expiringCerts > 0 ? 'text-yellow-500' : ''}`}>
                         {summary.expiringCerts}
                     </div>
-                    <p className="text-xs text-muted-foreground">expiring soon (&lt;14 days)</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'မကြာမီ သက်တမ်းကုန်မည် (&lt;14 ရက်)' : 'expiring soon (&lt;14 days)'}</p>
                 </CardContent>
             </Card>
 
             <Card className="ops-kpi-tile">
                 <CardHeader className="px-0 pb-2 pt-0">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Issues</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'ပြဿနာများ' : 'Issues'}</CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
                     <div className={`text-2xl font-bold ${(summary.expiredCerts + summary.tlsErrors + summary.connectionErrors) > 0 ? 'text-red-500' : 'text-green-500'}`}>
                         {summary.expiredCerts + summary.tlsErrors + summary.connectionErrors}
                     </div>
-                    <p className="text-xs text-muted-foreground">errors detected</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'တွေ့ရှိထားသော အမှားများ' : 'errors detected'}</p>
                 </CardContent>
             </Card>
         </div>
@@ -503,6 +524,23 @@ function incidentSeverityClasses(severity: string) {
     }
 }
 
+function getIncidentSeverityLabel(severity: string, isMyanmar: boolean) {
+    switch (severity) {
+        case 'LOW':
+            return isMyanmar ? 'နိမ့်' : 'Low';
+        case 'MEDIUM':
+            return isMyanmar ? 'အလယ်အလတ်' : 'Medium';
+        case 'HIGH':
+            return isMyanmar ? 'မြင့်' : 'High';
+        case 'CRITICAL':
+            return isMyanmar ? 'အရေးပေါ်' : 'Critical';
+        case 'ALL':
+            return isMyanmar ? 'အားလုံး' : 'All';
+        default:
+            return severity;
+    }
+}
+
 function incidentStatusClasses(status: string) {
     switch (status) {
         case 'ACTIVE':
@@ -511,6 +549,21 @@ function incidentStatusClasses(status: string) {
             return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500';
         default:
             return 'border-border/60 bg-background/70 text-muted-foreground';
+    }
+}
+
+function getIncidentStatusLabel(status: string, isMyanmar: boolean) {
+    switch (status) {
+        case 'ACTIVE':
+            return isMyanmar ? 'အသက်ဝင်' : 'Active';
+        case 'CONTAINED':
+            return isMyanmar ? 'ထိန်းထားပြီး' : 'Contained';
+        case 'RESOLVED':
+            return isMyanmar ? 'ဖြေရှင်းပြီး' : 'Resolved';
+        case 'ALL':
+            return isMyanmar ? 'အားလုံး' : 'All';
+        default:
+            return status;
     }
 }
 
@@ -525,6 +578,21 @@ function workflowStatusClasses(status: string) {
     }
 }
 
+function getWorkflowStatusLabel(status: string, isMyanmar: boolean) {
+    switch (status) {
+        case 'OPEN':
+            return isMyanmar ? 'ဖွင့်ထားသည်' : 'Open';
+        case 'ACKNOWLEDGED':
+            return isMyanmar ? 'လက်ခံစစ်ဆေးနေသည်' : 'Acknowledged';
+        case 'RESOLVED':
+            return isMyanmar ? 'ဖြေရှင်းပြီး' : 'Resolved';
+        case 'ALL':
+            return isMyanmar ? 'အားလုံး' : 'All';
+        default:
+            return status;
+    }
+}
+
 function reputationLevelClasses(level: string) {
     switch (level) {
         case 'CRITICAL':
@@ -535,6 +603,23 @@ function reputationLevelClasses(level: string) {
             return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-500';
         default:
             return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500';
+    }
+}
+
+function getRiskLevelLabel(level: string, isMyanmar: boolean) {
+    switch (level) {
+        case 'LOW':
+            return isMyanmar ? 'နိမ့်' : 'Low';
+        case 'ELEVATED':
+            return isMyanmar ? 'မြင့်တက်' : 'Elevated';
+        case 'HIGH':
+            return isMyanmar ? 'မြင့်' : 'High';
+        case 'CRITICAL':
+            return isMyanmar ? 'အရေးပေါ်' : 'Critical';
+        case 'ALL':
+            return isMyanmar ? 'အားလုံး' : 'All';
+        default:
+            return level;
     }
 }
 
@@ -625,40 +710,138 @@ function parseIncidentFiltersFromSearch(search: string): { filters: IncidentFilt
         hasValues,
     };
 }
-const alertRuleLabels: Record<string, { title: string; description: string }> = {
-    threshold: {
-        title: 'Threshold reached',
-        description: 'Early warning before the soft lock policy starts firing.',
-    },
-    lock: {
-        title: 'Lock applied',
-        description: 'Temporary app-layer lock after repeated failed logins.',
-    },
-    ban: {
-        title: 'Ban applied',
-        description: 'Harder restriction after the ban threshold is crossed.',
-    },
-    repeatedOffender: {
-        title: 'Repeated offender',
-        description: 'Longer-running noisy IP that keeps retrying over the daily window.',
-    },
-    unban: {
-        title: 'Unban',
-        description: 'Manual release of an app or fail2ban restriction.',
-    },
-    fail2banUnavailable: {
-        title: 'fail2ban unavailable',
-        description: 'Server-side jail is unavailable and only app-level protection remains.',
-    },
-    newDevice: {
-        title: 'New device sign-in',
-        description: 'Alert when an admin signs in from a device fingerprint not seen before.',
-    },
-    newCountry: {
-        title: 'New country sign-in',
-        description: 'Alert when an admin signs in from a country not seen before for that account.',
-    },
-};
+function getAlertRuleLabels(isMyanmar: boolean): Record<string, { title: string; description: string }> {
+    return {
+        threshold: {
+            title: isMyanmar ? 'သတ်မှတ်အရေအတွက် ရောက်ရှိသည်' : 'Threshold reached',
+            description: isMyanmar ? 'ယာယီလော့ခ် မစတင်မီ ကြိုတင်သတိပေးချက်။' : 'Early warning before the soft lock policy starts firing.',
+        },
+        lock: {
+            title: isMyanmar ? 'ယာယီလော့ခ် ချထားသည်' : 'Lock applied',
+            description: isMyanmar ? 'အကြိမ်ကြိမ် ဝင်ရောက်မှု မအောင်မြင်ပြီးနောက် အက်ပ်အဆင့် ယာယီလော့ခ် ချထားသည်။' : 'Temporary app-layer lock after repeated failed logins.',
+        },
+        ban: {
+            title: isMyanmar ? 'ပိတ်ပင်မှု ချထားသည်' : 'Ban applied',
+            description: isMyanmar ? 'ပိတ်ပင်မှု သတ်မှတ်အရေအတွက် ကျော်သွားပြီးနောက် ပိုမိုပြင်းထန်သော ကန့်သတ်ချက် ချထားသည်။' : 'Harder restriction after the ban threshold is crossed.',
+        },
+        repeatedOffender: {
+            title: isMyanmar ? 'ထပ်တလဲလဲ ကြိုးစားနေသူ' : 'Repeated offender',
+            description: isMyanmar ? 'နေ့စဉ်ကာလအတွင်း ထပ်ခါတလဲလဲ ကြိုးစားနေသည့် IP အတွက် သတိပေးချက်။' : 'Longer-running noisy IP that keeps retrying over the daily window.',
+        },
+        unban: {
+            title: isMyanmar ? 'ပိတ်ပင်မှု ဖြုတ်ထားသည်' : 'Unban',
+            description: isMyanmar ? 'အက်ပ် သို့မဟုတ် fail2ban ကန့်သတ်ချက်ကို ကိုယ်တိုင် ဖြုတ်ပေးခြင်း။' : 'Manual release of an app or fail2ban restriction.',
+        },
+        fail2banUnavailable: {
+            title: isMyanmar ? 'fail2ban မရနိုင်ပါ' : 'fail2ban unavailable',
+            description: isMyanmar ? 'ဆာဗာဘက်ပိတ်ပင်မှု မရနိုင်သဖြင့် အက်ပ်အဆင့် ကာကွယ်မှုသာ ကျန်ရှိသည်။' : 'Server-side jail is unavailable and only app-level protection remains.',
+        },
+        newDevice: {
+            title: isMyanmar ? 'စက်အသစ်မှ ဝင်ရောက်မှု' : 'New device sign-in',
+            description: isMyanmar ? 'ယခင်က မတွေ့ဖူးသော စက်လက်မှတ်မှ အက်မင် ဝင်ရောက်သည့်အခါ သတိပေးမည်။' : 'Alert when an admin signs in from a device fingerprint not seen before.',
+        },
+        newCountry: {
+            title: isMyanmar ? 'နိုင်ငံအသစ်မှ ဝင်ရောက်မှု' : 'New country sign-in',
+            description: isMyanmar ? 'အကောင့်အတွက် ယခင်က မတွေ့ဖူးသော နိုင်ငံမှ အက်မင် ဝင်ရောက်သည့်အခါ သတိပေးမည်။' : 'Alert when an admin signs in from a country not seen before for that account.',
+        },
+    };
+}
+
+function getRuleTypeLabel(type: string, isMyanmar: boolean) {
+    switch (type) {
+        case 'BLOCK':
+            return isMyanmar ? 'ပိတ်မည်' : 'Block';
+        case 'ALLOW':
+            return isMyanmar ? 'ခွင့်ပြုမည်' : 'Allow';
+        default:
+            return type;
+    }
+}
+
+function getRuleTargetTypeLabel(targetType: string, isMyanmar: boolean) {
+    switch (targetType) {
+        case 'IP':
+            return isMyanmar ? 'IP' : 'IP';
+        case 'CIDR':
+            return isMyanmar ? 'CIDR အပိုင်း' : 'CIDR';
+        case 'COUNTRY':
+            return isMyanmar ? 'နိုင်ငံ' : 'Country';
+        default:
+            return targetType;
+    }
+}
+
+function getProbeResultLabel(result: string, isMyanmar: boolean) {
+    switch (result) {
+        case 'OK':
+            return isMyanmar ? 'ပုံမှန်' : 'OK';
+        case 'CERT_EXPIRING':
+            return isMyanmar ? 'လက်မှတ် သက်တမ်းကုန်မီ' : 'Cert expiring';
+        case 'CERT_EXPIRED':
+            return isMyanmar ? 'လက်မှတ် သက်တမ်းကုန်' : 'Cert expired';
+        case 'TLS_ERROR':
+            return isMyanmar ? 'TLS အမှား' : 'TLS error';
+        case 'CONNECTION_ERROR':
+            return isMyanmar ? 'ချိတ်ဆက်မှု အမှား' : 'Connection error';
+        default:
+            return result.replaceAll('_', ' ');
+    }
+}
+
+function getRestrictionTypeLabel(type: string, isMyanmar: boolean) {
+    switch (type) {
+        case 'SOFT_LOCK':
+            return isMyanmar ? 'ယာယီလော့ခ်' : 'Soft lock';
+        case 'BAN':
+            return isMyanmar ? 'ပိတ်ပင်မှု' : 'Ban';
+        case 'ALLOWLIST':
+            return isMyanmar ? 'ခွင့်ပြုစာရင်း' : 'Allowlist';
+        default:
+            return type;
+    }
+}
+
+function getSuppressionScopeLabel(scopeType: string, isMyanmar: boolean) {
+    switch (scopeType) {
+        case 'INCIDENT':
+            return isMyanmar ? 'အဖြစ်အပျက်' : 'Incident';
+        case 'IP':
+            return isMyanmar ? 'IP' : 'IP';
+        default:
+            return scopeType;
+    }
+}
+
+function formatRelativeTime(value: Date | string, isMyanmar: boolean) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!isMyanmar) {
+        return formatDistanceToNow(date, { addSuffix: true });
+    }
+
+    const diffMs = date.getTime() - Date.now();
+    const future = diffMs > 0;
+    const absMs = Math.abs(diffMs);
+    const minuteMs = 60 * 1000;
+    const hourMs = 60 * minuteMs;
+    const dayMs = 24 * hourMs;
+
+    if (absMs < minuteMs) {
+        return future ? 'မကြာမီ' : 'မကြာသေးမီက';
+    }
+
+    const formatUnit = (count: number, unit: string) =>
+        future ? `${count} ${unit}အတွင်း` : `${count} ${unit}ခန့်က`;
+
+    if (absMs < hourMs) {
+        return formatUnit(Math.round(absMs / minuteMs), 'မိနစ် ');
+    }
+
+    if (absMs < dayMs) {
+        return formatUnit(Math.round(absMs / hourMs), 'နာရီ ');
+    }
+
+    return formatUnit(Math.round(absMs / dayMs), 'ရက် ');
+}
 
 function HistoryBars({
     label,
@@ -690,181 +873,221 @@ function HistoryBars({
 }
 
 function LoginProtectionCard() {
+    const { locale } = useLocale();
+    const isMyanmar = locale === 'my';
     const { toast } = useToast();
     const { data: overview, isLoading, refetch } = trpc.security.getAdminLoginAbuseOverview.useQuery();
     const exportMutation = trpc.security.exportAdminLoginIncidents.useMutation({
         onSuccess: (result) => {
             downloadTextFile(result.content, result.filename, result.type);
-            toast({ title: 'Incident export downloaded', description: result.filename });
+            toast({
+                title: isMyanmar ? 'ဖြစ်ရပ် export ဖိုင်ကို ဒေါင်းလုဒ်ပြီးပါပြီ' : 'Incident export downloaded',
+                description: result.filename,
+            });
         },
         onError: (error) => {
-            toast({ title: 'Failed to export incidents', description: error.message, variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'ဖြစ်ရပ် export မဒေါင်းလုဒ်နိုင်ပါ' : 'Failed to export incidents',
+                description: error.message,
+                variant: 'destructive',
+            });
         },
     });
     const saveMutation = trpc.security.updateAdminLoginProtectionConfig.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Login protection updated', description: 'The admin login abuse policy has been saved.' });
+            toast({
+                title: isMyanmar ? 'ဝင်ရောက်မှု ကာကွယ်ရေးကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Login protection updated',
+                description: isMyanmar ? 'အက်မင်ဝင်ရောက်မှု ကာကွယ်ရေး မူဝါဒကို သိမ်းပြီးပါပြီ။' : 'The admin login abuse policy has been saved.',
+            });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to save login protection', description: error.message, variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'ဝင်ရောက်မှု ကာကွယ်ရေးကို မသိမ်းနိုင်ပါ' : 'Failed to save login protection',
+                description: error.message,
+                variant: 'destructive',
+            });
         },
     });
     const unbanMutation = trpc.security.unbanAdminLoginIp.useMutation({
         onSuccess: async () => {
-            toast({ title: 'IP restriction cleared', description: 'The IP has been released from the admin login ban list.' });
+            toast({
+                title: isMyanmar ? 'IP ကန့်သတ်ချက်ကို ဖြုတ်ပြီးပါပြီ' : 'IP restriction cleared',
+                description: isMyanmar ? 'ဤ IP ကို အက်မင်ဝင်ရောက်မှု ပိတ်ပင်စာရင်းမှ ဖြုတ်လိုက်ပါပြီ။' : 'The IP has been released from the admin login ban list.',
+            });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to unban IP', description: error.message, variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'IP ပိတ်ပင်မှုကို မဖြုတ်နိုင်ပါ' : 'Failed to unban IP',
+                description: error.message,
+                variant: 'destructive',
+            });
         },
     });
     const acknowledgeMutation = trpc.security.acknowledgeAdminLoginIncident.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Incident acknowledged', description: 'The incident is now marked as being handled.' });
+            toast({
+                title: isMyanmar ? 'အဖြစ်အပျက်ကို လက်ခံစစ်ဆေးနေပါပြီ' : 'Incident acknowledged',
+                description: isMyanmar ? 'ဤအဖြစ်အပျက်ကို ယခု စစ်ဆေးနေသည်ဟု မှတ်သားလိုက်ပါပြီ။' : 'The incident is now marked as being handled.',
+            });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to acknowledge incident', description: error.message, variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'အဖြစ်အပျက်ကို မလက်ခံနိုင်ပါ' : 'Failed to acknowledge incident',
+                description: error.message,
+                variant: 'destructive',
+            });
         },
     });
     const resolveMutation = trpc.security.resolveAdminLoginIncident.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Incident resolved', description: 'The incident has been marked as resolved.' });
+            toast({
+                title: isMyanmar ? 'အဖြစ်အပျက်ကို ဖြေရှင်းပြီးပါပြီ' : 'Incident resolved',
+                description: isMyanmar ? 'ဤအဖြစ်အပျက်ကို ဖြေရှင်းပြီးဟု မှတ်သားလိုက်ပါပြီ။' : 'The incident has been marked as resolved.',
+            });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to resolve incident', description: error.message, variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'အဖြစ်အပျက်ကို မဖြေရှင်းနိုင်ပါ' : 'Failed to resolve incident',
+                description: error.message,
+                variant: 'destructive',
+            });
         },
     });
     const noteMutation = trpc.security.addAdminLoginIncidentNote.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Note added', description: 'The incident note has been saved.' });
+            toast({
+                title: isMyanmar ? 'မှတ်ချက်ကို ထည့်ပြီးပါပြီ' : 'Note added',
+                description: isMyanmar ? 'အဖြစ်အပျက် မှတ်ချက်ကို သိမ်းပြီးပါပြီ။' : 'The incident note has been saved.',
+            });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to save note', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'မှတ်ချက်ကို မသိမ်းနိုင်ပါ' : 'Failed to save note', description: error.message, variant: 'destructive' });
         },
     });
     const blockMutation = trpc.security.blockAdminLoginIp.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Permanent block added', description: 'The IP now has an active permanent block rule.' });
+            toast({ title: isMyanmar ? 'အမြဲတမ်း ပိတ်ဆို့ စည်းကမ်း ထည့်ပြီးပါပြီ' : 'Permanent block added', description: isMyanmar ? 'ဤ IP တွင် အမြဲတမ်း ပိတ်ဆို့ စည်းကမ်းကို အသက်ဝင်အဖြစ် ထည့်ပြီးပါပြီ။' : 'The IP now has an active permanent block rule.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to block IP', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'IP ကို ပိတ်ဆို့မရပါ' : 'Failed to block IP', description: error.message, variant: 'destructive' });
         },
     });
     const allowlistMutation = trpc.security.allowlistAdminLoginIp.useMutation({
         onSuccess: async () => {
-            toast({ title: 'IP allowlisted', description: 'The IP has been added to the allowlist and active bans were cleared.' });
+            toast({ title: isMyanmar ? 'IP ကို Allowlist ထဲထည့်ပြီးပါပြီ' : 'IP allowlisted', description: isMyanmar ? 'ဤ IP ကို allowlist ထဲသို့ ထည့်ပြီး အသက်ဝင်နေသော ပိတ်ပင်မှုများကို ဖယ်ရှားလိုက်ပါပြီ။' : 'The IP has been added to the allowlist and active bans were cleared.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to allowlist IP', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'IP ကို Allowlist ထဲမထည့်နိုင်ပါ' : 'Failed to allowlist IP', description: error.message, variant: 'destructive' });
         },
     });
     const promoteMutation = trpc.security.promoteAdminLoginIpToPermanentRule.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Permanent rule created', description: 'The IP was promoted to a permanent block rule.' });
+            toast({ title: isMyanmar ? 'အမြဲတမ်း စည်းကမ်း ဖန်တီးပြီးပါပြီ' : 'Permanent rule created', description: isMyanmar ? 'ဤ IP ကို အမြဲတမ်း ပိတ်ဆို့ စည်းကမ်းအဖြစ် မြှင့်တင်လိုက်ပါပြီ။' : 'The IP was promoted to a permanent block rule.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to promote IP', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'IP ကို မြှင့်တင်မရပါ' : 'Failed to promote IP', description: error.message, variant: 'destructive' });
         },
     });
     const digestMutation = trpc.security.runAdminLoginIncidentDigestNow.useMutation({
         onSuccess: (result) => {
             toast({
-                title: 'Incident digest sent',
-                description: `Delivered to ${result.adminChats} admin chat(s) for ${result.incidentCount} incident(s).`,
+                title: isMyanmar ? 'ဖြစ်ရပ် အနှစ်ချုပ်ကို ပို့ပြီးပါပြီ' : 'Incident digest sent',
+                description: isMyanmar ? `စီမံခန့်ခွဲသူ စကားပြောခန်း ${result.adminChats} ခုသို့ ဖြစ်ရပ် ${result.incidentCount} ခုအတွက် ပို့ပြီးပါပြီ။` : `Delivered to ${result.adminChats} admin chat(s) for ${result.incidentCount} incident(s).`,
             });
         },
         onError: (error) => {
-            toast({ title: 'Failed to send digest', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'အနှစ်ချုပ်ကို မပို့နိုင်ပါ' : 'Failed to send digest', description: error.message, variant: 'destructive' });
         },
     });
     const saveViewMutation = trpc.security.saveAdminLoginSavedView.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Saved view updated', description: 'The security view filters are saved.' });
+            toast({ title: isMyanmar ? 'သိမ်းထားသော မြင်ကွင်းကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Saved view updated', description: isMyanmar ? 'လုံခြုံရေး မြင်ကွင်း filter များကို သိမ်းပြီးပါပြီ။' : 'The security view filters are saved.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to save view', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'မြင်ကွင်းကို မသိမ်းနိုင်ပါ' : 'Failed to save view', description: error.message, variant: 'destructive' });
         },
     });
     const deleteViewMutation = trpc.security.deleteAdminLoginSavedView.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Saved view removed', description: 'The saved filter view has been deleted.' });
+            toast({ title: isMyanmar ? 'သိမ်းထားသော မြင်ကွင်းကို ဖယ်ရှားပြီးပါပြီ' : 'Saved view removed', description: isMyanmar ? 'သိမ်းထားသော filter မြင်ကွင်းကို ဖျက်လိုက်ပါပြီ။' : 'The saved filter view has been deleted.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to delete view', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'မြင်ကွင်းကို ဖျက်မရပါ' : 'Failed to delete view', description: error.message, variant: 'destructive' });
         },
     });
     const suppressMutation = trpc.security.suppressAdminLoginAlerts.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Alerts muted', description: 'Security alerts were suppressed for the selected scope.' });
+            toast({ title: isMyanmar ? 'သတိပေးချက်များကို တိတ်ထားပြီးပါပြီ' : 'Alerts muted', description: isMyanmar ? 'ရွေးထားသော အကျုံးဝင်မှုအတွက် လုံခြုံရေး သတိပေးချက်များကို ယာယီ ပိတ်ထားပါပြီ။' : 'Security alerts were suppressed for the selected scope.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to mute alerts', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'သတိပေးချက်များကို တိတ်မထားနိုင်ပါ' : 'Failed to mute alerts', description: error.message, variant: 'destructive' });
         },
     });
     const unsuppressMutation = trpc.security.removeAdminLoginAlertSuppression.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Alert mute removed', description: 'Alerts are active again for the selected scope.' });
+            toast({ title: isMyanmar ? 'သတိပေးချက် တိတ်ထားမှုကို ဖယ်ရှားပြီးပါပြီ' : 'Alert mute removed', description: isMyanmar ? 'ရွေးထားသော အကျုံးဝင်မှုအတွက် သတိပေးချက်များကို ပြန်လည် အသက်ဝင်စေပါပြီ။' : 'Alerts are active again for the selected scope.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to remove mute', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'တိတ်ထားမှုကို ဖယ်ရှားမရပါ' : 'Failed to remove mute', description: error.message, variant: 'destructive' });
         },
     });
     const bulkIncidentMutation = trpc.security.bulkUpdateAdminLoginIncidents.useMutation({
         onSuccess: async (result) => {
-            toast({ title: 'Bulk incident action complete', description: `${result.processed} incidents updated.` });
+            toast({ title: isMyanmar ? 'အစုလိုက် ဖြစ်ရပ် လုပ်ဆောင်ချက် ပြီးပါပြီ' : 'Bulk incident action complete', description: isMyanmar ? `ဖြစ်ရပ် ${result.processed} ခုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။` : `${result.processed} incidents updated.` });
             setSelectedIncidentIds([]);
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Bulk incident action failed', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'အစုလိုက် ဖြစ်ရပ် လုပ်ဆောင်ချက် မအောင်မြင်ပါ' : 'Bulk incident action failed', description: error.message, variant: 'destructive' });
         },
     });
     const assignIncidentMutation = trpc.security.assignAdminLoginIncident.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Incident assignment updated', description: 'The operator assignment has been saved.' });
+            toast({ title: isMyanmar ? 'ဖြစ်ရပ် တာဝန်ခွဲဝေမှုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Incident assignment updated', description: isMyanmar ? 'လုပ်ဆောင်သူ တာဝန်ခွဲဝေမှုကို သိမ်းထားပါပြီ။' : 'The operator assignment has been saved.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to update assignment', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'တာဝန်ခွဲဝေမှုကို အပ်ဒိတ်မလုပ်နိုင်ပါ' : 'Failed to update assignment', description: error.message, variant: 'destructive' });
         },
     });
     const bulkIpMutation = trpc.security.bulkUpdateAdminLoginIps.useMutation({
         onSuccess: async (result) => {
-            toast({ title: 'Bulk IP action complete', description: `${result.processed} IP entries updated.` });
+            toast({ title: isMyanmar ? 'အစုလိုက် IP လုပ်ဆောင်ချက် ပြီးပါပြီ' : 'Bulk IP action complete', description: isMyanmar ? `IP မှတ်တမ်း ${result.processed} ခုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။` : `${result.processed} IP entries updated.` });
             setSelectedIps([]);
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Bulk IP action failed', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'အစုလိုက် IP လုပ်ဆောင်ချက် မအောင်မြင်ပါ' : 'Bulk IP action failed', description: error.message, variant: 'destructive' });
         },
     });
     const approveLoginApprovalMutation = trpc.security.approveAdminLoginApproval.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Login approved', description: 'The pending admin sign-in can now complete.' });
+            toast({ title: isMyanmar ? 'ဝင်ရောက်ခွင့်ကို အတည်ပြုပြီးပါပြီ' : 'Login approved', description: isMyanmar ? 'စောင့်ဆိုင်းနေသော admin ဝင်ရောက်မှုကို ယခု ပြီးစီးနိုင်ပါပြီ။' : 'The pending admin sign-in can now complete.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to approve sign-in', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'ဝင်ရောက်မှုကို အတည်မပြုနိုင်ပါ' : 'Failed to approve sign-in', description: error.message, variant: 'destructive' });
         },
     });
     const rejectLoginApprovalMutation = trpc.security.rejectAdminLoginApproval.useMutation({
         onSuccess: async () => {
-            toast({ title: 'Login rejected', description: 'The pending admin sign-in was rejected.' });
+            toast({ title: isMyanmar ? 'ဝင်ရောက်မှုကို ပယ်ချပြီးပါပြီ' : 'Login rejected', description: isMyanmar ? 'စောင့်ဆိုင်းနေသော admin ဝင်ရောက်မှုကို ပယ်ချလိုက်ပါပြီ။' : 'The pending admin sign-in was rejected.' });
             await refetch();
         },
         onError: (error) => {
-            toast({ title: 'Failed to reject sign-in', description: error.message, variant: 'destructive' });
+            toast({ title: isMyanmar ? 'ဝင်ရောက်မှုကို ပယ်ချမရပါ' : 'Failed to reject sign-in', description: error.message, variant: 'destructive' });
         },
     });
 
@@ -1072,32 +1295,39 @@ function LoginProtectionCard() {
     };
 
     const handleIncidentAcknowledge = (incidentId: string) => {
-        const note = requestNote('Optional incident note');
+        const note = requestNote(isMyanmar ? 'အဖြစ်အပျက် မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional incident note');
         if (note === null) return;
         acknowledgeMutation.mutate({ incidentId, note: note || undefined });
     };
 
     const handleIncidentResolve = (incidentId: string) => {
-        const note = requestNote('Resolution note');
+        const note = requestNote(isMyanmar ? 'ဖြေရှင်းမှု မှတ်ချက်' : 'Resolution note');
         if (note === null) return;
         resolveMutation.mutate({ incidentId, note: note || undefined });
     };
 
     const handleIncidentNote = (incidentId: string) => {
-        const note = requestNote('Add an incident note');
+        const note = requestNote(isMyanmar ? 'အဖြစ်အပျက် မှတ်ချက် ထည့်ပါ' : 'Add an incident note');
         if (!note) return;
         noteMutation.mutate({ incidentId, note });
     };
 
     const requestAssignee = () => {
-        const value = window.prompt('Assign incident to which admin email?', currentOperatorEmail || '');
+        const value = window.prompt(
+            isMyanmar ? 'ဤအဖြစ်အပျက်ကို မည်သည့် အက်မင်အီးမေးလ်ထံ တာဝန်ပေးမည်နည်း။' : 'Assign incident to which admin email?',
+            currentOperatorEmail || '',
+        );
         if (value == null) {
             return null;
         }
 
         const normalized = value.trim().toLowerCase();
         if (!normalized) {
-            toast({ title: 'Assignment required', description: 'Enter an admin email to assign the incident.', variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'တာဝန်ပေးရန် လိုအပ်ပါသည်' : 'Assignment required',
+                description: isMyanmar ? 'ဤအဖြစ်အပျက်ကို တာဝန်ပေးရန် အက်မင်အီးမေးလ်တစ်ခု ထည့်ပါ။' : 'Enter an admin email to assign the incident.',
+                variant: 'destructive',
+            });
             return null;
         }
 
@@ -1105,7 +1335,11 @@ function LoginProtectionCard() {
     };
 
     const handleAssignIncident = (incidentId: string, assignedToEmail?: string | null) => {
-        const note = requestNote(assignedToEmail ? 'Optional assignment note' : 'Optional unassign note');
+        const note = requestNote(
+            assignedToEmail
+                ? (isMyanmar ? 'တာဝန်ပေးမှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional assignment note')
+                : (isMyanmar ? 'တာဝန်ဖြုတ်မှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional unassign note'),
+        );
         if (note === null) return;
 
         assignIncidentMutation.mutate({
@@ -1116,7 +1350,11 @@ function LoginProtectionCard() {
     };
 
     const handleBlockIp = (ip: string, promote = false) => {
-        const note = requestNote(promote ? 'Optional promotion note' : 'Optional block note');
+        const note = requestNote(
+            promote
+                ? (isMyanmar ? 'မြှင့်တင်မှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional promotion note')
+                : (isMyanmar ? 'ပိတ်ဆို့မှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional block note'),
+        );
         if (note === null) return;
         if (promote) {
             promoteMutation.mutate({ ip, note: note || undefined });
@@ -1127,7 +1365,7 @@ function LoginProtectionCard() {
     };
 
     const handleAllowlistIp = (ip: string) => {
-        const note = requestNote('Optional allowlist note');
+        const note = requestNote(isMyanmar ? 'ခွင့်ပြုစာရင်း မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional allowlist note');
         if (note === null) return;
         allowlistMutation.mutate({ ip, note: note || undefined });
     };
@@ -1137,7 +1375,7 @@ function LoginProtectionCard() {
     };
 
     const handleRejectLoginApproval = (approvalId: string) => {
-        const note = requestNote('Optional rejection reason');
+        const note = requestNote(isMyanmar ? 'ပယ်ချရသည့် အကြောင်း (မဖြစ်မနေမဟုတ်)' : 'Optional rejection reason');
         if (note === null) return;
         rejectLoginApprovalMutation.mutate({ approvalId, note: note || undefined });
     };
@@ -1146,7 +1384,7 @@ function LoginProtectionCard() {
         if (!overview) {
             return;
         }
-        const name = window.prompt('Saved view name', activeSavedViewId !== 'all'
+        const name = window.prompt(isMyanmar ? 'သိမ်းထားမည့် မြင်ကွင်း အမည်' : 'Saved view name', activeSavedViewId !== 'all'
             ? overview.savedViews.find((view) => view.id === activeSavedViewId)?.name || ''
             : '');
         if (!name?.trim()) {
@@ -1180,7 +1418,7 @@ function LoginProtectionCard() {
     };
 
     const handleDeleteSavedView = (viewId: string) => {
-        if (!window.confirm('Delete this saved view?')) {
+        if (!window.confirm(isMyanmar ? 'ဤသိမ်းထားသော မြင်ကွင်းကို ဖျက်မည်လား။' : 'Delete this saved view?')) {
             return;
         }
         deleteViewMutation.mutate({ id: viewId });
@@ -1201,12 +1439,18 @@ function LoginProtectionCard() {
         if (viewId === 'all') {
             window.localStorage.removeItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY);
             setDefaultSavedViewId('all');
-            toast({ title: 'Default view cleared', description: 'The security page will open with standard filters.' });
+            toast({
+                title: isMyanmar ? 'မူလ မြင်ကွင်းကို ဖြုတ်ပြီးပါပြီ' : 'Default view cleared',
+                description: isMyanmar ? 'Security စာမျက်နှာကို မူလ စစ်ထုတ်မှုများဖြင့် ဖွင့်ပါမည်။' : 'The security page will open with standard filters.',
+            });
             return;
         }
         window.localStorage.setItem(SECURITY_DEFAULT_SAVED_VIEW_STORAGE_KEY, viewId);
         setDefaultSavedViewId(viewId);
-        toast({ title: 'Default view saved', description: 'This view will be applied when the security page opens.' });
+        toast({
+            title: isMyanmar ? 'မူလ မြင်ကွင်းကို သိမ်းပြီးပါပြီ' : 'Default view saved',
+            description: isMyanmar ? 'Security စာမျက်နှာ ဖွင့်သည့်အခါ ဤမြင်ကွင်းကို အလိုအလျောက် အသုံးပြုမည်။' : 'This view will be applied when the security page opens.',
+        });
     };
 
     const requestSuppressionInput = (title: string) => {
@@ -1216,10 +1460,14 @@ function LoginProtectionCard() {
         }
         const parsed = Number(hours);
         if (!Number.isFinite(parsed) || parsed <= 0) {
-            toast({ title: 'Invalid duration', description: 'Enter a positive number of hours.', variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'ကြာချိန် မမှန်ကန်ပါ' : 'Invalid duration',
+                description: isMyanmar ? 'သုညထက်ကြီးသော နာရီအရေအတွက်ကို ထည့်ပါ။' : 'Enter a positive number of hours.',
+                variant: 'destructive',
+            });
             return null;
         }
-        const reason = window.prompt('Optional mute reason', '') ?? '';
+        const reason = window.prompt(isMyanmar ? 'အသိပေးချက် တိတ်ထားရသည့် အကြောင်း (မဖြစ်မနေမဟုတ်)' : 'Optional mute reason', '') ?? '';
         return {
             durationMinutes: Math.round(parsed * 60),
             reason: reason.trim() || undefined,
@@ -1227,7 +1475,9 @@ function LoginProtectionCard() {
     };
 
     const handleMuteScope = (scopeType: 'IP' | 'INCIDENT', scopeValue: string, label: string) => {
-        const payload = requestSuppressionInput(`Mute ${label} alerts for how many hours?`);
+        const payload = requestSuppressionInput(
+            isMyanmar ? `${label} အသိပေးချက်များကို ဘယ်နှနာရီကြာ တိတ်ထားမည်နည်း။` : `Mute ${label} alerts for how many hours?`,
+        );
         if (!payload) {
             return;
         }
@@ -1267,15 +1517,15 @@ function LoginProtectionCard() {
                 ? undefined
                 : requestNote(
                     action === 'ACKNOWLEDGE'
-                        ? 'Optional note for bulk acknowledge'
-                        : 'Optional note for bulk resolve',
+                        ? (isMyanmar ? 'အစုလိုက် လက်ခံစစ်ဆေးမှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional note for bulk acknowledge')
+                        : (isMyanmar ? 'အစုလိုက် ဖြေရှင်းမှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional note for bulk resolve'),
                 );
         if (note === null) {
             return;
         }
         const suppression =
             action === 'MUTE'
-                ? requestSuppressionInput('Mute selected incident alerts for how many hours?')
+                ? requestSuppressionInput(isMyanmar ? 'ရွေးထားသော အဖြစ်အပျက် အသိပေးချက်များကို ဘယ်နှနာရီကြာ တိတ်ထားမည်နည်း။' : 'Mute selected incident alerts for how many hours?')
                 : null;
         if (action === 'MUTE' && !suppression) {
             return;
@@ -1305,22 +1555,22 @@ function LoginProtectionCard() {
                 ? undefined
                 : requestNote(
                     action === 'BLOCK'
-                        ? 'Optional note for bulk block'
+                        ? (isMyanmar ? 'အစုလိုက် ပိတ်ဆို့မှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional note for bulk block')
                         : action === 'ALLOWLIST'
-                            ? 'Optional note for bulk allowlist'
-                            : 'Optional note for bulk promote',
+                            ? (isMyanmar ? 'အစုလိုက် ခွင့်ပြုစာရင်း မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional note for bulk allowlist')
+                            : (isMyanmar ? 'အစုလိုက် မြှင့်တင်မှု မှတ်ချက် (မဖြစ်မနေမဟုတ်)' : 'Optional note for bulk promote'),
                 );
         if (note === null) {
             return;
         }
         const suppression =
             action === 'MUTE'
-                ? requestSuppressionInput('Mute selected IP alerts for how many hours?')
+                ? requestSuppressionInput(isMyanmar ? 'ရွေးထားသော IP အသိပေးချက်များကို ဘယ်နှနာရီကြာ တိတ်ထားမည်နည်း။' : 'Mute selected IP alerts for how many hours?')
                 : null;
         if (action === 'MUTE' && !suppression) {
             return;
         }
-        if (action === 'UNBAN' && !window.confirm(`Unban ${selectedIps.length} IPs?`)) {
+        if (action === 'UNBAN' && !window.confirm(isMyanmar ? `IP ${selectedIps.length} ခု၏ ပိတ်ပင်မှုကို ဖြုတ်မည်လား။` : `Unban ${selectedIps.length} IPs?`)) {
             return;
         }
 
@@ -1485,9 +1735,11 @@ function LoginProtectionCard() {
         return (
             <Card className="ops-panel">
                 <CardHeader className="px-0 pt-0">
-                    <CardTitle>Admin login abuse protection</CardTitle>
+                    <CardTitle>{isMyanmar ? 'Admin login အလွဲသုံးစား ကာကွယ်မှု' : 'Admin login abuse protection'}</CardTitle>
                     <CardDescription>
-                        Loading current thresholds, trusted IPs, and recent failed login activity.
+                        {isMyanmar
+                            ? 'လက်ရှိ သတ်မှတ်ကန့်သတ်ချက်များ၊ ယုံကြည်ရသော IP များနှင့် မကြာသေးမီ login မအောင်မြင်မှုများကို တင်နေသည်။'
+                            : 'Loading current thresholds, trusted IPs, and recent failed login activity.'}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="px-0 pb-0">
@@ -1506,45 +1758,45 @@ function LoginProtectionCard() {
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Failed last hour</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ၁ နာရီ' : 'Failed last hour'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className="text-2xl font-bold">{overview.summary.failuresLastHour}</div>
-                        <p className="text-xs text-muted-foreground">failed admin login attempts</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'admin login မအောင်မြင်မှုများ' : 'failed admin login attempts'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Failed last 24h</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ၂၄ နာရီ' : 'Failed last 24h'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className="text-2xl font-bold">{overview.summary.failuresLastDay}</div>
-                        <p className="text-xs text-muted-foreground">recent login failures</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'မကြာသေးမီ login မအောင်မြင်မှုများ' : 'recent login failures'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Active restrictions</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'အသက်ဝင်ကန့်သတ်မှုများ' : 'Active restrictions'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className="text-2xl font-bold">{overview.summary.activeRestrictions}</div>
-                        <p className="text-xs text-muted-foreground">IPs currently locked or banned</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'လက်ရှိ lock သို့မဟုတ် ban ထားသော IP များ' : 'IPs currently locked or banned'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Active bans</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'အသက်ဝင် ban များ' : 'Active bans'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className={`text-2xl font-bold ${overview.summary.activeBans > 0 ? 'text-red-500' : ''}`}>
                             {overview.summary.activeBans}
                         </div>
-                        <p className="text-xs text-muted-foreground">harder blocks now in effect</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'ပြင်းထန်သော ပိတ်ဆို့မှုများ လက်ရှိအသက်ဝင်နေသည်' : 'harder blocks now in effect'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">fail2ban jail</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'fail2ban ကာကွယ်ရေးအုပ်စု' : 'fail2ban jail'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className={`text-2xl font-bold ${overview.fail2banStatus.available ? '' : 'text-yellow-500'}`}>
@@ -1552,116 +1804,122 @@ function LoginProtectionCard() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                             {overview.fail2banStatus.available
-                                ? `${overview.fail2banStatus.jail} currently banned`
-                                : 'fail2ban status unavailable'}
+                                ? isMyanmar
+                                    ? `${overview.fail2banStatus.jail} တွင် လက်ရှိ ban ထားသည်`
+                                    : `${overview.fail2banStatus.jail} currently banned`
+                                : isMyanmar
+                                    ? 'fail2ban အခြေအနေ မရနိုင်ပါ'
+                                    : 'fail2ban status unavailable'}
                         </p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Active incidents</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'အသက်ဝင် ဖြစ်ရပ်များ' : 'Active incidents'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className={`text-2xl font-bold ${activeIncidentCount > 0 ? 'text-orange-500' : ''}`}>
                             {activeIncidentCount}
                         </div>
-                        <p className="text-xs text-muted-foreground">ongoing abuse bursts still worth watching</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'ဆက်လက်စောင့်ကြည့်သင့်သည့် အလွဲသုံးစား လှိုင်းများ' : 'ongoing abuse bursts still worth watching'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">High-risk IPs</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'အန္တရာယ်မြင့် IP များ' : 'High-risk IPs'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className={`text-2xl font-bold ${highRiskIpCount > 0 ? 'text-red-500' : ''}`}>
                             {highRiskIpCount}
                         </div>
-                        <p className="text-xs text-muted-foreground">reputation score 50 or higher</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'reputation score ၅၀ နှင့်အထက်ရှိသော IP များ' : 'reputation score 50 or higher'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">New devices (24h)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'စက်အသစ်များ (၂၄ နာရီ)' : 'New devices (24h)'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className={`text-2xl font-bold ${newDeviceCount > 0 ? 'text-sky-500' : ''}`}>
                             {newDeviceCount}
                         </div>
-                        <p className="text-xs text-muted-foreground">admin sign-ins from unfamiliar devices</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'မသိသေးသော စက်များမှ admin ဝင်ရောက်မှုများ' : 'admin sign-ins from unfamiliar devices'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">New countries (24h)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'နိုင်ငံအသစ်များ (၂၄ နာရီ)' : 'New countries (24h)'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className={`text-2xl font-bold ${newCountryCount > 0 ? 'text-violet-500' : ''}`}>
                             {newCountryCount}
                         </div>
-                        <p className="text-xs text-muted-foreground">admin sign-ins from new geographies</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'နိုင်ငံအသစ်များမှ admin ဝင်ရောက်မှုများ' : 'admin sign-ins from new geographies'}</p>
                     </CardContent>
                 </Card>
                 <Card className="ops-kpi-tile">
                     <CardHeader className="px-0 pb-2 pt-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Pending approvals</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{isMyanmar ? 'စောင့်ဆိုင်းနေသော အတည်ပြုမှုများ' : 'Pending approvals'}</CardTitle>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         <div className={`text-2xl font-bold ${pendingApprovalCount > 0 ? 'text-amber-500' : ''}`}>
                             {pendingApprovalCount}
                         </div>
-                        <p className="text-xs text-muted-foreground">unusual admin sign-ins waiting for review</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'ပုံမှန်မဟုတ်သော admin ဝင်ရောက်မှုများကို စစ်ဆေးရန် စောင့်နေသည်' : 'unusual admin sign-ins waiting for review'}</p>
                     </CardContent>
                 </Card>
             </div>
 
             <Card className="ops-panel">
                 <CardHeader className="px-0 pt-0">
-                    <CardTitle>Policy</CardTitle>
+                    <CardTitle>{isMyanmar ? 'ကာကွယ်ရေး မူဝါဒ' : 'Policy'}</CardTitle>
                     <CardDescription>
-                        Automatic lock and ban thresholds for repeated failed admin logins. Telegram alerts use the configured admin chat IDs.
+                        {isMyanmar
+                            ? 'admin ဝင်ရောက်မှု မအောင်မြင်ခြင်းများ ထပ်ခါတလဲလဲ ဖြစ်လာပါက အလိုအလျောက် lock နှင့် ban သတ်မှတ်ချက်များကို ဤနေရာတွင် စီမံပါ။ Telegram အသိပေးချက်များသည် သတ်မှတ်ထားသော admin chat ID များကို အသုံးပြုပါသည်။'
+                            : 'Automatic lock and ban thresholds for repeated failed admin logins. Telegram alerts use the configured admin chat IDs.'}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 px-0 pb-0">
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="ops-detail-card flex items-center justify-between gap-4">
                             <div>
-                                <p className="font-medium">Enable login abuse protection</p>
-                                <p className="text-sm text-muted-foreground">Create temporary locks and bans from repeated failed logins.</p>
+                                <p className="font-medium">{isMyanmar ? 'login abuse protection ကို ဖွင့်မည်' : 'Enable login abuse protection'}</p>
+                                <p className="text-sm text-muted-foreground">{isMyanmar ? 'ဝင်ရောက်မှု မအောင်မြင်ခြင်းများ ထပ်ခါတလဲလဲ ဖြစ်လာပါက ယာယီ lock နှင့် ban များ ဖန်တီးပါ။' : 'Create temporary locks and bans from repeated failed logins.'}</p>
                             </div>
                             <Switch checked={form.enabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, enabled: checked }))} />
                         </div>
                         <div className="ops-detail-card flex items-center justify-between gap-4">
                             <div>
-                                <p className="font-medium">Telegram admin alerts</p>
-                                <p className="text-sm text-muted-foreground">Send the source IP and attempted email to the configured Telegram admin chats.</p>
+                                <p className="font-medium">{isMyanmar ? 'Telegram admin အသိပေးချက်များ' : 'Telegram admin alerts'}</p>
+                                <p className="text-sm text-muted-foreground">{isMyanmar ? 'ကြိုးစားခဲ့သော email နှင့် source IP ကို သတ်မှတ်ထားသော Telegram admin chat များသို့ ပို့ပါ။' : 'Send the source IP and attempted email to the configured Telegram admin chats.'}</p>
                             </div>
                             <Switch checked={form.telegramAlertEnabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, telegramAlertEnabled: checked }))} />
                         </div>
                         <div className="ops-detail-card flex items-center justify-between gap-4">
                             <div>
-                                <p className="font-medium">Alert on repeated offenders</p>
-                                <p className="text-sm text-muted-foreground">Send an extra Telegram alert when the same IP keeps failing logins over a full-day window.</p>
+                                <p className="font-medium">{isMyanmar ? 'ထပ်ခါတလဲလဲ ပြုလုပ်သူများကို သတိပေးမည်' : 'Alert on repeated offenders'}</p>
+                                <p className="text-sm text-muted-foreground">{isMyanmar ? 'တစ်နေ့တာအတွင်း တူညီသော IP မှ login မအောင်မြင်မှုများ ဆက်တိုက်ဖြစ်လျှင် Telegram အသိပေးချက် ထပ်မံပို့ပါ။' : 'Send an extra Telegram alert when the same IP keeps failing logins over a full-day window.'}</p>
                             </div>
                             <Switch checked={form.alertOnRepeatedOffender} onCheckedChange={(checked) => setForm((current) => ({ ...current, alertOnRepeatedOffender: checked }))} />
                         </div>
                         <div className="ops-detail-card flex items-center justify-between gap-4">
                             <div>
-                                <p className="font-medium">Alert on unban</p>
-                                <p className="text-sm text-muted-foreground">Notify Telegram admins when a ban or lock is manually cleared from the panel.</p>
+                                <p className="font-medium">{isMyanmar ? 'ပိတ်ပင်မှု ဖြုတ်သည့်အခါ အသိပေးမည်' : 'Alert on unban'}</p>
+                                <p className="text-sm text-muted-foreground">{isMyanmar ? 'panel မှ ban သို့မဟုတ် lock ကို manual ဖြုတ်လိုက်သည့်အခါ Telegram admin များကို အသိပေးပါ။' : 'Notify Telegram admins when a ban or lock is manually cleared from the panel.'}</p>
                             </div>
                             <Switch checked={form.alertOnUnban} onCheckedChange={(checked) => setForm((current) => ({ ...current, alertOnUnban: checked }))} />
                         </div>
                         <div className="ops-detail-card flex items-center justify-between gap-4 md:col-span-2">
                             <div>
-                                <p className="font-medium">Write fail2ban auth log</p>
-                                <p className="text-sm text-muted-foreground">Mirror failed admin logins to the dedicated fail2ban file so the server can hard-ban the IP too.</p>
+                                <p className="font-medium">{isMyanmar ? 'fail2ban auth log ရေးမည်' : 'Write fail2ban auth log'}</p>
+                                <p className="text-sm text-muted-foreground">{isMyanmar ? 'မအောင်မြင်သော admin login များကို fail2ban ဖိုင်ထဲသို့ mirror လုပ်ပေးပြီး ဆာဗာဘက်မှ IP ကို hard-ban ပြုလုပ်နိုင်စေပါသည်။' : 'Mirror failed admin logins to the dedicated fail2ban file so the server can hard-ban the IP too.'}</p>
                             </div>
                             <Switch checked={form.fail2banLogEnabled} onCheckedChange={(checked) => setForm((current) => ({ ...current, fail2banLogEnabled: checked }))} />
                         </div>
                         <div className="ops-detail-card flex items-center justify-between gap-4 md:col-span-2">
                             <div>
-                                <p className="font-medium">Require approval for unusual admin sign-ins</p>
-                                <p className="text-sm text-muted-foreground">Hold new device or new country admin logins until another admin approves them.</p>
+                                <p className="font-medium">{isMyanmar ? 'ပုံမှန်မဟုတ်သော admin ဝင်ရောက်မှုကို အတည်ပြုချက်လိုအပ်မည်' : 'Require approval for unusual admin sign-ins'}</p>
+                                <p className="text-sm text-muted-foreground">{isMyanmar ? 'စက်အသစ် သို့မဟုတ် နိုင်ငံအသစ်မှ admin login များကို အခြား admin တစ်ဦး အတည်ပြုမချင်း စောင့်ထားပါ။' : 'Hold new device or new country admin logins until another admin approves them.'}</p>
                             </div>
                             <Switch
                                 checked={form.unusualLoginApprovalEnabled}
@@ -1672,51 +1930,51 @@ function LoginProtectionCard() {
 
                     <div className="grid gap-4 md:grid-cols-3">
                         <div className="space-y-2">
-                            <Label>Soft lock threshold</Label>
+                            <Label>{isMyanmar ? 'ယာယီ lock စတင်မည့် အကြိမ်အရေအတွက်' : 'Soft lock threshold'}</Label>
                             <Input type="number" min={1} value={form.softLockThreshold} onChange={(event) => setForm((current) => ({ ...current, softLockThreshold: Number(event.target.value) || 1 }))} />
-                            <p className="text-xs text-muted-foreground">Wrong-password attempts before a temporary app lock starts.</p>
+                            <p className="text-xs text-muted-foreground">{isMyanmar ? 'စကားဝှက်မှားယွင်းမှု အကြိမ်အရေအတွက် သတ်မှတ်ချက်ပြည့်လျှင် ယာယီ app lock စတင်မည်။' : 'Wrong-password attempts before a temporary app lock starts.'}</p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Soft lock window (minutes)</Label>
+                            <Label>{isMyanmar ? 'ယာယီ lock ကြည့်ကာလ (မိနစ်)' : 'Soft lock window (minutes)'}</Label>
                             <Input type="number" min={1} value={form.softLockWindowMinutes} onChange={(event) => setForm((current) => ({ ...current, softLockWindowMinutes: Number(event.target.value) || 1 }))} />
                         </div>
                         <div className="space-y-2">
-                            <Label>Soft lock duration (minutes)</Label>
+                            <Label>{isMyanmar ? 'ယာယီ lock ကြာချိန် (မိနစ်)' : 'Soft lock duration (minutes)'}</Label>
                             <Input type="number" min={1} value={form.softLockDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, softLockDurationMinutes: Number(event.target.value) || 1 }))} />
                         </div>
                         <div className="space-y-2">
-                            <Label>Ban threshold</Label>
+                            <Label>{isMyanmar ? 'ban စတင်မည့် အကြိမ်အရေအတွက်' : 'Ban threshold'}</Label>
                             <Input type="number" min={1} value={form.banThreshold} onChange={(event) => setForm((current) => ({ ...current, banThreshold: Number(event.target.value) || 1 }))} />
-                            <p className="text-xs text-muted-foreground">When reached, the IP is fully denied by the app and also logged for fail2ban.</p>
+                            <p className="text-xs text-muted-foreground">{isMyanmar ? 'ဤအရေအတွက် ပြည့်လျှင် app မှ IP ကို အပြည့်အဝပိတ်မည်ဖြစ်ပြီး fail2ban အတွက်လည်း log ရေးမည်။' : 'When reached, the IP is fully denied by the app and also logged for fail2ban.'}</p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Ban window (minutes)</Label>
+                            <Label>{isMyanmar ? 'ban ကြည့်ကာလ (မိနစ်)' : 'Ban window (minutes)'}</Label>
                             <Input type="number" min={1} value={form.banWindowMinutes} onChange={(event) => setForm((current) => ({ ...current, banWindowMinutes: Number(event.target.value) || 1 }))} />
                         </div>
                         <div className="space-y-2">
-                            <Label>Ban duration (minutes)</Label>
+                            <Label>{isMyanmar ? 'ban ကြာချိန် (မိနစ်)' : 'Ban duration (minutes)'}</Label>
                             <Input type="number" min={1} value={form.banDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, banDurationMinutes: Number(event.target.value) || 1 }))} />
                         </div>
                         <div className="space-y-2 md:col-span-3">
-                            <Label>Repeated offender threshold (24h)</Label>
+                            <Label>{isMyanmar ? 'ထပ်ခါတလဲလဲ ကျူးလွန်သူ သတ်မှတ်ချက် (၂၄ နာရီ)' : 'Repeated offender threshold (24h)'}</Label>
                             <Input type="number" min={1} value={form.repeatedOffenderThreshold} onChange={(event) => setForm((current) => ({ ...current, repeatedOffenderThreshold: Number(event.target.value) || 1 }))} />
-                            <p className="text-xs text-muted-foreground">Telegram sends an extra offender alert when the same IP reaches this many failed admin logins in the last 24 hours.</p>
+                            <p className="text-xs text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ၂၄ နာရီအတွင်း တူညီသော IP မှ admin login မအောင်မြင်မှု အရေအတွက် ဤတန်ဖိုးရောက်လျှင် Telegram အသိပေးချက် ထပ်ပို့ပါမည်။' : 'Telegram sends an extra offender alert when the same IP reaches this many failed admin logins in the last 24 hours.'}</p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Repeat-ban lookback (days)</Label>
+                            <Label>{isMyanmar ? 'ထပ်ခါတလဲလဲ ban ကြည့်ကာလ (ရက်)' : 'Repeat-ban lookback (days)'}</Label>
                             <Input type="number" min={1} value={form.repeatedBanLookbackDays} onChange={(event) => setForm((current) => ({ ...current, repeatedBanLookbackDays: Number(event.target.value) || 1 }))} />
-                            <p className="text-xs text-muted-foreground">If the same IP is banned again inside this window, the ban duration escalates.</p>
+                            <p className="text-xs text-muted-foreground">{isMyanmar ? 'ဤကာလအတွင်း တူညီသော IP ကို ထပ်မံ ban လုပ်ရပါက ban ကြာချိန်ကို တိုးမြှင့်မည်။' : 'If the same IP is banned again inside this window, the ban duration escalates.'}</p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Escalated ban duration (minutes)</Label>
+                            <Label>{isMyanmar ? 'တိုးမြှင့်ထားသော ban ကြာချိန် (မိနစ်)' : 'Escalated ban duration (minutes)'}</Label>
                             <Input type="number" min={1} value={form.repeatedBanDurationMinutes} onChange={(event) => setForm((current) => ({ ...current, repeatedBanDurationMinutes: Number(event.target.value) || 1 }))} />
-                            <p className="text-xs text-muted-foreground">Default production value is 2880 minutes (48 hours).</p>
+                            <p className="text-xs text-muted-foreground">{isMyanmar ? 'production မူလတန်ဖိုးမှာ ၂၈၈၀ မိနစ် (၄၈ နာရီ) ဖြစ်သည်။' : 'Default production value is 2880 minutes (48 hours).'}</p>
                         </div>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label>Challenge mode for risky IPs</Label>
+                            <Label>{isMyanmar ? 'အန္တရာယ်ရှိ IP များအတွက် challenge mode' : 'Challenge mode for risky IPs'}</Label>
                             <Select
                                 value={form.challengeMode}
                                 onValueChange={(value) =>
@@ -1730,17 +1988,17 @@ function LoginProtectionCard() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="OFF">Off</SelectItem>
-                                    <SelectItem value="REQUIRE_2FA">Require 2FA if the account supports it</SelectItem>
-                                    <SelectItem value="BLOCK">Block risky IPs after password verification</SelectItem>
+                                    <SelectItem value="OFF">{isMyanmar ? 'ပိတ်ထားသည်' : 'Off'}</SelectItem>
+                                    <SelectItem value="REQUIRE_2FA">{isMyanmar ? 'အကောင့်က ထောက်ပံ့လျှင် 2FA တောင်းမည်' : 'Require 2FA if the account supports it'}</SelectItem>
+                                    <SelectItem value="BLOCK">{isMyanmar ? 'စကားဝှက်စစ်ပြီးနောက် အန္တရာယ်ရှိ IP များကို ပိတ်မည်' : 'Block risky IPs after password verification'}</SelectItem>
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground">
-                                Use risk reputation to add an extra hurdle after the password step.
+                                {isMyanmar ? 'စကားဝှက်အဆင့်ပြီးနောက် risk reputation အပေါ်မူတည်၍ အတားအဆီး ထပ်တိုးပါ။' : 'Use risk reputation to add an extra hurdle after the password step.'}
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Challenge minimum reputation</Label>
+                            <Label>{isMyanmar ? 'challenge စတင်မည့် reputation အနိမ့်ဆုံး' : 'Challenge minimum reputation'}</Label>
                             <Select
                                 value={form.challengeMinimumReputationLevel}
                                 onValueChange={(value) =>
@@ -1760,11 +2018,11 @@ function LoginProtectionCard() {
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground">
-                                Only IPs at or above this reputation level will trigger the challenge mode.
+                                {isMyanmar ? 'ဤ reputation အဆင့် သို့မဟုတ် ထိုထက်မြင့်သော IP များသာ challenge mode ကို ဖြစ်စေမည်။' : 'Only IPs at or above this reputation level will trigger the challenge mode.'}
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Approval trigger</Label>
+                            <Label>{isMyanmar ? 'အတည်ပြုချက် စတင်မည့် အခြေအနေ' : 'Approval trigger'}</Label>
                             <Select
                                 value={form.unusualLoginApprovalRequireFor}
                                 onValueChange={(value) =>
@@ -1778,18 +2036,18 @@ function LoginProtectionCard() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="NEW_DEVICE">New device only</SelectItem>
-                                    <SelectItem value="NEW_COUNTRY">New country only</SelectItem>
-                                    <SelectItem value="EITHER">New device or new country</SelectItem>
-                                    <SelectItem value="BOTH">Require both signals</SelectItem>
+                                    <SelectItem value="NEW_DEVICE">{isMyanmar ? 'စက်အသစ်သာ' : 'New device only'}</SelectItem>
+                                    <SelectItem value="NEW_COUNTRY">{isMyanmar ? 'နိုင်ငံအသစ်သာ' : 'New country only'}</SelectItem>
+                                    <SelectItem value="EITHER">{isMyanmar ? 'စက်အသစ် သို့မဟုတ် နိုင်ငံအသစ်' : 'New device or new country'}</SelectItem>
+                                    <SelectItem value="BOTH">{isMyanmar ? 'အချက်ပြနှစ်ခုလုံး လိုအပ်' : 'Require both signals'}</SelectItem>
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground">
-                                Choose which unusual sign-in pattern should require a manual admin approval.
+                                {isMyanmar ? 'မည်သည့် ပုံမှန်မဟုတ်သော ဝင်ရောက်မှုပုံစံတွင် manual admin အတည်ပြုချက်လိုအပ်မည်ကို ရွေးပါ။' : 'Choose which unusual sign-in pattern should require a manual admin approval.'}
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Approval window (minutes)</Label>
+                            <Label>{isMyanmar ? 'အတည်ပြုရန် စောင့်နိုင်သော ကာလ (မိနစ်)' : 'Approval window (minutes)'}</Label>
                             <Input
                                 type="number"
                                 min={5}
@@ -1803,21 +2061,21 @@ function LoginProtectionCard() {
                                 }
                             />
                             <p className="text-xs text-muted-foreground">
-                                How long an unusual sign-in can wait in the pending queue before it expires.
+                                {isMyanmar ? 'ပုံမှန်မဟုတ်သော ဝင်ရောက်မှုတစ်ခုသည် pending queue တွင် သက်တမ်းမကုန်မီ ဘယ်လောက်ကြာ စောင့်နိုင်မည်ကို သတ်မှတ်ပါ။' : 'How long an unusual sign-in can wait in the pending queue before it expires.'}
                             </p>
                         </div>
                     </div>
 
                     <div className="space-y-3">
                         <div>
-                            <Label>Telegram alert rules</Label>
+                            <Label>{isMyanmar ? 'Telegram အသိပေးချက် စည်းမျဉ်းများ' : 'Telegram alert rules'}</Label>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Fine-tune which security events send Telegram alerts and how noisy they’re allowed to be.
+                                {isMyanmar ? 'မည်သည့် လုံခြုံရေးဖြစ်ရပ်များကို Telegram သို့ ပို့မည်နှင့် အသိပေးချက် အကြိမ်ရေကို ဤနေရာတွင် ချိန်ညှိပါ။' : 'Fine-tune which security events send Telegram alerts and how noisy they’re allowed to be.'}
                             </p>
                         </div>
                         <div className="grid gap-4 xl:grid-cols-2">
                             {Object.entries(form.alertRules).map(([eventKey, rule]) => {
-                                const meta = alertRuleLabels[eventKey] || { title: eventKey, description: eventKey };
+                                const meta = getAlertRuleLabels(isMyanmar)[eventKey] || { title: eventKey, description: eventKey };
                                 return (
                                     <div key={eventKey} className="ops-detail-card space-y-4">
                                         <div className="flex items-start justify-between gap-4">
@@ -1840,7 +2098,7 @@ function LoginProtectionCard() {
                                         </div>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label>Cooldown (minutes)</Label>
+                                                <Label>{isMyanmar ? 'အအေးချိန်ကာလ (မိနစ်)' : 'Cooldown (minutes)'}</Label>
                                                 <Input
                                                     type="number"
                                                     min={1}
@@ -1860,7 +2118,7 @@ function LoginProtectionCard() {
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>Minimum reputation</Label>
+                                                <Label>{isMyanmar ? 'ယုံကြည်ရမှု အနိမ့်ဆုံး' : 'Minimum reputation'}</Label>
                                                 <Select
                                                     value={rule.minimumReputationLevel}
                                                     onValueChange={(value) =>
@@ -1897,9 +2155,9 @@ function LoginProtectionCard() {
                         <div className="ops-detail-card space-y-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
-                                    <p className="font-medium">Daily incident digest</p>
+                                    <p className="font-medium">{isMyanmar ? 'နေ့စဉ် ဖြစ်ရပ်အနှစ်ချုပ်' : 'Daily incident digest'}</p>
                                     <p className="text-sm text-muted-foreground">
-                                        Send a daily security summary to Telegram admin chats with current incidents and high-risk IPs.
+                                        {isMyanmar ? 'လက်ရှိ ဖြစ်ရပ်များနှင့် အန္တရာယ်မြင့် IP များ ပါဝင်သော နေ့စဉ်လုံခြုံရေးအနှစ်ချုပ်ကို Telegram စီမံခန့်ခွဲသူ စကားပြောခန်းများသို့ ပို့ပါ။' : 'Send a daily security summary to Telegram admin chats with current incidents and high-risk IPs.'}
                                     </p>
                                 </div>
                                 <Switch
@@ -1911,7 +2169,7 @@ function LoginProtectionCard() {
                             </div>
                             <div className="grid gap-3 sm:grid-cols-3">
                                 <div className="space-y-2">
-                                    <Label>Digest hour</Label>
+                                    <Label>{isMyanmar ? 'အနှစ်ချုပ်ပို့မည့် နာရီ' : 'Digest hour'}</Label>
                                     <Input
                                         type="number"
                                         min={0}
@@ -1926,7 +2184,7 @@ function LoginProtectionCard() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Digest minute</Label>
+                                    <Label>{isMyanmar ? 'အနှစ်ချုပ်ပို့မည့် မိနစ်' : 'Digest minute'}</Label>
                                     <Input
                                         type="number"
                                         min={0}
@@ -1941,7 +2199,7 @@ function LoginProtectionCard() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Lookback hours</Label>
+                                    <Label>{isMyanmar ? 'ပြန်ကြည့်မည့် နာရီအရေအတွက်' : 'Lookback hours'}</Label>
                                     <Input
                                         type="number"
                                         min={1}
@@ -1960,9 +2218,9 @@ function LoginProtectionCard() {
 
                         <div className="ops-detail-card space-y-4">
                             <div className="space-y-1">
-                                <p className="font-medium">Instant digest</p>
+                                <p className="font-medium">{isMyanmar ? 'ချက်ချင်း အနှစ်ချုပ်' : 'Instant digest'}</p>
                                 <p className="text-sm text-muted-foreground">
-                                    Push the current security incident summary to Telegram immediately without waiting for the scheduled digest.
+                                    {isMyanmar ? 'အချိန်ဇယားအနှစ်ချုပ်ကို မစောင့်ဘဲ လက်ရှိလုံခြုံရေးဖြစ်ရပ် အနှစ်ချုပ်ကို Telegram သို့ ချက်ချင်းပို့ပါ။' : 'Push the current security incident summary to Telegram immediately without waiting for the scheduled digest.'}
                                 </p>
                             </div>
                             <Button
@@ -1976,20 +2234,20 @@ function LoginProtectionCard() {
                                 ) : (
                                     <ExternalLink className="mr-2 h-4 w-4" />
                                 )}
-                                Send security digest now
+                                {isMyanmar ? 'လုံခြုံရေး အနှစ်ချုပ်ကို ယခုပို့မည်' : 'Send security digest now'}
                             </Button>
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Trusted IPs or CIDRs</Label>
+                        <Label>{isMyanmar ? 'ယုံကြည်ရသော IP သို့မဟုတ် CIDR များ' : 'Trusted IPs or CIDRs'}</Label>
                         <Textarea
                             value={form.trustedIpRanges}
                             onChange={(event) => setForm((current) => ({ ...current, trustedIpRanges: event.target.value }))}
                             placeholder={'203.0.113.10\n198.51.100.0/24'}
                             className="min-h-[110px]"
                         />
-                        <p className="text-xs text-muted-foreground">These addresses are exempt from automatic login bans. Use one IP or CIDR per line.</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? 'ဤလိပ်စာများကို auto login ban မှ ချန်လှပ်ထားပါသည်။ တစ်ကြောင်းလျှင် IP တစ်ခု သို့မဟုတ် CIDR တစ်ခုစီ ထည့်ပါ။' : 'These addresses are exempt from automatic login bans. Use one IP or CIDR per line.'}</p>
                     </div>
 
                     <div className="flex justify-end">
@@ -2003,7 +2261,7 @@ function LoginProtectionCard() {
                             })}
                             disabled={saveMutation.isPending}
                         >
-                            {saveMutation.isPending ? 'Saving…' : 'Save protection policy'}
+                            {saveMutation.isPending ? (isMyanmar ? 'သိမ်းနေသည်…' : 'Saving…') : (isMyanmar ? 'ကာကွယ်ရေး မူဝါဒကို သိမ်းမည်' : 'Save protection policy')}
                         </Button>
                     </div>
                 </CardContent>
@@ -2013,14 +2271,14 @@ function LoginProtectionCard() {
                 <div className="space-y-6">
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle>Pending unusual sign-ins</CardTitle>
+                            <CardTitle>{isMyanmar ? 'စောင့်ဆိုင်းနေသော ပုံမှန်မဟုတ်သည့် ဝင်ရောက်မှုများ' : 'Pending unusual sign-ins'}</CardTitle>
                             <CardDescription>
-                                Admin logins from new devices or countries can wait here until another admin approves them.
+                                {isMyanmar ? 'စက်အသစ် သို့မဟုတ် နိုင်ငံအသစ်မှ admin login များကို အခြား admin တစ်ဦး အတည်ပြုမချင်း ဤနေရာတွင် စောင့်ထားမည်။' : 'Admin logins from new devices or countries can wait here until another admin approves them.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="px-0 pb-0">
                             {overview.pendingApprovals.length === 0 ? (
-                                <div className="ops-chart-empty py-8 text-muted-foreground">No admin sign-ins are waiting for approval.</div>
+                                <div className="ops-chart-empty py-8 text-muted-foreground">{isMyanmar ? 'စောင့်ဆိုင်းနေသော admin ဝင်ရောက်မှုများ မရှိပါ။' : 'No admin sign-ins are waiting for approval.'}</div>
                             ) : (
                                 <div className="space-y-3">
                                     {overview.pendingApprovals.map((approval) => (
@@ -2029,10 +2287,10 @@ function LoginProtectionCard() {
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <p className="font-medium">{approval.email}</p>
                                                     <Badge variant={approval.status === 'PENDING' ? 'secondary' : 'outline'}>
-                                                        {approval.status}
+                                                    {getWorkflowStatusLabel(approval.status, isMyanmar)}
                                                     </Badge>
-                                                    {approval.newDevice ? <Badge variant="outline">New device</Badge> : null}
-                                                    {approval.newCountry ? <Badge variant="outline">New country</Badge> : null}
+                                                    {approval.newDevice ? <Badge variant="outline">{isMyanmar ? 'စက်အသစ်' : 'New device'}</Badge> : null}
+                                                    {approval.newCountry ? <Badge variant="outline">{isMyanmar ? 'နိုင်ငံအသစ်' : 'New country'}</Badge> : null}
                                                 </div>
                                                 <div className="text-sm text-muted-foreground">
                                                     {approval.ip}
@@ -2041,10 +2299,12 @@ function LoginProtectionCard() {
                                                 </div>
                                                 <div className="text-sm text-muted-foreground">
                                                     {approval.deviceLabel}
-                                                    {approval.method ? ` • ${approval.method}` : approval.via2FA ? ' • 2FA' : ' • password only'}
+                                                    {approval.method ? ` • ${approval.method}` : approval.via2FA ? ' • 2FA' : isMyanmar ? ' • စကားဝှက်သာ' : ' • password only'}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    Requested {formatDistanceToNow(approval.createdAt, { addSuffix: true })} • expires in about {approval.remainingMinutes} min
+                                                    {isMyanmar
+                                                        ? `တောင်းဆိုချိန် ${formatRelativeTime(approval.createdAt, isMyanmar)} • ${approval.remainingMinutes} မိနစ်ခန့်အတွင်း သက်တမ်းကုန်မည်`
+                                                        : `Requested ${formatRelativeTime(approval.createdAt, isMyanmar)} • expires in about ${approval.remainingMinutes} min`}
                                                 </div>
                                             </div>
                                             <div className="flex flex-wrap items-center gap-2">
@@ -2054,14 +2314,14 @@ function LoginProtectionCard() {
                                                     onClick={() => handleRejectLoginApproval(approval.id)}
                                                     disabled={rejectLoginApprovalMutation.isPending || approval.status !== 'PENDING'}
                                                 >
-                                                    Reject
+                                                    {isMyanmar ? 'ငြင်းမည်' : 'Reject'}
                                                 </Button>
                                                 <Button
                                                     className="rounded-full"
                                                     onClick={() => handleApproveLoginApproval(approval.id)}
                                                     disabled={approveLoginApprovalMutation.isPending || approval.status !== 'PENDING'}
                                                 >
-                                                    Approve
+                                                    {isMyanmar ? 'အတည်ပြုမည်' : 'Approve'}
                                                 </Button>
                                             </div>
                                         </div>
@@ -2073,27 +2333,27 @@ function LoginProtectionCard() {
 
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle>Recent failed admin logins</CardTitle>
+                            <CardTitle>{isMyanmar ? 'မကြာသေးခင်က မအောင်မြင်သော admin ဝင်ရောက်မှုများ' : 'Recent failed admin logins'}</CardTitle>
                             <CardDescription>
-                                Most recent bad-password attempts recorded by the app.
+                                {isMyanmar ? 'app မှ မှတ်တမ်းတင်ထားသော နောက်ဆုံး bad-password ကြိုးစားမှုများ။' : 'Most recent bad-password attempts recorded by the app.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="px-0 pb-0">
                             {overview.recentFailures.length === 0 ? (
-                                <div className="ops-chart-empty py-8 text-muted-foreground">No recent failed admin login attempts.</div>
+                                <div className="ops-chart-empty py-8 text-muted-foreground">{isMyanmar ? 'မကြာသေးခင်က မအောင်မြင်သော admin login ကြိုးစားမှု မရှိပါ။' : 'No recent failed admin login attempts.'}</div>
                             ) : (
                                 <div className="space-y-3">
                                     {overview.recentFailures.map((failure) => (
                                         <div key={failure.id} className="ops-row-card flex items-center justify-between gap-4">
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-medium">{failure.ip || 'Unknown IP'}</span>
+                                                    <span className="font-medium">{failure.ip || (isMyanmar ? 'မသိရသည့် IP' : 'Unknown IP')}</span>
                                                     {failure.countryCode && <Badge variant="outline">{failure.countryCode}</Badge>}
                                                 </div>
-                                                <p className="text-sm text-muted-foreground">{failure.email || 'Unknown email'}</p>
+                                                <p className="text-sm text-muted-foreground">{failure.email || (isMyanmar ? 'မသိရသည့် email' : 'Unknown email')}</p>
                                             </div>
                                             <p className="text-xs text-muted-foreground">
-                                                {formatDistanceToNow(new Date(failure.createdAt), { addSuffix: true })}
+                                                {formatRelativeTime(failure.createdAt, isMyanmar)}
                                             </p>
                                         </div>
                                     ))}
@@ -2104,30 +2364,30 @@ function LoginProtectionCard() {
 
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle>Recent admin sign-ins</CardTitle>
+                            <CardTitle>{isMyanmar ? 'မကြာသေးခင်က admin ဝင်ရောက်မှုများ' : 'Recent admin sign-ins'}</CardTitle>
                             <CardDescription>
-                                Successful admin logins with device and country-change review.
+                                {isMyanmar ? 'စက်ပစ္စည်းနှင့် နိုင်ငံပြောင်းလဲမှုကို ပြန်လည်သုံးသပ်နိုင်ရန် အောင်မြင်သော admin ဝင်ရောက်မှုများကို ပြပါသည်။' : 'Successful admin logins with device and country-change review.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="px-0 pb-0">
                             {recentAdminLogins.length === 0 ? (
-                                <div className="ops-chart-empty py-8 text-muted-foreground">No recent successful admin sign-ins recorded yet.</div>
+                                <div className="ops-chart-empty py-8 text-muted-foreground">{isMyanmar ? 'မကြာသေးခင်က အောင်မြင်သော admin ဝင်ရောက်မှု မှတ်တမ်း မရှိသေးပါ။' : 'No recent successful admin sign-ins recorded yet.'}</div>
                             ) : (
                                 <div className="space-y-3">
                                     {recentAdminLogins.map((login) => (
                                         <div key={login.id} className="ops-row-card flex flex-wrap items-start justify-between gap-4">
                                             <div className="min-w-0 space-y-2">
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="font-medium">{login.email || 'Unknown admin'}</span>
+                                                    <span className="font-medium">{login.email || (isMyanmar ? 'မသိရသည့် admin' : 'Unknown admin')}</span>
                                                     {login.countryCode && <Badge variant="outline">{login.countryCode}</Badge>}
-                                                    {login.newDevice && <Badge className="bg-sky-500/10 text-sky-600 dark:text-sky-300">New device</Badge>}
-                                                    {login.newCountry && <Badge className="bg-violet-500/10 text-violet-600 dark:text-violet-300">New country</Badge>}
+                                                    {login.newDevice && <Badge className="bg-sky-500/10 text-sky-600 dark:text-sky-300">{isMyanmar ? 'စက်ပစ္စည်းအသစ်' : 'New device'}</Badge>}
+                                                    {login.newCountry && <Badge className="bg-violet-500/10 text-violet-600 dark:text-violet-300">{isMyanmar ? 'နိုင်ငံအသစ်' : 'New country'}</Badge>}
                                                     {login.via2FA && <Badge variant="secondary">2FA</Badge>}
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                                                    <span>{login.ip || 'Unknown IP'}</span>
+                                                    <span>{login.ip || (isMyanmar ? 'မသိရသည့် IP' : 'Unknown IP')}</span>
                                                     <span>•</span>
-                                                    <span>{login.deviceLabel || 'Unknown device'}</span>
+                                                    <span>{login.deviceLabel || (isMyanmar ? 'မသိရသည့် စက်ပစ္စည်း' : 'Unknown device')}</span>
                                                     {login.host && (
                                                         <>
                                                             <span>•</span>
@@ -2152,7 +2412,7 @@ function LoginProtectionCard() {
                                                 </div>
                                             </div>
                                             <p className="text-xs text-muted-foreground">
-                                                {formatDistanceToNow(new Date(login.createdAt), { addSuffix: true })}
+                                                {formatRelativeTime(login.createdAt, isMyanmar)}
                                             </p>
                                         </div>
                                     ))}
@@ -2165,36 +2425,38 @@ function LoginProtectionCard() {
                 <div className="space-y-6">
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle>Server fail2ban status</CardTitle>
+                            <CardTitle>{isMyanmar ? 'server fail2ban အခြေအနေ' : 'Server fail2ban status'}</CardTitle>
                             <CardDescription>
-                                Live jail state from the server-side auth jail that hard-bans abusive admin login IPs.
+                                {isMyanmar ? 'abusive admin login IP များကို hard-ban လုပ်သည့် server-side auth jail ၏ လက်ရှိအခြေအနေကို ပြပါသည်။' : 'Live jail state from the server-side auth jail that hard-bans abusive admin login IPs.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4 px-0 pb-0">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="ops-detail-card">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Jail</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'Jail' : 'Jail'}</p>
                                     <p className="mt-2 font-semibold">{overview.fail2banStatus.jail}</p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        {overview.fail2banStatus.available ? 'Connected to fail2ban' : overview.fail2banStatus.error || 'Unavailable'}
+                                        {overview.fail2banStatus.available
+                                            ? (isMyanmar ? 'fail2ban နှင့် ချိတ်ဆက်ထားသည်' : 'Connected to fail2ban')
+                                            : overview.fail2banStatus.error || (isMyanmar ? 'မရရှိနိုင်ပါ' : 'Unavailable')}
                                     </p>
                                 </div>
                                 <div className="ops-detail-card">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Currently banned</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ယခု ပိတ်ပင်ထားသည်' : 'Currently banned'}</p>
                                     <p className="mt-2 text-2xl font-semibold">{overview.fail2banStatus.currentlyBanned}</p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        {overview.fail2banStatus.totalBanned} total bans recorded
+                                        {isMyanmar ? `စုစုပေါင်း ban ${overview.fail2banStatus.totalBanned} ကြိမ် မှတ်တမ်းတင်ထားသည်` : `${overview.fail2banStatus.totalBanned} total bans recorded`}
                                     </p>
                                 </div>
                                 <div className="ops-detail-card">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Currently failed</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ယခု မအောင်မြင်မှု' : 'Currently failed'}</p>
                                     <p className="mt-2 text-2xl font-semibold">{overview.fail2banStatus.currentlyFailed}</p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        {overview.fail2banStatus.totalFailed} total failed hits seen by the jail
+                                        {isMyanmar ? `jail မှ တွေ့ရှိထားသော စုစုပေါင်း မအောင်မြင်မှု ${overview.fail2banStatus.totalFailed} ကြိမ်` : `${overview.fail2banStatus.totalFailed} total failed hits seen by the jail`}
                                     </p>
                                 </div>
                                 <div className="ops-detail-card">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Banned IP list</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ပိတ်ပင်ထားသော IP စာရင်း' : 'Banned IP list'}</p>
                                     <div className="mt-2 space-y-2">
                                         {overview.fail2banStatus.bannedIps.length > 0 ? (
                                             overview.fail2banStatus.bannedIps.slice(0, 8).map((ip) => (
@@ -2208,12 +2470,12 @@ function LoginProtectionCard() {
                                                         onClick={() => unbanMutation.mutate({ ip })}
                                                     >
                                                         <Unlock className="mr-2 h-3.5 w-3.5" />
-                                                        Unban
+                                                        {isMyanmar ? 'ပိတ်ပင်မှု ဖြုတ်မည်' : 'Unban'}
                                                     </Button>
                                                 </div>
                                             ))
                                         ) : (
-                                            <p className="text-sm text-muted-foreground">No IPs currently banned by fail2ban.</p>
+                                            <p className="text-sm text-muted-foreground">{isMyanmar ? 'fail2ban ဖြင့် ယခု ပိတ်ပင်ထားသော IP မရှိပါ။' : 'No IPs currently banned by fail2ban.'}</p>
                                         )}
                                     </div>
                                 </div>
@@ -2223,25 +2485,25 @@ function LoginProtectionCard() {
 
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle>Top offender IPs</CardTitle>
+                            <CardTitle>{isMyanmar ? 'အများဆုံး ကြိုးစားနေသော IP များ' : 'Top offender IPs'}</CardTitle>
                             <CardDescription>
-                                Highest failure counts over the last 24 hours.
+                                {isMyanmar ? 'နောက်ဆုံး ၂၄ နာရီအတွင်း မအောင်မြင်မှု အများဆုံး IP များ။' : 'Highest failure counts over the last 24 hours.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="px-0 pb-0">
                             {overview.topOffenders.length === 0 ? (
-                                <div className="ops-chart-empty py-8 text-muted-foreground">No offender IPs recorded yet.</div>
+                                <div className="ops-chart-empty py-8 text-muted-foreground">{isMyanmar ? 'offender IP မှတ်တမ်း မရှိသေးပါ။' : 'No offender IPs recorded yet.'}</div>
                             ) : (
                                 <div className="space-y-3">
                                     {overview.topOffenders.map((offender) => (
                                         <div key={offender.ip} className="ops-row-card flex items-center justify-between gap-4">
                                             <div className="space-y-1">
                                                 <p className="font-medium">{offender.ip}</p>
-                                                <p className="text-xs text-muted-foreground">{offender.email || 'Unknown email'}</p>
+                                                <p className="text-xs text-muted-foreground">{offender.email || (isMyanmar ? 'မသိရသည့် email' : 'Unknown email')}</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className="font-semibold">{offender.count}</p>
-                                                <p className="text-xs text-muted-foreground">attempts</p>
+                                                <p className="text-xs text-muted-foreground">{isMyanmar ? 'ကြိုးစားမှုများ' : 'attempts'}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -2252,14 +2514,14 @@ function LoginProtectionCard() {
 
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle>Active restrictions</CardTitle>
+                            <CardTitle>{isMyanmar ? 'အသက်ဝင် ကန့်သတ်ချက်များ' : 'Active restrictions'}</CardTitle>
                             <CardDescription>
-                                IPs currently locked or banned by the app.
+                                {isMyanmar ? 'app မှ ယခု lock သို့မဟုတ် ban လုပ်ထားသော IP များ။' : 'IPs currently locked or banned by the app.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="px-0 pb-0">
                             {overview.activeRestrictions.length === 0 ? (
-                                <div className="ops-chart-empty py-8 text-muted-foreground">No active login bans or locks.</div>
+                                <div className="ops-chart-empty py-8 text-muted-foreground">{isMyanmar ? 'အသက်ဝင် login ban သို့မဟုတ် lock မရှိပါ။' : 'No active login bans or locks.'}</div>
                             ) : (
                                 <div className="space-y-3">
                                     {overview.activeRestrictions.map((restriction) => (
@@ -2269,10 +2531,10 @@ function LoginProtectionCard() {
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-medium">{restriction.ip}</span>
                                                         <Badge variant={restriction.restrictionType === 'BAN' ? 'destructive' : 'secondary'}>
-                                                            {restriction.restrictionType}
+                                                            {getRestrictionTypeLabel(restriction.restrictionType, isMyanmar)}
                                                         </Badge>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground">{restriction.attemptedEmail || 'Unknown email'}</p>
+                                                    <p className="text-sm text-muted-foreground">{restriction.attemptedEmail || (isMyanmar ? 'မသိရသည့် email' : 'Unknown email')}</p>
                                                 </div>
                                                 <Button
                                                     variant="outline"
@@ -2281,13 +2543,13 @@ function LoginProtectionCard() {
                                                     disabled={unbanMutation.isPending}
                                                 >
                                                     <Unlock className="mr-2 h-4 w-4" />
-                                                    Unban
+                                                    {isMyanmar ? 'ပြန်ဖွင့်မည်' : 'Unban'}
                                                 </Button>
                                             </div>
                                             <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
-                                                <span>Failures: {restriction.failureCount}</span>
-                                                <span>Last hit: {formatDistanceToNow(new Date(restriction.lastFailedAt), { addSuffix: true })}</span>
-                                                <span>Expires: {formatDistanceToNow(new Date(restriction.expiresAt), { addSuffix: true })}</span>
+                                                <span>{isMyanmar ? `မအောင်မြင်မှုများ: ${restriction.failureCount}` : `Failures: ${restriction.failureCount}`}</span>
+                                                <span>{isMyanmar ? `နောက်ဆုံးတွေ့ရှိချိန်: ${formatRelativeTime(restriction.lastFailedAt, isMyanmar)}` : `Last hit: ${formatRelativeTime(restriction.lastFailedAt, isMyanmar)}`}</span>
+                                                <span>{isMyanmar ? `သက်တမ်းကုန်မည့်အချိန်: ${formatRelativeTime(restriction.expiresAt, isMyanmar)}` : `Expires: ${formatRelativeTime(restriction.expiresAt, isMyanmar)}`}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -2303,9 +2565,9 @@ function LoginProtectionCard() {
                     <CardHeader className="px-0 pt-0">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <CardTitle>Incident timeline</CardTitle>
+                                <CardTitle>{isMyanmar ? 'အဖြစ်အပျက် အချိန်လိုင်း' : 'Incident timeline'}</CardTitle>
                                 <CardDescription>
-                                    Grouped bursts of failed admin logins so you can see what escalated, what was contained, and what is still active.
+                                    {isMyanmar ? 'မအောင်မြင်သော admin login များကို အစုလိုက် ပြသပြီး အဘယ်အရာ တိုးလာသည်၊ ထိန်းထားနိုင်သည်၊ မည်သည့်အရာ ဆက်လက် active ဖြစ်နေသည်ကို ကြည့်နိုင်သည်။' : 'Grouped bursts of failed admin logins so you can see what escalated, what was contained, and what is still active.'}
                                 </CardDescription>
                             </div>
                             <div className="flex gap-2">
@@ -2321,7 +2583,7 @@ function LoginProtectionCard() {
                                     ) : (
                                         <Download className="mr-2 h-4 w-4" />
                                     )}
-                                    Export CSV
+                                    {isMyanmar ? 'CSV ထုတ်မည်' : 'Export CSV'}
                                 </Button>
                                 <Button
                                     variant="outline"
@@ -2335,7 +2597,7 @@ function LoginProtectionCard() {
                                     ) : (
                                         <Download className="mr-2 h-4 w-4" />
                                     )}
-                                    Export JSON
+                                    {isMyanmar ? 'JSON ထုတ်မည်' : 'Export JSON'}
                                 </Button>
                             </div>
                         </div>
@@ -2345,17 +2607,17 @@ function LoginProtectionCard() {
                             <div className="ops-detail-card space-y-3">
                                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                                     <div className="space-y-2">
-                                        <Label>Search</Label>
+                                        <Label>{isMyanmar ? 'ရှာဖွေမှု' : 'Search'}</Label>
                                         <Input
                                             value={incidentFilters.search}
                                             onChange={(event) =>
                                                 setIncidentFilters((current) => ({ ...current, search: event.target.value }))
                                             }
-                                            placeholder="IP, email, host, ASN..."
+                                            placeholder={isMyanmar ? 'IP, email, host, ASN...' : 'IP, email, host, ASN...'}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Status</Label>
+                                        <Label>{isMyanmar ? 'အခြေအနေ' : 'Status'}</Label>
                                         <Select
                                             value={incidentFilters.status}
                                             onValueChange={(value) =>
@@ -2374,7 +2636,7 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Workflow</Label>
+                                        <Label>{isMyanmar ? 'လုပ်ငန်းစဉ်' : 'Workflow'}</Label>
                                         <Select
                                             value={incidentFilters.workflowStatus}
                                             onValueChange={(value) =>
@@ -2393,7 +2655,7 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Severity</Label>
+                                        <Label>{isMyanmar ? 'ပြင်းထန်မှု' : 'Severity'}</Label>
                                         <Select
                                             value={incidentFilters.severity}
                                             onValueChange={(value) =>
@@ -2412,7 +2674,7 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Country</Label>
+                                        <Label>{isMyanmar ? 'နိုင်ငံ' : 'Country'}</Label>
                                         <Select
                                             value={incidentFilters.country}
                                             onValueChange={(value) =>
@@ -2421,7 +2683,7 @@ function LoginProtectionCard() {
                                         >
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="ALL">ALL</SelectItem>
+                                                <SelectItem value="ALL">{isMyanmar ? 'အားလုံး' : 'ALL'}</SelectItem>
                                                 {availableCountries.map((country) => (
                                                     <SelectItem key={country} value={country}>{country}</SelectItem>
                                                 ))}
@@ -2429,7 +2691,7 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Assignee</Label>
+                                        <Label>{isMyanmar ? 'တာဝန်ခံ' : 'Assignee'}</Label>
                                         <Select
                                             value={incidentFilters.assignee}
                                             onValueChange={(value) =>
@@ -2438,11 +2700,11 @@ function LoginProtectionCard() {
                                         >
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="ALL">ALL</SelectItem>
+                                                <SelectItem value="ALL">{isMyanmar ? 'အားလုံး' : 'ALL'}</SelectItem>
                                                 {currentOperatorEmail && (
-                                                    <SelectItem value={currentOperatorEmail}>Assigned to me</SelectItem>
+                                                    <SelectItem value={currentOperatorEmail}>{isMyanmar ? 'ကျွန်ုပ်ထံ သတ်မှတ်ထားသည်' : 'Assigned to me'}</SelectItem>
                                                 )}
-                                                <SelectItem value={INCIDENT_ASSIGNEE_UNASSIGNED_VALUE}>Unassigned</SelectItem>
+                                                <SelectItem value={INCIDENT_ASSIGNEE_UNASSIGNED_VALUE}>{isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned'}</SelectItem>
                                                 {availableAssignees
                                                     .filter((email) => email !== currentOperatorEmail)
                                                     .map((email) => (
@@ -2452,7 +2714,7 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Reputation</Label>
+                                        <Label>{isMyanmar ? 'Reputation' : 'Reputation'}</Label>
                                         <Select
                                             value={incidentFilters.reputation}
                                             onValueChange={(value) =>
@@ -2464,7 +2726,7 @@ function LoginProtectionCard() {
                                         >
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="ALL">ALL</SelectItem>
+                                                <SelectItem value="ALL">{isMyanmar ? 'အားလုံး' : 'ALL'}</SelectItem>
                                                 {riskLevels.map((level) => (
                                                     <SelectItem key={level} value={level}>{level}</SelectItem>
                                                 ))}
@@ -2472,7 +2734,7 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Time window</Label>
+                                        <Label>{isMyanmar ? 'အချိန်အပိုင်း' : 'Time window'}</Label>
                                         <Select
                                             value={incidentFilters.timeWindowHours === null ? 'all' : String(incidentFilters.timeWindowHours)}
                                             onValueChange={(value) =>
@@ -2484,12 +2746,12 @@ function LoginProtectionCard() {
                                         >
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="1">Last 1 hour</SelectItem>
-                                                <SelectItem value="6">Last 6 hours</SelectItem>
-                                                <SelectItem value="24">Last 24 hours</SelectItem>
-                                                <SelectItem value="72">Last 72 hours</SelectItem>
-                                                <SelectItem value="168">Last 7 days</SelectItem>
-                                                <SelectItem value="all">All available</SelectItem>
+                                                <SelectItem value="1">{isMyanmar ? 'နောက်ဆုံး ၁ နာရီ' : 'Last 1 hour'}</SelectItem>
+                                                <SelectItem value="6">{isMyanmar ? 'နောက်ဆုံး ၆ နာရီ' : 'Last 6 hours'}</SelectItem>
+                                                <SelectItem value="24">{isMyanmar ? 'နောက်ဆုံး ၂၄ နာရီ' : 'Last 24 hours'}</SelectItem>
+                                                <SelectItem value="72">{isMyanmar ? 'နောက်ဆုံး ၇၂ နာရီ' : 'Last 72 hours'}</SelectItem>
+                                                <SelectItem value="168">{isMyanmar ? 'နောက်ဆုံး ၇ ရက်' : 'Last 7 days'}</SelectItem>
+                                                <SelectItem value="all">{isMyanmar ? 'ရနိုင်သမျှ အားလုံး' : 'All available'}</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -2503,7 +2765,7 @@ function LoginProtectionCard() {
                                         onClick={handleSaveCurrentView}
                                     >
                                         <Plus className="mr-2 h-4 w-4" />
-                                        Save current view
+                                        {isMyanmar ? 'လက်ရှိ view ကို သိမ်းမည်' : 'Save current view'}
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -2515,7 +2777,7 @@ function LoginProtectionCard() {
                                         }}
                                     >
                                         <RefreshCw className="mr-2 h-4 w-4" />
-                                        Reset filters
+                                        {isMyanmar ? 'စစ်ထုတ်မှုများကို ပြန်သတ်မှတ်မည်' : 'Reset filters'}
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -2534,7 +2796,7 @@ function LoginProtectionCard() {
                                         }}
                                     >
                                         <ListFilter className="mr-2 h-4 w-4" />
-                                        My active work
+                                        {isMyanmar ? 'ကျွန်ုပ်၏ active အလုပ်' : 'My active work'}
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -2550,15 +2812,17 @@ function LoginProtectionCard() {
                                         }}
                                     >
                                         <AlertTriangle className="mr-2 h-4 w-4" />
-                                        High-risk week
+                                        {isMyanmar ? 'အန္တရာယ်မြင့် အပတ်' : 'High-risk week'}
                                     </Button>
                                 </div>
                             </div>
                             <div className="ops-detail-card space-y-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <p className="font-medium">Saved views</p>
-                                        <p className="text-sm text-muted-foreground">Reuse common incident and reputation filters.</p>
+                                        <p className="font-medium">{isMyanmar ? 'သိမ်းထားသော မြင်ကွင်းများ' : 'Saved views'}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                        {isMyanmar ? 'ဖြစ်ရပ်နှင့် reputation စစ်ထုတ်မှုများကို ပြန်လည်အသုံးပြုပါ။' : 'Reuse common incident and reputation filters.'}
+                                        </p>
                                     </div>
                                     <Badge variant="outline">{overview.savedViews.length}</Badge>
                                 </div>
@@ -2569,7 +2833,7 @@ function LoginProtectionCard() {
                                         className="w-full justify-start rounded-full"
                                         onClick={() => handleApplySavedView('all')}
                                     >
-                                        All incidents
+                                        {isMyanmar ? 'ဖြစ်ရပ်အားလုံး' : 'All incidents'}
                                     </Button>
                                     <Button
                                         variant={defaultSavedViewId === 'all' ? 'secondary' : 'ghost'}
@@ -2578,7 +2842,9 @@ function LoginProtectionCard() {
                                         onClick={() => handleSetDefaultSavedView('all')}
                                     >
                                         <Star className="mr-2 h-4 w-4" />
-                                        {defaultSavedViewId === 'all' ? 'Default view' : 'Set current default'}
+                                        {defaultSavedViewId === 'all'
+                                            ? (isMyanmar ? 'မူလ မြင်ကွင်း' : 'Default view')
+                                            : (isMyanmar ? 'လက်ရှိ မြင်ကွင်းကို မူလအဖြစ် သတ်မှတ်မည်' : 'Set current default')}
                                     </Button>
                                     {overview.savedViews.map((view) => (
                                         <div key={view.id} className="flex items-center gap-2">
@@ -2615,14 +2881,16 @@ function LoginProtectionCard() {
                         <div className="ops-detail-card space-y-3">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="font-medium">Alert suppressions</p>
-                                    <p className="text-sm text-muted-foreground">Review muted incidents and IPs without opening each card.</p>
+                                    <p className="font-medium">{isMyanmar ? 'အသိပေးချက် တိတ်ဆိတ်ထားမှုများ' : 'Alert suppressions'}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {isMyanmar ? 'ကတ်တစ်ခုချင်း မဖွင့်ဘဲ အသိပေးချက် ပိတ်ထားသော ဖြစ်ရပ်များနှင့် IP များကို စစ်ဆေးပါ။' : 'Review muted incidents and IPs without opening each card.'}
+                                    </p>
                                 </div>
                                 <Badge variant="outline">{overview.activeAlertSuppressions.length}</Badge>
                             </div>
                             {overview.activeAlertSuppressions.length === 0 ? (
                                 <div className="rounded-[1rem] border border-dashed border-border/60 px-4 py-4 text-sm text-muted-foreground">
-                                    No active suppressions.
+                                    {isMyanmar ? 'အသက်ဝင် တိတ်ဆိတ်ထားမှု မရှိပါ။' : 'No active suppressions.'}
                                 </div>
                             ) : (
                                 <div className="space-y-2">
@@ -2638,11 +2906,13 @@ function LoginProtectionCard() {
                                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                                     <div className="space-y-1">
                                                         <div className="flex flex-wrap items-center gap-2">
-                                                            <Badge variant="outline">{suppression.scopeType}</Badge>
+                                                            <Badge variant="outline">{getSuppressionScopeLabel(suppression.scopeType, isMyanmar)}</Badge>
                                                             <span className="text-sm font-medium break-all">{suppression.scopeValue}</span>
                                                         </div>
                                                         <p className="text-xs text-muted-foreground">
-                                                            {suppression.reason || 'No reason provided'} · expires {formatDistanceToNow(new Date(suppression.expiresAt), { addSuffix: true })}
+                                                            {(suppression.reason || (isMyanmar ? 'အကြောင်းပြချက် မဖော်ပြထားပါ' : 'No reason provided'))}
+                                                            {' · '}
+                                                            {isMyanmar ? 'သက်တမ်းကုန်ရန်' : 'expires'} {formatRelativeTime(suppression.expiresAt, isMyanmar)}
                                                         </p>
                                                         {relatedIncident && (
                                                             <p className="text-xs text-muted-foreground">{relatedIncident.summary}</p>
@@ -2657,7 +2927,7 @@ function LoginProtectionCard() {
                                                                 onClick={() => setIncidentDetailId(relatedIncident.id)}
                                                             >
                                                                 <Eye className="mr-2 h-4 w-4" />
-                                                                View
+                                                                {isMyanmar ? 'ကြည့်မည်' : 'View'}
                                                             </Button>
                                                         )}
                                                         <Button
@@ -2668,7 +2938,7 @@ function LoginProtectionCard() {
                                                             onClick={() => handleUnmuteScope(suppression.scopeType, suppression.scopeValue)}
                                                         >
                                                             <Unlock className="mr-2 h-4 w-4" />
-                                                            Unmute
+                                                            {isMyanmar ? 'အသိပေးချက် ပိတ်ခြင်း ဖြုတ်မည်' : 'Unmute'}
                                                         </Button>
                                                     </div>
                                                 </div>
@@ -2682,37 +2952,41 @@ function LoginProtectionCard() {
                             <div className="ops-detail-card space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div>
-                                        <p className="font-medium">{selectedIncidentIds.length} incidents selected</p>
-                                        <p className="text-sm text-muted-foreground">Apply the same workflow or mute action to all selected incidents.</p>
+                                                <p className="font-medium">
+                                                    {isMyanmar ? `ဖြစ်ရပ် ${selectedIncidentIds.length} ခု ရွေးထားသည်` : `${selectedIncidentIds.length} incidents selected`}
+                                                </p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {isMyanmar ? 'ရွေးထားသော ဖြစ်ရပ်အားလုံးတွင် လုပ်ငန်းစဉ် သို့မဟုတ် အသိပေးချက် ပိတ်ခြင်းလုပ်ဆောင်ချက်ကို တူညီစွာ အသုံးချပါ။' : 'Apply the same workflow or mute action to all selected incidents.'}
+                                                </p>
                                     </div>
                                     <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedIncidentIds([])}>
-                                        Clear selection
+                                        {isMyanmar ? 'ရွေးချယ်မှု ဖြုတ်မည်' : 'Clear selection'}
                                     </Button>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('ACKNOWLEDGE')}>
                                         <CheckCircle className="mr-2 h-4 w-4" />
-                                        Acknowledge
+                                        {isMyanmar ? 'အတည်ပြုမည်' : 'Acknowledge'}
                                     </Button>
                                     <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('RESOLVE')}>
                                         <ShieldCheck className="mr-2 h-4 w-4" />
-                                        Resolve
+                                        {isMyanmar ? 'ဖြေရှင်းမည်' : 'Resolve'}
                                     </Button>
                                     <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('MUTE')}>
                                         <BellOff className="mr-2 h-4 w-4" />
-                                        Mute
+                                        {isMyanmar ? 'အသိပေးချက် ပိတ်မည်' : 'Mute'}
                                     </Button>
                                     <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('UNMUTE')}>
                                         <Unlock className="mr-2 h-4 w-4" />
-                                        Unmute
+                                        {isMyanmar ? 'အသိပေးချက် ပိတ်ခြင်း ဖြုတ်မည်' : 'Unmute'}
                                     </Button>
                                     <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('ASSIGN')}>
                                         <User className="mr-2 h-4 w-4" />
-                                        Assign
+                                        {isMyanmar ? 'တာဝန်ပေးမည်' : 'Assign'}
                                     </Button>
                                     <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIncidentAction('UNASSIGN')}>
                                         <UserX className="mr-2 h-4 w-4" />
-                                        Unassign
+                                        {isMyanmar ? 'တာဝန်ဖြုတ်မည်' : 'Unassign'}
                                     </Button>
                                 </div>
                             </div>
@@ -2720,8 +2994,8 @@ function LoginProtectionCard() {
                         {filteredIncidents.length === 0 ? (
                             <div className="ops-chart-empty py-8 text-muted-foreground">
                                 {overview.securityIncidents.length === 0
-                                    ? 'No login abuse incidents recorded yet.'
-                                    : 'No incidents match the current filters.'}
+                                    ? (isMyanmar ? 'admin login abuse ဖြစ်ရပ်များ မမှတ်တမ်းတင်ရသေးပါ။' : 'No login abuse incidents recorded yet.')
+                                    : (isMyanmar ? 'လက်ရှိ စစ်ထုတ်မှုများနှင့် ကိုက်ညီသော ဖြစ်ရပ် မရှိပါ။' : 'No incidents match the current filters.')}
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -2735,10 +3009,10 @@ function LoginProtectionCard() {
                                                 )
                                             }
                                         />
-                                        <span className="text-muted-foreground">Select all visible incidents</span>
+                                        <span className="text-muted-foreground">{isMyanmar ? 'မြင်ရသမျှ ဖြစ်ရပ်အားလုံးကို ရွေးမည်' : 'Select all visible incidents'}</span>
                                     </div>
                                     <span className="text-xs text-muted-foreground">
-                                        {selectedIncidentIds.length} selected
+                                        {isMyanmar ? `${selectedIncidentIds.length} ခု ရွေးထားသည်` : `${selectedIncidentIds.length} selected`}
                                     </span>
                                 </div>
                                 {filteredIncidents.map((incident) => (
@@ -2755,16 +3029,16 @@ function LoginProtectionCard() {
                                                     <span className="font-medium">{incident.ip}</span>
                                                     {incident.countryCode && <Badge variant="outline">{incident.countryCode}</Badge>}
                                                     <Badge variant="outline" className={incidentSeverityClasses(incident.severity)}>
-                                                        {incident.severity}
+                                                        {getIncidentSeverityLabel(incident.severity, isMyanmar)}
                                                     </Badge>
                                                     <Badge variant="outline" className={incidentStatusClasses(incident.status)}>
-                                                        {incident.status}
+                                                        {getIncidentStatusLabel(incident.status, isMyanmar)}
                                                     </Badge>
                                                     <Badge variant="outline" className={workflowStatusClasses(incident.workflowStatus)}>
-                                                        {incident.workflowStatus}
+                                                        {getWorkflowStatusLabel(incident.workflowStatus, isMyanmar)}
                                                     </Badge>
                                                     {incident.activeRestrictionType && (
-                                                        <Badge variant="outline">{incident.activeRestrictionType}</Badge>
+                                                        <Badge variant="outline">{getRestrictionTypeLabel(incident.activeRestrictionType, isMyanmar)}</Badge>
                                                     )}
                                                     {incident.assignedToEmail && (
                                                         <Badge variant="outline" className="gap-1">
@@ -2773,15 +3047,17 @@ function LoginProtectionCard() {
                                                         </Badge>
                                                     )}
                                                     {incident.alertSuppression && (
-                                                        <Badge variant="outline">Muted for {incident.alertSuppression.remainingMinutes} min</Badge>
+                                                        <Badge variant="outline">
+                                                            {isMyanmar ? `${incident.alertSuppression.remainingMinutes} မိနစ် အသိပေးချက် ပိတ်ထားသည်` : `Muted for ${incident.alertSuppression.remainingMinutes} min`}
+                                                        </Badge>
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">{incident.summary}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right text-xs text-muted-foreground">
-                                                <p>Started {formatDistanceToNow(new Date(incident.startedAt), { addSuffix: true })}</p>
-                                                <p>Last seen {formatDistanceToNow(new Date(incident.endedAt), { addSuffix: true })}</p>
+                                                <p>{isMyanmar ? 'စတင်ချိန် ' : 'Started '}{formatRelativeTime(incident.startedAt, isMyanmar)}</p>
+                                                <p>{isMyanmar ? 'နောက်ဆုံးတွေ့ရှိချိန် ' : 'Last seen '}{formatRelativeTime(incident.endedAt, isMyanmar)}</p>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
@@ -2789,28 +3065,32 @@ function LoginProtectionCard() {
                                                     onClick={() => setIncidentDetailId(incident.id)}
                                                 >
                                                     <Eye className="mr-2 h-4 w-4" />
-                                                    Details
+                                                    {isMyanmar ? 'အသေးစိတ်' : 'Details'}
                                                 </Button>
                                             </div>
                                         </div>
                                         {(incident.notesPreview || incident.assignedToEmail || incident.enrichment.reverseDns.length > 0 || incident.enrichment.asn || incident.enrichment.isp || incident.enrichment.organization) && (
                                             <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-2">
                                                 <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
-                                                    <p className="font-medium text-foreground">Workflow</p>
+                                                    <p className="font-medium text-foreground">{isMyanmar ? 'လုပ်ငန်းစဉ်' : 'Workflow'}</p>
                                                     <p className="mt-1">
                                                         {incident.workflowStatus === 'ACKNOWLEDGED' && incident.acknowledgedAt
-                                                            ? `Acknowledged ${formatDistanceToNow(new Date(incident.acknowledgedAt), { addSuffix: true })}${incident.acknowledgedByEmail ? ` by ${incident.acknowledgedByEmail}` : ''}`
+                                                            ? isMyanmar
+                                                                ? `${formatRelativeTime(incident.acknowledgedAt, isMyanmar)} တွင် အတည်ပြုပြီး${incident.acknowledgedByEmail ? ` ${incident.acknowledgedByEmail} မှ` : ''}`
+                                                                : `Acknowledged ${formatRelativeTime(incident.acknowledgedAt, isMyanmar)}${incident.acknowledgedByEmail ? ` by ${incident.acknowledgedByEmail}` : ''}`
                                                             : incident.workflowStatus === 'RESOLVED' && incident.resolvedAt
-                                                                ? `Resolved ${formatDistanceToNow(new Date(incident.resolvedAt), { addSuffix: true })}${incident.resolvedByEmail ? ` by ${incident.resolvedByEmail}` : ''}`
-                                                                : 'Open incident'}
+                                                                ? isMyanmar
+                                                                    ? `${formatRelativeTime(incident.resolvedAt, isMyanmar)} တွင် ဖြေရှင်းပြီး${incident.resolvedByEmail ? ` ${incident.resolvedByEmail} မှ` : ''}`
+                                                                    : `Resolved ${formatRelativeTime(incident.resolvedAt, isMyanmar)}${incident.resolvedByEmail ? ` by ${incident.resolvedByEmail}` : ''}`
+                                                                : (isMyanmar ? 'ဖွင့်ထားသော အဖြစ်အပျက်' : 'Open incident')}
                                                     </p>
                                                     {incident.assignedToEmail && (
                                                         <p className="mt-2 text-muted-foreground">
-                                                            Assigned to {incident.assignedToEmail}
+                                                            {isMyanmar ? `${incident.assignedToEmail} ထံ တာဝန်ပေးထားသည်` : `Assigned to ${incident.assignedToEmail}`}
                                                             {incident.assignedAt
-                                                                ? ` ${formatDistanceToNow(new Date(incident.assignedAt), { addSuffix: true })}`
+                                                                ? ` ${formatRelativeTime(incident.assignedAt, isMyanmar)}`
                                                                 : ''}
-                                                            {incident.assignedByEmail ? ` by ${incident.assignedByEmail}` : ''}
+                                                            {incident.assignedByEmail ? (isMyanmar ? ` ${incident.assignedByEmail} မှ` : ` by ${incident.assignedByEmail}`) : ''}
                                                         </p>
                                                     )}
                                                     {incident.notesPreview && (
@@ -2818,17 +3098,17 @@ function LoginProtectionCard() {
                                                     )}
                                                 </div>
                                                 <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
-                                                    <p className="font-medium text-foreground">Network enrichment</p>
+                                                    <p className="font-medium text-foreground">{isMyanmar ? 'ကွန်ရက် အချက်အလက် ဖြည့်စွက်မှု' : 'Network enrichment'}</p>
                                                     <div className="mt-1 space-y-1">
                                                         <p>
                                                             {incident.enrichment.asn || incident.enrichment.organization || incident.enrichment.isp
                                                                 ? [incident.enrichment.asn, incident.enrichment.organization, incident.enrichment.isp].filter(Boolean).join(' · ')
-                                                                : 'No ASN / ISP data'}
+                                                                : (isMyanmar ? 'ASN / ISP အချက်အလက် မရှိပါ' : 'No ASN / ISP data')}
                                                         </p>
                                                         <p className="break-all">
                                                             {incident.enrichment.reverseDns.length > 0
                                                                 ? incident.enrichment.reverseDns.join(', ')
-                                                                : 'No reverse DNS'}
+                                                                : (isMyanmar ? 'reverse DNS မရှိပါ' : 'No reverse DNS')}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -2836,21 +3116,23 @@ function LoginProtectionCard() {
                                         )}
                                         <div className="grid gap-3 text-xs text-muted-foreground md:grid-cols-3">
                                             <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
-                                                <p className="font-medium text-foreground">Attempts</p>
+                                                <p className="font-medium text-foreground">{isMyanmar ? 'ကြိုးစားမှုများ' : 'Attempts'}</p>
                                                 <p className="mt-1">
-                                                    {incident.failureCount} failures · {incident.lockCount} locks · {incident.banCount} bans
+                                                    {isMyanmar
+                                                        ? `${incident.failureCount} ကြိမ် မအောင်မြင် · ${incident.lockCount} ကြိမ် lock · ${incident.banCount} ကြိမ် ban`
+                                                        : `${incident.failureCount} failures · ${incident.lockCount} locks · ${incident.banCount} bans`}
                                                 </p>
                                             </div>
                                             <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
-                                                <p className="font-medium text-foreground">Attempted emails</p>
+                                                <p className="font-medium text-foreground">{isMyanmar ? 'ကြိုးစားထားသော အီးမေးလ်များ' : 'Attempted emails'}</p>
                                                 <p className="mt-1 break-all">
-                                                    {incident.attemptedEmails.length > 0 ? incident.attemptedEmails.join(', ') : 'Unknown'}
+                                                    {incident.attemptedEmails.length > 0 ? incident.attemptedEmails.join(', ') : (isMyanmar ? 'မသိ' : 'Unknown')}
                                                 </p>
                                             </div>
                                             <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
-                                                <p className="font-medium text-foreground">Host / path</p>
+                                                <p className="font-medium text-foreground">{isMyanmar ? 'Host / လမ်းကြောင်း' : 'Host / path'}</p>
                                                 <p className="mt-1 break-all">
-                                                    {(incident.hosts[0] || 'unknown host')}{incident.paths[0] ? ` · ${incident.paths[0]}` : ''}
+                                                    {(incident.hosts[0] || (isMyanmar ? 'မသိသော host' : 'unknown host'))}{incident.paths[0] ? ` · ${incident.paths[0]}` : ''}
                                                 </p>
                                             </div>
                                         </div>
@@ -2864,7 +3146,7 @@ function LoginProtectionCard() {
                                                     onClick={() => handleIncidentAcknowledge(incident.id)}
                                                 >
                                                     <CheckCircle className="mr-2 h-4 w-4" />
-                                                    Acknowledge
+                                                    {isMyanmar ? 'အတည်ပြုမည်' : 'Acknowledge'}
                                                 </Button>
                                             )}
                                             {incident.workflowStatus !== 'RESOLVED' && (
@@ -2876,7 +3158,7 @@ function LoginProtectionCard() {
                                                     onClick={() => handleIncidentResolve(incident.id)}
                                                 >
                                                     <ShieldCheck className="mr-2 h-4 w-4" />
-                                                    Resolve
+                                                    {isMyanmar ? 'ဖြေရှင်းမည်' : 'Resolve'}
                                                 </Button>
                                             )}
                                             <Button
@@ -2887,7 +3169,7 @@ function LoginProtectionCard() {
                                                 onClick={() => handleIncidentNote(incident.id)}
                                             >
                                                 <AlertCircle className="mr-2 h-4 w-4" />
-                                                Add note
+                                                {isMyanmar ? 'မှတ်စု ထည့်မည်' : 'Add note'}
                                             </Button>
                                             {incident.assignedToEmail ? (
                                                 <Button
@@ -2898,7 +3180,7 @@ function LoginProtectionCard() {
                                                     onClick={() => handleAssignIncident(incident.id, null)}
                                                 >
                                                     <UserX className="mr-2 h-4 w-4" />
-                                                    Unassign
+                                                    {isMyanmar ? 'တာဝန်ဖြုတ်မည်' : 'Unassign'}
                                                 </Button>
                                             ) : (
                                                 <Button
@@ -2913,7 +3195,7 @@ function LoginProtectionCard() {
                                                     }}
                                                 >
                                                     <User className="mr-2 h-4 w-4" />
-                                                    Assign
+                                                    {isMyanmar ? 'တာဝန်ပေးမည်' : 'Assign'}
                                                 </Button>
                                             )}
                                             <Button
@@ -2924,7 +3206,7 @@ function LoginProtectionCard() {
                                                 onClick={() => handleBlockIp(incident.ip)}
                                             >
                                                 <Lock className="mr-2 h-4 w-4" />
-                                                Block IP
+                                                {isMyanmar ? 'IP ပိတ်မည်' : 'Block IP'}
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -2934,7 +3216,7 @@ function LoginProtectionCard() {
                                                 onClick={() => handleAllowlistIp(incident.ip)}
                                             >
                                                 <Shield className="mr-2 h-4 w-4" />
-                                                Allowlist IP
+                                                {isMyanmar ? 'IP ခွင့်ပြုစာရင်းသို့ ထည့်မည်' : 'Allowlist IP'}
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -2944,7 +3226,7 @@ function LoginProtectionCard() {
                                                 onClick={() => handleBlockIp(incident.ip, true)}
                                             >
                                                 <ExternalLink className="mr-2 h-4 w-4" />
-                                                Promote permanent rule
+                                                {isMyanmar ? 'အမြဲတမ်း rule အဖြစ် မြှင့်မည်' : 'Promote permanent rule'}
                                             </Button>
                                             {incident.alertSuppression ? (
                                                 <Button
@@ -2960,7 +3242,7 @@ function LoginProtectionCard() {
                                                     }
                                                 >
                                                     <Unlock className="mr-2 h-4 w-4" />
-                                                    Unmute alerts
+                                                    {isMyanmar ? 'အသိပေးချက် ပိတ်ခြင်း ဖြုတ်မည်' : 'Unmute alerts'}
                                                 </Button>
                                             ) : (
                                                 <>
@@ -2972,7 +3254,7 @@ function LoginProtectionCard() {
                                                         onClick={() => handleMuteScope('INCIDENT', incident.id, 'incident')}
                                                     >
                                                         <AlertTriangle className="mr-2 h-4 w-4" />
-                                                        Mute incident alerts
+                                                        {isMyanmar ? 'ဖြစ်ရပ် အသိပေးချက်များကို ပိတ်မည်' : 'Mute incident alerts'}
                                                     </Button>
                                                     <Button
                                                         variant="outline"
@@ -2982,7 +3264,7 @@ function LoginProtectionCard() {
                                                         onClick={() => handleMuteScope('IP', incident.ip, 'IP')}
                                                     >
                                                         <AlertTriangle className="mr-2 h-4 w-4" />
-                                                        Mute IP alerts
+                                                        {isMyanmar ? 'IP အသိပေးချက်များကို ပိတ်မည်' : 'Mute IP alerts'}
                                                     </Button>
                                                 </>
                                             )}
@@ -2996,17 +3278,19 @@ function LoginProtectionCard() {
 
                 <Card className="ops-panel">
                     <CardHeader className="px-0 pt-0">
-                        <CardTitle>IP reputation</CardTitle>
+                        <CardTitle>{isMyanmar ? 'IP အန္တရာယ် အဆင့်သတ်မှတ်ချက်' : 'IP reputation'}</CardTitle>
                         <CardDescription>
-                            Rolling risk score per IP based on recent failures, enforcement actions, and repeat-offender behavior.
+                            {isMyanmar
+                                ? 'မကြာသေးခင်က မအောင်မြင်မှုများ၊ enforcement actions နှင့် ထပ်ခါတလဲလဲဖြစ်သော အပြုအမူအပေါ် အခြေခံသည့် IP တစ်ခုချင်း၏ အန္တရာယ်ရမှတ်။'
+                                : 'Rolling risk score per IP based on recent failures, enforcement actions, and repeat-offender behavior.'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="px-0 pb-0">
                         {filteredReputation.length === 0 ? (
                             <div className="ops-chart-empty py-8 text-muted-foreground">
                                 {overview.ipReputation.length === 0
-                                    ? 'No abusive IP reputation data yet.'
-                                    : 'No IP reputation entries match the current filters.'}
+                                    ? (isMyanmar ? 'အန္တရာယ်ရှိသော IP အဆင့်သတ်မှတ်ချက် ဒေတာ မရှိသေးပါ။' : 'No abusive IP reputation data yet.')
+                                    : (isMyanmar ? 'လက်ရှိ စစ်ထုတ်မှုများနှင့် ကိုက်ညီသော IP အဆင့်သတ်မှတ်ချက် မှတ်တမ်း မရှိပါ။' : 'No IP reputation entries match the current filters.')}
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -3014,37 +3298,37 @@ function LoginProtectionCard() {
                                     <div className="ops-detail-card space-y-3">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             <div>
-                                                <p className="font-medium">{selectedIps.length} IPs selected</p>
-                                                <p className="text-sm text-muted-foreground">Run response and mute actions across all selected IPs.</p>
+                                                <p className="font-medium">{isMyanmar ? `IP ${selectedIps.length} ခု ရွေးထားသည်` : `${selectedIps.length} IPs selected`}</p>
+                                                <p className="text-sm text-muted-foreground">{isMyanmar ? 'ရွေးထားသော IP အားလုံးတွင် response နှင့် အသိပေးချက် ပိတ်ခြင်း action များကို တစ်ပြိုင်နက် လုပ်ဆောင်ပါ။' : 'Run response and mute actions across all selected IPs.'}</p>
                                             </div>
                                             <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSelectedIps([])}>
-                                                Clear selection
+                                                {isMyanmar ? 'ရွေးချယ်မှု ဖြုတ်မည်' : 'Clear selection'}
                                             </Button>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
                                             <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('BLOCK')}>
                                                 <Lock className="mr-2 h-4 w-4" />
-                                                Block
+                                                {isMyanmar ? 'ပိတ်မည်' : 'Block'}
                                             </Button>
                                             <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('ALLOWLIST')}>
                                                 <Shield className="mr-2 h-4 w-4" />
-                                                Allowlist
+                                                {isMyanmar ? 'ခွင့်ပြုစာရင်း' : 'Allowlist'}
                                             </Button>
                                             <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('PROMOTE')}>
                                                 <ExternalLink className="mr-2 h-4 w-4" />
-                                                Promote
+                                                {isMyanmar ? 'မြှင့်မည်' : 'Promote'}
                                             </Button>
                                             <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('MUTE')}>
                                                 <BellOff className="mr-2 h-4 w-4" />
-                                                Mute
+                                                {isMyanmar ? 'အသိပေးချက် ပိတ်မည်' : 'Mute'}
                                             </Button>
                                             <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('UNMUTE')}>
                                                 <Unlock className="mr-2 h-4 w-4" />
-                                                Unmute
+                                                {isMyanmar ? 'အသိပေးချက် ပိတ်ခြင်း ဖြုတ်မည်' : 'Unmute'}
                                             </Button>
                                             <Button variant="outline" size="sm" className="rounded-full" onClick={() => handleBulkIpAction('UNBAN')}>
                                                 <Ban className="mr-2 h-4 w-4" />
-                                                Unban
+                                                {isMyanmar ? 'ပိတ်ပင်မှု ဖြုတ်မည်' : 'Unban'}
                                             </Button>
                                         </div>
                                     </div>
@@ -3057,9 +3341,9 @@ function LoginProtectionCard() {
                                                 setSelectedIps(checked ? filteredReputation.map((entry) => entry.ip) : [])
                                             }
                                         />
-                                        <span className="text-muted-foreground">Select all visible IPs</span>
+                                        <span className="text-muted-foreground">{isMyanmar ? 'မြင်ရသမျှ IP အားလုံးကို ရွေးမည်' : 'Select all visible IPs'}</span>
                                     </div>
-                                    <span className="text-xs text-muted-foreground">{selectedIps.length} selected</span>
+                                    <span className="text-xs text-muted-foreground">{isMyanmar ? `${selectedIps.length} ခု ရွေးထားသည်` : `${selectedIps.length} selected`}</span>
                                 </div>
                                 {filteredReputation.map((entry) => (
                                     <div key={entry.ip} className="ops-row-card space-y-3">
@@ -3077,48 +3361,52 @@ function LoginProtectionCard() {
                                                     <Badge variant="outline" className={reputationLevelClasses(entry.level)}>
                                                         {entry.level}
                                                     </Badge>
-                                                    {entry.currentlyBanned && <Badge variant="destructive">Banned now</Badge>}
-                                                    {!entry.currentlyBanned && entry.currentlyRestricted && <Badge variant="secondary">Restricted now</Badge>}
+                                                    {entry.currentlyBanned && <Badge variant="destructive">{isMyanmar ? 'ယခု ပိတ်ပင်ထားသည်' : 'Banned now'}</Badge>}
+                                                    {!entry.currentlyBanned && entry.currentlyRestricted && <Badge variant="secondary">{isMyanmar ? 'ယခု ကန့်သတ်ထားသည်' : 'Restricted now'}</Badge>}
                                                     {entry.alertSuppression && (
-                                                        <Badge variant="outline">Muted for {entry.alertSuppression.remainingMinutes} min</Badge>
+                                                        <Badge variant="outline">{isMyanmar ? `${entry.alertSuppression.remainingMinutes} မိနစ် အသိပေးချက် ပိတ်ထားသည်` : `Muted for ${entry.alertSuppression.remainingMinutes} min`}</Badge>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-muted-foreground break-all">{entry.topEmail || 'Unknown email'}</p>
+                                                <p className="text-xs text-muted-foreground break-all">{entry.topEmail || (isMyanmar ? 'မသိရသည့် email' : 'Unknown email')}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-2xl font-semibold">{entry.score}</p>
-                                                <p className="text-xs text-muted-foreground">risk score</p>
+                                                <p className="text-xs text-muted-foreground">{isMyanmar ? 'အန္တရာယ်ရမှတ်' : 'risk score'}</p>
                                             </div>
                                         </div>
                                         <Progress value={entry.score} className="h-2" />
                                         <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
                                             <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
-                                                <p className="font-medium text-foreground">Recent pressure</p>
+                                                <p className="font-medium text-foreground">{isMyanmar ? 'မကြာသေးခင်က ဖိအား' : 'Recent pressure'}</p>
                                                 <p className="mt-1">
-                                                    {entry.failures24h} in 24h · {entry.failures7d} in 7d · {entry.failures30d} in 30d
+                                                    {isMyanmar
+                                                        ? `၂၄ နာရီအတွင်း ${entry.failures24h} · ၇ ရက်အတွင်း ${entry.failures7d} · ၃၀ ရက်အတွင်း ${entry.failures30d}`
+                                                        : `${entry.failures24h} in 24h · ${entry.failures7d} in 7d · ${entry.failures30d} in 30d`}
                                                 </p>
                                             </div>
                                             <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 dark:bg-white/[0.02]">
-                                                <p className="font-medium text-foreground">Enforcement history</p>
+                                                <p className="font-medium text-foreground">{isMyanmar ? 'အရေးယူမှု မှတ်တမ်း' : 'Enforcement history'}</p>
                                                 <p className="mt-1">
-                                                    {entry.bans7d} bans · {entry.locks7d} locks · {entry.incidents7d} incidents
+                                                    {isMyanmar
+                                                        ? `ban ${entry.bans7d} ကြိမ် · lock ${entry.locks7d} ကြိမ် · incident ${entry.incidents7d} ခု`
+                                                        : `${entry.bans7d} bans · ${entry.locks7d} locks · ${entry.incidents7d} incidents`}
                                                 </p>
                                             </div>
                                         </div>
                                         {(entry.enrichment.reverseDns.length > 0 || entry.enrichment.asn || entry.enrichment.isp || entry.enrichment.organization) && (
                                             <div className="rounded-[0.95rem] border border-border/50 bg-background/65 px-3 py-2 text-xs text-muted-foreground dark:bg-white/[0.02]">
-                                                <p className="font-medium text-foreground">Network enrichment</p>
+                                                <p className="font-medium text-foreground">{isMyanmar ? 'ကွန်ရက် အချက်အလက် ဖြည့်စွက်မှု' : 'Network enrichment'}</p>
                                                 <p className="mt-1">
-                                                    {[entry.enrichment.asn, entry.enrichment.organization, entry.enrichment.isp].filter(Boolean).join(' · ') || 'No ASN / ISP data'}
+                                                    {[entry.enrichment.asn, entry.enrichment.organization, entry.enrichment.isp].filter(Boolean).join(' · ') || (isMyanmar ? 'ASN / ISP အချက်အလက် မရှိပါ' : 'No ASN / ISP data')}
                                                 </p>
                                                 <p className="mt-1 break-all">
-                                                    {entry.enrichment.reverseDns.length > 0 ? entry.enrichment.reverseDns.join(', ') : 'No reverse DNS'}
+                                                    {entry.enrichment.reverseDns.length > 0 ? entry.enrichment.reverseDns.join(', ') : (isMyanmar ? 'reverse DNS မရှိပါ' : 'No reverse DNS')}
                                                 </p>
                                             </div>
                                         )}
                                         <p className="text-xs text-muted-foreground">
-                                            Last seen {formatDistanceToNow(new Date(entry.lastSeenAt), { addSuffix: true })}
+                                            {isMyanmar ? 'နောက်ဆုံးတွေ့ရှိချိန် ' : 'Last seen '}{formatRelativeTime(entry.lastSeenAt, isMyanmar)}
                                         </p>
                                         <div className="flex flex-wrap gap-2">
                                             <Button
@@ -3129,7 +3417,7 @@ function LoginProtectionCard() {
                                                 onClick={() => handleBlockIp(entry.ip)}
                                             >
                                                 <Lock className="mr-2 h-4 w-4" />
-                                                Block IP
+                                                {isMyanmar ? 'IP ပိတ်မည်' : 'Block IP'}
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -3139,7 +3427,7 @@ function LoginProtectionCard() {
                                                 onClick={() => handleAllowlistIp(entry.ip)}
                                             >
                                                 <Shield className="mr-2 h-4 w-4" />
-                                                Allowlist IP
+                                                {isMyanmar ? 'IP ခွင့်ပြုစာရင်းသို့ ထည့်မည်' : 'Allowlist IP'}
                                             </Button>
                                             <Button
                                                 variant="outline"
@@ -3149,7 +3437,7 @@ function LoginProtectionCard() {
                                                 onClick={() => handleBlockIp(entry.ip, true)}
                                             >
                                                 <ExternalLink className="mr-2 h-4 w-4" />
-                                                Promote permanent rule
+                                                {isMyanmar ? 'အမြဲတမ်း rule အဖြစ် မြှင့်မည်' : 'Promote permanent rule'}
                                             </Button>
                                             {entry.alertSuppression ? (
                                                 <Button
@@ -3160,7 +3448,7 @@ function LoginProtectionCard() {
                                                     onClick={() => handleUnmuteScope('IP', entry.ip)}
                                                 >
                                                     <Unlock className="mr-2 h-4 w-4" />
-                                                    Unmute alerts
+                                                    {isMyanmar ? 'အသိပေးချက် ပိတ်ခြင်း ဖြုတ်မည်' : 'Unmute alerts'}
                                                 </Button>
                                             ) : (
                                                 <Button
@@ -3171,7 +3459,7 @@ function LoginProtectionCard() {
                                                     onClick={() => handleMuteScope('IP', entry.ip, 'IP')}
                                                 >
                                                     <AlertTriangle className="mr-2 h-4 w-4" />
-                                                    Mute IP alerts
+                                                    {isMyanmar ? 'IP အသိပေးချက်များကို အသိပေးချက် ပိတ်မည်' : 'Mute IP alerts'}
                                                 </Button>
                                             )}
                                         </div>
@@ -3185,33 +3473,33 @@ function LoginProtectionCard() {
 
             <Card className="ops-panel">
                 <CardHeader className="px-0 pt-0">
-                    <CardTitle>Reputation history</CardTitle>
+                    <CardTitle>{isMyanmar ? 'ယုံကြည်ရမှတ် မှတ်တမ်း' : 'Reputation history'}</CardTitle>
                     <CardDescription>
-                        Fourteen-day pressure trend showing failed logins, high-risk IP activity, and daily peak reputation.
+                        {isMyanmar ? 'နောက်ဆုံး ၁၄ ရက်အတွင်း failed login, အန္တရာယ်မြင့် IP activity နှင့် နေ့စဉ် reputation အမြင့်ဆုံး အခြေအနေကို ပြသသည်။' : 'Fourteen-day pressure trend showing failed logins, high-risk IP activity, and daily peak reputation.'}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5 px-0 pb-0">
                     <div className="grid gap-3 md:grid-cols-3">
                         <div className="ops-detail-card">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Failures (14d)</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'မအောင်မြင်မှုများ (၁၄ ရက်)' : 'Failures (14d)'}</p>
                             <p className="mt-2 text-2xl font-semibold">
                                 {overview.reputationHistory.reduce((total, point) => total + point.failures, 0)}
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground">all failed admin login attempts recorded in the last 14 days</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ၁၄ ရက်အတွင်း မှတ်တမ်းတင်ထားသော admin login မအောင်မြင်မှုအားလုံး' : 'all failed admin login attempts recorded in the last 14 days'}</p>
                         </div>
                         <div className="ops-detail-card">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">High-risk IPs (peak day)</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အန္တရာယ်မြင့် IP များ (အမြင့်ဆုံးနေ့)' : 'High-risk IPs (peak day)'}</p>
                             <p className="mt-2 text-2xl font-semibold">
                                 {Math.max(...overview.reputationHistory.map((point) => point.highRiskIps), 0)}
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground">maximum daily count of high-risk IPs in the current window</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'လက်ရှိ window အတွင်း တစ်နေ့လျှင် အမြင့်ဆုံး အန္တရာယ်မြင့် IP အရေအတွက်' : 'maximum daily count of high-risk IPs in the current window'}</p>
                         </div>
                         <div className="ops-detail-card">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Peak reputation</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အမြင့်ဆုံး reputation' : 'Peak reputation'}</p>
                             <p className="mt-2 text-2xl font-semibold">
                                 {Math.max(...overview.reputationHistory.map((point) => point.peakScore), 0)}
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground">highest single-IP daily score inside the current 14-day window</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'လက်ရှိ ၁၄ ရက် window အတွင်း single IP တစ်ခု၏ အမြင့်ဆုံး တစ်နေ့စာ score' : 'highest single-IP daily score inside the current 14-day window'}</p>
                         </div>
                     </div>
 
@@ -3219,11 +3507,11 @@ function LoginProtectionCard() {
                         <div className="ops-detail-card space-y-4">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <p className="font-medium">Failed logins by day</p>
-                                    <p className="text-sm text-muted-foreground">Bars scale to the highest daily failure count in the last two weeks.</p>
+                                    <p className="font-medium">{isMyanmar ? 'နေ့စဉ် login မအောင်မြင်မှု' : 'Failed logins by day'}</p>
+                                    <p className="text-sm text-muted-foreground">{isMyanmar ? 'bar အမြင့်ကို နောက်ဆုံး နှစ်ပတ်အတွင်း တစ်နေ့လျှင် အများဆုံး မအောင်မြင်မှုအရေအတွက်အလိုက် တိုင်းတာထားသည်။' : 'Bars scale to the highest daily failure count in the last two weeks.'}</p>
                                 </div>
                                 <Badge variant="outline">
-                                    Max {Math.max(...overview.reputationHistory.map((point) => point.failures), 0)}
+                                    {isMyanmar ? 'အများဆုံး' : 'Max'} {Math.max(...overview.reputationHistory.map((point) => point.failures), 0)}
                                 </Badge>
                             </div>
                             <div className="overflow-x-auto">
@@ -3242,7 +3530,7 @@ function LoginProtectionCard() {
                         </div>
 
                         <div className="ops-detail-card space-y-3">
-                            <p className="font-medium">Daily risk detail</p>
+                            <p className="font-medium">{isMyanmar ? 'နေ့စဉ် အန္တရာယ်အသေးစိတ်' : 'Daily risk detail'}</p>
                             <div className="space-y-3">
                                 {overview.reputationHistory.slice(-5).reverse().map((point) => (
                                     <div
@@ -3254,10 +3542,14 @@ function LoginProtectionCard() {
                                             <Badge variant="outline">{point.peakScore}</Badge>
                                         </div>
                                         <p className="mt-2 text-xs text-muted-foreground">
-                                            {point.failures} failures · {point.highRiskIps} high-risk IPs · {point.uniqueIps} unique IPs
+                                            {isMyanmar
+                                                ? `${point.failures} မအောင်မြင်မှု · ${point.highRiskIps} အန္တရာယ်မြင့် IP · ${point.uniqueIps} သီးခြား IP`
+                                                : `${point.failures} failures · ${point.highRiskIps} high-risk IPs · ${point.uniqueIps} unique IPs`}
                                         </p>
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            {point.bans} bans · {point.locks} locks · {point.repeatedAlerts} repeat alerts
+                                            {isMyanmar
+                                                ? `${point.bans} ban · ${point.locks} lock · ${point.repeatedAlerts} ထပ်ခါတလဲလဲ အသိပေးချက်`
+                                                : `${point.bans} bans · ${point.locks} locks · ${point.repeatedAlerts} repeat alerts`}
                                         </p>
                                     </div>
                                 ))}
@@ -3270,9 +3562,9 @@ function LoginProtectionCard() {
             <Dialog open={Boolean(incidentDetailId)} onOpenChange={(open) => !open && setIncidentDetailId(null)}>
                 <DialogContent className="max-w-4xl">
                     <DialogHeader>
-                        <DialogTitle>Incident detail</DialogTitle>
+                        <DialogTitle>{isMyanmar ? 'ဖြစ်ရပ် အသေးစိတ်' : 'Incident detail'}</DialogTitle>
                         <DialogDescription>
-                            Full workflow, audit events, and suppression context for this login-abuse incident.
+                            {isMyanmar ? 'ဤ login-abuse အဖြစ်အပျက်အတွက် လုပ်ငန်းစဉ်၊ စစ်ဆေးမှုဖြစ်ရပ်များနှင့် ဖိနှိပ်ထားမှု အချက်အလက်အပြည့်အစုံကို ပြသည်။' : 'Full workflow, audit events, and suppression context for this login-abuse incident.'}
                         </DialogDescription>
                     </DialogHeader>
                     {incidentDetailQuery.isLoading || !incidentDetailQuery.data ? (
@@ -3285,35 +3577,41 @@ function LoginProtectionCard() {
                         <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-2">
                             <div className="grid gap-3 md:grid-cols-3">
                                 <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-3 dark:bg-white/[0.02]">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Incident</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အဖြစ်အပျက်' : 'Incident'}</p>
                                     <p className="mt-2 text-lg font-semibold">{incidentDetailQuery.data.incident.ip}</p>
                                     <p className="mt-1 text-xs text-muted-foreground">{incidentDetailQuery.data.incident.summary}</p>
                                 </div>
                                 <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-3 dark:bg-white/[0.02]">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Workflow</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'လုပ်ငန်းစဉ်' : 'Workflow'}</p>
                                     <p className="mt-2 text-lg font-semibold">{incidentDetailQuery.data.incident.workflowStatus}</p>
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         {incidentDetailQuery.data.incident.alertSuppression
-                                            ? `Muted for ${incidentDetailQuery.data.incident.alertSuppression.remainingMinutes} min`
-                                            : 'Alerts active'}
+                                            ? (isMyanmar
+                                                ? `${incidentDetailQuery.data.incident.alertSuppression.remainingMinutes} မိနစ်ကြာ အသိပေးချက် ပိတ်ထားသည်`
+                                                : `Muted for ${incidentDetailQuery.data.incident.alertSuppression.remainingMinutes} min`)
+                                                : (isMyanmar ? 'အသိပေးချက်များ အသက်ဝင်နေသည်' : 'Alerts active')}
                                     </p>
                                     {incidentDetailQuery.data.incident.assignedToEmail && (
                                         <p className="mt-2 text-xs text-muted-foreground">
-                                            Assigned to {incidentDetailQuery.data.incident.assignedToEmail}
+                                            {isMyanmar
+                                                ? `${incidentDetailQuery.data.incident.assignedToEmail} ထံ တာဝန်ပေးထားသည်`
+                                                : `Assigned to ${incidentDetailQuery.data.incident.assignedToEmail}`}
                                             {incidentDetailQuery.data.incident.assignedAt
-                                                ? ` ${formatDistanceToNow(new Date(incidentDetailQuery.data.incident.assignedAt), { addSuffix: true })}`
+                                                ? ` ${formatRelativeTime(incidentDetailQuery.data.incident.assignedAt, isMyanmar)}`
                                                 : ''}
                                             {incidentDetailQuery.data.incident.assignedByEmail
-                                                ? ` by ${incidentDetailQuery.data.incident.assignedByEmail}`
+                                                ? (isMyanmar
+                                                    ? ` ${incidentDetailQuery.data.incident.assignedByEmail} မှ`
+                                                    : ` by ${incidentDetailQuery.data.incident.assignedByEmail}`)
                                                 : ''}
                                         </p>
                                     )}
                                 </div>
                                 <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-3 dark:bg-white/[0.02]">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Reputation</p>
-                                    <p className="mt-2 text-lg font-semibold">{incidentDetailQuery.data.reputation?.level || 'Unknown'}</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ယုံကြည်ရမှတ်' : 'Reputation'}</p>
+                                    <p className="mt-2 text-lg font-semibold">{incidentDetailQuery.data.reputation?.level || (isMyanmar ? 'မသိ' : 'Unknown')}</p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Score {incidentDetailQuery.data.reputation?.score ?? 0}
+                                        {isMyanmar ? 'အမှတ်' : 'Score'} {incidentDetailQuery.data.reputation?.score ?? 0}
                                     </p>
                                 </div>
                             </div>
@@ -3323,13 +3621,13 @@ function LoginProtectionCard() {
                                     <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             <div>
-                                                <p className="font-medium">Ownership</p>
+                                                <p className="font-medium">{isMyanmar ? 'တာဝန်ခံမှု' : 'Ownership'}</p>
                                                 <p className="text-sm text-muted-foreground">
-                                                    Assign or clear the current operator for this incident.
+                                                    {isMyanmar ? 'ဤအဖြစ်အပျက်အတွက် လက်ရှိ operator ကို သတ်မှတ်ပါ သို့မဟုတ် ဖြုတ်ပါ။' : 'Assign or clear the current operator for this incident.'}
                                                 </p>
                                             </div>
                                             <Badge variant="outline">
-                                                {incidentDetailQuery.data.incident.assignedToEmail || 'Unassigned'}
+                                                {incidentDetailQuery.data.incident.assignedToEmail || (isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned')}
                                             </Badge>
                                         </div>
                                         <div className="mt-3 flex flex-wrap gap-2">
@@ -3345,7 +3643,7 @@ function LoginProtectionCard() {
                                                 }}
                                             >
                                                 <User className="mr-2 h-4 w-4" />
-                                                Assign
+                                                {isMyanmar ? 'သတ်မှတ်မည်' : 'Assign'}
                                             </Button>
                                             {incidentDetailQuery.data.incident.assignedToEmail && (
                                                 <Button
@@ -3356,7 +3654,7 @@ function LoginProtectionCard() {
                                                     onClick={() => handleAssignIncident(incidentDetailQuery.data!.incident.id, null)}
                                                 >
                                                     <UserX className="mr-2 h-4 w-4" />
-                                                    Unassign
+                                                    {isMyanmar ? 'ဖြုတ်မည်' : 'Unassign'}
                                                 </Button>
                                             )}
                                         </div>
@@ -3364,19 +3662,19 @@ function LoginProtectionCard() {
 
                                     <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
                                         <div className="flex items-center justify-between gap-3">
-                                            <p className="font-medium">Notes timeline</p>
+                                            <p className="font-medium">{isMyanmar ? 'မှတ်စု အချိန်လိုင်း' : 'Notes timeline'}</p>
                                             <Badge variant="outline">{incidentDetailQuery.data.noteEntries.length}</Badge>
                                         </div>
                                         {incidentDetailQuery.data.noteEntries.length === 0 ? (
-                                            <p className="mt-3 text-sm text-muted-foreground">No workflow notes recorded for this incident.</p>
+                                            <p className="mt-3 text-sm text-muted-foreground">{isMyanmar ? 'ဤအဖြစ်အပျက်အတွက် လုပ်ငန်းစဉ် မှတ်စုများ မရှိသေးပါ။' : 'No workflow notes recorded for this incident.'}</p>
                                         ) : (
                                             <div className="mt-3 space-y-3">
                                                 {incidentDetailQuery.data.noteEntries.map((entry, index) => (
                                                     <div key={`${entry.raw}-${index}`} className="rounded-[0.9rem] border border-border/40 bg-background/70 px-3 py-3 text-sm dark:bg-white/[0.02]">
                                                         <div className="flex flex-wrap items-center justify-between gap-2">
-                                                            <span className="font-medium">{entry.actorEmail || 'Unknown actor'}</span>
+                                                            <span className="font-medium">{entry.actorEmail || (isMyanmar ? 'မသိသော လုပ်ဆောင်သူ' : 'Unknown actor')}</span>
                                                             <span className="text-xs text-muted-foreground">
-                                                                {entry.timestamp ? formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true }) : 'unknown time'}
+                                                                {entry.timestamp ? formatRelativeTime(entry.timestamp, isMyanmar) : (isMyanmar ? 'မသိသော အချိန်' : 'unknown time')}
                                                             </span>
                                                         </div>
                                                         <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{entry.body}</p>
@@ -3388,7 +3686,7 @@ function LoginProtectionCard() {
 
                                     <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
                                         <div className="flex items-center justify-between gap-3">
-                                            <p className="font-medium">Restrictions and enrichment</p>
+                                            <p className="font-medium">{isMyanmar ? 'ကန့်သတ်ချက်များနှင့် အချက်အလက်ဖြည့်တင်းမှု' : 'Restrictions and enrichment'}</p>
                                             <Badge variant="outline">{incidentDetailQuery.data.relatedRestrictions.length}</Badge>
                                         </div>
                                         <div className="mt-3 space-y-3 text-sm text-muted-foreground">
@@ -3399,20 +3697,20 @@ function LoginProtectionCard() {
                                                         incidentDetailQuery.data.reputation?.enrichment.organization,
                                                         incidentDetailQuery.data.reputation?.enrichment.isp,
                                                     ].filter(Boolean).join(' · ')
-                                                    : 'No ASN or ISP enrichment'}
+                                                    : (isMyanmar ? 'ASN သို့မဟုတ် ISP enrichment မရှိပါ' : 'No ASN or ISP enrichment')}
                                             </p>
                                             <p className="break-all">
                                                 {incidentDetailQuery.data.reputation?.enrichment.reverseDns?.length
                                                     ? incidentDetailQuery.data.reputation.enrichment.reverseDns.join(', ')
-                                                    : 'No reverse DNS'}
+                                                    : (isMyanmar ? 'reverse DNS မရှိပါ' : 'No reverse DNS')}
                                             </p>
                                             {incidentDetailQuery.data.relatedRestrictions.map((restriction) => (
                                                 <div key={restriction.id} className="rounded-[0.9rem] border border-border/40 bg-background/70 px-3 py-3 dark:bg-white/[0.02]">
                                                     <div className="flex items-center justify-between gap-3">
-                                                        <span className="font-medium text-foreground">{restriction.restrictionType}</span>
-                                                        <span className="text-xs">{formatDistanceToNow(new Date(restriction.expiresAt), { addSuffix: true })}</span>
+                                                        <span className="font-medium text-foreground">{getRestrictionTypeLabel(restriction.restrictionType, isMyanmar)}</span>
+                                                        <span className="text-xs">{formatRelativeTime(restriction.expiresAt, isMyanmar)}</span>
                                                     </div>
-                                                    <p className="mt-1 text-xs">Attempted email: {restriction.attemptedEmail || 'Unknown'}</p>
+                                                    <p className="mt-1 text-xs">{isMyanmar ? 'ကြိုးစားထားသော အီးမေးလ်:' : 'Attempted email:'} {restriction.attemptedEmail || (isMyanmar ? 'မသိ' : 'Unknown')}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -3421,7 +3719,7 @@ function LoginProtectionCard() {
 
                                 <div className="rounded-[1rem] border border-border/50 bg-background/65 px-4 py-4 dark:bg-white/[0.02]">
                                     <div className="flex items-center justify-between gap-3">
-                                        <p className="font-medium">Event timeline</p>
+                                        <p className="font-medium">{isMyanmar ? 'ဖြစ်ရပ် အချိန်လိုင်း' : 'Event timeline'}</p>
                                         <Badge variant="outline">{incidentDetailQuery.data.events.length}</Badge>
                                     </div>
                                     <div className="mt-3 space-y-3">
@@ -3431,17 +3729,17 @@ function LoginProtectionCard() {
                                                     <div className="space-y-1">
                                                         <p className="font-medium">{event.label}</p>
                                                         <p className="text-xs text-muted-foreground">
-                                                            {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
+                                                            {formatRelativeTime(event.createdAt, isMyanmar)}
                                                         </p>
                                                     </div>
                                                     <Badge variant="outline">{event.action}</Badge>
                                                 </div>
                                                 <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                                                    {event.email && <p>Email: {event.email}</p>}
-                                                    {event.host && <p className="break-all">Host: {event.host}</p>}
-                                                    {event.path && <p className="break-all">Path: {event.path}</p>}
-                                                    {event.restrictionType && <p>Restriction: {event.restrictionType}</p>}
-                                                    {event.details && <p className="whitespace-pre-wrap break-all">Detail: {event.details}</p>}
+                                                    {event.email && <p>{isMyanmar ? 'အီးမေးလ်' : 'Email'}: {event.email}</p>}
+                                                    {event.host && <p className="break-all">{isMyanmar ? 'ဟို့စ်' : 'Host'}: {event.host}</p>}
+                                                    {event.path && <p className="break-all">{isMyanmar ? 'လမ်းကြောင်း' : 'Path'}: {event.path}</p>}
+                                                    {event.restrictionType && <p>{isMyanmar ? 'ကန့်သတ်ချက်' : 'Restriction'}: {event.restrictionType}</p>}
+                                                    {event.details && <p className="whitespace-pre-wrap break-all">{isMyanmar ? 'အသေးစိတ်' : 'Detail'}: {event.details}</p>}
                                                 </div>
                                             </div>
                                         ))}
@@ -3451,7 +3749,7 @@ function LoginProtectionCard() {
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIncidentDetailId(null)}>Close</Button>
+                        <Button variant="outline" onClick={() => setIncidentDetailId(null)}>{isMyanmar ? 'ပိတ်မည်' : 'Close'}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -3460,7 +3758,9 @@ function LoginProtectionCard() {
 }
 
 export default function SecurityPage() {
+    const { locale, t } = useLocale();
     const { toast } = useToast();
+    const isMyanmar = locale === 'my';
     const [createOpen, setCreateOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('status');
     const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
@@ -3475,27 +3775,42 @@ export default function SecurityPage() {
         },
         onError: (err) => {
             setTogglingRuleId(null);
-            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'အမှားဖြစ်ပွားသည်' : 'Error',
+                description: err.message,
+                variant: 'destructive',
+            });
         },
     });
 
     const deleteMutation = trpc.security.deleteRule.useMutation({
         onSuccess: () => {
-            toast({ title: 'Rule deleted' });
+            toast({ title: isMyanmar ? 'စည်းမျဉ်းကို ဖျက်ပြီးပါပြီ' : 'Rule deleted' });
             setDeletingRuleId(null);
             refetch();
         },
         onError: (err) => {
             setDeletingRuleId(null);
-            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+            toast({
+                title: isMyanmar ? 'အမှားဖြစ်ပွားသည်' : 'Error',
+                description: err.message,
+                variant: 'destructive',
+            });
         },
     });
 
     const triggerProbeMutation = trpc.security.triggerSecurityProbe.useMutation({
         onSuccess: () => {
-            toast({ title: 'Probe triggered', description: 'Security check initiated.' });
+            toast({
+                title: isMyanmar ? 'စမ်းသပ်စစ်ဆေးမှုကို စတင်ပြီးပါပြီ' : 'Probe triggered',
+                description: isMyanmar ? 'လုံခြုံရေး စစ်ဆေးမှုကို စတင်ထားပါသည်။' : 'Security check initiated.',
+            });
         },
-        onError: (err) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+        onError: (err) => toast({
+            title: isMyanmar ? 'အမှားဖြစ်ပွားသည်' : 'Error',
+            description: err.message,
+            variant: 'destructive',
+        }),
     });
 
     return (
@@ -3508,18 +3823,20 @@ export default function SecurityPage() {
                             className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
                         >
                             <ShieldCheck className="mr-2 h-3.5 w-3.5" />
-                            Security Command Center
+                            {isMyanmar ? 'လုံခြုံရေး ထိန်းချုပ်ရေးဌာန' : 'Security Command Center'}
                         </Badge>
 
                         <div className="space-y-3">
                             <div className="text-sm text-muted-foreground">
-                                <BackButton href="/dashboard" label="Dashboard" />
+                                <BackButton href="/dashboard" label={isMyanmar ? 'အချက်အချာ' : 'Dashboard'} />
                             </div>
                             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
-                                Security & access control
+                                {isMyanmar ? 'လုံခြုံရေးနှင့် ဝင်ရောက်ခွင့် ထိန်းချုပ်မှု' : 'Security & access control'}
                             </h1>
                             <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                                Monitor dashboard and server security posture, trigger fresh probes, and control dashboard access with IP, CIDR, and country rules.
+                                {isMyanmar
+                                    ? 'စီမံခန့်ခွဲမှု မျက်နှာပြင်နှင့် ဆာဗာ လုံခြုံရေးအခြေအနေကို စောင့်ကြည့်ပါ၊ စစ်ဆေးမှု အသစ်များ ပြုလုပ်ပါ၊ IP၊ CIDR နှင့် နိုင်ငံစည်းကမ်းများဖြင့် ဝင်ရောက်ခွင့်ကို ထိန်းချုပ်ပါ။'
+                                    : 'Monitor dashboard and server security posture, trigger fresh probes, and control dashboard access with IP, CIDR, and country rules.'}
                             </p>
                         </div>
 
@@ -3529,32 +3846,36 @@ export default function SecurityPage() {
                     <div className="ops-detail-rail">
                         <div className="ops-panel space-y-3">
                             <div className="space-y-1">
-                                <p className="ops-section-heading">Security controls</p>
-                                <h2 className="text-xl font-semibold">Command rail</h2>
+                                <p className="ops-section-heading">{isMyanmar ? 'လုံခြုံရေး ထိန်းချုပ်မှုများ' : 'Security controls'}</p>
+                                <h2 className="text-xl font-semibold">{t('dashboard.command_rail')}</h2>
                                 <p className="text-sm text-muted-foreground">
-                                    Trigger a new probe or jump straight into the rule tab when you need to tighten panel access.
+                                    {isMyanmar
+                                        ? 'ဝင်ရောက်ခွင့်ကို ပိုမိုတင်းကျပ်ရန် လိုအပ်သည့်အခါ စစ်ဆေးမှု အသစ်ပြုလုပ်ပါ သို့မဟုတ် စည်းမျဉ်းတပ်ဗ်သို့ တိုက်ရိုက်သွားပါ။'
+                                        : 'Trigger a new probe or jump straight into the rule tab when you need to tighten panel access.'}
                                 </p>
                             </div>
 
                             <Button className="h-11 w-full rounded-full" onClick={() => triggerProbeMutation.mutate()} disabled={triggerProbeMutation.isPending}>
                                 <RefreshCw className={`mr-2 h-4 w-4 ${triggerProbeMutation.isPending ? 'animate-spin' : ''}`} />
-                                {triggerProbeMutation.isPending ? 'Running probe…' : 'Run security probe'}
+                                {triggerProbeMutation.isPending ? (isMyanmar ? 'စစ်ဆေးမှု လုပ်ဆောင်နေသည်…' : 'Running probe…') : (isMyanmar ? 'လုံခြုံရေး စစ်ဆေးမှု စတင်မည်' : 'Run security probe')}
                             </Button>
 
                             <Button variant="outline" className="h-11 w-full rounded-full" onClick={() => setActiveTab('rules')}>
                                 <Lock className="mr-2 h-4 w-4" />
-                                Open access rules
+                                {isMyanmar ? 'ဝင်ရောက်ခွင့် စည်းကမ်းများကို ဖွင့်မည်' : 'Open access rules'}
                             </Button>
                         </div>
 
                         <div className="ops-panel space-y-3">
                             <div className="space-y-1">
-                                <p className="ops-section-heading">Probe note</p>
-                                <h2 className="text-xl font-semibold">Worker status</h2>
+                                <p className="ops-section-heading">{isMyanmar ? 'စစ်ဆေးမှု မှတ်ချက်' : 'Probe note'}</p>
+                                <h2 className="text-xl font-semibold">{isMyanmar ? 'ဝန်ဆောင်မှု အခြေအနေ' : 'Worker status'}</h2>
                             </div>
                             <div className="ops-detail-card space-y-2">
                                 <p className="text-sm text-muted-foreground">
-                                    Security probes run automatically via the security worker process. Use the probe action when you need a fresh certificate or header check immediately.
+                                    {isMyanmar
+                                        ? 'လုံခြုံရေး စစ်ဆေးမှုများကို လုံခြုံရေး ဝန်ဆောင်မှု လုပ်ငန်းစဉ်က အလိုအလျောက် လုပ်ဆောင်ပါသည်။ လက်မှတ် သို့မဟုတ် header စစ်ဆေးမှု အသစ်ချက်ချင်းလိုအပ်ပါက စစ်ဆေးမှု ခလုတ်ကို အသုံးပြုပါ။'
+                                        : 'Security probes run automatically via the security worker process. Use the probe action when you need a fresh certificate or header check immediately.'}
                                 </p>
                             </div>
                         </div>
@@ -3564,9 +3885,9 @@ export default function SecurityPage() {
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="ops-command-bar h-auto w-full justify-start gap-2 rounded-[1.5rem] border-0 bg-transparent p-0 md:w-fit">
-                    <TabsTrigger value="status">Security Status</TabsTrigger>
-                    <TabsTrigger value="rules">Access Rules</TabsTrigger>
-                    <TabsTrigger value="login">Login Protection</TabsTrigger>
+                    <TabsTrigger value="status">{isMyanmar ? 'လုံခြုံရေး အခြေအနေ' : 'Security Status'}</TabsTrigger>
+                    <TabsTrigger value="rules">{isMyanmar ? 'ဝင်ရောက်ခွင့် စည်းကမ်းများ' : 'Access Rules'}</TabsTrigger>
+                    <TabsTrigger value="login">{isMyanmar ? 'ဝင်ရောက်မှု ကာကွယ်ရေး' : 'Login Protection'}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="status" className="space-y-6 mt-6">
@@ -3579,13 +3900,14 @@ export default function SecurityPage() {
                         <CardHeader className="px-0 pb-2 pt-0">
                             <CardTitle className="text-lg text-blue-500 flex items-center gap-2">
                                 <AlertCircle className="w-5 h-5" />
-                                Security Worker
+                                {isMyanmar ? 'လုံခြုံရေး ဝန်ဆောင်မှု လုပ်ငန်းစဉ်' : 'Security Worker'}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="px-0 pb-0">
                             <p className="text-sm text-blue-400">
-                                Security probes run automatically via the security worker process.
-                                See the worker setup documentation for deployment instructions.
+                                {isMyanmar
+                                        ? 'လုံခြုံရေး စစ်ဆေးမှုများကို လုံခြုံရေး ဝန်ဆောင်မှု လုပ်ငန်းစဉ်က အလိုအလျောက် လုပ်ဆောင်ပါသည်။ တပ်ဆင်အသုံးပြုမှုအတွက် ဝန်ဆောင်မှု စီစဉ်လမ်းညွှန်ကို ကြည့်ပါ။'
+                                    : 'Security probes run automatically via the security worker process. See the worker setup documentation for deployment instructions.'}
                             </p>
                         </CardContent>
                     </Card>
@@ -3595,12 +3917,12 @@ export default function SecurityPage() {
                     <div className="ops-table-toolbar">
                         <div className="flex items-center gap-2">
                             <div className="ops-table-meta">
-                                {rules?.length ?? 0} configured rules
+                                    {rules?.length ?? 0} {isMyanmar ? 'ခု သတ်မှတ်ထားသော စည်းမျဉ်းများ' : 'configured rules'}
                             </div>
                         </div>
                         <Button onClick={() => setCreateOpen(true)}>
                             <Plus className="w-4 h-4 mr-2" />
-                            Add Rule
+                            {isMyanmar ? 'စည်းကမ်း ထည့်မည်' : 'Add Rule'}
                         </Button>
                     </div>
 
@@ -3609,12 +3931,14 @@ export default function SecurityPage() {
                             <CardHeader className="px-0 pb-2 pt-0">
                                 <CardTitle className="text-lg text-red-500 flex items-center gap-2">
                                     <AlertTriangle className="w-5 h-5" />
-                                    Warning
+                                    {isMyanmar ? 'သတိပေးချက်' : 'Warning'}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="px-0 pb-0">
                                 <p className="text-sm text-red-400">
-                                    Be careful when adding blocking rules. Ensure you do not block your own IP address. Localhost is always allowed.
+                                    {isMyanmar
+                                      ? 'ပိတ်ဆို့ရေး စည်းမျဉ်းများ ထည့်သွင်းရာတွင် သတိထားပါ။ မိမိ၏ IP ကို မတော်တဆ မပိတ်မိစေရန် သေချာစစ်ပါ။ localhost ကို အမြဲခွင့်ပြုထားသည်။'
+                                      : 'Be careful when adding blocking rules. Ensure you do not block your own IP address. Localhost is always allowed.'}
                                 </p>
                             </CardContent>
                         </Card>
@@ -3622,9 +3946,9 @@ export default function SecurityPage() {
 
                     <Card className="ops-panel">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle>Active Rules</CardTitle>
+                            <CardTitle>{isMyanmar ? 'အသက်ဝင် စည်းကမ်းများ' : 'Active Rules'}</CardTitle>
                             <CardDescription>
-                                Rules are evaluated in order: Allowed Localhost - Block Rules - Allow Rules.
+                                {isMyanmar ? 'စည်းကမ်းများကို အစဉ်လိုက် စစ်ဆေးသည် - localhost ခွင့်ပြုချက်၊ ပိတ်ဆို့ရေး စည်းကမ်းများ၊ ခွင့်ပြုရေး စည်းကမ်းများ။' : 'Rules are evaluated in order: Allowed Localhost - Block Rules - Allow Rules.'}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="px-0 pb-0">
@@ -3634,7 +3958,7 @@ export default function SecurityPage() {
                                 </div>
                             ) : rules?.length === 0 ? (
                                 <div className="ops-chart-empty py-8 text-muted-foreground">
-                                    No security rules defined. All traffic is allowed.
+                                    {isMyanmar ? 'လုံခြုံရေး စည်းမျဉ်းများ မသတ်မှတ်ရသေးပါ။ ဝင်လာသည့် ဆက်သွယ်မှုအားလုံးကို ခွင့်ပြုထားသည်။' : 'No security rules defined. All traffic is allowed.'}
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -3647,9 +3971,9 @@ export default function SecurityPage() {
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-semibold">{rule.targetValue}</span>
-                                                        <Badge variant="outline">{rule.targetType}</Badge>
-                                                        <Badge variant={rule.type === 'BLOCK' ? 'destructive' : 'default'}>{rule.type}</Badge>
-                                                        {!rule.isActive && <Badge variant="secondary">DISABLED</Badge>}
+                                                        <Badge variant="outline">{getRuleTargetTypeLabel(rule.targetType, isMyanmar)}</Badge>
+                                                        <Badge variant={rule.type === 'BLOCK' ? 'destructive' : 'default'}>{getRuleTypeLabel(rule.type, isMyanmar)}</Badge>
+                                                        {!rule.isActive && <Badge variant="secondary">{isMyanmar ? 'ပိတ်ထားသည်' : 'DISABLED'}</Badge>}
                                                     </div>
                                                     {rule.description && (
                                                         <p className="text-sm text-muted-foreground mt-1">{rule.description}</p>
@@ -3666,7 +3990,7 @@ export default function SecurityPage() {
                                                         toggleMutation.mutate({ id: rule.id });
                                                     }}
                                                     disabled={toggleMutation.isPending && togglingRuleId === rule.id}
-                                                    title={rule.isActive ? "Disable Rule" : "Enable Rule"}
+                                                    title={rule.isActive ? (isMyanmar ? 'စည်းမျဉ်းကို ပိတ်မည်' : 'Disable Rule') : (isMyanmar ? 'စည်းမျဉ်းကို ဖွင့်မည်' : 'Enable Rule')}
                                                 >
                                                     {toggleMutation.isPending && togglingRuleId === rule.id ? (
                                                         <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -3680,7 +4004,7 @@ export default function SecurityPage() {
                                                     className="text-destructive"
                                                     disabled={deleteMutation.isPending && deletingRuleId === rule.id}
                                                     onClick={() => {
-                                                        if (confirm('Delete this rule?')) {
+                                                        if (confirm(isMyanmar ? 'ဤစည်းမျဉ်းကို ဖျက်မလား?' : 'Delete this rule?')) {
                                                             setDeletingRuleId(rule.id);
                                                             deleteMutation.mutate({ id: rule.id });
                                                         }

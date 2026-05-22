@@ -514,14 +514,14 @@ function getAnnouncementCardStyleLabel(
 ) {
   switch (cardStyle) {
     case 'PROMO':
-      return isMyanmar ? 'Promo card' : 'Promo card';
+      return isMyanmar ? 'ပရိုမိုးရှင်း ကတ်' : 'Promo card';
     case 'PREMIUM':
-      return isMyanmar ? 'Premium card' : 'Premium card';
+      return isMyanmar ? 'Premium အဆင့်ကတ်' : 'Premium card';
     case 'OPERATIONS':
-      return isMyanmar ? 'Operations card' : 'Operations card';
+      return isMyanmar ? 'လုပ်ငန်းဆောင်ရွက်မှု ကတ်' : 'Operations card';
     case 'DEFAULT':
     default:
-      return isMyanmar ? 'Default card' : 'Default card';
+      return isMyanmar ? 'မူလ ကတ်' : 'Default card';
   }
 }
 
@@ -531,13 +531,13 @@ function getAnnouncementSegmentLabel(
 ) {
   switch (segment) {
     case 'TRIAL_TO_PAID':
-      return isMyanmar ? 'Trial မှ paid သို့' : 'Trial to paid';
+      return isMyanmar ? 'အစမ်းသုံးမှ ငွေပေးချေမှုသို့' : 'Trial to paid';
     case 'PREMIUM_UPSELL':
-      return isMyanmar ? 'Premium upsell' : 'Premium upsell';
+      return isMyanmar ? 'Premium အဆင့်မြှင့် အကြံပြု' : 'Premium upsell';
     case 'RENEWAL_SOON':
-      return isMyanmar ? 'Renewal မကြာမီ' : 'Renewal soon';
+      return isMyanmar ? 'သက်တမ်းတိုးရန် မကြာမီ' : 'Renewal soon';
     case 'HIGH_VALUE':
-      return isMyanmar ? 'တန်ဖိုးမြင့် customer' : 'High-value customer';
+      return isMyanmar ? 'တန်ဖိုးမြင့် အသုံးပြုသူ' : 'High-value customer';
     default:
       return segment;
   }
@@ -1400,112 +1400,112 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       : 'New users choose English or Burmese before the welcome flow continues.',
     englishLanguage: 'English',
     burmeseLanguage: isMyanmar ? 'မြန်မာ' : 'Burmese',
-    enableBot: isMyanmar ? 'Telegram bot ကို ဖွင့်မည်' : 'Enable Telegram bot',
-    enableBotDesc: isMyanmar ? 'အသုံးပြုသူများက key ကို ချိတ်ဆက်နိုင်ခြင်း၊ share page ရယူနိုင်ခြင်းနှင့် self-service command များ အသုံးပြုနိုင်ခြင်းကို ခွင့်ပြုမည်။' : 'Allow users to link keys, receive share pages, and run self-service bot commands.',
-    dailyDigest: isMyanmar ? 'Admin digest ကို နေ့စဉ် ပို့မည်' : 'Daily admin digest',
-    dailyDigestDesc: isMyanmar ? 'သက်တမ်းကုန်နီးသော key များ၊ usage နှင့် share-page activity summary များကို admin chat များသို့ ပို့မည်။' : 'Send expiring-key, usage, and share-page activity summaries to admin chats.',
-    digestHour: isMyanmar ? 'Digest ပို့ချိန် (နာရီ)' : 'Digest hour',
-    digestMinute: isMyanmar ? 'Digest ပို့ချိန် (မိနစ်)' : 'Digest minute',
+    enableBot: isMyanmar ? 'Telegram ဘော့ကို ဖွင့်မည်' : 'Enable Telegram bot',
+    enableBotDesc: isMyanmar ? 'အသုံးပြုသူများက သော့ကို ချိတ်ဆက်နိုင်ခြင်း၊ မျှဝေစာမျက်နှာ ရယူနိုင်ခြင်းနှင့် ကိုယ်တိုင်ဝန်ဆောင်မှု အမိန့်များ အသုံးပြုနိုင်ခြင်းကို ခွင့်ပြုမည်။' : 'Allow users to link keys, receive share pages, and run self-service bot commands.',
+    dailyDigest: isMyanmar ? 'စီမံသူ အနှစ်ချုပ်ကို နေ့စဉ် ပို့မည်' : 'Daily admin digest',
+    dailyDigestDesc: isMyanmar ? 'သက်တမ်းကုန်နီးသော သော့များ၊ အသုံးပြုမှုနှင့် မျှဝေစာမျက်နှာ လှုပ်ရှားမှု အနှစ်ချုပ်များကို စီမံသူ စကားပြောခန်းများသို့ ပို့မည်။' : 'Send expiring-key, usage, and share-page activity summaries to admin chats.',
+    digestHour: isMyanmar ? 'အနှစ်ချုပ် ပို့ချိန် (နာရီ)' : 'Digest hour',
+    digestMinute: isMyanmar ? 'အနှစ်ချုပ် ပို့ချိန် (မိနစ်)' : 'Digest minute',
     lookbackWindow: isMyanmar ? 'ပြန်ကြည့်မည့် အချိန်အပိုင်းအခြား' : 'Lookback window',
-    localizedWelcome: isMyanmar ? 'ဘာသာစကားလိုက် Welcome template များ' : 'Localized welcome templates',
-    localizedWelcomeDesc: isMyanmar ? 'Default welcome message ကို အစားထိုးမည့် English / Burmese message များကို သတ်မှတ်နိုင်ပါသည်။' : 'Set English and Burmese variants for the bot welcome message.',
-    localizedNotFound: isMyanmar ? 'ဘာသာစကားလိုက် Key-not-found template များ' : 'Localized key-not-found templates',
-    localizedNotFoundDesc: isMyanmar ? 'Key မတွေ့သောအခါ အသုံးပြုမည့် English / Burmese message များကို သတ်မှတ်နိုင်ပါသည်။' : 'Set English and Burmese variants for the missing-key reply.',
-    englishTemplate: isMyanmar ? 'English template' : 'English template',
-    burmeseTemplate: isMyanmar ? 'မြန်မာ template' : 'Burmese template',
+    localizedWelcome: isMyanmar ? 'ဘာသာစကားလိုက် ကြိုဆိုစာ တမ်းပလိတ်များ' : 'Localized welcome templates',
+    localizedWelcomeDesc: isMyanmar ? 'မူလ ကြိုဆိုစာကို အစားထိုးမည့် အင်္ဂလိပ် / မြန်မာ စာသားများကို သတ်မှတ်နိုင်ပါသည်။' : 'Set English and Burmese variants for the bot welcome message.',
+    localizedNotFound: isMyanmar ? 'ဘာသာစကားလိုက် သော့မတွေ့စာ တမ်းပလိတ်များ' : 'Localized key-not-found templates',
+    localizedNotFoundDesc: isMyanmar ? 'သော့ မတွေ့သောအခါ အသုံးပြုမည့် အင်္ဂလိပ် / မြန်မာ စာသားများကို သတ်မှတ်နိုင်ပါသည်။' : 'Set English and Burmese variants for the missing-key reply.',
+    englishTemplate: isMyanmar ? 'အင်္ဂလိပ် တမ်းပလိတ်' : 'English template',
+    burmeseTemplate: isMyanmar ? 'မြန်မာ တမ်းပလိတ်' : 'Burmese template',
     settingsSaved: isMyanmar ? 'Telegram ဆက်တင်များ သိမ်းပြီးပါပြီ' : 'Telegram settings saved',
-    settingsSavedDesc: isMyanmar ? 'ဘော့ configuration နှင့် digest schedule ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The bot configuration and digest schedule were updated.',
+    settingsSavedDesc: isMyanmar ? 'ဘော့ဆက်တင်နှင့် အနှစ်ချုပ် အချိန်ဇယားကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The bot configuration and digest schedule were updated.',
     settingsFailed: isMyanmar ? 'Telegram ဆက်တင် သိမ်းမရပါ' : 'Telegram settings failed',
     connected: isMyanmar ? 'Telegram ချိတ်ဆက်ပြီးပါပြီ' : 'Telegram connected',
     connectedDesc: (botName: string) => isMyanmar ? `@${botName} အဖြစ် ချိတ်ဆက်ထားသည်။` : `Connected as @${botName}.`,
-    webhookSet: isMyanmar ? 'Webhook သတ်မှတ်ပြီးပါပြီ' : 'Webhook set',
-    webhookSetDesc: isMyanmar ? 'ယခုမှစပြီး Telegram သည် update များကို ဤ panel သို့ ပို့မည်။' : 'Telegram will now send updates to this panel.',
-    webhookRemoved: isMyanmar ? 'Webhook ဖယ်ရှားပြီးပါပြီ' : 'Webhook removed',
-    webhookRemovedDesc: isMyanmar ? 'Telegram webhook delivery ကို ပိတ်လိုက်ပါပြီ။' : 'Telegram webhook delivery has been disabled.',
-    webhookFailed: isMyanmar ? 'Webhook ပြင်ဆင်မှု မအောင်မြင်ပါ' : 'Webhook setup failed',
-    webhookRemoveFailed: isMyanmar ? 'Webhook ဖယ်ရှားမှု မအောင်မြင်ပါ' : 'Webhook removal failed',
-    digestSent: isMyanmar ? 'Telegram digest ပို့ပြီးပါပြီ' : 'Telegram digest sent',
-    digestSentDesc: (count: number) => isMyanmar ? `Admin chat ${count} ခုသို့ ပို့ပြီးပါပြီ။` : `Delivered to ${count} admin chat(s).`,
-    digestFailed: isMyanmar ? 'Digest ပို့မှု မအောင်မြင်ပါ' : 'Digest failed',
-    webhookDesc: isMyanmar ? 'Webhook ဖွင့်ထားပါက message အသစ်များကို Telegram မှ ဤ endpoint သို့ ပို့မည်။' : 'Telegram sends new messages to this endpoint when the webhook is active.',
-    webhookUnavailable: isMyanmar ? 'ဤ environment တွင် Webhook URL မရနိုင်ပါ' : 'Webhook URL unavailable in this environment',
-    pendingUpdates: isMyanmar ? 'စောင့်ဆိုင်းနေသော update များ' : 'Pending updates',
+    webhookSet: isMyanmar ? 'ဝဘ်ဟွတ် သတ်မှတ်ပြီးပါပြီ' : 'Webhook set',
+    webhookSetDesc: isMyanmar ? 'ယခုမှစပြီး Telegram သည် အပ်ဒိတ်များကို ဤထိန်းချုပ်ခန်းသို့ ပို့မည်။' : 'Telegram will now send updates to this panel.',
+    webhookRemoved: isMyanmar ? 'ဝဘ်ဟွတ် ဖယ်ရှားပြီးပါပြီ' : 'Webhook removed',
+    webhookRemovedDesc: isMyanmar ? 'Telegram ဝဘ်ဟွတ် ပို့ဆောင်မှုကို ပိတ်လိုက်ပါပြီ။' : 'Telegram webhook delivery has been disabled.',
+    webhookFailed: isMyanmar ? 'ဝဘ်ဟွတ် ပြင်ဆင်မှု မအောင်မြင်ပါ' : 'Webhook setup failed',
+    webhookRemoveFailed: isMyanmar ? 'ဝဘ်ဟွတ် ဖယ်ရှားမှု မအောင်မြင်ပါ' : 'Webhook removal failed',
+    digestSent: isMyanmar ? 'Telegram အနှစ်ချုပ် ပို့ပြီးပါပြီ' : 'Telegram digest sent',
+    digestSentDesc: (count: number) => isMyanmar ? `စီမံသူ စကားပြောခန်း ${count} ခုသို့ ပို့ပြီးပါပြီ။` : `Delivered to ${count} admin chat(s).`,
+    digestFailed: isMyanmar ? 'အနှစ်ချုပ် ပို့မှု မအောင်မြင်ပါ' : 'Digest failed',
+    webhookDesc: isMyanmar ? 'ဝဘ်ဟွတ် ဖွင့်ထားပါက စာတိုအသစ်များကို Telegram မှ ဤလိပ်စာသို့ ပို့မည်။' : 'Telegram sends new messages to this endpoint when the webhook is active.',
+    webhookUnavailable: isMyanmar ? 'ဤပတ်ဝန်းကျင်တွင် ဝဘ်ဟွတ် URL မရနိုင်ပါ' : 'Webhook URL unavailable in this environment',
+    pendingUpdates: isMyanmar ? 'စောင့်ဆိုင်းနေသော အပ်ဒိတ်များ' : 'Pending updates',
     lastError: isMyanmar ? 'နောက်ဆုံးအမှား' : 'Last error',
-    commandSurface: isMyanmar ? 'ဘော့ command မျက်နှာပြင်' : 'Bot command surface',
-    userCommands: isMyanmar ? 'အသုံးပြုသူ command များ' : 'User commands',
-    adminCommands: isMyanmar ? 'Admin command များ' : 'Admin commands',
-    sendDigestNow: isMyanmar ? 'Digest ကို ယခုချက်ချင်း ပို့မည်' : 'Send digest now',
+    commandSurface: isMyanmar ? 'ဘော့ အမိန့် မျက်နှာပြင်' : 'Bot command surface',
+    userCommands: isMyanmar ? 'အသုံးပြုသူ အမိန့်များ' : 'User commands',
+    adminCommands: isMyanmar ? 'စီမံခန့်ခွဲရေး အမိန့်များ' : 'Admin commands',
+    sendDigestNow: isMyanmar ? 'အနှစ်ချုပ်ကို ယခုချက်ချင်း ပို့မည်' : 'Send digest now',
     announcementTitle: isMyanmar ? 'အသိပေးစာ ပို့ခြင်း' : 'Send announcement',
     announcementDesc: isMyanmar
-      ? 'Discount, new server, maintenance, သို့မဟုတ် အခြား announcement များကို Telegram အသုံးပြုသူများထံသို့ တိုက်ရိုက်ပို့နိုင်သည်။'
+      ? 'လျှော့စျေး၊ ဆာဗာအသစ်၊ ထိန်းသိမ်းမှု သို့မဟုတ် အခြားကြေညာချက်များကို Telegram အသုံးပြုသူများထံသို့ တိုက်ရိုက်ပို့နိုင်သည်။'
       : 'Send discounts, new server updates, maintenance notes, or any other manual Telegram announcement to users.',
-    announcementAudience: isMyanmar ? 'ပို့မည့် audience' : 'Audience',
-    announcementType: isMyanmar ? 'Announcement အမျိုးအစား' : 'Announcement type',
+    announcementAudience: isMyanmar ? 'ပို့မည့် ပရိသတ်' : 'Audience',
+    announcementType: isMyanmar ? 'ကြေညာချက် အမျိုးအစား' : 'Announcement type',
     announcementSubject: isMyanmar ? 'ခေါင်းစဉ်' : 'Title',
     announcementBody: isMyanmar ? 'မက်ဆေ့ချ်' : 'Message',
-    announcementTargetTag: isMyanmar ? 'Tag ဖြင့် target' : 'Target by tag',
-    announcementTargetServer: isMyanmar ? 'Server ဖြင့် target' : 'Target by server',
-    announcementTargetRegion: isMyanmar ? 'Region ဖြင့် target' : 'Target by region',
+    announcementTargetTag: isMyanmar ? 'တဂ်ဖြင့် ပစ်မှတ်ထားမည်' : 'Target by tag',
+    announcementTargetServer: isMyanmar ? 'ဆာဗာဖြင့် ပစ်မှတ်ထားမည်' : 'Target by server',
+    announcementTargetRegion: isMyanmar ? 'ဒေသဖြင့် ပစ်မှတ်ထားမည်' : 'Target by region',
     announcementAllTargets: isMyanmar ? 'အားလုံး' : 'All',
-    announcementCardStyle: isMyanmar ? 'Card style' : 'Card style',
-    announcementCardPreview: isMyanmar ? 'Card preview' : 'Card preview',
+    announcementCardStyle: isMyanmar ? 'ကတ်ပုံစံ' : 'Card style',
+    announcementCardPreview: isMyanmar ? 'ကတ်အကြိုကြည့်ရှုမှု' : 'Card preview',
     announcementCardPreviewDesc: isMyanmar
       ? 'Telegram တွင် ပို့မည့် branded card preview ကို ကြည့်နိုင်သည်။'
       : 'Preview the branded card style that will be sent to Telegram.',
-    announcementRecurrence: isMyanmar ? 'Repeat schedule' : 'Repeat schedule',
+    announcementRecurrence: isMyanmar ? 'ထပ်ပို့မည့် အချိန်ဇယား' : 'Repeat schedule',
     announcementOneTime: isMyanmar ? 'တစ်ကြိမ်သာ' : 'One-time',
     announcementDaily: isMyanmar ? 'နေ့စဉ်' : 'Daily',
     announcementWeekly: isMyanmar ? 'အပတ်စဉ်' : 'Weekly',
-    includeSupportButton: isMyanmar ? 'Support button ထည့်မည်' : 'Include support button',
+    includeSupportButton: isMyanmar ? 'အကူအညီခလုတ် ထည့်မည်' : 'Include support button',
     sendAnnouncementNow: isMyanmar ? 'ယခုပဲ ပို့မည်' : 'Send now',
-    announcementSent: isMyanmar ? 'Announcement ပို့ပြီးပါပြီ' : 'Announcement sent',
-    announcementFailed: isMyanmar ? 'Announcement ပို့မရပါ' : 'Announcement failed',
+    announcementSent: isMyanmar ? 'ကြေညာချက် ပို့ပြီးပါပြီ' : 'Announcement sent',
+    announcementFailed: isMyanmar ? 'ကြေညာချက် ပို့မရပါ' : 'Announcement failed',
     recipientsLabel: isMyanmar ? 'လက်ခံသူ' : 'Recipients',
     announcementScheduleAt: isMyanmar ? 'ပို့မည့် အချိန်' : 'Schedule for',
     announcementScheduleHint: isMyanmar ? 'အချိန် သတ်မှတ်ထားပါက နောက်မှ ပို့ပါမည်။' : 'Set a future time to send it later.',
     announcementScheduleNow: isMyanmar ? 'အချိန်ဇယားဖြင့် သိမ်းမည်' : 'Schedule',
-    announcementPreviewSelf: isMyanmar ? 'ကိုယ့် Telegram သို့ preview ပို့မည်' : 'Preview to myself',
-    announcementPreviewSent: isMyanmar ? 'Preview ပို့ပြီးပါပြီ' : 'Preview sent',
-    announcementTemplateName: isMyanmar ? 'Template အမည်' : 'Template name',
-    announcementSaveTemplate: isMyanmar ? 'Template အဖြစ် သိမ်းမည်' : 'Save template',
-    announcementTemplateSaved: isMyanmar ? 'Template သိမ်းပြီးပါပြီ' : 'Template saved',
-    announcementTemplateDeleted: isMyanmar ? 'Template ဖျက်ပြီးပါပြီ' : 'Template deleted',
-    announcementTemplatesTitle: isMyanmar ? 'Saved templates' : 'Saved templates',
-    announcementTemplatesDesc: isMyanmar ? 'အကြိမ်ကြိမ်အသုံးပြုမည့် announcement များကို template အဖြစ် သိမ်းနိုင်သည်။' : 'Save reusable announcement presets for discounts, new servers, maintenance, and more.',
-    announcementPresetTemplatesTitle: isMyanmar ? 'Quick template presets' : 'Quick template presets',
+    announcementPreviewSelf: isMyanmar ? 'ကိုယ့် Telegram သို့ အစမ်းပို့မည်' : 'Preview to myself',
+    announcementPreviewSent: isMyanmar ? 'အစမ်းပို့ပြီးပါပြီ' : 'Preview sent',
+    announcementTemplateName: isMyanmar ? 'တမ်းပလိတ်အမည်' : 'Template name',
+    announcementSaveTemplate: isMyanmar ? 'တမ်းပလိတ်အဖြစ် သိမ်းမည်' : 'Save template',
+    announcementTemplateSaved: isMyanmar ? 'တမ်းပလိတ် သိမ်းပြီးပါပြီ' : 'Template saved',
+    announcementTemplateDeleted: isMyanmar ? 'တမ်းပလိတ် ဖျက်ပြီးပါပြီ' : 'Template deleted',
+    announcementTemplatesTitle: isMyanmar ? 'သိမ်းထားသော တမ်းပလိတ်များ' : 'Saved templates',
+    announcementTemplatesDesc: isMyanmar ? 'အကြိမ်ကြိမ်အသုံးပြုမည့် ကြေညာချက်များကို တမ်းပလိတ်အဖြစ် သိမ်းနိုင်သည်။' : 'Save reusable announcement presets for discounts, new servers, maintenance, and more.',
+    announcementPresetTemplatesTitle: isMyanmar ? 'အလျင်အမြန် သုံးရန် တမ်းပလိတ် preset များ' : 'Quick template presets',
     announcementPresetTemplatesDesc: isMyanmar
-      ? 'အသင့်သုံး announcement template များကို form ထဲသို့ ထည့်နိုင်သလို Telegram admin command အဖြစ် copy လည်း လုပ်နိုင်သည်။'
+      ? 'အသင့်သုံး ကြေညာချက်တမ်းပလိတ်များကို ဖောင်ထဲသို့ ထည့်နိုင်သလို Telegram စီမံခန့်ခွဲသူ အမိန့်အဖြစ် ကူးနိုင်သည်။'
       : 'Load ready-to-send announcement presets into the form or copy them as exact Telegram admin commands.',
-    announcementHistoryTitle: isMyanmar ? 'Announcement history' : 'Announcement history',
-    announcementHistoryDesc: isMyanmar ? 'ပို့ထားသော announcement များ၊ schedule များနှင့် failed deliveries များကို ကြည့်နိုင်သည်။' : 'Review sent announcements, scheduled sends, and failed deliveries.',
-    announcementHeroImage: isMyanmar ? 'Hero image URL' : 'Hero image URL',
-    announcementHeroImageHint: isMyanmar ? 'Telegram တွင် image card အဖြစ် ပို့လိုပါက image URL ကို ထည့်ပါ။' : 'Add an image URL to send the announcement as a branded Telegram image card.',
-    announcementPinToInbox: isMyanmar ? 'Inbox တွင် pin လုပ်မည်' : 'Pin in customer inbox',
+    announcementHistoryTitle: isMyanmar ? 'ကြေညာချက်မှတ်တမ်း' : 'Announcement history',
+    announcementHistoryDesc: isMyanmar ? 'ပို့ထားသော ကြေညာချက်များ၊ အချိန်ဇယားများနှင့် မအောင်မြင်သော ပို့ဆောင်မှုများကို ကြည့်နိုင်သည်။' : 'Review sent announcements, scheduled sends, and failed deliveries.',
+    announcementHeroImage: isMyanmar ? 'အဓိကပုံ URL' : 'Hero image URL',
+    announcementHeroImageHint: isMyanmar ? 'Telegram တွင် ပုံကတ်အဖြစ် ပို့လိုပါက ပုံ URL ကို ထည့်ပါ။' : 'Add an image URL to send the announcement as a branded Telegram image card.',
+    announcementPinToInbox: isMyanmar ? 'ဖောက်သည် inbox တွင် ကပ်ထားမည်' : 'Pin in customer inbox',
     announcementPinToInboxHint: isMyanmar
-      ? 'ဤ announcement ကို customer inbox ထိပ်တွင် အရေးကြီး notice အဖြစ် ပြပါမည်။'
+      ? 'ဤကြေညာချက်ကို ဖောက်သည် inbox ထိပ်တွင် အရေးကြီး အသိပေးချက်အဖြစ် ပြပါမည်။'
       : 'Keep this announcement pinned near the top of the customer inbox.',
-    announcementAnalyticsTitle: isMyanmar ? 'Delivery analytics' : 'Delivery analytics',
-    announcementAnalyticsDesc: isMyanmar ? 'Open/click performance၊ audience success rate နှင့် resend recovery ကို ကြည့်နိုင်သည်။' : 'Track delivery success, opens, clicks, and resend recovery for announcements.',
-    announcementAnalyticsRange: isMyanmar ? 'Analytics window' : 'Analytics window',
-    announcementOpens: isMyanmar ? 'Open များ' : 'Opens',
-    announcementClicks: isMyanmar ? 'Clicks' : 'Clicks',
-    announcementOpenRate: isMyanmar ? 'Open rate' : 'Open rate',
-    announcementClickRate: isMyanmar ? 'Click rate' : 'Click rate',
-    announcementSuccessRate: isMyanmar ? 'Success rate' : 'Success rate',
-    announcementResendRecovery: isMyanmar ? 'Resend recovery' : 'Resend recovery',
-    announcementByType: isMyanmar ? 'By announcement type' : 'By announcement type',
-    announcementByAudience: isMyanmar ? 'By audience' : 'By audience',
-    announcementApplyTemplate: isMyanmar ? 'Template သုံးမည်' : 'Use template',
-    announcementSavePreset: isMyanmar ? 'Preset ကို သိမ်းမည်' : 'Save preset',
-    announcementCopyCommand: isMyanmar ? 'Command ကို copy လုပ်မည်' : 'Copy command',
-    announcementCommandCopied: isMyanmar ? 'Announcement command ကို copy လုပ်ပြီးပါပြီ' : 'Announcement command copied',
-    announcementCommandPreview: isMyanmar ? 'Telegram command' : 'Telegram command',
-    announcementDeleteTemplate: isMyanmar ? 'Template ဖျက်မည်' : 'Delete template',
-    announcementNoTemplates: isMyanmar ? 'Saved template မရှိသေးပါ။' : 'No saved templates yet.',
-    announcementNoHistory: isMyanmar ? 'Announcement history မရှိသေးပါ။' : 'No announcements sent yet.',
-    announcementResendFailed: isMyanmar ? 'Failed များကို ပြန်ပို့မည်' : 'Resend failed',
+    announcementAnalyticsTitle: isMyanmar ? 'ပို့ဆောင်မှု အချက်အလက်' : 'Delivery analytics',
+    announcementAnalyticsDesc: isMyanmar ? 'ဖွင့်ကြည့်မှု၊ နှိပ်မှု၊ audience အောင်မြင်မှုနှုန်းနှင့် ပြန်ပို့ပြီး ပြန်လည်ရရှိမှုကို ကြည့်နိုင်သည်။' : 'Track delivery success, opens, clicks, and resend recovery for announcements.',
+    announcementAnalyticsRange: isMyanmar ? 'အချက်အလက် ကြည့်ရှုချိန်' : 'Analytics window',
+    announcementOpens: isMyanmar ? 'ဖွင့်ကြည့်မှုများ' : 'Opens',
+    announcementClicks: isMyanmar ? 'နှိပ်မှုများ' : 'Clicks',
+    announcementOpenRate: isMyanmar ? 'ဖွင့်ကြည့်မှုနှုန်း' : 'Open rate',
+    announcementClickRate: isMyanmar ? 'နှိပ်မှုနှုန်း' : 'Click rate',
+    announcementSuccessRate: isMyanmar ? 'အောင်မြင်မှုနှုန်း' : 'Success rate',
+    announcementResendRecovery: isMyanmar ? 'ပြန်ပို့ပြီး ပြန်လည်ရရှိမှု' : 'Resend recovery',
+    announcementByType: isMyanmar ? 'ကြေညာချက် အမျိုးအစားအလိုက်' : 'By announcement type',
+    announcementByAudience: isMyanmar ? 'ပရိသတ်အလိုက်' : 'By audience',
+    announcementApplyTemplate: isMyanmar ? 'တမ်းပလိတ် သုံးမည်' : 'Use template',
+    announcementSavePreset: isMyanmar ? 'အသင့်သုံးပုံစံကို သိမ်းမည်' : 'Save preset',
+    announcementCopyCommand: isMyanmar ? 'အမိန့်ကို ကူးမည်' : 'Copy command',
+    announcementCommandCopied: isMyanmar ? 'ကြေညာချက်အမိန့်ကို ကူးပြီးပါပြီ' : 'Announcement command copied',
+    announcementCommandPreview: isMyanmar ? 'Telegram အမိန့်' : 'Telegram command',
+    announcementDeleteTemplate: isMyanmar ? 'တမ်းပလိတ် ဖျက်မည်' : 'Delete template',
+    announcementNoTemplates: isMyanmar ? 'သိမ်းထားသော တမ်းပလိတ် မရှိသေးပါ။' : 'No saved templates yet.',
+    announcementNoHistory: isMyanmar ? 'ကြေညာချက်မှတ်တမ်း မရှိသေးပါ။' : 'No announcements sent yet.',
+    announcementResendFailed: isMyanmar ? 'မအောင်မြင်သည့် ပို့ဆောင်မှုများကို ပြန်ပို့မည်' : 'Resend failed',
     announcementSendScheduledNow: isMyanmar ? 'ယခုပဲ ပို့မည်' : 'Send now',
-    announcementScheduled: isMyanmar ? 'Schedule လုပ်ပြီးပါပြီ' : 'Announcement scheduled',
+    announcementScheduled: isMyanmar ? 'ကြေညာချက်ကို အချိန်ဇယားသတ်မှတ်ပြီးပါပြီ' : 'Announcement scheduled',
     announcementScheduledDesc: (when: string) => isMyanmar ? `${when} တွင် ပို့မည်။` : `Scheduled for ${when}.`,
     announcementExperimentsTitle: isMyanmar ? 'A/B experiments' : 'A/B experiments',
     announcementExperimentsDesc: isMyanmar
@@ -1520,7 +1520,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     announcementExperimentSaved: isMyanmar ? 'Experiment သိမ်းပြီးပါပြီ' : 'Experiment saved',
     announcementExperimentLaunched: isMyanmar ? 'Experiment စတင်ပြီးပါပြီ' : 'Experiment launched',
     announcementExperimentCreateNew: isMyanmar ? 'အသစ်ဖန်တီးမည်' : 'Create new',
-    announcementExperimentJumpHistory: isMyanmar ? 'History သို့ သွားမည်' : 'Jump to history',
+    announcementExperimentJumpHistory: isMyanmar ? 'မှတ်တမ်းသို့ သွားမည်' : 'Jump to history',
     announcementExperimentLoad: isMyanmar ? 'Edit form ထဲသို့ ထည့်မည်' : 'Load into form',
   };
   const utils = trpc.useUtils();
@@ -1974,9 +1974,9 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
         utils.telegramBot.getAnnouncementAnalytics.invalidate(),
       ]);
       toast({
-        title: isMyanmar ? 'Announcement များကို archive လုပ်ပြီးပါပြီ' : 'Announcements archived',
+        title: isMyanmar ? 'ကြေညာချက်များကို မှတ်တမ်းသို့ ရွှေ့ပြီးပါပြီ' : 'Announcements archived',
         description: isMyanmar
-          ? `${result.archivedCount} ခုကို history မှ archive လုပ်ပြီးပါပြီ။`
+          ? `${result.archivedCount} ခုကို မှတ်တမ်းမှ သိမ်းဆည်းပြီးပါပြီ။`
           : `${result.archivedCount} announcement${result.archivedCount === 1 ? '' : 's'} archived.`,
       });
       if (announcementIdParam) {
@@ -2910,7 +2910,10 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                 </div>
               </div>
               {announcementAnalyticsQuery.isLoading ? (
-                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading analytics…</div>
+                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {isMyanmar ? 'Analytics ကို တင်နေသည်…' : 'Loading analytics…'}
+                </div>
               ) : announcementAnalytics ? (
                 <div className="mt-4 space-y-4">
                   <AnnouncementExperimentsPanel
@@ -3897,318 +3900,318 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
   );
 
   const salesUi = {
-    title: isMyanmar ? 'Telegram အော်ဒါ flow' : 'Telegram order workflow',
+    title: isMyanmar ? 'Telegram အော်ဒါ လုပ်ငန်းစဉ်' : 'Telegram order workflow',
     desc: isMyanmar
       ? 'အသုံးပြုသူများက bot မှတစ်ဆင့် plan ရွေးခြင်း၊ payment proof ပို့ခြင်းနှင့် admin အတည်ပြုချက်ဖြင့် key ရယူနိုင်ပါသည်။'
       : 'Let users pick a plan, upload payment proof, and wait for admin approval before a key is delivered.',
-    enableOrders: isMyanmar ? 'Telegram order flow ကို ဖွင့်မည်' : 'Enable Telegram order flow',
-    allowRenewals: isMyanmar ? 'Renewal order များကို ခွင့်ပြုမည်' : 'Allow renewal orders',
-    supportLink: isMyanmar ? 'Telegram support account' : 'Telegram support account',
+    enableOrders: isMyanmar ? 'Telegram အော်ဒါ လုပ်ငန်းစဉ်ကို ဖွင့်မည်' : 'Enable Telegram order flow',
+    allowRenewals: isMyanmar ? 'သက်တမ်းတိုး အော်ဒါများကို ခွင့်ပြုမည်' : 'Allow renewal orders',
+    supportLink: isMyanmar ? 'Telegram အကူအညီ အကောင့်' : 'Telegram support account',
     supportLinkDesc: isMyanmar
-      ? 'Bot အတွင်း /support command နှင့် payment prompt များတွင် ဤ Telegram account ကို အသုံးပြုမည်။ @username သို့မဟုတ် https://t.me/... ကို ထည့်နိုင်ပြီး မထည့်ပါက Subscription Page support link ကို fallback အဖြစ် သုံးမည်။'
+      ? 'ဘော့အတွင်း /support ညွှန်ကြားချက်နှင့် ငွေပေးချေမှု လမ်းညွှန်များတွင် ဤ Telegram အကောင့်ကို အသုံးပြုမည်။ @username သို့မဟုတ် https://t.me/... ကို ထည့်နိုင်ပြီး မထည့်ပါက စာရင်းသွင်းမှု စာမျက်နှာရှိ အကူအညီလင့်ခ်ကို အစားထိုးအသုံးပြုမည်။'
       : 'Use this Telegram account for the bot /support command and payment prompts. You can enter either @username or a full https://t.me/... link. If left empty, the Subscription Page support link is used as a fallback.',
-    supportLinkPreview: isMyanmar ? 'Preview' : 'Preview',
+    supportLinkPreview: isMyanmar ? 'ကြိုကြည့်ရန်' : 'Preview',
     supportLinkPreviewFallback: isMyanmar
-      ? 'Telegram support account မသတ်မှတ်ရသေးပါ။ Subscription Page support link ကို fallback အဖြစ် သုံးပါမည်။'
+      ? 'Telegram အကူအညီ အကောင့် မသတ်မှတ်ရသေးပါ။ စာရင်းသွင်းမှု စာမျက်နှာရှိ အကူအညီလင့်ခ်ကို အစားထိုးအသုံးပြုမည်။'
       : 'No Telegram support account set yet. The bot will fall back to the Subscription Page support link.',
-    paymentAutomation: isMyanmar ? 'Unpaid order automation' : 'Unpaid order automation',
+    paymentAutomation: isMyanmar ? 'မပေးချေရသေးသော အော်ဒါ automation' : 'Unpaid order automation',
     paymentAutomationDesc: isMyanmar
-      ? 'Payment method မရွေးသေးသော သို့မဟုတ် screenshot မပို့ရသေးသော order များကို reminder ပို့ပြီး အချိန်ကျော်လျှင် အလိုအလျောက် cancel လုပ်ပါမည်။'
+      ? 'ငွေပေးချေမှု နည်းလမ်း မရွေးသေးသော သို့မဟုတ် စကရင်ရှော့ မပို့ရသေးသော အော်ဒါများကို သတိပေးပြီး အချိန်ကျော်လျှင် အလိုအလျောက် ပယ်ဖျက်မည်။'
       : 'Send one reminder for unpaid orders, then automatically cancel them if the user never selects a method or submits proof.',
-    paymentReminderHours: isMyanmar ? 'Reminder after (hours)' : 'Reminder after (hours)',
+    paymentReminderHours: isMyanmar ? 'သတိပေးမည့် အချိန် (နာရီ)' : 'Reminder after (hours)',
     pendingReviewReminderHours: isMyanmar
-      ? 'Admin review reminder (hours)'
+      ? 'စီမံခန့်ခွဲသူ စစ်ဆေးရန် သတိပေးချိန် (နာရီ)'
       : 'Admin review reminder (hours)',
     rejectedOrderReminderHours: isMyanmar
-      ? 'Rejected follow-up reminder (hours)'
+      ? 'ပယ်ထားသော အော်ဒါ နောက်ဆက်တွဲ သတိပေးချိန် (နာရီ)'
       : 'Rejected follow-up reminder (hours)',
     retryOrderReminderHours: isMyanmar
-      ? 'Retry reminder (hours)'
+      ? 'ထပ်မံကြိုးစားရန် သတိပေးချိန် (နာရီ)'
       : 'Retry reminder (hours)',
-    unpaidOrderExpiryHours: isMyanmar ? 'Auto-expire after (hours)' : 'Auto-expire after (hours)',
-    paymentInstructions: isMyanmar ? 'Payment လမ်းညွှန်' : 'Payment instructions',
-    englishInstructions: isMyanmar ? 'English instructions' : 'English instructions',
-    burmeseInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
+    unpaidOrderExpiryHours: isMyanmar ? 'အလိုအလျောက် သက်တမ်းကုန်မည့်အချိန် (နာရီ)' : 'Auto-expire after (hours)',
+    paymentInstructions: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment instructions',
+    englishInstructions: isMyanmar ? 'အင်္ဂလိပ် လမ်းညွှန်' : 'English instructions',
+    burmeseInstructions: isMyanmar ? 'မြန်မာ လမ်းညွှန်' : 'Burmese instructions',
     paymentMethodsTitle: isMyanmar ? 'ငွေပေးချေမှု အကောင့်များ' : 'Payment methods',
     paymentMethodsDesc: isMyanmar
       ? 'KPay, Wave Pay, AYA Pay စသည့် ငွေပေးချေမှု account အချက်အလက်များကို bot မှ ပြသပါမည်။'
       : 'Show KPay, Wave Pay, AYA Pay, and other payment account details in the bot before users upload screenshots.',
-    paymentMethodLabel: isMyanmar ? 'Payment method' : 'Payment method',
+    paymentMethodLabel: isMyanmar ? 'ငွေပေးချေမှု နည်းလမ်း' : 'Payment method',
     accountName: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
     accountNumber: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
     paymentImageUrl: isMyanmar ? 'QR / account image URL' : 'QR / account image URL',
-    englishMethodInstructions: isMyanmar ? 'English instructions' : 'English instructions',
-    burmeseMethodInstructions: isMyanmar ? 'မြန်မာ instructions' : 'Burmese instructions',
-    planConfig: isMyanmar ? 'Plan configuration' : 'Plan configuration',
-    planLabel: isMyanmar ? 'Plan အမည်' : 'Plan label',
-    burmeseLabel: isMyanmar ? 'မြန်မာ label' : 'Burmese label',
+    englishMethodInstructions: isMyanmar ? 'အင်္ဂလိပ် လမ်းညွှန်' : 'English instructions',
+    burmeseMethodInstructions: isMyanmar ? 'မြန်မာ လမ်းညွှန်' : 'Burmese instructions',
+    planConfig: isMyanmar ? 'ပလန် သတ်မှတ်ချက်' : 'Plan configuration',
+    planLabel: isMyanmar ? 'ပလန် အမည်' : 'Plan label',
+    burmeseLabel: isMyanmar ? 'မြန်မာ အမည်' : 'Burmese label',
     priceAmount: isMyanmar ? 'ငွေပမာဏ' : 'Price amount',
     priceCurrency: isMyanmar ? 'ငွေကြေး' : 'Currency',
-    priceLabel: isMyanmar ? 'စျေးနှုန်း label' : 'Price label',
-    burmesePriceLabel: isMyanmar ? 'မြန်မာ စျေးနှုန်း label' : 'Burmese price label',
-    autoPricePreview: isMyanmar ? 'အလိုအလျောက် စျေးနှုန်း preview' : 'Automatic price preview',
-    deliveryType: isMyanmar ? 'Delivery type' : 'Delivery type',
-    serverSwitches: isMyanmar ? 'Server switch limit' : 'Server switch limit',
-    serverSwitchesHint: isMyanmar ? 'Switch server လုပ်နိုင်သော အကြိမ်ရေ။ -1 = Unlimited' : 'Number of times user can switch servers. -1 = Unlimited.',
-    badge: isMyanmar ? 'Badge' : 'Badge',
+    priceLabel: isMyanmar ? 'စျေးနှုန်း စာသား' : 'Price label',
+    burmesePriceLabel: isMyanmar ? 'မြန်မာ စျေးနှုန်း စာသား' : 'Burmese price label',
+    autoPricePreview: isMyanmar ? 'အလိုအလျောက် စျေးနှုန်း ကြိုကြည့်ရန်' : 'Automatic price preview',
+    deliveryType: isMyanmar ? 'ပေးပို့မည့် အမျိုးအစား' : 'Delivery type',
+    serverSwitches: isMyanmar ? 'ဆာဗာ ပြောင်းခွင့် ကန့်သတ်ချက်' : 'Server switch limit',
+    serverSwitchesHint: isMyanmar ? 'ဆာဗာပြောင်းနိုင်သော အကြိမ်ရေ။ -1 = အကန့်အသတ်မရှိ' : 'Number of times user can switch servers. -1 = Unlimited.',
+    badge: isMyanmar ? 'အမှတ်တံဆိပ်' : 'Badge',
     badgeHint: isMyanmar ? 'Telegram bot plan list တွင် ပြသမည့် badge။' : 'Shown on the Telegram bot plan list.',
-    planCategory: isMyanmar ? 'Plan category' : 'Plan category',
-    flashPlans: isMyanmar ? '⚡ Flash Plans' : '⚡ Flash Plans',
-    seasonPlans: isMyanmar ? '🌙 Season Plans' : '🌙 Season Plans',
-    dynamicPlans: isMyanmar ? '🔑 Dynamic Plans' : '🔑 Dynamic Plans',
-    trialPlans: isMyanmar ? '🎁 Trial Plans' : '🎁 Trial Plans',
-    accessKeyDelivery: isMyanmar ? 'Normal access key' : 'Normal access key',
-    dynamicKeyDelivery: isMyanmar ? 'Managed dynamic key' : 'Managed dynamic key',
+    planCategory: isMyanmar ? 'ပလန် အမျိုးအစား' : 'Plan category',
+    flashPlans: isMyanmar ? '⚡ Flash ပလန်များ' : '⚡ Flash Plans',
+    seasonPlans: isMyanmar ? '🌙 Season ပလန်များ' : '🌙 Season Plans',
+    dynamicPlans: isMyanmar ? '🔑 ပြောင်းလဲသတ်မှတ် ပလန်များ' : '🔑 Dynamic Plans',
+    trialPlans: isMyanmar ? '🎁 အစမ်းသုံး ပလန်များ' : '🎁 Trial Plans',
+    accessKeyDelivery: isMyanmar ? 'ပုံမှန် အသုံးပြုခွင့်သော့' : 'Normal access key',
+    dynamicKeyDelivery: isMyanmar ? 'စီမံထားသော ပြောင်းလဲသတ်မှတ်သော့' : 'Managed dynamic key',
     premiumTemplateOnlyHint: isMyanmar
-      ? 'Dynamic delivery plan များအတွက် self-managed dynamic template များကိုသာ ပြသပါမည်။'
+      ? 'ပြောင်းလဲသတ်မှတ် ပို့ဆောင်မှုပလန်များအတွက် ကိုယ်တိုင်စီမံသော ပြောင်းလဲနိုင်သော နမူနာပုံစံများကိုသာ ပြသမည်။'
       : 'Dynamic delivery plans only show self-managed dynamic templates.',
     accessKeySoftLimitHint: isMyanmar
-      ? 'Normal access-key delivery သည် soft-limit only ဖြစ်သည်။ Official flow တွင် raw config ကို ဖုံးထားနိုင်သော်လည်း copied ss:// secret ကို device အခြားတစ်ခုမှာ ပြန်သုံးနိုင်သေးသည်။ Stronger anti-sharing အတွက် dynamic delivery ကို အသုံးပြုပါ။'
+      ? 'ပုံမှန် အသုံးပြုခွင့်သော့ ပို့ဆောင်မှုသည် ပျော့ပြောင်းကန့်သတ်ချက်သာ ဖြစ်သည်။ တရားဝင် လမ်းကြောင်းတွင် raw ဆက်တင်ကို ဖုံးထားနိုင်သော်လည်း ကူးယူထားသော ss:// လျှို့ဝှက်ချက်ကို အခြားစက်တစ်ခုတွင် ပြန်သုံးနိုင်သေးသည်။ ပိုမိုကောင်းမွန်သော မျှဝေကာကွယ်မှုအတွက် ပြောင်းလဲနိုင်သော ပို့ဆောင်မှုကို အသုံးပြုပါ။'
       : 'Normal access-key delivery is soft-limit only. You can hide the raw config on the official flow, but a copied ss:// secret can still be reused. Use dynamic delivery for stronger anti-sharing.',
     dynamicDeliveryStrongHint: isMyanmar
-      ? 'Dynamic delivery သည် customers ကို managed share page / client-link flow ပေါ်တွင်ထားပေးသောကြောင့် stronger anti-sharing အတွက် အကြံပြုထားသော path ဖြစ်သည်။'
+      ? 'ပြောင်းလဲနိုင်သော ပို့ဆောင်မှုသည် ဖောက်သည်များကို စီမံထားသော မျှဝေစာမျက်နှာ / ကလိုင်းယင့်လင့်ခ် လမ်းကြောင်းပေါ်တွင် ထိန်းထားပေးသောကြောင့် ပိုမိုကောင်းမွန်သော မျှဝေကာကွယ်မှုအတွက် အကြံပြုထားသည့် လမ်းကြောင်းဖြစ်သည်။'
       : 'Dynamic delivery keeps customers on the managed share-page / client-link flow and is the recommended path for stronger anti-sharing.',
     dynamicDeliveryLockedHint: isMyanmar
-      ? 'ဤ built-in protected plan သည် dynamic delivery ပေါ်တွင်ပဲ ဆက်နေရမည်။ Anti-sharing လိုအပ်သော plan ကို normal access key သို့ downgrade မလုပ်ပါနှင့်။'
+      ? 'ဤ built-in ကာကွယ်ထားသော ပလန်သည် ပြောင်းလဲနိုင်သော ပို့ဆောင်မှု ပေါ်တွင်သာ ဆက်ရှိရမည်။ မျှဝေကာကွယ်မှု လိုအပ်သော ပလန်ကို ပုံမှန် အသုံးပြုခွင့်သော့အဖြစ် လျှော့မချပါနှင့်။'
       : 'This built-in protected plan stays on dynamic delivery. Do not downgrade an anti-sharing plan to a normal access key.',
-    premiumPool: isMyanmar ? 'Premium pool' : 'Premium pool',
-    stableLink: isMyanmar ? 'Stable link' : 'Stable link',
-    autoFailover: isMyanmar ? 'Auto failover' : 'Auto failover',
-    preferredRouting: isMyanmar ? 'Preferred routing' : 'Preferred routing',
-    template: isMyanmar ? 'အသုံးပြုမည့် template' : 'Template to apply',
-    dynamicTemplate: isMyanmar ? 'အသုံးပြုမည့် dynamic template' : 'Dynamic template to apply',
-    noTemplate: isMyanmar ? 'Template မသုံးပါ' : 'No template',
-    noTemplateSelected: isMyanmar ? 'ဤ plan အတွက် template မရွေးထားသေးပါ။' : 'No template is selected for this plan yet.',
-    templateMissing: isMyanmar ? 'ရွေးထားသော template ကို မတွေ့ပါ။' : 'The selected template could not be found.',
-    templateSummary: isMyanmar ? 'Template summary' : 'Template summary',
-    server: isMyanmar ? 'Server' : 'Server',
-    autoSelectServer: isMyanmar ? 'Auto-select' : 'Auto-select',
-    method: isMyanmar ? 'Method' : 'Method',
-    slugRule: isMyanmar ? 'Slug rule' : 'Slug rule',
-    theme: isMyanmar ? 'Theme' : 'Theme',
-    shareDelivery: isMyanmar ? 'Share page' : 'Share page',
-    clientDelivery: isMyanmar ? 'Client link' : 'Client link',
-    telegramDelivery: isMyanmar ? 'Telegram delivery' : 'Telegram delivery',
+    premiumPool: isMyanmar ? 'ပရီမီယံ အုပ်စု' : 'Premium pool',
+    stableLink: isMyanmar ? 'တည်ငြိမ်သော လင့်ခ်' : 'Stable link',
+    autoFailover: isMyanmar ? 'အလိုအလျောက် အရန်လမ်းကြောင်းပြောင်းမှု' : 'Auto failover',
+    preferredRouting: isMyanmar ? 'ဦးစားပေး လမ်းကြောင်းခွဲမှု' : 'Preferred routing',
+    template: isMyanmar ? 'အသုံးပြုမည့် နမူနာပုံစံ' : 'Template to apply',
+    dynamicTemplate: isMyanmar ? 'အသုံးပြုမည့် ပြောင်းလဲနိုင်သော နမူနာပုံစံ' : 'Dynamic template to apply',
+    noTemplate: isMyanmar ? 'နမူနာပုံစံ မသုံးပါ' : 'No template',
+    noTemplateSelected: isMyanmar ? 'ဤပလန်အတွက် တမ်းပလိတ် မရွေးထားသေးပါ။' : 'No template is selected for this plan yet.',
+    templateMissing: isMyanmar ? 'ရွေးထားသော တမ်းပလိတ်ကို မတွေ့ပါ။' : 'The selected template could not be found.',
+    templateSummary: isMyanmar ? 'နမူနာပုံစံ အကျဉ်းချုပ်' : 'Template summary',
+    server: isMyanmar ? 'ဆာဗာ' : 'Server',
+    autoSelectServer: isMyanmar ? 'အလိုအလျောက် ရွေးမည်' : 'Auto-select',
+    method: isMyanmar ? 'နည်းလမ်း' : 'Method',
+    slugRule: isMyanmar ? 'အတိုအမည် စည်းမျဉ်း' : 'Slug rule',
+    theme: isMyanmar ? 'အပြင်အဆင်' : 'Theme',
+    shareDelivery: isMyanmar ? 'မျှဝေစာမျက်နှာ' : 'Share page',
+    clientDelivery: isMyanmar ? 'ကလိုင်းယင့် လင့်ခ်' : 'Client link',
+    telegramDelivery: isMyanmar ? 'Telegram ပို့ဆောင်မှု' : 'Telegram delivery',
     enabledShort: isMyanmar ? 'ဖွင့်ထား' : 'Enabled',
     disabledShort: isMyanmar ? 'ပိတ်ထား' : 'Disabled',
     none: isMyanmar ? 'မရှိ' : 'None',
-    behavior: isMyanmar ? 'Plan behavior' : 'Plan behavior',
+    behavior: isMyanmar ? 'ပလန် အပြုအမူ' : 'Plan behavior',
     duration: isMyanmar ? 'သက်တမ်း' : 'Duration',
     days: (count: number) => (isMyanmar ? `${count} ရက်` : `${count} day${count === 1 ? '' : 's'}`),
     enabled: isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled',
     disabled: isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled',
-    unlimited: isMyanmar ? 'Unlimited quota' : 'Unlimited quota',
+    unlimited: isMyanmar ? 'အကန့်အသတ်မဲ့ ဒေတာ' : 'Unlimited quota',
     months: (count: number) => (isMyanmar ? `${count} လ` : `${count} month${count === 1 ? '' : 's'}`),
     minMonths: (count: number) => (isMyanmar ? `အနည်းဆုံး ${count} လ` : `Minimum ${count} months`),
     dataLimit: (gb: number | null | undefined) =>
-      gb ? (isMyanmar ? `${gb} GB limit` : `${gb} GB limit`) : isMyanmar ? 'Unlimited quota' : 'Unlimited quota',
-    saveConfig: isMyanmar ? 'Order settings သိမ်းမည်' : 'Save order settings',
-    saved: isMyanmar ? 'Telegram order settings သိမ်းပြီးပါပြီ' : 'Telegram order settings saved',
-    savedDesc: isMyanmar ? 'Plan configuration, pricing နှင့် payment instructions ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Plan configuration, pricing, and payment instructions were updated.',
-    pendingTitle: isMyanmar ? 'Pending review orders' : 'Pending review orders',
-    reviewQueue: isMyanmar ? 'Review queue' : 'Review queue',
+      gb ? (isMyanmar ? `${gb} GB ကန့်သတ်ချက်` : `${gb} GB limit`) : isMyanmar ? 'အကန့်အသတ်မဲ့ ဒေတာ' : 'Unlimited quota',
+    saveConfig: isMyanmar ? 'အော်ဒါ သတ်မှတ်ချက်များကို သိမ်းမည်' : 'Save order settings',
+    saved: isMyanmar ? 'Telegram အော်ဒါ သတ်မှတ်ချက်များကို သိမ်းပြီးပါပြီ' : 'Telegram order settings saved',
+    savedDesc: isMyanmar ? 'ပလန် သတ်မှတ်ချက်များ၊ ဈေးနှုန်းများနှင့် ငွေပေးချေမှု လမ်းညွှန်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Plan configuration, pricing, and payment instructions were updated.',
+    pendingTitle: isMyanmar ? 'စစ်ဆေးရန် စောင့်နေသော အော်ဒါများ' : 'Pending review orders',
+    reviewQueue: isMyanmar ? 'စစ်ဆေးရေး တန်းစီစာရင်း' : 'Review queue',
     noOrders: isMyanmar ? 'အော်ဒါ မရှိသေးပါ။' : 'No Telegram orders yet.',
     searchPlaceholder: isMyanmar
       ? 'Order code၊ Telegram username၊ email သို့မဟုတ် key name ဖြင့် ရှာရန်'
       : 'Search by order code, Telegram username, email, or key name',
-    allStatuses: isMyanmar ? 'Status အားလုံး' : 'All statuses',
-    allTypes: isMyanmar ? 'Type အားလုံး' : 'All types',
+    allStatuses: isMyanmar ? 'အခြေအနေ အားလုံး' : 'All statuses',
+    allTypes: isMyanmar ? 'အမျိုးအစား အားလုံး' : 'All types',
     newOrders: isMyanmar ? 'အသစ်' : 'New orders',
-    renewals: isMyanmar ? 'Renewals' : 'Renewals',
-    customer: isMyanmar ? 'Customer' : 'Customer',
-    linkedKeys: isMyanmar ? 'Linked keys' : 'Linked keys',
-    recentOrders: isMyanmar ? 'Recent orders' : 'Recent orders',
-    orderStatusCommand: isMyanmar ? 'Order status command' : 'Order status command',
-    customerProfile: isMyanmar ? 'Telegram profile' : 'Telegram profile',
-    orderContext: isMyanmar ? 'Order context' : 'Order context',
-    noLinkedKeys: isMyanmar ? 'ဆက်စပ် key မတွေ့ပါ။' : 'No linked keys found.',
+    renewals: isMyanmar ? 'သက်တမ်းတိုး အော်ဒါများ' : 'Renewals',
+    customer: isMyanmar ? 'ဖောက်သည်' : 'Customer',
+    linkedKeys: isMyanmar ? 'ချိတ်ဆက်ထားသော သော့များ' : 'Linked keys',
+    recentOrders: isMyanmar ? 'နောက်ဆုံး အော်ဒါများ' : 'Recent orders',
+    orderStatusCommand: isMyanmar ? 'အော်ဒါ အခြေအနေ ညွှန်ကြားချက်' : 'Order status command',
+    customerProfile: isMyanmar ? 'Telegram ပရိုဖိုင်' : 'Telegram profile',
+    orderContext: isMyanmar ? 'အော်ဒါ အခြေအနေအချက်အလက်' : 'Order context',
+    noLinkedKeys: isMyanmar ? 'ဆက်စပ် သော့ မတွေ့ပါ။' : 'No linked keys found.',
     noRecentOrders: isMyanmar ? 'ယခင် order မတွေ့ပါ။' : 'No previous orders.',
-    noCaption: isMyanmar ? 'Caption မရှိပါ' : 'No caption',
+    noCaption: isMyanmar ? 'စာတန်း မရှိပါ' : 'No caption',
     proofForwardedHint: isMyanmar
-      ? 'Proof screenshot ကို admin Telegram chat သို့ copy လုပ်ထားပါသည်။'
+      ? 'သက်သေဓာတ်ပုံကို စီမံသူ Telegram စကားပြောခန်းသို့ ကူးထားပါသည်။'
       : 'The proof screenshot has been copied into the admin Telegram chat.',
     ordersMatched: (count: number) =>
-      isMyanmar ? `ကိုက်ညီသော order ${count} ခု` : `${count} matching orders`,
-    localeLabel: isMyanmar ? 'Locale' : 'Locale',
-    lastFulfilled: isMyanmar ? 'နောက်ဆုံး fulfilled' : 'Last fulfilled',
-    totalOrders: isMyanmar ? 'စုစုပေါင်း orders' : 'Total orders',
-    proofCaption: isMyanmar ? 'Proof caption' : 'Proof caption',
-    selectedServer: isMyanmar ? 'ရွေးထားသော server' : 'Selected server',
+      isMyanmar ? `ကိုက်ညီသော အော်ဒါ ${count} ခု` : `${count} matching orders`,
+    localeLabel: isMyanmar ? 'ဘာသာစကား' : 'Locale',
+    lastFulfilled: isMyanmar ? 'နောက်ဆုံး ပြီးမြောက်သော အော်ဒါ' : 'Last fulfilled',
+    totalOrders: isMyanmar ? 'စုစုပေါင်း အော်ဒါများ' : 'Total orders',
+    proofCaption: isMyanmar ? 'အထောက်အထား စာတန်း' : 'Proof caption',
+    selectedServer: isMyanmar ? 'ရွေးထားသော ဆာဗာ' : 'Selected server',
     reviewContextHint: isMyanmar
       ? 'Approve မပြုမီ customer context နှင့် linked keys ကို စစ်ဆေးပါ။'
       : 'Review customer context and linked keys before approving.',
-    reviewerAssignment: isMyanmar ? 'Reviewer assignment' : 'Reviewer assignment',
-    reviewer: isMyanmar ? 'Reviewer' : 'Reviewer',
-    updateReviewer: isMyanmar ? 'Reviewer ကို အပ်ဒိတ်လုပ်မည်' : 'Update reviewer',
-    assignToMe: isMyanmar ? 'ကိုယ့်ထံ assign လုပ်မည်' : 'Assign to me',
-    reviewerUpdated: isMyanmar ? 'Reviewer ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Reviewer updated',
+    reviewerAssignment: isMyanmar ? 'စစ်ဆေးသူ သတ်မှတ်ချက်' : 'Reviewer assignment',
+    reviewer: isMyanmar ? 'စစ်ဆေးသူ' : 'Reviewer',
+    updateReviewer: isMyanmar ? 'စစ်ဆေးသူကို အပ်ဒိတ်လုပ်မည်' : 'Update reviewer',
+    assignToMe: isMyanmar ? 'ကိုယ့်ထံ တာဝန်ယူမည်' : 'Assign to me',
+    reviewerUpdated: isMyanmar ? 'စစ်ဆေးသူကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Reviewer updated',
     reviewerUpdatedDesc: isMyanmar
-      ? 'Order reviewer assignment ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။'
+      ? 'အော်ဒါ စစ်ဆေးသူ သတ်မှတ်ချက်ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။'
       : 'The order reviewer assignment was updated.',
-    claimOrder: isMyanmar ? 'Claim' : 'Claim',
-    releaseOrder: isMyanmar ? 'Release' : 'Release',
-    claimedBy: isMyanmar ? 'Claimed by' : 'Claimed by',
-    claimedAt: isMyanmar ? 'Claimed at' : 'Claimed at',
-    claimedByMe: isMyanmar ? 'Claimed by me' : 'Claimed by me',
-    unassigned: isMyanmar ? 'Unassigned' : 'Unassigned',
-    claimSuccess: isMyanmar ? 'Order ကို claim လုပ်ပြီးပါပြီ' : 'Order claimed',
-    releaseSuccess: isMyanmar ? 'Order claim ကို လွှတ်ပြီးပါပြီ' : 'Order released',
-    salesDigest: isMyanmar ? 'Daily sales digest' : 'Daily sales digest',
+    claimOrder: isMyanmar ? 'ရယူမည်' : 'Claim',
+    releaseOrder: isMyanmar ? 'ပြန်လွှတ်မည်' : 'Release',
+    claimedBy: isMyanmar ? 'ရယူထားသူ' : 'Claimed by',
+    claimedAt: isMyanmar ? 'ရယူချိန်' : 'Claimed at',
+    claimedByMe: isMyanmar ? 'ကိုယ်တိုင် ရယူထား' : 'Claimed by me',
+    unassigned: isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned',
+    claimSuccess: isMyanmar ? 'အော်ဒါကို ရယူပြီးပါပြီ' : 'Order claimed',
+    releaseSuccess: isMyanmar ? 'အော်ဒါ ရယူမှုကို ပြန်လွှတ်ပြီးပါပြီ' : 'Order released',
+    salesDigest: isMyanmar ? 'နေ့စဉ် အရောင်း အကျဉ်းချုပ်' : 'Daily sales digest',
     salesDigestDesc: isMyanmar
-      ? 'Telegram admin chat များသို့ sales summary ကို နေ့စဉ် ပို့မည်။'
+      ? 'Telegram စီမံခန့်ခွဲသူ စကားပြောခန်းများသို့ အရောင်းအနှစ်ချုပ်ကို နေ့စဉ် ပို့မည်။'
       : 'Send a daily Telegram sales summary to the configured admin chats.',
-    salesDigestHour: isMyanmar ? 'Sales digest hour' : 'Sales digest hour',
-    salesDigestMinute: isMyanmar ? 'Sales digest minute' : 'Sales digest minute',
-    sendSalesDigestNow: isMyanmar ? 'Sales digest ကို ယခု ပို့မည်' : 'Send sales digest now',
-    salesDigestSent: isMyanmar ? 'Sales digest ပို့ပြီးပါပြီ' : 'Sales digest sent',
-    salesDigestFailed: isMyanmar ? 'Sales digest မပို့နိုင်ပါ' : 'Sales digest failed',
+    salesDigestHour: isMyanmar ? 'အရောင်း အကျဉ်းချုပ် ပို့မည့် နာရီ' : 'Sales digest hour',
+    salesDigestMinute: isMyanmar ? 'အရောင်း အကျဉ်းချုပ် ပို့မည့် မိနစ်' : 'Sales digest minute',
+    sendSalesDigestNow: isMyanmar ? 'အရောင်း အကျဉ်းချုပ်ကို ယခု ပို့မည်' : 'Send sales digest now',
+    salesDigestSent: isMyanmar ? 'အရောင်း အကျဉ်းချုပ် ပို့ပြီးပါပြီ' : 'Sales digest sent',
+    salesDigestFailed: isMyanmar ? 'အရောင်း အကျဉ်းချုပ် မပို့နိုင်ပါ' : 'Sales digest failed',
     salesDigestSentDesc: (count: number) =>
-      isMyanmar ? `Admin chat ${count} ခုသို့ ပို့ပြီးပါပြီ။` : `Delivered to ${count} admin chat(s).`,
-    priorityQueue: isMyanmar ? 'Priority queue' : 'Priority queue',
-    reviewerWorkload: isMyanmar ? 'Reviewer workload' : 'Reviewer workload',
-    queueAll: isMyanmar ? 'All' : 'All',
-    queueUnclaimed: isMyanmar ? 'Unclaimed' : 'Unclaimed',
-    queueHighRisk: isMyanmar ? 'High risk' : 'High risk',
-    queuePremium: isMyanmar ? 'Premium' : 'Premium',
-    queueMine: isMyanmar ? 'My queue' : 'My queue',
-    queueOldest: isMyanmar ? 'Oldest first' : 'Oldest first',
-    highRiskPending: isMyanmar ? 'High-risk pending' : 'High-risk pending',
-    myClaimed: isMyanmar ? 'My claimed' : 'My claimed',
-    claimedByOthers: isMyanmar ? 'Claimed by others' : 'Claimed by others',
-    quickApprove: isMyanmar ? 'Quick approve' : 'Quick approve',
-    macroRejectDuplicate: isMyanmar ? 'Reject duplicate' : 'Reject duplicate',
-    macroRejectBlurry: isMyanmar ? 'Reject blurry' : 'Reject blurry',
-    macroRejectAmount: isMyanmar ? 'Wrong amount' : 'Wrong amount',
-    macroRejectMethod: isMyanmar ? 'Wrong method' : 'Wrong method',
-    macroApplied: isMyanmar ? 'Review macro applied' : 'Review macro applied',
-    macroApplyFailed: isMyanmar ? 'Review macro failed' : 'Review macro failed',
-    noAssignedReviewers: isMyanmar ? 'No claimed pending orders yet.' : 'No claimed pending orders yet.',
-    riskLabel: isMyanmar ? 'Risk score' : 'Risk score',
-    riskLow: isMyanmar ? 'Low' : 'Low',
-    riskMedium: isMyanmar ? 'Medium' : 'Medium',
-    riskHigh: isMyanmar ? 'High' : 'High',
-    riskCritical: isMyanmar ? 'Critical' : 'Critical',
-    riskReasonDuplicateProof: isMyanmar ? 'Duplicate proof history' : 'Duplicate proof history',
-    riskReasonRepeatedRejections: isMyanmar ? 'Repeated rejected orders' : 'Repeated rejected orders',
-    riskReasonPaymentMismatch: isMyanmar ? 'Payment mismatch history' : 'Payment mismatch history',
-    riskReasonRetryPattern: isMyanmar ? 'Retry-heavy order pattern' : 'Retry-heavy order pattern',
-    riskReasonMultipleOpenOrders: isMyanmar ? 'Multiple open orders' : 'Multiple open orders',
-    riskReasonResubmittedProof: isMyanmar ? 'Proof resubmitted' : 'Proof resubmitted',
-    user: isMyanmar ? 'User' : 'User',
-    order: isMyanmar ? 'Order' : 'Order',
-    proof: isMyanmar ? 'Payment proof' : 'Payment proof',
-    target: isMyanmar ? 'Target key' : 'Target key',
-    submitted: isMyanmar ? 'Submitted' : 'Submitted',
-    status: isMyanmar ? 'Status' : 'Status',
+      isMyanmar ? `စီမံခန့်ခွဲသူ စကားပြောခန်း ${count} ခုသို့ ပို့ပြီးပါပြီ။` : `Delivered to ${count} admin chat(s).`,
+    priorityQueue: isMyanmar ? 'ဦးစားပေး တန်းစီစာရင်း' : 'Priority queue',
+    reviewerWorkload: isMyanmar ? 'စစ်ဆေးသူ အလုပ်ပမာဏ' : 'Reviewer workload',
+    queueAll: isMyanmar ? 'အားလုံး' : 'All',
+    queueUnclaimed: isMyanmar ? 'မရယူရသေး' : 'Unclaimed',
+    queueHighRisk: isMyanmar ? 'အန္တရာယ်မြင့်' : 'High risk',
+    queuePremium: isMyanmar ? 'ပရီမီယံ' : 'Premium',
+    queueMine: isMyanmar ? 'ကိုယ့်တန်းစီစာရင်း' : 'My queue',
+    queueOldest: isMyanmar ? 'အဟောင်းဆုံးကို ဦးစားပေး' : 'Oldest first',
+    highRiskPending: isMyanmar ? 'အန္တရာယ်မြင့် အော်ဒါများ' : 'High-risk pending',
+    myClaimed: isMyanmar ? 'ကိုယ်တိုင် ရယူထား' : 'My claimed',
+    claimedByOthers: isMyanmar ? 'အခြားသူ ရယူထား' : 'Claimed by others',
+    quickApprove: isMyanmar ? 'အမြန် အတည်ပြုမည်' : 'Quick approve',
+    macroRejectDuplicate: isMyanmar ? 'ထပ်နေ၍ ပယ်မည်' : 'Reject duplicate',
+    macroRejectBlurry: isMyanmar ? 'မရှင်းလင်း၍ ပယ်မည်' : 'Reject blurry',
+    macroRejectAmount: isMyanmar ? 'ငွေပမာဏ မကိုက်၍ ပယ်မည်' : 'Wrong amount',
+    macroRejectMethod: isMyanmar ? 'နည်းလမ်း မကိုက်၍ ပယ်မည်' : 'Wrong method',
+    macroApplied: isMyanmar ? 'စစ်ဆေးရေး macro ကို အသုံးပြုပြီးပါပြီ' : 'Review macro applied',
+    macroApplyFailed: isMyanmar ? 'စစ်ဆေးရေး macro မအောင်မြင်ပါ' : 'Review macro failed',
+    noAssignedReviewers: isMyanmar ? 'ရယူထားသော စောင့်ဆိုင်းနေသည့် အော်ဒါ မရှိသေးပါ။' : 'No claimed pending orders yet.',
+    riskLabel: isMyanmar ? 'အန္တရာယ် အမှတ်' : 'Risk score',
+    riskLow: isMyanmar ? 'နည်း' : 'Low',
+    riskMedium: isMyanmar ? 'အလယ်အလတ်' : 'Medium',
+    riskHigh: isMyanmar ? 'မြင့်' : 'High',
+    riskCritical: isMyanmar ? 'အလွန်မြင့်' : 'Critical',
+    riskReasonDuplicateProof: isMyanmar ? 'ထပ်နေသော အထောက်အထား မှတ်တမ်း' : 'Duplicate proof history',
+    riskReasonRepeatedRejections: isMyanmar ? 'အကြိမ်ကြိမ် ပယ်ထားသော အော်ဒါများ' : 'Repeated rejected orders',
+    riskReasonPaymentMismatch: isMyanmar ? 'ငွေပေးချေမှု မကိုက်ညီသော မှတ်တမ်း' : 'Payment mismatch history',
+    riskReasonRetryPattern: isMyanmar ? 'ထပ်စမ်းမှုများသော အော်ဒါ ပုံစံ' : 'Retry-heavy order pattern',
+    riskReasonMultipleOpenOrders: isMyanmar ? 'ဖွင့်ထားသော အော်ဒါများ များပြားခြင်း' : 'Multiple open orders',
+    riskReasonResubmittedProof: isMyanmar ? 'အထောက်အထားကို ပြန်တင်ထားခြင်း' : 'Proof resubmitted',
+    user: isMyanmar ? 'အသုံးပြုသူ' : 'User',
+    order: isMyanmar ? 'အော်ဒါ' : 'Order',
+    proof: isMyanmar ? 'ငွေပေးချေမှု အထောက်အထား' : 'Payment proof',
+    target: isMyanmar ? 'ရည်ရွယ်သော key' : 'Target key',
+    submitted: isMyanmar ? 'တင်ထားပြီး' : 'Submitted',
+    status: isMyanmar ? 'အခြေအနေ' : 'Status',
     approve: isMyanmar ? 'အတည်ပြုမည်' : 'Approve',
     reject: isMyanmar ? 'ပယ်မည်' : 'Reject',
-    adminNote: isMyanmar ? 'Admin note' : 'Admin note',
-    customerMessage: isMyanmar ? 'Customer message' : 'Customer message',
+    adminNote: isMyanmar ? 'စီမံခန့်ခွဲသူ မှတ်ချက်' : 'Admin note',
+    customerMessage: isMyanmar ? 'ဖောက်သည်ထံ ပို့မည့် စာ' : 'Customer message',
     customerMessageDesc: isMyanmar
-      ? 'User ကို Telegram မှာ ပြသမည့် စာသားဖြစ်ပါသည်။ မထည့်ပါက support နှင့် ပြန်စနိုင်ကြောင်း default message ကို ပို့မည်။'
+      ? 'အသုံးပြုသူထံ Telegram တွင် ပြသမည့် စာသားဖြစ်သည်။ မထည့်ပါက အကူအညီနှင့် ထပ်မံစတင်နိုင်ကြောင်း မူလစာကို ပို့မည်။'
       : 'This message is shown to the user in Telegram. Leave it empty to send the default support/retry message.',
-    rejectPresets: isMyanmar ? 'Reject reason presets' : 'Reject reason presets',
-    rejectPresetCustom: isMyanmar ? 'Custom message' : 'Custom message',
-    proofRevision: isMyanmar ? 'Proof revisions' : 'Proof revisions',
-    duplicateProofFlag: isMyanmar ? 'Duplicate proof detected' : 'Duplicate proof detected',
+    rejectPresets: isMyanmar ? 'ပယ်ရန် အကြောင်းပြချက် နမူနာများ' : 'Reject reason presets',
+    rejectPresetCustom: isMyanmar ? 'စိတ်ကြိုက် စာ' : 'Custom message',
+    proofRevision: isMyanmar ? 'အထောက်အထား ပြင်ဆင်သမိုင်း' : 'Proof revisions',
+    duplicateProofFlag: isMyanmar ? 'ထပ်နေသော အထောက်အထား တွေ့ရှိသည်' : 'Duplicate proof detected',
     duplicateProofHint: isMyanmar
       ? 'ဤ payment screenshot သည် ယခင် order တစ်ခုတွင် အသုံးပြုထားသော proof နှင့် ကိုက်ညီနေပါသည်။'
       : 'This payment screenshot matches proof already used on another order.',
-    duplicateProofOrderLabel: isMyanmar ? 'Matched order' : 'Matched order',
-    duplicateProofDetectedAt: isMyanmar ? 'Detected at' : 'Detected at',
-    proofPreview: isMyanmar ? 'Proof preview' : 'Proof preview',
-    zoomProof: isMyanmar ? 'Proof ကို ချဲ့ကြည့်မည်' : 'Zoom proof',
-    openProof: isMyanmar ? 'Proof ဖွင့်မည်' : 'Open proof',
-    downloadProof: isMyanmar ? 'Proof ဒေါင်းလုဒ်လုပ်မည်' : 'Download proof',
-    editBeforeApproval: isMyanmar ? 'Approve မပြုမီ order ကို ပြင်ဆင်မည်' : 'Edit order before approval',
+    duplicateProofOrderLabel: isMyanmar ? 'ကိုက်ညီသော အော်ဒါ' : 'Matched order',
+    duplicateProofDetectedAt: isMyanmar ? 'တွေ့ရှိသည့် အချိန်' : 'Detected at',
+    proofPreview: isMyanmar ? 'အထောက်အထား ကြိုကြည့်ရန်' : 'Proof preview',
+    zoomProof: isMyanmar ? 'အထောက်အထားကို ချဲ့ကြည့်မည်' : 'Zoom proof',
+    openProof: isMyanmar ? 'အထောက်အထား ဖွင့်မည်' : 'Open proof',
+    downloadProof: isMyanmar ? 'အထောက်အထား ဒေါင်းလုဒ်လုပ်မည်' : 'Download proof',
+    editBeforeApproval: isMyanmar ? 'အတည်မပြုမီ အော်ဒါကို ပြင်ဆင်မည်' : 'Edit order before approval',
     editBeforeApprovalDesc: isMyanmar
       ? 'Plan၊ သက်တမ်းနှင့် server ကို ပြောင်းပြီး key ဖန်တီးမည့် setting ကို အတည်ပြုပြီးမှ approve လုပ်ပါ။'
       : 'Adjust the plan, duration, or preferred server before you approve and create the key.',
-    saveOrderChanges: isMyanmar ? 'Order changes သိမ်းမည်' : 'Save order changes',
-    orderUpdated: isMyanmar ? 'Order ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Order updated',
+    saveOrderChanges: isMyanmar ? 'အော်ဒါ ပြောင်းလဲမှုများကို သိမ်းမည်' : 'Save order changes',
+    orderUpdated: isMyanmar ? 'အော်ဒါကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Order updated',
     orderUpdatedDesc: isMyanmar
       ? 'Approve မပြုမီ order အသေးစိတ်ကို ပြင်ဆင်ပြီးပါပြီ။'
       : 'The order details were updated before approval.',
-    updateFailed: isMyanmar ? 'Order အပ်ဒိတ် မအောင်မြင်ပါ' : 'Order update failed',
-    paymentProofImage: isMyanmar ? 'Payment proof image' : 'Payment proof image',
+    updateFailed: isMyanmar ? 'အော်ဒါ အပ်ဒိတ် မအောင်မြင်ပါ' : 'Order update failed',
+    paymentProofImage: isMyanmar ? 'ငွေပေးချေမှု အထောက်အထားပုံ' : 'Payment proof image',
     noImagePreview: isMyanmar ? 'ဤ proof ကို panel ထဲတွင် preview မပြနိုင်ပါ။' : 'This proof cannot be previewed inline.',
-    approveSuccess: isMyanmar ? 'အော်ဒါကို အတည်ပြုပြီး key ပေးပြီးပါပြီ' : 'Order approved and key delivered',
+    approveSuccess: isMyanmar ? 'အော်ဒါကို အတည်ပြုပြီး သော့ပေးပြီးပါပြီ' : 'Order approved and key delivered',
     rejectSuccess: isMyanmar ? 'အော်ဒါကို ပယ်ပြီး Telegram သို့ အသိပေးပြီးပါပြီ' : 'Order rejected and user notified',
-    deliveryWarning: isMyanmar ? 'Key ကို ဖန်တီးပြီးပေမယ့် Telegram ပို့မှု မအောင်မြင်ပါ' : 'Key was created but Telegram delivery failed',
-    markForReview: isMyanmar ? 'Payment proof ကို admin များ Telegram chat တွင် စစ်ဆေးပါ။' : 'Review the payment proof from your Telegram admin chat before approving.',
-    awaitingProof: isMyanmar ? 'Payment proof စောင့်နေသည်' : 'Awaiting payment proof',
+    deliveryWarning: isMyanmar ? 'သော့ကို ဖန်တီးပြီးပေမယ့် Telegram ပို့မှု မအောင်မြင်ပါ' : 'Key was created but Telegram delivery failed',
+    markForReview: isMyanmar ? 'ငွေပေးချေမှု အထောက်အထားကို စီမံခန့်ခွဲသူများ၏ Telegram စကားပြောခန်းတွင် စစ်ဆေးပါ။' : 'Review the payment proof from your Telegram admin chat before approving.',
+    awaitingProof: isMyanmar ? 'ငွေပေးချေမှု အထောက်အထား စောင့်နေသည်' : 'Awaiting payment proof',
     fulfilled: isMyanmar ? 'ပြီးစီးပြီး' : 'Fulfilled',
     rejected: isMyanmar ? 'ပယ်ထားပြီး' : 'Rejected',
     cancelled: isMyanmar ? 'ပယ်ဖျက်ပြီး' : 'Cancelled',
-    pending: isMyanmar ? 'Pending review' : 'Pending review',
-    serverChangeRequestsTitle: isMyanmar ? 'Server change requests' : 'Server change requests',
+    pending: isMyanmar ? 'စစ်ဆေးရန် စောင့်ဆိုင်းနေသည်' : 'Pending review',
+    serverChangeRequestsTitle: isMyanmar ? 'ဆာဗာ ပြောင်းရန် တောင်းဆိုချက်များ' : 'Server change requests',
     serverChangeRequestsDesc: isMyanmar
       ? 'User များက normal key အတွက် server ပြောင်းရန် တောင်းဆိုထားသော request များကို စစ်ဆေးပြီး approve/reject လုပ်ပါ။'
       : 'Review requests from users who need a normal access key moved to another server.',
     noServerChangeRequests: isMyanmar
-      ? 'Pending server change request မရှိသေးပါ။'
+      ? 'စောင့်ဆိုင်းနေသော server ပြောင်းရန် request မရှိသေးပါ။'
       : 'No pending server change requests.',
-    requestedMove: isMyanmar ? 'Requested move' : 'Requested move',
-    remainingAfterApproval: isMyanmar ? 'Approve ပြီးနောက် ကျန်မည့် ပြောင်းခွင့်' : 'Remaining after approval',
-    reviewInKeyPage: isMyanmar ? 'Key page ဖွင့်မည်' : 'Open key page',
-    currentServer: isMyanmar ? 'လက်ရှိ server' : 'Current server',
-    requestedServer: isMyanmar ? 'တောင်းဆိုထားသော server' : 'Requested server',
-    requestSubmittedAt: isMyanmar ? 'Requested' : 'Requested',
-    approveMoveSuccess: isMyanmar ? 'Server change request ကို approve လုပ်ပြီး key ကို ပြောင်းပြီးပါပြီ' : 'Server change request approved and key moved',
-    rejectMoveSuccess: isMyanmar ? 'Server change request ကို reject လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Server change request rejected and user notified',
-    premiumSupportRequestsTitle: isMyanmar ? 'Premium support requests' : 'Premium support requests',
+    requestedMove: isMyanmar ? 'တောင်းဆိုထားသော ပြောင်းရွှေ့မှု' : 'Requested move',
+    remainingAfterApproval: isMyanmar ? 'အတည်ပြုပြီးနောက် ကျန်မည့် ပြောင်းရွှေ့ခွင့်' : 'Remaining after approval',
+    reviewInKeyPage: isMyanmar ? 'သော့ စာမျက်နှာ ဖွင့်မည်' : 'Open key page',
+    currentServer: isMyanmar ? 'လက်ရှိ ဆာဗာ' : 'Current server',
+    requestedServer: isMyanmar ? 'တောင်းဆိုထားသော ဆာဗာ' : 'Requested server',
+    requestSubmittedAt: isMyanmar ? 'တောင်းဆိုချိန်' : 'Requested',
+    approveMoveSuccess: isMyanmar ? 'ဆာဗာပြောင်းရန် တောင်းဆိုချက်ကို အတည်ပြုပြီး သော့ကို ရွှေ့ပြီးပါပြီ' : 'Server change request approved and key moved',
+    rejectMoveSuccess: isMyanmar ? 'ဆာဗာပြောင်းရန် တောင်းဆိုချက်ကို ပယ်ပြီး အသုံးပြုသူကို အသိပေးပြီးပါပြီ' : 'Server change request rejected and user notified',
+    premiumSupportRequestsTitle: isMyanmar ? 'ပရီမီယံ အကူအညီ တောင်းဆိုချက်များ' : 'Premium support requests',
     premiumSupportRequestsDesc: isMyanmar
       ? 'Premium dynamic key များအတွက် region preference နှင့် route issue request များကို စစ်ဆေးပြီး လိုအပ်သလို update လုပ်ပါ။'
       : 'Review preferred-region changes and premium route-issue reports for dynamic keys.',
     noPremiumSupportRequests: isMyanmar
-      ? 'Pending premium support request မရှိသေးပါ။'
+      ? 'စောင့်ဆိုင်းနေသော premium support request မရှိသေးပါ။'
       : 'No pending premium support requests.',
-    premiumRequestType: isMyanmar ? 'Request type' : 'Request type',
-    premiumRequestTypeRegion: isMyanmar ? 'Preferred region change' : 'Preferred region change',
-    premiumRequestTypeRoute: isMyanmar ? 'Route issue report' : 'Route issue report',
-    premiumPoolSummary: isMyanmar ? 'Current premium pool' : 'Current premium pool',
-    premiumResolvedServer: isMyanmar ? 'Last resolved server' : 'Last resolved server',
-    premiumRequestedRegion: isMyanmar ? 'Requested region' : 'Requested region',
-    premiumApproveRegion: isMyanmar ? 'Region approve' : 'Approve region',
-    premiumHandleIssue: isMyanmar ? 'Handle issue' : 'Handle issue',
-    premiumDismiss: isMyanmar ? 'Dismiss' : 'Dismiss',
-    premiumReply: isMyanmar ? 'Reply to user' : 'Reply to user',
-    premiumReplySuccess: isMyanmar ? 'Premium reply ကို user ထံ ပို့ပြီးပါပြီ' : 'Premium reply sent to the user',
-    premiumPinServer: isMyanmar ? 'Temporary pin server' : 'Temporary pin server',
-    premiumPinExpires: isMyanmar ? 'Pin duration' : 'Pin duration',
-    premiumNoPinServer: isMyanmar ? 'No temporary pin' : 'No temporary pin',
-    premiumAppendNoteToKey: isMyanmar ? 'Dynamic key note ထဲသို့ admin note ကို ထည့်မည်' : 'Append admin note to the dynamic key',
-    premiumApproveSuccess: isMyanmar ? 'Premium region request ကို approve လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Premium region request approved and user notified',
-    premiumHandleSuccess: isMyanmar ? 'Premium route issue ကို handle လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Premium route issue handled and user notified',
-    premiumDismissSuccess: isMyanmar ? 'Premium support request ကို dismiss လုပ်ပြီး user ကို အသိပေးပြီးပါပြီ' : 'Premium support request dismissed and user notified',
-    premiumOpenDynamicKey: isMyanmar ? 'Dynamic key page ဖွင့်မည်' : 'Open dynamic key page',
-    premiumPinPresets: isMyanmar ? 'Pin time' : 'Pin time',
-    premiumCurrentPin: isMyanmar ? 'Current pin' : 'Current pin',
-    premiumNoRequestedRegion: isMyanmar ? 'Auto / admin review' : 'Auto / admin review',
+    premiumRequestType: isMyanmar ? 'တောင်းဆိုချက် အမျိုးအစား' : 'Request type',
+    premiumRequestTypeRegion: isMyanmar ? 'လိုချင်သော region ပြောင်းမည်' : 'Preferred region change',
+    premiumRequestTypeRoute: isMyanmar ? 'လမ်းကြောင်း ပြဿနာ တင်ပြချက်' : 'Route issue report',
+    premiumPoolSummary: isMyanmar ? 'လက်ရှိ premium pool' : 'Current premium pool',
+    premiumResolvedServer: isMyanmar ? 'နောက်ဆုံး ဖြေရှင်းထားသော ဆာဗာ' : 'Last resolved server',
+    premiumRequestedRegion: isMyanmar ? 'တောင်းဆိုထားသော ဒေသ' : 'Requested region',
+    premiumApproveRegion: isMyanmar ? 'ဒေသကို အတည်ပြုမည်' : 'Approve region',
+    premiumHandleIssue: isMyanmar ? 'ပြဿနာကို ဆောင်ရွက်မည်' : 'Handle issue',
+    premiumDismiss: isMyanmar ? 'ပိတ်သိမ်းမည်' : 'Dismiss',
+    premiumReply: isMyanmar ? 'အသုံးပြုသူထံ ပြန်ကြားမည်' : 'Reply to user',
+    premiumReplySuccess: isMyanmar ? 'ပရီမီယံ အကြောင်းပြန်စာကို အသုံးပြုသူထံ ပို့ပြီးပါပြီ' : 'Premium reply sent to the user',
+    premiumPinServer: isMyanmar ? 'ယာယီ ပင်လုပ်မည့် ဆာဗာ' : 'Temporary pin server',
+    premiumPinExpires: isMyanmar ? 'Pin သက်တမ်း' : 'Pin duration',
+    premiumNoPinServer: isMyanmar ? 'ယာယီ pin မရှိပါ' : 'No temporary pin',
+    premiumAppendNoteToKey: isMyanmar ? 'ပြောင်းလဲသတ်မှတ်သော့ မှတ်စုထဲသို့ စီမံခန့်ခွဲသူ မှတ်ချက် ထည့်မည်' : 'Append admin note to the dynamic key',
+    premiumApproveSuccess: isMyanmar ? 'ပရီမီယံ ဒေသတောင်းဆိုချက်ကို အတည်ပြုပြီး အသုံးပြုသူကို အသိပေးပြီးပါပြီ' : 'Premium region request approved and user notified',
+    premiumHandleSuccess: isMyanmar ? 'ပရီမီယံ လမ်းကြောင်းပြဿနာကို ဆောင်ရွက်ပြီး အသုံးပြုသူကို အသိပေးပြီးပါပြီ' : 'Premium route issue handled and user notified',
+    premiumDismissSuccess: isMyanmar ? 'ပရီမီယံ အကူအညီ တောင်းဆိုချက်ကို ပိတ်သိမ်းပြီး အသုံးပြုသူကို အသိပေးပြီးပါပြီ' : 'Premium support request dismissed and user notified',
+    premiumOpenDynamicKey: isMyanmar ? 'ပြောင်းလဲသတ်မှတ်သော့ စာမျက်နှာ ဖွင့်မည်' : 'Open dynamic key page',
+    premiumPinPresets: isMyanmar ? 'Pin အချိန်' : 'Pin time',
+    premiumCurrentPin: isMyanmar ? 'လက်ရှိ pin' : 'Current pin',
+    premiumNoRequestedRegion: isMyanmar ? 'အလိုအလျောက် / စီမံခန့်ခွဲသူ စစ်ဆေးမှု' : 'Auto / admin review',
     premiumSearchPlaceholder: isMyanmar
       ? 'Request code၊ key၊ region သို့မဟုတ် Telegram user ဖြင့် ရှာရန်'
       : 'Search by request code, key, region, or Telegram user',
-    premiumAllStatuses: isMyanmar ? 'Status အားလုံး' : 'All statuses',
-    premiumAllTypes: isMyanmar ? 'Request type အားလုံး' : 'All request types',
+    premiumAllStatuses: isMyanmar ? 'အခြေအနေ အားလုံး' : 'All statuses',
+    premiumAllTypes: isMyanmar ? 'တောင်းဆိုချက် အမျိုးအစား အားလုံး' : 'All request types',
     premiumQueueMatches: (count: number) =>
-      isMyanmar ? `ကိုက်ညီသော request ${count} ခု` : `${count} matching requests`,
-    premiumStatusPending: isMyanmar ? 'Pending review' : 'Pending review',
-    premiumStatusApproved: isMyanmar ? 'Approved' : 'Approved',
-    premiumStatusHandled: isMyanmar ? 'Handled' : 'Handled',
-    premiumStatusDismissed: isMyanmar ? 'Dismissed' : 'Dismissed',
-    premiumHistoryTitle: isMyanmar ? 'Status history' : 'Status history',
-    premiumHistorySubmitted: isMyanmar ? 'Submitted' : 'Submitted',
-    premiumHistoryReviewed: isMyanmar ? 'Reviewed' : 'Reviewed',
-    premiumHistoryApproved: isMyanmar ? 'Preferred region applied' : 'Preferred region applied',
-    premiumHistoryHandled: isMyanmar ? 'Issue handled' : 'Issue handled',
-    premiumHistoryDismissed: isMyanmar ? 'Dismissed' : 'Dismissed',
-    premiumHistoryPinApplied: isMyanmar ? 'Temporary pin applied' : 'Temporary pin applied',
-    premiumHistoryCustomerReply: isMyanmar ? 'Customer follow-up' : 'Customer follow-up',
-    premiumHistoryAdminReply: isMyanmar ? 'Admin reply' : 'Admin reply',
-    premiumFollowUpPending: isMyanmar ? 'Follow-up waiting' : 'Follow-up waiting',
-    premiumReplyThreadTitle: isMyanmar ? 'Conversation' : 'Conversation',
-    premiumLatestReply: isMyanmar ? 'Latest reply' : 'Latest reply',
-    premiumLastUpdate: isMyanmar ? 'Last update' : 'Last update',
+      isMyanmar ? `ကိုက်ညီသော တောင်းဆိုချက် ${count} ခု` : `${count} matching requests`,
+    premiumStatusPending: isMyanmar ? 'စစ်ဆေးရန် စောင့်ဆိုင်းနေသည်' : 'Pending review',
+    premiumStatusApproved: isMyanmar ? 'အတည်ပြုပြီး' : 'Approved',
+    premiumStatusHandled: isMyanmar ? 'ဆောင်ရွက်ပြီး' : 'Handled',
+    premiumStatusDismissed: isMyanmar ? 'ပိတ်သိမ်းပြီး' : 'Dismissed',
+    premiumHistoryTitle: isMyanmar ? 'အခြေအနေ မှတ်တမ်း' : 'Status history',
+    premiumHistorySubmitted: isMyanmar ? 'တင်သွင်းပြီး' : 'Submitted',
+    premiumHistoryReviewed: isMyanmar ? 'စစ်ဆေးပြီး' : 'Reviewed',
+    premiumHistoryApproved: isMyanmar ? 'လိုချင်သော region ကို အသုံးပြုပြီး' : 'Preferred region applied',
+    premiumHistoryHandled: isMyanmar ? 'ပြဿနာကို ဆောင်ရွက်ပြီး' : 'Issue handled',
+    premiumHistoryDismissed: isMyanmar ? 'ပိတ်သိမ်းပြီး' : 'Dismissed',
+    premiumHistoryPinApplied: isMyanmar ? 'ယာယီ pin လုပ်ပြီး' : 'Temporary pin applied',
+    premiumHistoryCustomerReply: isMyanmar ? 'အသုံးပြုသူ ထပ်မံတုံ့ပြန်ချက်' : 'Customer follow-up',
+    premiumHistoryAdminReply: isMyanmar ? 'Admin ပြန်ကြားချက်' : 'Admin reply',
+    premiumFollowUpPending: isMyanmar ? 'ထပ်မံ လုပ်ဆောင်ရန် စောင့်နေသည်' : 'Follow-up waiting',
+    premiumReplyThreadTitle: isMyanmar ? 'စကားပြော မှတ်တမ်း' : 'Conversation',
+    premiumLatestReply: isMyanmar ? 'နောက်ဆုံး ပြန်ကြားချက်' : 'Latest reply',
+    premiumLastUpdate: isMyanmar ? 'နောက်ဆုံး အပ်ဒိတ်' : 'Last update',
   };
 
   const renderTemplateSummary = (
@@ -4254,7 +4257,15 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <p className={cn('font-medium', compact ? 'text-xs' : 'text-sm')}>{template.name}</p>
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">{salesUi.dynamicKeyDelivery}</Badge>
-              <Badge variant="outline">{template.type === 'SELF_MANAGED' ? 'Self-managed' : 'Manual'}</Badge>
+              <Badge variant="outline">
+                {template.type === 'SELF_MANAGED'
+                  ? isMyanmar
+                    ? 'ကိုယ်တိုင်စီမံ'
+                    : 'Self-managed'
+                  : isMyanmar
+                    ? 'လက်ဖြင့်စီမံ'
+                    : 'Manual'}
+              </Badge>
               {template.subscriptionTheme ? (
                 <Badge variant="outline">{template.subscriptionTheme}</Badge>
               ) : null}
@@ -4688,7 +4699,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Order assignment failed' : 'Order assignment failed',
+        title: isMyanmar ? 'အော်ဒါ တာဝန်ခွဲမှု မအောင်မြင်ပါ' : 'Order assignment failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -5269,7 +5280,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
   }, [pendingOrders, currentReviewerId]);
   const describeQuota = (order: TelegramOrderRow) => {
     if (order.unlimitedQuota) {
-      return isMyanmar ? 'Unlimited quota' : 'Unlimited quota';
+      return isMyanmar ? 'အကန့်အသတ်မဲ့ ဒေတာ' : 'Unlimited quota';
     }
     if (!order.dataLimitBytes) {
       return '—';
@@ -5385,23 +5396,29 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     activeWorkflowTab === 'guardrails';
   const campaignSimulation = simulateCampaignAudienceMutation.data;
   const campaignTypeLabels: Record<string, string> = {
-    TRIAL_TO_PAID: isMyanmar ? 'Trial to paid' : 'Trial to paid',
-    RENEWAL_SOON: isMyanmar ? 'Renewal' : 'Renewal',
-    PREMIUM_UPSELL: isMyanmar ? 'Premium upsell' : 'Premium upsell',
-    WINBACK: isMyanmar ? 'Win-back' : 'Win-back',
+    TRIAL_TO_PAID: isMyanmar ? 'Trial မှ paid သို့ ပြောင်းလဲမှု' : 'Trial to paid',
+    RENEWAL_SOON: isMyanmar ? 'Renewal အချိန်နီး' : 'Renewal',
+    PREMIUM_UPSELL: isMyanmar ? 'Premium သို့ အဆင့်မြှင့် အကြံပြု' : 'Premium upsell',
+    WINBACK: isMyanmar ? 'ပြန်လည်ရယူရေး' : 'Win-back',
   };
   const campaignReasonLabels: Record<string, string> = {
-    DISABLED: isMyanmar ? 'Campaign disabled' : 'Campaign disabled',
-    PAUSED: isMyanmar ? 'Campaign paused' : 'Campaign paused',
-    NO_TELEGRAM: isMyanmar ? 'No Telegram link' : 'No Telegram link',
-    MANUAL_BLOCK: isMyanmar ? 'Manually suppressed' : 'Manually suppressed',
-    RECENT_REFUND: isMyanmar ? 'Recent refund' : 'Recent refund',
-    SUPPORT_HEAVY: isMyanmar ? 'Support-heavy' : 'Support-heavy',
-    COOLDOWN: isMyanmar ? 'Cooling down' : 'Cooling down',
-    ACTIVE_COUPON: isMyanmar ? 'Already has active coupon' : 'Already has active coupon',
-    LIMIT_REACHED: isMyanmar ? 'Per-user limit reached' : 'Per-user limit reached',
-    CONVERTED: isMyanmar ? 'Already converted' : 'Already converted',
+    DISABLED: isMyanmar ? 'ကမ်ပိန်း ပိတ်ထားသည်' : 'Campaign disabled',
+    PAUSED: isMyanmar ? 'ကမ်ပိန်း ရပ်ထားသည်' : 'Campaign paused',
+    NO_TELEGRAM: isMyanmar ? 'Telegram လင့်ခ် မရှိပါ' : 'No Telegram link',
+    MANUAL_BLOCK: isMyanmar ? 'လက်ဖြင့် ပိတ်ထားသည်' : 'Manually suppressed',
+    RECENT_REFUND: isMyanmar ? 'မကြာသေးမီ refund ရှိသည်' : 'Recent refund',
+    SUPPORT_HEAVY: isMyanmar ? 'Support တောင်းဆိုမှု များလွန်းသည်' : 'Support-heavy',
+    COOLDOWN: isMyanmar ? 'cool-down ကာလအတွင်း' : 'Cooling down',
+    ACTIVE_COUPON: isMyanmar ? 'အသုံးပြုနေသော coupon ရှိပြီး' : 'Already has active coupon',
+    LIMIT_REACHED: isMyanmar ? 'အသုံးပြုသူအလိုက် ကန့်သတ်ချက်ပြည့်သွားသည်' : 'Per-user limit reached',
+    CONVERTED: isMyanmar ? 'ပြီးသား ပြောင်းလဲပြီး' : 'Already converted',
   };
+  const enabledLabel = isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled';
+  const disabledLabel = isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled';
+  const pausedLabel = isMyanmar ? 'ရပ်ထားသည်' : 'Paused';
+  const runningLabel = isMyanmar ? 'လည်ပတ်နေသည်' : 'Running';
+  const resumeCampaignLabel = isMyanmar ? 'ကမ်ပိန်းကို ပြန်စမည်' : 'Resume campaign';
+  const pauseCampaignLabel = isMyanmar ? 'ကမ်ပိန်းကို ရပ်မည်' : 'Pause campaign';
 
   return (
     <>
@@ -5428,11 +5445,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             className="space-y-6"
           >
             <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.82),rgba(5,12,24,0.74))] lg:grid-cols-5">
-              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="settings">Order settings</TabsTrigger>
-              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="coupons">Coupons</TabsTrigger>
-              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="guardrails">Guardrails</TabsTrigger>
-              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="review">Review queue</TabsTrigger>
-              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="premium">Premium support</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="settings">{isMyanmar ? 'အော်ဒါ သတ်မှတ်ချက်များ' : 'Order settings'}</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="coupons">{isMyanmar ? 'ကူပွန်များ' : 'Coupons'}</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="guardrails">{isMyanmar ? 'ကာကွယ်ရေး စည်းမျဉ်းများ' : 'Guardrails'}</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="review">{isMyanmar ? 'စစ်ဆေးရေး တန်းစီစာရင်း' : 'Review queue'}</TabsTrigger>
+              <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="premium">{isMyanmar ? 'Premium အကူအညီ' : 'Premium support'}</TabsTrigger>
             </TabsList>
 
             <div className="sticky top-20 z-20 rounded-2xl border border-border/60 bg-background/85 px-4 py-3 shadow-sm backdrop-blur">
@@ -5441,20 +5458,20 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                   <p className="text-sm font-medium">
                     {workflowConfigWorkspace
                       ? workflowConfigDirty
-                        ? 'Unsaved Telegram workflow changes'
-                        : 'Workflow settings are in sync'
+                        ? (isMyanmar ? 'Telegram လုပ်ငန်းစဉ် ပြောင်းလဲမှုများကို မသိမ်းရသေးပါ' : 'Unsaved Telegram workflow changes')
+                        : (isMyanmar ? 'လုပ်ငန်းစဉ် သတ်မှတ်ချက်များသည် နောက်ဆုံး သိမ်းထားမှုနှင့် ကိုက်ညီပါသည်' : 'Workflow settings are in sync')
                       : activeWorkflowTab === 'review'
-                        ? 'Review workspace'
-                        : 'Premium support workspace'}
+                        ? (isMyanmar ? 'စစ်ဆေးရေး အလုပ်ခန်း' : 'Review workspace')
+                        : (isMyanmar ? 'Premium အကူအညီ အလုပ်ခန်း' : 'Premium support workspace')}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {workflowConfigWorkspace
                       ? workflowConfigDirty
-                        ? 'Save or reset before leaving this workspace.'
-                        : 'Coupons, payment rules, and order settings match the latest saved configuration.'
+                        ? (isMyanmar ? 'ဤအလုပ်ခန်းမှ မထွက်ခွာမီ သိမ်းမည် သို့မဟုတ် မူလအတိုင်း ပြန်ထားမည် ကိုလုပ်ပါ။' : 'Save or reset before leaving this workspace.')
+                        : (isMyanmar ? 'ကူပွန်များ၊ ငွေပေးချေမှု စည်းမျဉ်းများနှင့် အော်ဒါ သတ်မှတ်ချက်များသည် နောက်ဆုံး သိမ်းထားသော ပြင်ဆင်မှုနှင့် ကိုက်ညီပါသည်။' : 'Coupons, payment rules, and order settings match the latest saved configuration.')
                       : activeWorkflowTab === 'review'
-                        ? 'Queue, reviewer actions, and server-change requests are isolated below.'
-                        : 'Premium support requests and follow-up actions are isolated below.'}
+                        ? (isMyanmar ? 'တန်းစီစာရင်း၊ စစ်ဆေးသူ လုပ်ဆောင်ချက်များနှင့် ဆာဗာ ပြောင်းရန် တောင်းဆိုချက်များကို အောက်တွင် သီးသန့် စီမံနိုင်ပါသည်။' : 'Queue, reviewer actions, and server-change requests are isolated below.')
+                        : (isMyanmar ? 'Premium အကူအညီ တောင်းဆိုချက်များနှင့် နောက်ဆက်တွဲ လုပ်ဆောင်ချက်များကို အောက်တွင် သီးသန့် စီမံနိုင်ပါသည်။' : 'Premium support requests and follow-up actions are isolated below.')}
                   </p>
                 </div>
                 {workflowConfigWorkspace ? (
@@ -5465,7 +5482,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                       disabled={!workflowConfigDirty || saveConfigMutation.isPending}
                       onClick={handleResetWorkflowConfig}
                     >
-                      Reset
+                      {isMyanmar ? 'မူလအတိုင်း ပြန်ထားမည်' : 'Reset'}
                     </Button>
                     <Button
                       type="button"
@@ -5487,8 +5504,8 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             {!workflowConfigWorkspace ? (
               <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                 {activeWorkflowTab === 'review'
-                  ? 'Use the review workspace below for Telegram payment review, quick macros, and server-change approvals.'
-                  : 'Use the premium workspace below for premium support requests, replies, and routing actions.'}
+                  ? (isMyanmar ? 'Telegram ငွေပေးချေမှု စစ်ဆေးခြင်း၊ အမြန် macro များနှင့် ဆာဗာပြောင်း အတည်ပြု လုပ်ဆောင်ချက်များကို အောက်ပါ စစ်ဆေးရေး အလုပ်ခန်းတွင် အသုံးပြုပါ။' : 'Use the review workspace below for Telegram payment review, quick macros, and server-change approvals.')
+                  : (isMyanmar ? 'Premium အကူအညီ တောင်းဆိုချက်များ၊ အကြောင်းပြန်စာများနှင့် လမ်းကြောင်းသတ်မှတ် လုပ်ဆောင်ချက်များကို အောက်ပါ Premium အလုပ်ခန်းတွင် အသုံးပြုပါ။' : 'Use the premium workspace below for premium support requests, replies, and routing actions.')}
               </div>
             ) : null}
 
@@ -5507,7 +5524,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
               <div className="space-y-1">
                 <p className="text-sm font-medium">{salesUi.allowRenewals}</p>
                 <p className="text-xs text-muted-foreground">
-                  {isMyanmar ? 'ရှိပြီးသော key များကို Telegram မှ renewal အော်ဒါတင်နိုင်ပါသည်။' : 'Allow Telegram users to place renewal orders for existing keys.'}
+                  {isMyanmar ? 'ရှိပြီးသော သော့များအတွက် Telegram မှ renewal အော်ဒါတင်နိုင်ပါသည်။' : 'Allow Telegram users to place renewal orders for existing keys.'}
                 </p>
               </div>
               <Switch
@@ -5545,19 +5562,19 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 <p className="text-sm font-medium">
                   {workflowConfigDirty
                     ? isMyanmar
-                      ? 'Telegram support account ပြောင်းလဲမှုကို မသိမ်းရသေးပါ'
+                      ? 'Telegram အကူအညီ အကောင့် ပြောင်းလဲမှုကို မသိမ်းရသေးပါ'
                       : 'Telegram support account change is not saved yet'
                     : isMyanmar
-                      ? 'Telegram support account setting ကို သိမ်းပြီးပါပြီ'
+                      ? 'Telegram အကူအညီ အကောင့် သတ်မှတ်ချက်ကို သိမ်းပြီးပါပြီ'
                       : 'Telegram support account setting is saved'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {workflowConfigDirty
-                    ? isMyanmar
-                      ? 'Premium support tab ထဲကနေတင်ပဲ save သို့မဟုတ် reset လုပ်နိုင်ပါသည်။'
+                      ? isMyanmar
+                        ? 'Premium အကူအညီ tab ထဲတွင် တိုက်ရိုက် သိမ်းနိုင်သလို မူလအတိုင်း ပြန်ထားနိုင်ပါသည်။'
                       : 'You can save or reset this directly from the Premium support tab.'
                     : isMyanmar
-                      ? 'ဤ field ကို ပြင်ဆင်ပြီးနောက် Save order settings ကိုနှိပ်ပါ။'
+                      ? 'ဤအကွက်ကို ပြင်ဆင်ပြီးနောက် အော်ဒါ သတ်မှတ်ချက်များ သိမ်းမည် ကိုနှိပ်ပါ။'
                       : 'Edit this field and the save button will enable here.'}
                 </p>
               </div>
@@ -5568,7 +5585,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                   disabled={!workflowConfigDirty || saveConfigMutation.isPending}
                   onClick={handleResetWorkflowConfig}
                 >
-                  Reset
+                  {isMyanmar ? 'မူလအတိုင်း ပြန်ထားမည်' : 'Reset'}
                 </Button>
                 <Button
                   type="button"
@@ -5731,7 +5748,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             {[
               {
                 key: 'trial',
-                title: 'Trial-to-paid',
+                title: isMyanmar ? 'အစမ်းသုံးမှ ငွေပေးချေသို့' : 'Trial-to-paid',
                 enabled: form.trialCouponEnabled,
                 paused: form.trialCouponPaused,
                 onToggle: () =>
@@ -5742,7 +5759,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
               },
               {
                 key: 'renewal',
-                title: 'Renewal',
+                title: isMyanmar ? 'သက်တမ်းတိုး' : 'Renewal',
                 enabled: form.renewalCouponEnabled,
                 paused: form.renewalCouponPaused,
                 onToggle: () =>
@@ -5753,7 +5770,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
               },
               {
                 key: 'premium',
-                title: 'Premium upsell',
+                title: isMyanmar ? 'Premium အဆင့်မြှင့် အကြံပြု' : 'Premium upsell',
                 enabled: form.premiumUpsellCouponEnabled,
                 paused: form.premiumUpsellCouponPaused,
                 onToggle: () =>
@@ -5764,7 +5781,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
               },
               {
                 key: 'winback',
-                title: 'Win-back',
+                title: isMyanmar ? 'ပြန်လည်ရယူရေး' : 'Win-back',
                 enabled: form.winbackCouponEnabled,
                 paused: form.winbackCouponPaused,
                 onToggle: () =>
@@ -5782,11 +5799,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                   <div>
                     <p className="text-sm font-medium">{campaign.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {campaign.enabled ? (campaign.paused ? 'Enabled but paused' : 'Enabled and running') : 'Disabled'}
+                      {campaign.enabled ? (campaign.paused ? (isMyanmar ? 'ဖွင့်ထားသော်လည်း ရပ်ထားသည်' : 'Enabled but paused') : (isMyanmar ? 'ဖွင့်ထားပြီး လည်ပတ်နေသည်' : 'Enabled and running')) : disabledLabel}
                     </p>
                   </div>
                   <Badge variant={campaign.enabled ? 'default' : 'secondary'}>
-                    {campaign.enabled ? (campaign.paused ? 'Paused' : 'Running') : 'Disabled'}
+                    {campaign.enabled ? (campaign.paused ? pausedLabel : runningLabel) : disabledLabel}
                   </Badge>
                 </div>
                 <Button
@@ -5797,7 +5814,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                   onClick={campaign.onToggle}
                   disabled={!campaign.enabled}
                 >
-                  {campaign.paused ? 'Resume campaign' : 'Pause campaign'}
+                  {campaign.paused ? resumeCampaignLabel : pauseCampaignLabel}
                 </Button>
               </div>
             ))}
@@ -5807,11 +5824,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
-                  {isMyanmar ? 'Trial-to-paid coupon campaign' : 'Trial-to-paid coupon campaign'}
+                  {isMyanmar ? 'အစမ်းသုံးမှ ငွေပေးချေသို့ ကူပွန် ကမ်ပိန်း' : 'Trial-to-paid coupon campaign'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {isMyanmar
-                    ? 'Trial သက်တမ်းကုန်ရန်နီးသော user များထံ automatic coupon notice ပို့မည်။'
+                    ? 'အစမ်းသုံးကာလ ကုန်ဆုံးရန်နီးသော အသုံးပြုသူများထံ ကူပွန် အသိပေးချက်ကို အလိုအလျောက် ပို့မည်။'
                     : 'Automatically send a coupon-style upsell message to trial users who are close to expiry.'}
                 </p>
               </div>
@@ -5824,10 +5841,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={form.trialCouponEnabled ? 'default' : 'secondary'}>
-                {form.trialCouponEnabled ? 'Enabled' : 'Disabled'}
+                {form.trialCouponEnabled ? enabledLabel : disabledLabel}
               </Badge>
               <Badge variant={form.trialCouponPaused ? 'outline' : 'secondary'}>
-                {form.trialCouponPaused ? 'Paused' : 'Running'}
+                {form.trialCouponPaused ? pausedLabel : runningLabel}
               </Badge>
               <Button
                 type="button"
@@ -5838,12 +5855,12 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 }
                 disabled={!form.trialCouponEnabled}
               >
-                {form.trialCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+                {form.trialCouponPaused ? resumeCampaignLabel : pauseCampaignLabel}
               </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Send before expiry (hours)' : 'Send before expiry (hours)'}</Label>
+                <Label>{isMyanmar ? 'သက်တမ်းမကုန်မီ ပို့မည့် အချိန် (နာရီ)' : 'Send before expiry (hours)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.trialCouponLeadHours}
@@ -5857,7 +5874,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Label>{isMyanmar ? 'ကူပွန် ကုဒ်' : 'Coupon code'}</Label>
                 <Input
                   value={form.trialCouponCode}
                   onChange={(event) =>
@@ -5870,7 +5887,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Label>{isMyanmar ? 'ကမ်းလှမ်းချက် စာတမ်း' : 'Offer label'}</Label>
                 <Input
                   value={form.trialCouponDiscountLabel}
                   onChange={(event) =>
@@ -5879,11 +5896,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                       trialCouponDiscountLabel: event.target.value,
                     }))
                   }
-                  placeholder="500 Kyat off your first paid order"
+                  placeholder={isMyanmar ? 'ပထမ ငွေပေးချေ အော်ဒါအတွက် 500 ကျပ် လျှော့ဈေး' : '500 Kyat off your first paid order'}
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Label>{isMyanmar ? 'လျှော့ဈေး ပမာဏ (ကျပ်)' : 'Discount amount (Kyat)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.trialCouponDiscountAmount}
@@ -5897,7 +5914,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Label>{isMyanmar ? 'တစ်ကြိမ်ပို့တိုင်း အများဆုံး ပို့မည့်အရေအတွက်' : 'Max sends per run'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.trialCouponMaxRecipientsPerRun}
@@ -5917,11 +5934,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
-                  {isMyanmar ? 'Renewal coupon campaign' : 'Renewal coupon campaign'}
+                  {isMyanmar ? 'သက်တမ်းတိုး ကူပွန် ကမ်ပိန်း' : 'Renewal coupon campaign'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {isMyanmar
-                    ? 'သက်တမ်းကုန်ရန်နီးသော user များထံ renewal coupon ကို automatic ပို့မည်။'
+                    ? 'သက်တမ်းကုန်ရန်နီးသော အသုံးပြုသူများထံ သက်တမ်းတိုး ကူပွန်ကို အလိုအလျောက် ပို့မည်။'
                     : 'Automatically send renewal coupons to users whose keys are close to expiry.'}
                 </p>
               </div>
@@ -5934,10 +5951,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={form.renewalCouponEnabled ? 'default' : 'secondary'}>
-                {form.renewalCouponEnabled ? 'Enabled' : 'Disabled'}
+                {form.renewalCouponEnabled ? enabledLabel : disabledLabel}
               </Badge>
               <Badge variant={form.renewalCouponPaused ? 'outline' : 'secondary'}>
-                {form.renewalCouponPaused ? 'Paused' : 'Running'}
+                {form.renewalCouponPaused ? pausedLabel : runningLabel}
               </Badge>
               <Button
                 type="button"
@@ -5948,12 +5965,12 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 }
                 disabled={!form.renewalCouponEnabled}
               >
-                {form.renewalCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+                {form.renewalCouponPaused ? resumeCampaignLabel : pauseCampaignLabel}
               </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Lead time (days)' : 'Lead time (days)'}</Label>
+                <Label>{isMyanmar ? 'ကြိုတင်ပို့မည့် ကာလ (ရက်)' : 'Lead time (days)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.renewalCouponLeadDays}
@@ -5967,7 +5984,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Label>{isMyanmar ? 'ကူပွန် ကုဒ်' : 'Coupon code'}</Label>
                 <Input
                   value={form.renewalCouponCode}
                   onChange={(event) =>
@@ -5980,7 +5997,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Label>{isMyanmar ? 'ကမ်းလှမ်းချက် စာတမ်း' : 'Offer label'}</Label>
                 <Input
                   value={form.renewalCouponDiscountLabel}
                   onChange={(event) =>
@@ -5989,11 +6006,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                       renewalCouponDiscountLabel: event.target.value,
                     }))
                   }
-                  placeholder="500 Kyat off your renewal"
+                  placeholder={isMyanmar ? 'သက်တမ်းတိုး အော်ဒါအတွက် 500 ကျပ် လျှော့ဈေး' : '500 Kyat off your renewal'}
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Label>{isMyanmar ? 'လျှော့ဈေး ပမာဏ (ကျပ်)' : 'Discount amount (Kyat)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.renewalCouponDiscountAmount}
@@ -6007,7 +6024,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Label>{isMyanmar ? 'တစ်ကြိမ်ပို့တိုင်း အများဆုံး ပို့မည့်အရေအတွက်' : 'Max sends per run'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.renewalCouponMaxRecipientsPerRun}
@@ -6027,11 +6044,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
-                  {isMyanmar ? 'Premium upsell coupon campaign' : 'Premium upsell coupon campaign'}
+                  {isMyanmar ? 'Premium အဆင့်မြှင့် ကူပွန် ကမ်ပိန်း' : 'Premium upsell coupon campaign'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {isMyanmar
-                    ? 'Usage မြင့်လာသော standard user များထံ premium upgrade coupon ကို automatic ပို့မည်။'
+                    ? 'အသုံးပြုမှု မြင့်လာသော standard အသုံးပြုသူများထံ premium အဆင့်မြှင့် ကူပွန်ကို အလိုအလျောက် ပို့မည်။'
                     : 'Automatically send premium upgrade coupons to standard users with high usage.'}
                 </p>
               </div>
@@ -6044,10 +6061,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={form.premiumUpsellCouponEnabled ? 'default' : 'secondary'}>
-                {form.premiumUpsellCouponEnabled ? 'Enabled' : 'Disabled'}
+                {form.premiumUpsellCouponEnabled ? enabledLabel : disabledLabel}
               </Badge>
               <Badge variant={form.premiumUpsellCouponPaused ? 'outline' : 'secondary'}>
-                {form.premiumUpsellCouponPaused ? 'Paused' : 'Running'}
+                {form.premiumUpsellCouponPaused ? pausedLabel : runningLabel}
               </Badge>
               <Button
                 type="button"
@@ -6061,12 +6078,12 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 }
                 disabled={!form.premiumUpsellCouponEnabled}
               >
-                {form.premiumUpsellCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+                {form.premiumUpsellCouponPaused ? resumeCampaignLabel : pauseCampaignLabel}
               </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Usage threshold (%)' : 'Usage threshold (%)'}</Label>
+                <Label>{isMyanmar ? 'အသုံးပြုမှု သတ်မှတ်ချက် (%)' : 'Usage threshold (%)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.premiumUpsellUsageThresholdPercent}
@@ -6080,7 +6097,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Label>{isMyanmar ? 'ကူပွန် ကုဒ်' : 'Coupon code'}</Label>
                 <Input
                   value={form.premiumUpsellCouponCode}
                   onChange={(event) =>
@@ -6093,7 +6110,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Label>{isMyanmar ? 'ကမ်းလှမ်းချက် စာတမ်း' : 'Offer label'}</Label>
                 <Input
                   value={form.premiumUpsellCouponDiscountLabel}
                   onChange={(event) =>
@@ -6102,11 +6119,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                       premiumUpsellCouponDiscountLabel: event.target.value,
                     }))
                   }
-                  placeholder="1,000 Kyat off your premium upgrade"
+                  placeholder={isMyanmar ? 'Premium အဆင့်မြှင့် အော်ဒါအတွက် 1,000 ကျပ် လျှော့ဈေး' : '1,000 Kyat off your premium upgrade'}
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Label>{isMyanmar ? 'လျှော့ဈေး ပမာဏ (ကျပ်)' : 'Discount amount (Kyat)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.premiumUpsellCouponDiscountAmount}
@@ -6120,7 +6137,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Label>{isMyanmar ? 'တစ်ကြိမ်ပို့တိုင်း အများဆုံး ပို့မည့်အရေအတွက်' : 'Max sends per run'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.premiumUpsellCouponMaxRecipientsPerRun}
@@ -6140,11 +6157,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <div className="flex items-center justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium">
-                  {isMyanmar ? 'Win-back coupon campaign' : 'Win-back coupon campaign'}
+                  {isMyanmar ? 'ပြန်လည်ရယူရေး ကူပွန် ကမ်ပိန်း' : 'Win-back coupon campaign'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {isMyanmar
-                    ? 'အချိန်တစ်ခုကြာ inactive ဖြစ်နေသော user များထံ comeback coupon ကို automatic ပို့မည်။'
+                    ? 'အချိန်တစ်ခုကြာ မလှုပ်ရှားသော အသုံးပြုသူများထံ ပြန်လည်ရယူရေး ကူပွန်ကို အလိုအလျောက် ပို့မည်။'
                     : 'Automatically send comeback coupons to inactive past buyers.'}
                 </p>
               </div>
@@ -6157,10 +6174,10 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={form.winbackCouponEnabled ? 'default' : 'secondary'}>
-                {form.winbackCouponEnabled ? 'Enabled' : 'Disabled'}
+                {form.winbackCouponEnabled ? enabledLabel : disabledLabel}
               </Badge>
               <Badge variant={form.winbackCouponPaused ? 'outline' : 'secondary'}>
-                {form.winbackCouponPaused ? 'Paused' : 'Running'}
+                {form.winbackCouponPaused ? pausedLabel : runningLabel}
               </Badge>
               <Button
                 type="button"
@@ -6171,12 +6188,12 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 }
                 disabled={!form.winbackCouponEnabled}
               >
-                {form.winbackCouponPaused ? 'Resume campaign' : 'Pause campaign'}
+                {form.winbackCouponPaused ? resumeCampaignLabel : pauseCampaignLabel}
               </Button>
             </div>
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Inactive after (days)' : 'Inactive after (days)'}</Label>
+                <Label>{isMyanmar ? 'မလှုပ်ရှားသည့် ကာလ (ရက်)' : 'Inactive after (days)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.winbackCouponInactivityDays}
@@ -6190,7 +6207,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Coupon code' : 'Coupon code'}</Label>
+                <Label>{isMyanmar ? 'ကူပွန် ကုဒ်' : 'Coupon code'}</Label>
                 <Input
                   value={form.winbackCouponCode}
                   onChange={(event) =>
@@ -6203,7 +6220,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Offer label' : 'Offer label'}</Label>
+                <Label>{isMyanmar ? 'ကမ်းလှမ်းချက် စာတမ်း' : 'Offer label'}</Label>
                 <Input
                   value={form.winbackCouponDiscountLabel}
                   onChange={(event) =>
@@ -6212,11 +6229,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                       winbackCouponDiscountLabel: event.target.value,
                     }))
                   }
-                  placeholder="700 Kyat off your comeback order"
+                  placeholder={isMyanmar ? 'ပြန်လည်အော်ဒါအတွက် 700 ကျပ် လျှော့ဈေး' : '700 Kyat off your comeback order'}
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Discount amount (Kyat)' : 'Discount amount (Kyat)'}</Label>
+                <Label>{isMyanmar ? 'လျှော့ဈေး ပမာဏ (ကျပ်)' : 'Discount amount (Kyat)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.winbackCouponDiscountAmount}
@@ -6230,7 +6247,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Max sends per run' : 'Max sends per run'}</Label>
+                <Label>{isMyanmar ? 'တစ်ကြိမ်ပို့တိုင်း အများဆုံး ပို့မည့်အရေအတွက်' : 'Max sends per run'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.winbackCouponMaxRecipientsPerRun}
@@ -6249,17 +6266,17 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
           <div className={cn('space-y-3 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'guardrails' && 'hidden')}>
             <div className="space-y-1">
               <p className="text-sm font-medium">
-                {isMyanmar ? 'Campaign guardrails' : 'Campaign guardrails'}
+                {isMyanmar ? 'ကမ်ပိန်း ကာကွယ်ရေး စည်းမျဉ်းများ' : 'Campaign guardrails'}
               </p>
               <p className="text-xs text-muted-foreground">
                 {isMyanmar
-                  ? 'Promo များကို အရမ်းများများမပို့မိစေရန် cool-down, refund, support volume rules များကို သတ်မှတ်ပါ။'
+                  ? 'လျှော့ဈေး ကမ်းလှမ်းချက်များကို အလွန်အကျွံ မပို့မိစေရန် အနားယူကာလ၊ ငွေပြန်အမ်းမှုနှင့် အကူအညီတောင်းဆိုမှု စည်းမျဉ်းများကို သတ်မှတ်ပါ။'
                   : 'Set cool-down, refund, and support-volume rules so the same customer does not receive too many promos.'}
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Promo cool-down (hours)' : 'Promo cool-down (hours)'}</Label>
+                <Label>{isMyanmar ? 'လျှော့ဈေး ကမ်းလှမ်းချက် အနားယူကာလ (နာရီ)' : 'Promo cool-down (hours)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.promoCampaignCooldownHours}
@@ -6273,7 +6290,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Recent refund lookback (days)' : 'Recent refund lookback (days)'}</Label>
+                <Label>{isMyanmar ? 'မကြာသေးမီ ငွေပြန်အမ်းမှု ပြန်ကြည့်ကာလ (ရက်)' : 'Recent refund lookback (days)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.promoExcludeRecentRefundDays}
@@ -6288,7 +6305,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Support lookback (days)' : 'Support lookback (days)'}</Label>
+                <Label>{isMyanmar ? 'အကူအညီ တောင်းဆိုမှုများကို ပြန်ကြည့်မည့် ကာလ (ရက်)' : 'Support lookback (days)'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.promoSupportHeavyLookbackDays}
@@ -6303,7 +6320,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Support-heavy threshold' : 'Support-heavy threshold'}</Label>
+                <Label>{isMyanmar ? 'အကူအညီ တောင်းဆိုမှု များပြားသည်ဟု သတ်မှတ်မည့် ပမာဏ' : 'Support-heavy threshold'}</Label>
                 <Input
                   inputMode="numeric"
                   value={form.promoSupportHeavyThreshold}
@@ -6321,8 +6338,8 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
                 <div>
-                  <p className="text-sm font-medium">Exclude recent refund users</p>
-                  <p className="text-xs text-muted-foreground">Skip promo sends after recent refund activity.</p>
+                  <p className="text-sm font-medium">{isMyanmar ? 'မကြာသေးမီ ငွေပြန်အမ်းမှုရှိသူများကို ချန်လှပ်မည်' : 'Exclude recent refund users'}</p>
+                  <p className="text-xs text-muted-foreground">{isMyanmar ? 'မကြာသေးမီ ငွေပြန်အမ်းမှု ပြုလုပ်ထားသူများထံ လျှော့ဈေးကမ်းလှမ်းချက် မပို့ပါ။' : 'Skip promo sends after recent refund activity.'}</p>
                 </div>
                 <Switch
                   checked={form.promoExcludeRecentRefundUsers}
@@ -6333,8 +6350,8 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
               </div>
               <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
                 <div>
-                  <p className="text-sm font-medium">Exclude support-heavy users</p>
-                  <p className="text-xs text-muted-foreground">Skip promo sends for customers with recent support volume.</p>
+                  <p className="text-sm font-medium">{isMyanmar ? 'အကူအညီ တောင်းဆိုမှုများသော အသုံးပြုသူများကို ချန်လှပ်မည်' : 'Exclude support-heavy users'}</p>
+                  <p className="text-xs text-muted-foreground">{isMyanmar ? 'မကြာသေးမီ အကူအညီ တောင်းဆိုမှုများသော အသုံးပြုသူများထံ လျှော့ဈေးကမ်းလှမ်းချက် မပို့ပါ။' : 'Skip promo sends for customers with recent support volume.'}</p>
                 </div>
                 <Switch
                   checked={form.promoExcludeSupportHeavyUsers}
@@ -6354,9 +6371,9 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
-                <p className="text-sm font-medium">Campaign audience simulation</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'ကမ်ပိန်း လက်ခံသူများကို ကြိုတင်ခန့်မှန်းစမ်းသပ်မှု' : 'Campaign audience simulation'}</p>
                 <p className="text-xs text-muted-foreground">
-                  Preview who would receive each coupon campaign right now, then inspect why others are blocked.
+                  {isMyanmar ? 'ယခုအချိန်တွင် ကူပွန်ကမ်ပိန်း တစ်ခုချင်းစီကို မည်သူများ လက်ခံမည်ကို ကြိုတင်ကြည့်ပြီး အခြားသူများ ဘာကြောင့် ပိတ်ထားသည်ကို စစ်ဆေးပါ။' : 'Preview who would receive each coupon campaign right now, then inspect why others are blocked.'}
                 </p>
               </div>
               <Button
@@ -6370,7 +6387,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                 ) : (
                   <Eye className="mr-2 h-4 w-4" />
                 )}
-                Run simulation
+                {isMyanmar ? 'ခန့်မှန်းစမ်းသပ်မှုကို လည်ပတ်မည်' : 'Run simulation'}
               </Button>
             </div>
 
@@ -6389,46 +6406,46 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                         <p className="text-xs text-muted-foreground">
                           {campaign.enabled
                             ? campaign.paused
-                              ? 'Enabled but paused'
-                              : 'Enabled and ready'
-                            : 'Disabled'}
+                              ? (isMyanmar ? 'ဖွင့်ထားသော်လည်း ရပ်ထားသည်' : 'Enabled but paused')
+                              : (isMyanmar ? 'ဖွင့်ထားပြီး အသင့်ဖြစ်နေသည်' : 'Enabled and ready')
+                            : disabledLabel}
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Badge variant={campaign.enabled ? 'default' : 'secondary'}>
-                          {campaign.enabled ? 'Enabled' : 'Disabled'}
+                          {campaign.enabled ? enabledLabel : disabledLabel}
                         </Badge>
                         <Badge variant={campaign.paused ? 'outline' : 'secondary'}>
-                          {campaign.paused ? 'Paused' : 'Running'}
+                          {campaign.paused ? pausedLabel : runningLabel}
                         </Badge>
                       </div>
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-xl border border-border/50 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Candidates</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'လက်ခံနိုင်သူ' : 'Candidates'}</p>
                         <p className="mt-2 text-xl font-semibold">{campaign.totalCandidates}</p>
                       </div>
                       <div className="rounded-xl border border-border/50 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Eligible</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အကျုံးဝင်' : 'Eligible'}</p>
                         <p className="mt-2 text-xl font-semibold">{campaign.eligibleCount}</p>
                       </div>
                       <div className="rounded-xl border border-border/50 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Would send</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပို့မည့်အရေအတွက်' : 'Would send'}</p>
                         <p className="mt-2 text-xl font-semibold">{campaign.wouldSendCount}</p>
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          Cap {campaign.maxRecipientsPerRun > 0 ? campaign.maxRecipientsPerRun : 'No cap'}
+                          {isMyanmar ? 'အများဆုံး ပမာဏ' : 'Cap'} {campaign.maxRecipientsPerRun > 0 ? campaign.maxRecipientsPerRun : (isMyanmar ? 'ကန့်သတ်ချက်မရှိ' : 'No cap')}
                         </p>
                       </div>
                       <div className="rounded-xl border border-border/50 p-3">
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Blocked</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပိတ်ထား' : 'Blocked'}</p>
                         <p className="mt-2 text-xl font-semibold">{campaign.blockedCount}</p>
                       </div>
                     </div>
 
                     {campaign.blockedReasons.length > 0 ? (
                       <div className="mt-4 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">Blocked by reason</p>
+                        <p className="text-xs font-medium text-muted-foreground">{isMyanmar ? 'ပိတ်ထားရသည့် အကြောင်းရင်းများ' : 'Blocked by reason'}</p>
                         <div className="flex flex-wrap gap-2">
                           {campaign.blockedReasons.map((reason) => (
                             <Badge key={`${campaign.campaignType}-${reason.reason}`} variant="outline">
@@ -6443,7 +6460,9 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
-                Run the simulation to preview caps, cooldowns, refund blocks, and support-heavy exclusions before the next promo cycle.
+                {isMyanmar
+                  ? 'နောက်ထပ် လျှော့ဈေး ကမ်ပိန်း မစမီ အများဆုံးပမာဏ၊ အနားယူကာလ၊ ငွေပြန်အမ်းမှု ပိတ်ဆို့ချက်များနှင့် အကူအညီ များပြားသူများ ချန်လှပ်မှုကို ကြိုတင် စစ်ဆေးပါ။'
+                  : 'Run the simulation to preview caps, cooldowns, refund blocks, and support-heavy exclusions before the next promo cycle.'}
               </div>
             )}
           </div>
@@ -6455,14 +6474,18 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
           >
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/55 p-4">
               <div>
-                <p className="text-sm font-medium">Advanced order configuration</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'အဆင့်မြင့် အော်ဒါ ပြင်ဆင်သတ်မှတ်မှု' : 'Advanced order configuration'}</p>
                 <p className="text-xs text-muted-foreground">
-                  Payment instructions, payment methods, and plan/template mapping live here so the base workflow stays lighter.
+                  {isMyanmar
+                    ? 'ငွေပေးချေမှု လမ်းညွှန်၊ payment method များနှင့် plan/template mapping များကို ဤနေရာတွင် စီမံသတ်မှတ်ထားသောကြောင့် အခြေခံ workflow ကို ပိုမိုရိုးရှင်းစေသည်။'
+                    : 'Payment instructions, payment methods, and plan/template mapping live here so the base workflow stays lighter.'}
                 </p>
               </div>
               <CollapsibleTrigger asChild>
                 <Button type="button" variant="outline" size="sm">
-                  {workflowAdvancedOpen ? 'Hide advanced' : 'Show advanced'}
+                  {workflowAdvancedOpen
+                    ? (isMyanmar ? 'အဆင့်မြင့် သတ်မှတ်ချက်များကို ဝှက်မည်' : 'Hide advanced')
+                    : (isMyanmar ? 'အဆင့်မြင့် သတ်မှတ်ချက်များကို ပြမည်' : 'Show advanced')}
                   <ChevronRight
                     className={cn('ml-2 h-4 w-4 transition-transform', workflowAdvancedOpen && 'rotate-90')}
                   />
@@ -6648,7 +6671,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
             <div className="space-y-1">
               <p className="text-sm font-medium">{salesUi.planConfig}</p>
               <p className="text-xs text-muted-foreground">
-                {isMyanmar ? 'Bot မှ အသုံးပြုမည့် plan, ဈေးနှုန်း, custom label နှင့် template ကို သတ်မှတ်ပါ။' : 'Set the plan labels, prices, custom labels, and templates used by the Telegram bot.'}
+                {isMyanmar ? 'Bot မှ အသုံးပြုမည့် plan၊ ဈေးနှုန်း၊ custom label နှင့် template ကို သတ်မှတ်ပါ။' : 'Set the plan labels, prices, custom labels, and templates used by the Telegram bot.'}
               </p>
             </div>
 
@@ -7073,7 +7096,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
               </div>
               <p className="text-xs text-muted-foreground">
                 {isMyanmar
-                  ? 'Pending review orders များကို unclaimed, high risk, premium နှင့် oldest-first အလိုက် ချက်ချင်း စစ်ဆေးနိုင်ပါသည်။'
+                  ? 'စစ်ဆေးရန် စောင့်နေသော အော်ဒါများကို မ claim ရသေးသော၊ အန္တရာယ်မြင့်သော၊ premium နှင့် အဟောင်းဆုံးကို ဦးစားပေး အုပ်စုများအလိုက် ချက်ချင်း စစ်ဆေးနိုင်ပါသည်။'
                   : 'Review pending orders instantly by unclaimed, high risk, premium, or oldest-first priority.'}
               </p>
             </div>
@@ -7524,7 +7547,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
           {serverChangeRequestsQuery.isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
+              {isMyanmar ? 'တင်နေသည်…' : 'Loading…'}
             </div>
           ) : !serverChangeRequestsQuery.data || serverChangeRequestsQuery.data.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 p-6 text-sm text-muted-foreground">
@@ -7712,7 +7735,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
           {premiumSupportRequestsQuery.isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading…
+              {isMyanmar ? 'တင်နေသည်…' : 'Loading…'}
             </div>
           ) : !premiumSupportRequestsQuery.data || premiumSupportRequestsQuery.data.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 p-6 text-sm text-muted-foreground">
@@ -8807,11 +8830,11 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="30">30 min</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="180">3 hours</SelectItem>
-                    <SelectItem value="720">12 hours</SelectItem>
-                    <SelectItem value="1440">24 hours</SelectItem>
+                    <SelectItem value="30">{isMyanmar ? '၃၀ မိနစ်' : '30 min'}</SelectItem>
+                    <SelectItem value="60">{isMyanmar ? '၁ နာရီ' : '1 hour'}</SelectItem>
+                    <SelectItem value="180">{isMyanmar ? '၃ နာရီ' : '3 hours'}</SelectItem>
+                    <SelectItem value="720">{isMyanmar ? '၁၂ နာရီ' : '12 hours'}</SelectItem>
+                    <SelectItem value="1440">{isMyanmar ? '၂၄ နာရီ' : '24 hours'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -9789,7 +9812,7 @@ export default function NotificationsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Delete failed',
+        title: isMyanmar ? 'ဖျက်ခြင်း မအောင်မြင်ပါ' : 'Delete failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -9808,7 +9831,7 @@ export default function NotificationsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Test failed',
+        title: isMyanmar ? 'စမ်းသပ်မှု မအောင်မြင်ပါ' : 'Test failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -9846,38 +9869,38 @@ export default function NotificationsPage() {
   }> = [
     {
       id: 'overview',
-      title: isMyanmar ? 'Overview' : 'Overview',
+      title: isMyanmar ? 'အကျဉ်းချုပ်' : 'Overview',
       description: isMyanmar
-        ? 'Alert များ၊ queue နှင့် delivery health ကို အမြန်ကြည့်ရန်'
+        ? 'သတိပေးချက်များ၊ စောင့်ဆိုင်းစာရင်းနှင့် ပို့ဆောင်မှု အခြေအနေကို အမြန်ကြည့်ရန်'
         : 'Alerts, queue health, and the most important notification signals.',
-      meta: `${channels.length} ${isMyanmar ? 'channels' : 'channels'} • ${subscribedEventCount} ${isMyanmar ? 'events' : 'events'}`,
+      meta: `${channels.length} ${isMyanmar ? 'ချန်နယ်' : 'channels'} • ${subscribedEventCount} ${isMyanmar ? 'ဖြစ်ရပ်' : 'events'}`,
       icon: Bell,
     },
     {
       id: 'telegram',
-      title: isMyanmar ? 'Telegram bot' : 'Telegram bot',
+      title: isMyanmar ? 'Telegram ဘော့' : 'Telegram bot',
       description: isMyanmar
-        ? 'Bot setup, webhook, welcome flows နှင့် broadcasts'
+        ? 'ဘော့တပ်ဆင်မှု၊ webhook၊ ဘာသာစကားလိုက် စာများနှင့် ကြေညာချက်များ'
         : 'Bot setup, webhook controls, localized flows, and broadcasts.',
-      meta: isMyanmar ? 'Bot + broadcasts' : 'Bot + broadcasts',
+      meta: isMyanmar ? 'ဘော့ + ကြေညာချက်များ' : 'Bot + broadcasts',
       icon: MessageSquare,
     },
     {
       id: 'workflow',
-      title: isMyanmar ? 'Order workflow' : 'Order workflow',
+      title: isMyanmar ? 'အော်ဒါ လုပ်ငန်းစဉ်' : 'Order workflow',
       description: isMyanmar
-        ? 'Sales automation, coupon campaigns, review queue'
+        ? 'အရောင်း အလိုအလျောက် လုပ်ဆောင်မှုများ၊ ကူပွန် ကမ်ပိန်းများနှင့် စစ်ဆေးရေး စောင့်ဆိုင်းစာရင်း'
         : 'Sales automation, coupon campaigns, and review operations.',
-      meta: isMyanmar ? 'Sales + review' : 'Sales + review',
+      meta: isMyanmar ? 'အရောင်း + စစ်ဆေးမှု' : 'Sales + review',
       icon: Send,
     },
     {
       id: 'channels',
-      title: isMyanmar ? 'Channels & history' : 'Channels & history',
+      title: isMyanmar ? 'ချန်နယ်များနှင့် မှတ်တမ်း' : 'Channels & history',
       description: isMyanmar
-        ? 'Channel setup နှင့် delivery history ကို စီမံရန်'
+        ? 'ချန်နယ်တပ်ဆင်မှုနှင့် ပို့ဆောင်မှုမှတ်တမ်းကို စီမံရန်'
         : 'Channel setup, testing, and delivery history in one place.',
-      meta: `${activeChannels} ${isMyanmar ? 'active' : 'active'} • ${Math.max(0, channels.length - activeChannels)} ${isMyanmar ? 'inactive' : 'inactive'}`,
+      meta: `${activeChannels} ${isMyanmar ? 'လည်ပတ်နေ' : 'active'} • ${Math.max(0, channels.length - activeChannels)} ${isMyanmar ? 'ပိတ်ထား' : 'inactive'}`,
       icon: History,
     },
   ];
@@ -9935,7 +9958,7 @@ export default function NotificationsPage() {
             <div className="ops-hero-aside space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1">
-                  <p className="ops-section-heading">Command rail</p>
+                  <p className="ops-section-heading">{t('dashboard.command_rail')}</p>
                   <h2 className="text-xl font-semibold">{t('notifications.add_channel')}</h2>
                   <p className="text-sm text-muted-foreground">{t('notifications.subtitle')}</p>
                 </div>
@@ -9943,14 +9966,14 @@ export default function NotificationsPage() {
                   variant="outline"
                   className="h-auto w-fit max-w-full self-start whitespace-normal break-words rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 leading-tight dark:text-cyan-200 sm:self-auto"
                 >
-                  {workspaces.length} workspaces
+                  {workspaces.length} {locale === 'my' ? 'အလုပ်ခန်း' : 'workspaces'}
                 </Badge>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="ops-kpi-tile p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Active workspace
+                    {locale === 'my' ? 'လက်ရှိ အလုပ်ခန်း' : 'Active workspace'}
                   </p>
                   <p className="mt-2 text-lg font-semibold leading-tight">
                     {workspaces.find((workspace) => workspace.id === activeWorkspace)?.title}
@@ -9961,10 +9984,10 @@ export default function NotificationsPage() {
                 </div>
                 <div className="ops-kpi-tile p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Delivery focus
+                    {locale === 'my' ? 'ပို့ဆောင်မှု ဦးတည်ချက်' : 'Delivery focus'}
                   </p>
-                  <p className="mt-2 text-lg font-semibold leading-tight">{activeChannels} live</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{subscribedEventCount} subscribed events</p>
+                  <p className="mt-2 text-lg font-semibold leading-tight">{locale === 'my' ? `${activeChannels} ခု လက်ရှိလည်ပတ်နေသည်` : `${activeChannels} live`}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{locale === 'my' ? `ဖြစ်ရပ် ${subscribedEventCount} ခုကို စာရင်းသွင်းထားသည်` : `${subscribedEventCount} subscribed events`}</p>
                 </div>
               </div>
 
@@ -10055,11 +10078,11 @@ export default function NotificationsPage() {
                 <Card className="border-border/60 bg-background/60 dark:bg-white/[0.02]">
                   <CardHeader className="space-y-1">
                     <CardTitle className="text-lg">
-                      {isMyanmar ? 'Focused workspaces' : 'Focused workspaces'}
+                      {isMyanmar ? 'ဦးစားပေး အလုပ်ခန်းများ' : 'Focused workspaces'}
                     </CardTitle>
                     <CardDescription>
                       {isMyanmar
-                        ? 'Notifications ကို အလုပ်အမျိုးအစားအလိုက် ခွဲထားပြီး scroll များမဖြစ်စေရန် တစ်ခန်းချင်း စီမံနိုင်ပါသည်။'
+                        ? 'အသိပေးချက်များကို အလုပ်အမျိုးအစားအလိုက် ခွဲထားပြီး စာမျက်နှာရှည်ကြီးတစ်ခုလုံးကို မဖြတ်သန်းဘဲ တစ်ခန်းချင်း စီမံနိုင်ပါသည်။'
                         : 'Open only the part of Notifications you need instead of working through one long page.'}
                     </CardDescription>
                   </CardHeader>
@@ -10099,16 +10122,16 @@ export default function NotificationsPage() {
               <CardContent className="flex flex-col gap-3 p-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1">
                   <p className="text-sm font-medium">
-                    {isMyanmar ? 'Bot setup and broadcasts' : 'Bot setup and broadcasts'}
+                    {isMyanmar ? 'ဘော့တပ်ဆင်မှုနှင့် ကြေညာချက်များ' : 'Bot setup and broadcasts'}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {isMyanmar
-                      ? 'Bot identity, webhook, localized messages, announcements, templates, analytics နှင့် history ကို တစ်နေရာတည်းတွင် စီမံနိုင်ပါသည်။'
+                      ? 'ဘော့အမည်အချက်အလက်၊ webhook၊ ဘာသာပြန်စာများ၊ ကြေညာချက်များ၊ ပုံစံများ၊ အချက်အလက်စိစစ်မှုနှင့် မှတ်တမ်းများကို တစ်နေရာတည်းတွင် စီမံနိုင်ပါသည်။'
                       : 'Manage bot identity, webhook, localized messages, broadcasts, templates, analytics, and history without mixing them with the rest of the page.'}
                   </p>
                 </div>
                 <Badge variant="outline" className="w-fit">
-                  {isMyanmar ? 'Cleaner full-width workspace' : 'Cleaner full-width workspace'}
+                  {isMyanmar ? 'ပြည့်စုံပြီး ကျယ်ဝန်းသော အလုပ်ခန်း' : 'Cleaner full-width workspace'}
                 </Badge>
               </CardContent>
             </Card>
@@ -10123,16 +10146,16 @@ export default function NotificationsPage() {
               <CardContent className="flex flex-col gap-3 p-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-1">
                   <p className="text-sm font-medium">
-                    {isMyanmar ? 'Sales automation and review operations' : 'Sales automation and review operations'}
+                    {isMyanmar ? 'အရောင်း automation နှင့် စစ်ဆေးရေး လုပ်ငန်းများ' : 'Sales automation and review operations'}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {isMyanmar
-                      ? 'Order flow, coupons, automation guardrails, reviewer queue နှင့် premium support ကို သီးခြား workspace အဖြစ်ထားပေးထားသည်။'
+                      ? 'အော်ဒါလုပ်ငန်းစဉ်၊ ကူပွန်များ၊ အလိုအလျောက် လုံခြုံမှုကန့်သတ်ချက်များ၊ စစ်ဆေးရေး စောင့်ဆိုင်းစာရင်းနှင့် ပရီမီယံ အကူအညီကို သီးခြားအလုပ်ခန်းအဖြစ် စီမံနိုင်ပါသည်။'
                       : 'Keep order flow, coupons, automation guardrails, reviewer queues, and premium support in a dedicated operations workspace.'}
                   </p>
                 </div>
                 <Badge variant="outline" className="w-fit">
-                  {isMyanmar ? 'Sales + review' : 'Sales + review'}
+                  {isMyanmar ? 'အရောင်း + စစ်ဆေးမှု' : 'Sales + review'}
                 </Badge>
               </CardContent>
             </Card>
@@ -10147,11 +10170,11 @@ export default function NotificationsPage() {
               <Card className="border-border/60 bg-background/60 dark:bg-white/[0.02]">
                 <CardHeader className="space-y-1">
                   <CardTitle className="text-lg">
-                    {isMyanmar ? 'Delivery channels' : 'Delivery channels'}
+                    {isMyanmar ? 'ပို့ဆောင်မှု ချန်နယ်များ' : 'Delivery channels'}
                   </CardTitle>
                   <CardDescription>
                     {isMyanmar
-                      ? 'Telegram, email နှင့် webhook channel များကို ပြုပြင်၊ test လုပ်ပြီး delivery history ကို စစ်ဆေးနိုင်သည်။'
+                      ? 'Telegram၊ email နှင့် webhook ချန်နယ်များကို ပြင်ဆင်၊ စမ်းသပ်ပြီး အမှန်တကယ် ပို့ဆောင်ခဲ့သော မှတ်တမ်းကို စစ်ဆေးနိုင်ပါသည်။'
                       : 'Manage Telegram, email, and webhook delivery channels, then review what the worker actually sent.'}
                   </CardDescription>
                 </CardHeader>
@@ -10182,7 +10205,7 @@ export default function NotificationsPage() {
                   <CardTitle className="text-lg">{t('notifications.add_channel')}</CardTitle>
                   <CardDescription>
                     {isMyanmar
-                      ? 'Delivery endpoint အသစ် ထည့်ပြီး event coverage ကို တိုးချဲ့နိုင်သည်။'
+                      ? 'ပို့ဆောင်မှု endpoint အသစ်တစ်ခု ထည့်သွင်းပြီး ဖြစ်ရပ်လွှမ်းခြုံမှုကို တိုးချဲ့နိုင်ပါသည်။'
                       : 'Create a new delivery endpoint and expand your event coverage.'}
                   </CardDescription>
                 </CardHeader>

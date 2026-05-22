@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useLocale } from '@/hooks/use-locale';
 import { useToast } from '@/hooks/use-toast';
 import { withBasePath } from '@/lib/base-path';
 import { trpc } from '@/lib/trpc';
@@ -30,14 +31,16 @@ type SupportStatusFilter = 'ALL' | 'ACTIVE' | 'WAITING_ADMIN' | 'WAITING_USER' |
 type SupportAssignmentFilter = 'ALL' | 'UNASSIGNED' | 'MINE' | 'ASSIGNED';
 type SupportIssueFilter = 'ALL' | 'ORDER' | 'KEY' | 'SERVER' | 'BILLING' | 'GENERAL';
 
-function getThreadStateLabel(status: string, waitingOn: string) {
+function getThreadStateLabel(status: string, waitingOn: string, isMyanmar = false) {
   if (status === 'HANDLED') {
-    return 'Handled';
+    return isMyanmar ? 'ဖြေရှင်းပြီး' : 'Handled';
   }
   if (status === 'ESCALATED') {
-    return 'Escalated';
+    return isMyanmar ? 'တင်ပြထားသည်' : 'Escalated';
   }
-  return (waitingOn || '').toUpperCase() === 'USER' ? 'Waiting for customer' : 'Waiting for admin';
+  return (waitingOn || '').toUpperCase() === 'USER'
+    ? isMyanmar ? 'အသုံးပြုသူကို စောင့်နေသည်' : 'Waiting for customer'
+    : isMyanmar ? 'စီမံခန့်ခွဲသူကို စောင့်နေသည်' : 'Waiting for admin';
 }
 
 function getThreadStateBadgeClass(status: string, waitingOn: string) {
@@ -52,51 +55,70 @@ function getThreadStateBadgeClass(status: string, waitingOn: string) {
     : 'border-red-500/30 bg-red-500/10 text-red-100';
 }
 
+function getSupportIssueLabel(
+  category: SupportIssueFilter | string | null | undefined,
+  isMyanmar = false,
+) {
+  switch ((category || '').toUpperCase()) {
+    case 'ORDER':
+      return isMyanmar ? 'အမှာစာ / ငွေပေးချေမှု' : 'Order / payment';
+    case 'KEY':
+      return isMyanmar ? 'သော့ / အသုံးပြုမှု' : 'Key / usage';
+    case 'SERVER':
+      return isMyanmar ? 'ဆာဗာ / လမ်းကြောင်း ပြဿနာ' : 'Server / route issue';
+    case 'BILLING':
+      return isMyanmar ? 'ငွေတောင်းခံမှု / ငွေပြန်အမ်း' : 'Billing / refund';
+    case 'GENERAL':
+    default:
+      return isMyanmar ? 'အထွေထွေ အကူအညီ' : 'General help';
+  }
+}
+
 function getLatestReplyPreview(reply: {
   message: string;
   mediaKind: string | null;
   senderType: string;
-} | null) {
+} | null, isMyanmar = false) {
   if (!reply) {
-    return 'No replies yet.';
+    return isMyanmar ? 'တုံ့ပြန်ချက် မရှိသေးပါ။' : 'No replies yet.';
   }
 
-  const prefix = reply.senderType === 'ADMIN' ? 'Admin' : 'Customer';
+  const prefix = reply.senderType === 'ADMIN' ? (isMyanmar ? 'စီမံခန့်ခွဲသူ' : 'Admin') : isMyanmar ? 'အသုံးပြုသူ' : 'Customer';
   const message = reply.message.trim();
   if (message) {
     const preview = message.length > 180 ? `${message.slice(0, 177)}...` : message;
     return `${prefix}: ${preview}`;
   }
   if (reply.mediaKind === 'IMAGE') {
-    return `${prefix}: image attachment`;
+    return isMyanmar ? `${prefix}: ပုံဖိုင်တွဲ` : `${prefix}: image attachment`;
   }
   if (reply.mediaKind) {
-    return `${prefix}: file attachment`;
+    return isMyanmar ? `${prefix}: ဖိုင်တွဲ` : `${prefix}: file attachment`;
   }
-  return `${prefix}: update sent`;
+  return isMyanmar ? `${prefix}: အသစ်ပြန်ပို့ထားသည်` : `${prefix}: update sent`;
 }
 
 function getLatestReplyAttachmentLabel(reply: {
   mediaKind: string | null;
   mediaFilename?: string | null;
-} | null) {
+} | null, isMyanmar = false) {
   if (!reply?.mediaKind) {
     return null;
   }
 
   if (reply.mediaKind === 'IMAGE') {
-    return reply.mediaFilename?.trim() || 'Image attachment';
+    return reply.mediaFilename?.trim() || (isMyanmar ? 'ပုံဖိုင်တွဲ' : 'Image attachment');
   }
 
-  return reply.mediaFilename?.trim() || 'File attachment';
+  return reply.mediaFilename?.trim() || (isMyanmar ? 'ဖိုင်တွဲ' : 'File attachment');
 }
 
 function getSupportThreadContextSummary(thread: {
   relatedOrderCode?: string | null;
   relatedKeyName?: string | null;
   relatedServerName?: string | null;
-}) {
-  return thread.relatedOrderCode || thread.relatedKeyName || thread.relatedServerName || 'General help';
+}, isMyanmar = false) {
+  return thread.relatedOrderCode || thread.relatedKeyName || thread.relatedServerName || (isMyanmar ? 'အထွေထွေ အကူအညီ' : 'General help');
 }
 
 function getSupportThreadNextAction(thread: {
@@ -104,50 +126,50 @@ function getSupportThreadNextAction(thread: {
   waitingOn: string | null;
   assignedAdminName?: string | null;
   isOverdue?: boolean | null;
-}) {
+}, isMyanmar = false) {
   if (thread.status === 'HANDLED') {
     return {
-      label: 'Thread is handled',
-      helper: 'No immediate follow-up is needed unless the customer replies again.',
+      label: isMyanmar ? 'စကားဝိုင်းကို ဖြေရှင်းပြီးဖြစ်သည်' : 'Thread is handled',
+      helper: isMyanmar ? 'အသုံးပြုသူ ပြန်မဖြေမချင်း ထပ်မံလိုက်လံရန် မလိုပါ။' : 'No immediate follow-up is needed unless the customer replies again.',
       tone: 'default' as const,
     };
   }
 
   if (thread.status === 'ESCALATED') {
     return {
-      label: 'Review the escalation',
-      helper: 'Confirm the blocker, decide owner, and send the next update.',
+      label: isMyanmar ? 'တင်ပြထားမှုကို စစ်ဆေးမည်' : 'Review the escalation',
+      helper: isMyanmar ? 'အတားအဆီးကို အတည်ပြုပြီး တာဝန်ခံသတ်မှတ်ကာ နောက်တုံ့ပြန်ချက်ကို ပို့ပါ။' : 'Confirm the blocker, decide owner, and send the next update.',
       tone: 'warning' as const,
     };
   }
 
   if (!thread.assignedAdminName) {
     return {
-      label: 'Claim an owner',
-      helper: 'Take ownership before replying so the thread stays accountable.',
+      label: isMyanmar ? 'တာဝန်ခံ တစ်ဦး သတ်မှတ်မည်' : 'Claim an owner',
+      helper: isMyanmar ? 'မပြန်ဖြေမီ တာဝန်ယူသူကို သတ်မှတ်ပါ။' : 'Take ownership before replying so the thread stays accountable.',
       tone: 'warning' as const,
     };
   }
 
   if ((thread.waitingOn || '').toUpperCase() === 'USER') {
     return {
-      label: 'Waiting for customer reply',
-      helper: 'No admin action is needed until the customer answers.',
+      label: isMyanmar ? 'အသုံးပြုသူ တုံ့ပြန်ချက်ကို စောင့်နေသည်' : 'Waiting for customer reply',
+      helper: isMyanmar ? 'အသုံးပြုသူ မပြန်ဖြေမချင်း စီမံခန့်ခွဲရေး လုပ်ဆောင်ချက် မလိုအပ်ပါ။' : 'No admin action is needed until the customer answers.',
       tone: 'default' as const,
     };
   }
 
   if (thread.isOverdue) {
     return {
-      label: 'Reply now',
-      helper: 'This thread has missed first-response SLA and needs an admin update.',
+      label: isMyanmar ? 'ယခုပင် ပြန်ဖြေပါ' : 'Reply now',
+      helper: isMyanmar ? 'ဤစကားဝိုင်းသည် ပထမဆုံးတုံ့ပြန်ချိန် ကတိကို ကျော်လွန်သွားပြီး စီမံခန့်ခွဲရေး တုံ့ပြန်ချက် လိုအပ်သည်။' : 'This thread has missed first-response SLA and needs an admin update.',
       tone: 'danger' as const,
     };
   }
 
   return {
-    label: 'Send the next admin update',
-    helper: 'Open the thread, review the latest reply, and respond or resolve it.',
+    label: isMyanmar ? 'နောက် စီမံခန့်ခွဲရေး တုံ့ပြန်ချက် ပို့မည်' : 'Send the next admin update',
+    helper: isMyanmar ? 'စကားဝိုင်းကို ဖွင့်ပြီး နောက်ဆုံးတုံ့ပြန်ချက်ကို စစ်ဆေးကာ ပြန်ဖြေပါ သို့မဟုတ် ဖြေရှင်းပါ။' : 'Open the thread, review the latest reply, and respond or resolve it.',
     tone: 'warning' as const,
   };
 }
@@ -179,20 +201,25 @@ function SupportStatCard({
   );
 }
 
-function formatDurationLabel(minutes: number | null) {
+function formatDurationLabel(minutes: number | null, isMyanmar = false) {
   if (minutes == null) {
-    return 'No data yet';
+    return isMyanmar ? 'ဒေတာ မရှိသေးပါ' : 'No data yet';
   }
   if (minutes < 60) {
-    return `${minutes} min`;
+    return isMyanmar ? `${minutes} မိနစ်` : `${minutes} min`;
   }
 
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
+  if (isMyanmar) {
+    return remainingMinutes > 0 ? `${hours} နာရီ ${remainingMinutes} မိနစ်` : `${hours} နာရီ`;
+  }
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 export default function SupportCenterPage() {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<SupportStatusFilter>('ACTIVE');
   const [assignmentFilter, setAssignmentFilter] = useState<SupportAssignmentFilter>('ALL');
@@ -215,20 +242,20 @@ export default function SupportCenterPage() {
   const claimMutation = trpc.users.claimSupportThread.useMutation({
     onSuccess: async () => {
       await Promise.all([threadsQuery.refetch(), analyticsQuery.refetch()]);
-      toast({ title: 'Support thread claimed' });
+      toast({ title: isMyanmar ? 'အကူအညီ စကားဝိုင်းကို တာဝန်ယူပြီးပါပြီ' : 'Support thread claimed' });
     },
     onError: (error) => {
-      toast({ title: 'Claim failed', description: error.message, variant: 'destructive' });
+      toast({ title: isMyanmar ? 'တာဝန်ယူမှု မအောင်မြင်ပါ' : 'Claim failed', description: error.message, variant: 'destructive' });
     },
   });
 
   const unclaimMutation = trpc.users.unclaimSupportThread.useMutation({
     onSuccess: async () => {
       await Promise.all([threadsQuery.refetch(), analyticsQuery.refetch()]);
-      toast({ title: 'Support thread unclaimed' });
+      toast({ title: isMyanmar ? 'အကူအညီ စကားဝိုင်း၏ တာဝန်ယူမှုကို ဖြုတ်ပြီးပါပြီ' : 'Support thread unclaimed' });
     },
     onError: (error) => {
-      toast({ title: 'Unclaim failed', description: error.message, variant: 'destructive' });
+      toast({ title: isMyanmar ? 'တာဝန်ယူမှု ဖြုတ်ခြင်း မအောင်မြင်ပါ' : 'Unclaim failed', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -239,8 +266,8 @@ export default function SupportCenterPage() {
   const boardCards = [
     {
       id: 'unassigned',
-      title: 'Unassigned',
-      helper: 'Claimable threads with no owner.',
+      title: isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned',
+      helper: isMyanmar ? 'တာဝန်ခံ မရှိသေးသော စကားဝိုင်းများ။' : 'Claimable threads with no owner.',
       value: threadsQuery.data?.summary.unassigned || 0,
       isActive: assignmentFilter === 'UNASSIGNED' && statusFilter === 'ACTIVE',
       onClick: () => {
@@ -250,8 +277,8 @@ export default function SupportCenterPage() {
     },
     {
       id: 'mine',
-      title: 'Mine',
-      helper: 'Your currently assigned queue.',
+      title: isMyanmar ? 'ကျွန်ုပ်၏ အုပ်စု' : 'Mine',
+      helper: isMyanmar ? 'သင့်ထံ လက်ရှိ သတ်မှတ်ထားသော စကားဝိုင်းများ။' : 'Your currently assigned queue.',
       value: threadsQuery.data?.summary.mine || 0,
       isActive: assignmentFilter === 'MINE' && statusFilter === 'ACTIVE',
       onClick: () => {
@@ -261,8 +288,8 @@ export default function SupportCenterPage() {
     },
     {
       id: 'waiting-admin',
-      title: 'Waiting for admin',
-      helper: 'Threads blocked on operator action.',
+      title: isMyanmar ? 'စီမံခန့်ခွဲသူကို စောင့်နေသည်' : 'Waiting for admin',
+      helper: isMyanmar ? 'စီမံခန့်ခွဲရေး လုပ်ဆောင်ချက်ကို စောင့်နေသော စကားဝိုင်းများ။' : 'Threads blocked on operator action.',
       value: threadsQuery.data?.summary.waitingAdmin || 0,
       isActive: statusFilter === 'WAITING_ADMIN',
       onClick: () => {
@@ -272,8 +299,8 @@ export default function SupportCenterPage() {
     },
     {
       id: 'waiting-user',
-      title: 'Waiting for customer',
-      helper: 'Threads awaiting customer follow-up.',
+      title: isMyanmar ? 'အသုံးပြုသူကို စောင့်နေသည်' : 'Waiting for customer',
+      helper: isMyanmar ? 'အသုံးပြုသူ၏ လိုက်လံတုံ့ပြန်ချက်ကို စောင့်နေသော စကားဝိုင်းများ။' : 'Threads awaiting customer follow-up.',
       value: threadsQuery.data?.summary.waitingUser || 0,
       isActive: statusFilter === 'WAITING_USER',
       onClick: () => {
@@ -283,8 +310,8 @@ export default function SupportCenterPage() {
     },
     {
       id: 'overdue',
-      title: 'Overdue',
-      helper: 'First-response SLA has already slipped.',
+      title: isMyanmar ? 'အချိန်ကျော်နေသည်' : 'Overdue',
+      helper: isMyanmar ? 'ပထမဆုံး တုံ့ပြန်ချိန် ကတိကို ကျော်လွန်သွားပါပြီ။' : 'First-response SLA has already slipped.',
       value: threadsQuery.data?.summary.overdue || 0,
       isActive: statusFilter === 'OVERDUE',
       onClick: () => {
@@ -296,23 +323,25 @@ export default function SupportCenterPage() {
 
   const emptyStateLabel = useMemo(() => {
     if (threadsQuery.isLoading) {
-      return 'Loading support threads...';
+      return isMyanmar ? 'အကူအညီ စကားဝိုင်းများကို တင်နေသည်...' : 'Loading support threads...';
     }
     if (search.trim()) {
-      return 'No support threads matched that search.';
+      return isMyanmar ? 'အဆိုပါရှာဖွေမှုနှင့် ကိုက်ညီသော အကူအညီ စကားဝိုင်း မရှိပါ။' : 'No support threads matched that search.';
     }
-    return 'No support threads matched the current filters.';
-  }, [search, threadsQuery.isLoading]);
+    return isMyanmar ? 'လက်ရှိ စစ်ထုတ်မှုများနှင့် ကိုက်ညီသော အကူအညီ စကားဝိုင်း မရှိပါ။' : 'No support threads matched the current filters.';
+  }, [isMyanmar, search, threadsQuery.isLoading]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Support center</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{isMyanmar ? 'အကူအညီ ဗဟို' : 'Support center'}</p>
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Support threads</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">{isMyanmar ? 'အကူအညီ စကားဝိုင်းများ' : 'Support threads'}</h1>
             <p className="text-sm text-muted-foreground">
-              One place for Telegram support ownership, SLA follow-up, and customer thread navigation.
+              {isMyanmar
+                ? 'Telegram အကူအညီ တာဝန်ခွဲဝေမှု၊ SLA လိုက်လံစစ်ဆေးမှုနှင့် အသုံးပြုသူ စကားဝိုင်း လမ်းညွှန်မှုများကို တစ်နေရာတည်းတွင် စီမံပါ။'
+                : 'One place for Telegram support ownership, SLA follow-up, and customer thread navigation.'}
             </p>
           </div>
         </div>
@@ -320,7 +349,7 @@ export default function SupportCenterPage() {
           <Button asChild variant="outline">
             <Link href={withBasePath('/dashboard/users')}>
               <Users className="mr-2 h-4 w-4" />
-              Open CRM
+              {isMyanmar ? 'အသုံးပြုသူ စာရင်း ဖွင့်မည်' : 'Open CRM'}
             </Link>
           </Button>
         </div>
@@ -328,36 +357,36 @@ export default function SupportCenterPage() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <SupportStatCard
-          label="Open threads"
+          label={isMyanmar ? 'ဖွင့်ထားသော စကားဝိုင်းများ' : 'Open threads'}
           value={threadsQuery.data?.summary.open || 0}
-          helper="Currently open or escalated"
+          helper={isMyanmar ? 'လက်ရှိ ဖွင့်ထားသည့် သို့မဟုတ် အဆင့်မြှင့်တင်ထားသော စကားဝိုင်းများ' : 'Currently open or escalated'}
         />
         <SupportStatCard
-          label="Waiting for admin"
+          label={isMyanmar ? 'စီမံခန့်ခွဲသူကို စောင့်နေသည်' : 'Waiting for admin'}
           value={threadsQuery.data?.summary.waitingAdmin || 0}
-          helper="Needs operator action"
+          helper={isMyanmar ? 'စီမံခန့်ခွဲရေး လုပ်ဆောင်ချက် လိုအပ်သည်' : 'Needs operator action'}
           tone="warning"
         />
         <SupportStatCard
-          label="Waiting for customer"
+          label={isMyanmar ? 'အသုံးပြုသူကို စောင့်နေသည်' : 'Waiting for customer'}
           value={threadsQuery.data?.summary.waitingUser || 0}
-          helper="Awaiting customer reply"
+          helper={isMyanmar ? 'အသုံးပြုသူ၏ တုံ့ပြန်ချက်ကို စောင့်နေသည်' : 'Awaiting customer reply'}
         />
         <SupportStatCard
-          label="Overdue"
+          label={isMyanmar ? 'အချိန်ကျော်နေသည်' : 'Overdue'}
           value={threadsQuery.data?.summary.overdue || 0}
-          helper="First response SLA missed"
+          helper={isMyanmar ? 'ပထမဆုံး တုံ့ပြန်ချိန် ကတိကို ကျော်လွန်သွားပါပြီ' : 'First response SLA missed'}
           tone="danger"
         />
         <SupportStatCard
-          label="Unassigned"
+          label={isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned'}
           value={threadsQuery.data?.summary.unassigned || 0}
-          helper="No owner yet"
+          helper={isMyanmar ? 'တာဝန်ခံ မသတ်မှတ်ရသေးပါ' : 'No owner yet'}
         />
         <SupportStatCard
-          label="Assigned to me"
+          label={isMyanmar ? 'ကျွန်ုပ်ထံ သတ်မှတ်ထားသည်' : 'Assigned to me'}
           value={threadsQuery.data?.summary.mine || 0}
-          helper="Your active support load"
+          helper={isMyanmar ? 'သင်၏ လက်ရှိ အကူအညီ တာဝန်ပမာဏ' : 'Your active support load'}
         />
       </div>
 
@@ -365,9 +394,9 @@ export default function SupportCenterPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Assignment board
+            {isMyanmar ? 'တာဝန်ခွဲဝေမှု ဘုတ်' : 'Assignment board'}
           </CardTitle>
-          <CardDescription>Jump straight into the queue slice you need to work next.</CardDescription>
+          <CardDescription>{isMyanmar ? 'နောက်တစ်ဆင့် လုပ်ဆောင်ရမည့် အုပ်စုအပိုင်းသို့ တိုက်ရိုက်ဝင်ပါ။' : 'Jump straight into the queue slice you need to work next.'}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {boardCards.map((card) => (
@@ -394,52 +423,52 @@ export default function SupportCenterPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
-            Filters
+            {isMyanmar ? 'စစ်ထုတ်မှုများ' : 'Filters'}
           </CardTitle>
-          <CardDescription>Search by code, customer, order, key, server, or thread subject.</CardDescription>
+          <CardDescription>{isMyanmar ? 'ကုဒ်၊ အသုံးပြုသူ၊ အမှာစာ၊ သော့၊ ဆာဗာ သို့မဟုတ် စကားဝိုင်းခေါင်းစဉ်ဖြင့် ရှာဖွေပါ။' : 'Search by code, customer, order, key, server, or thread subject.'}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search code, email, order, key, server..."
+            placeholder={isMyanmar ? 'ကုဒ်၊ အီးမေးလ်၊ အမှာစာ၊ သော့၊ ဆာဗာကို ရှာဖွေပါ...' : 'Search code, email, order, key, server...'}
           />
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as SupportStatusFilter)}>
             <SelectTrigger>
-              <SelectValue placeholder="Thread state" />
+              <SelectValue placeholder={isMyanmar ? 'စကားဝိုင်း အခြေအနေ' : 'Thread state'} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ACTIVE">Active</SelectItem>
-              <SelectItem value="WAITING_ADMIN">Waiting for admin</SelectItem>
-              <SelectItem value="WAITING_USER">Waiting for customer</SelectItem>
-              <SelectItem value="ESCALATED">Escalated</SelectItem>
-              <SelectItem value="OVERDUE">Overdue</SelectItem>
-              <SelectItem value="HANDLED">Handled</SelectItem>
-              <SelectItem value="ALL">All</SelectItem>
+              <SelectItem value="ACTIVE">{isMyanmar ? 'လုပ်ဆောင်နေသည်' : 'Active'}</SelectItem>
+              <SelectItem value="WAITING_ADMIN">{isMyanmar ? 'စီမံခန့်ခွဲသူကို စောင့်နေသည်' : 'Waiting for admin'}</SelectItem>
+              <SelectItem value="WAITING_USER">{isMyanmar ? 'အသုံးပြုသူကို စောင့်နေသည်' : 'Waiting for customer'}</SelectItem>
+              <SelectItem value="ESCALATED">{isMyanmar ? 'အဆင့်မြှင့်တင်ထားသည်' : 'Escalated'}</SelectItem>
+              <SelectItem value="OVERDUE">{isMyanmar ? 'အချိန်ကျော်နေသည်' : 'Overdue'}</SelectItem>
+              <SelectItem value="HANDLED">{isMyanmar ? 'ဖြေရှင်းပြီး' : 'Handled'}</SelectItem>
+              <SelectItem value="ALL">{isMyanmar ? 'အားလုံး' : 'All'}</SelectItem>
             </SelectContent>
           </Select>
           <Select value={assignmentFilter} onValueChange={(value) => setAssignmentFilter(value as SupportAssignmentFilter)}>
             <SelectTrigger>
-              <SelectValue placeholder="Assignment" />
+              <SelectValue placeholder={isMyanmar ? 'တာဝန်ခွဲဝေမှု' : 'Assignment'} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All assignments</SelectItem>
-              <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
-              <SelectItem value="MINE">Assigned to me</SelectItem>
-              <SelectItem value="ASSIGNED">Assigned to someone</SelectItem>
+              <SelectItem value="ALL">{isMyanmar ? 'တာဝန်ခွဲဝေမှု အားလုံး' : 'All assignments'}</SelectItem>
+              <SelectItem value="UNASSIGNED">{isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned'}</SelectItem>
+              <SelectItem value="MINE">{isMyanmar ? 'ကျွန်ုပ်ထံ သတ်မှတ်ထားသည်' : 'Assigned to me'}</SelectItem>
+              <SelectItem value="ASSIGNED">{isMyanmar ? 'တစ်စုံတစ်ဦးထံ သတ်မှတ်ထားသည်' : 'Assigned to someone'}</SelectItem>
             </SelectContent>
           </Select>
           <Select value={issueFilter} onValueChange={(value) => setIssueFilter(value as SupportIssueFilter)}>
             <SelectTrigger>
-              <SelectValue placeholder="Issue category" />
+              <SelectValue placeholder={isMyanmar ? 'ပြဿနာ အမျိုးအစား' : 'Issue category'} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All categories</SelectItem>
-              <SelectItem value="ORDER">Order / payment</SelectItem>
-              <SelectItem value="KEY">Key / usage</SelectItem>
-              <SelectItem value="SERVER">Server / route issue</SelectItem>
-              <SelectItem value="BILLING">Billing / refund</SelectItem>
-              <SelectItem value="GENERAL">General help</SelectItem>
+              <SelectItem value="ALL">{isMyanmar ? 'အမျိုးအစား အားလုံး' : 'All categories'}</SelectItem>
+              <SelectItem value="ORDER">{isMyanmar ? 'အမှာစာ / ငွေပေးချေမှု' : 'Order / payment'}</SelectItem>
+              <SelectItem value="KEY">{isMyanmar ? 'သော့ / အသုံးပြုမှု' : 'Key / usage'}</SelectItem>
+              <SelectItem value="SERVER">{isMyanmar ? 'ဆာဗာ / လမ်းကြောင်း ပြဿနာ' : 'Server / route issue'}</SelectItem>
+              <SelectItem value="BILLING">{isMyanmar ? 'ငွေတောင်းခံမှု / ငွေပြန်အမ်း' : 'Billing / refund'}</SelectItem>
+              <SelectItem value="GENERAL">{isMyanmar ? 'အထွေထွေ အကူအညီ' : 'General help'}</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
@@ -450,9 +479,9 @@ export default function SupportCenterPage() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
-              Support analytics
+            {isMyanmar ? 'အကူအညီ သုံးသပ်ချက်' : 'Support analytics'}
             </CardTitle>
-            <CardDescription>Response speed, handled time, overdue rate, and workload split.</CardDescription>
+            <CardDescription>{isMyanmar ? 'တုံ့ပြန်မြန်နှုန်း၊ ဖြေရှင်းချိန်၊ အချိန်ကျော်နှုန်းနှင့် တာဝန်ပမာဏ ခွဲဝေမှုကို ကြည့်ပါ။' : 'Response speed, handled time, overdue rate, and workload split.'}</CardDescription>
           </div>
           <div className="w-full max-w-[180px]">
             <Select
@@ -460,12 +489,12 @@ export default function SupportCenterPage() {
               onValueChange={(value) => setAnalyticsWindowDays(Number(value))}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Analytics window" />
+                <SelectValue placeholder={isMyanmar ? 'သုံးသပ်မှု အချိန်အပိုင်း' : 'Analytics window'} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="7">{isMyanmar ? 'နောက်ဆုံး ၇ ရက်' : 'Last 7 days'}</SelectItem>
+                <SelectItem value="30">{isMyanmar ? 'နောက်ဆုံး ၃၀ ရက်' : 'Last 30 days'}</SelectItem>
+                <SelectItem value="90">{isMyanmar ? 'နောက်ဆုံး ၉၀ ရက်' : 'Last 90 days'}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -479,46 +508,46 @@ export default function SupportCenterPage() {
             <>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <SupportStatCard
-                  label="First response"
-                  value={formatDurationLabel(analyticsQuery.data.summary.firstResponseMinutes)}
-                  helper={`Average in the last ${analyticsQuery.data.timeframeDays} days`}
+                  label={isMyanmar ? 'ပထမဆုံး တုံ့ပြန်ချိန်' : 'First response'}
+                  value={formatDurationLabel(analyticsQuery.data.summary.firstResponseMinutes, isMyanmar)}
+                  helper={isMyanmar ? `နောက်ဆုံး ${analyticsQuery.data.timeframeDays} ရက်အတွင်း ပျမ်းမျှ` : `Average in the last ${analyticsQuery.data.timeframeDays} days`}
                 />
                 <SupportStatCard
-                  label="Handled time"
-                  value={formatDurationLabel(analyticsQuery.data.summary.handledMinutes)}
-                  helper="Average time from thread open to handled"
+                  label={isMyanmar ? 'ဖြေရှင်းချိန်' : 'Handled time'}
+                  value={formatDurationLabel(analyticsQuery.data.summary.handledMinutes, isMyanmar)}
+                  helper={isMyanmar ? 'စကားဝိုင်း ဖွင့်ချိန်မှ ဖြေရှင်းပြီးချိန်အထိ ပျမ်းမျှ' : 'Average time from thread open to handled'}
                 />
                 <SupportStatCard
-                  label="Overdue rate"
+                  label={isMyanmar ? 'အချိန်ကျော်နှုန်း' : 'Overdue rate'}
                   value={`${analyticsQuery.data.summary.overdueRate}%`}
-                  helper={`${analyticsQuery.data.summary.overdue} overdue of ${analyticsQuery.data.summary.total} threads`}
+                  helper={isMyanmar ? `${analyticsQuery.data.summary.total} ခုအနက် ${analyticsQuery.data.summary.overdue} ခု အချိန်ကျော်` : `${analyticsQuery.data.summary.overdue} overdue of ${analyticsQuery.data.summary.total} threads`}
                   tone={analyticsQuery.data.summary.overdueRate >= 20 ? 'danger' : analyticsQuery.data.summary.overdueRate >= 10 ? 'warning' : 'default'}
                 />
                 <SupportStatCard
-                  label="Handled"
+                  label={isMyanmar ? 'ဖြေရှင်းပြီး' : 'Handled'}
                   value={analyticsQuery.data.summary.handled}
-                  helper={`${analyticsQuery.data.summary.open} still open in the same window`}
+                  helper={isMyanmar ? `တူညီသော အချိန်အပိုင်းအတွင်း ${analyticsQuery.data.summary.open} ခု ဖွင့်ထားဆဲ` : `${analyticsQuery.data.summary.open} still open in the same window`}
                 />
               </div>
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
                   <div className="mb-4">
-                    <p className="text-sm font-semibold">By admin</p>
-                    <p className="text-sm text-muted-foreground">Ownership load, response speed, and overdue rate.</p>
+                    <p className="text-sm font-semibold">{isMyanmar ? 'စီမံခန့်ခွဲသူ အလိုက်' : 'By admin'}</p>
+                    <p className="text-sm text-muted-foreground">{isMyanmar ? 'တာဝန်ပမာဏ၊ တုံ့ပြန်မြန်နှုန်းနှင့် အချိန်ကျော်နှုန်းကို ပြသသည်။' : 'Ownership load, response speed, and overdue rate.'}</p>
                   </div>
                   <div className="space-y-3">
                     {analyticsQuery.data.byAdmin.map((bucket) => (
                       <div key={bucket.key} className="rounded-[0.9rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{bucket.label}</p>
-                          <Badge variant="outline">{bucket.total} threads</Badge>
+                          <Badge variant="outline">{bucket.total} {isMyanmar ? 'စကားဝိုင်း' : 'threads'}</Badge>
                         </div>
                         <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">
-                          <p>Open: {bucket.open}</p>
-                          <p>Handled: {bucket.handled}</p>
-                          <p>First reply: {formatDurationLabel(bucket.firstResponseMinutes)}</p>
-                          <p>Overdue: {bucket.overdueRate}%</p>
+                          <p>{isMyanmar ? 'ဖွင့်ထားသည်:' : 'Open:'} {bucket.open}</p>
+                          <p>{isMyanmar ? 'ဖြေရှင်းပြီး:' : 'Handled:'} {bucket.handled}</p>
+                          <p>{isMyanmar ? 'ပထမ တုံ့ပြန်ချက်:' : 'First reply:'} {formatDurationLabel(bucket.firstResponseMinutes, isMyanmar)}</p>
+                          <p>{isMyanmar ? 'အချိန်ကျော်:' : 'Overdue:'} {bucket.overdueRate}%</p>
                         </div>
                       </div>
                     ))}
@@ -527,21 +556,21 @@ export default function SupportCenterPage() {
 
                 <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
                   <div className="mb-4">
-                    <p className="text-sm font-semibold">By category</p>
-                    <p className="text-sm text-muted-foreground">See which issue types are driving response time.</p>
+                    <p className="text-sm font-semibold">{isMyanmar ? 'အမျိုးအစား အလိုက်' : 'By category'}</p>
+                    <p className="text-sm text-muted-foreground">{isMyanmar ? 'မည်သည့် ပြဿနာအမျိုးအစားများက တုံ့ပြန်ချိန်ကို အကျိုးသက်ရောက်စေသည်ကို ကြည့်ပါ။' : 'See which issue types are driving response time.'}</p>
                   </div>
                   <div className="space-y-3">
                     {analyticsQuery.data.byCategory.map((bucket) => (
                       <div key={bucket.key} className="rounded-[0.9rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{bucket.label}</p>
-                          <Badge variant="outline">{bucket.total} threads</Badge>
+                          <Badge variant="outline">{bucket.total} {isMyanmar ? 'စကားဝိုင်း' : 'threads'}</Badge>
                         </div>
                         <div className="mt-2 grid gap-2 text-sm text-muted-foreground sm:grid-cols-4">
-                          <p>Open: {bucket.open}</p>
-                          <p>Handled: {bucket.handled}</p>
-                          <p>Handled time: {formatDurationLabel(bucket.handledMinutes)}</p>
-                          <p>Overdue: {bucket.overdueRate}%</p>
+                          <p>{isMyanmar ? 'ဖွင့်ထားသည်:' : 'Open:'} {bucket.open}</p>
+                          <p>{isMyanmar ? 'ဖြေရှင်းပြီး:' : 'Handled:'} {bucket.handled}</p>
+                          <p>{isMyanmar ? 'ဖြေရှင်းချိန်:' : 'Handled time:'} {formatDurationLabel(bucket.handledMinutes, isMyanmar)}</p>
+                          <p>{isMyanmar ? 'အချိန်ကျော်:' : 'Overdue:'} {bucket.overdueRate}%</p>
                         </div>
                       </div>
                     ))}
@@ -557,10 +586,12 @@ export default function SupportCenterPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Thread queue
+            {isMyanmar ? 'စကားဝိုင်း အစဉ်' : 'Thread queue'}
           </CardTitle>
           <CardDescription>
-            Scan the latest customer context, see the next action, and jump into the full thread only when needed.
+            {isMyanmar
+              ? 'ဖောက်သည်၏ နောက်ဆုံး context ကို ကြည့်ပြီး နောက်လုပ်ဆောင်ရန်ကို အမြန်ဆုံးသိကာ လိုအပ်သည့်အခါမှသာ thread အပြည့်သို့ ဝင်ပါ။'
+              : 'Scan the latest customer context, see the next action, and jump into the full thread only when needed.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -576,9 +607,9 @@ export default function SupportCenterPage() {
             threads.map((thread) => {
               const isMine = Boolean(currentUserId && thread.assignedAdminUserId === currentUserId);
               const customerLabel = thread.customer?.email || thread.telegramUsername || thread.threadCode;
-              const latestPreview = getLatestReplyPreview(thread.latestReply);
-              const nextAction = getSupportThreadNextAction(thread);
-              const linkedContext = getSupportThreadContextSummary(thread);
+              const latestPreview = getLatestReplyPreview(thread.latestReply, isMyanmar);
+              const nextAction = getSupportThreadNextAction(thread, isMyanmar);
+              const linkedContext = getSupportThreadContextSummary(thread, isMyanmar);
               const threadHref = withBasePath(`/dashboard/support/threads/${thread.id}`);
               const customerHref = thread.customer ? withBasePath(`/dashboard/users/${thread.customer.id}`) : null;
 
@@ -589,12 +620,12 @@ export default function SupportCenterPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-base font-semibold">{thread.threadCode}</p>
                         <Badge variant="outline" className={getThreadStateBadgeClass(thread.status, thread.waitingOn)}>
-                          {getThreadStateLabel(thread.status, thread.waitingOn)}
+                          {getThreadStateLabel(thread.status, thread.waitingOn, isMyanmar)}
                         </Badge>
-                        <Badge variant="outline">{thread.issueLabel}</Badge>
+                        <Badge variant="outline">{getSupportIssueLabel(thread.issueCategory, isMyanmar)}</Badge>
                         {thread.isOverdue ? (
                           <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-100">
-                            Overdue
+                            {isMyanmar ? 'အချိန်ကျော်နေသည်' : 'Overdue'}
                           </Badge>
                         ) : null}
                       </div>
@@ -607,13 +638,13 @@ export default function SupportCenterPage() {
                     <div className="flex flex-wrap gap-2">
                       <Button asChild variant="outline" size="sm">
                         <Link href={threadHref}>
-                          Open thread
+                          {isMyanmar ? 'စကားဝိုင်း ဖွင့်မည်' : 'Open thread'}
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                       </Button>
                       {customerHref ? (
                         <Button asChild variant="outline" size="sm">
-                          <Link href={customerHref}>Open CRM</Link>
+                          <Link href={customerHref}>{isMyanmar ? 'အသုံးပြုသူ စာရင်း ဖွင့်မည်' : 'Open CRM'}</Link>
                         </Button>
                       ) : null}
                       {thread.assignedAdminUserId ? (
@@ -624,7 +655,7 @@ export default function SupportCenterPage() {
                             disabled={isBusy}
                             onClick={() => unclaimMutation.mutate({ threadId: thread.id })}
                           >
-                            Unclaim
+                          {isMyanmar ? 'တာဝန်မှ ဖြုတ်မည်' : 'Unclaim'}
                           </Button>
                         ) : null
                       ) : (
@@ -634,7 +665,7 @@ export default function SupportCenterPage() {
                           disabled={isBusy}
                           onClick={() => claimMutation.mutate({ threadId: thread.id })}
                         >
-                          Claim
+                          {isMyanmar ? 'တာဝန်ယူမည်' : 'Claim'}
                         </Button>
                       )}
                     </div>
@@ -642,7 +673,7 @@ export default function SupportCenterPage() {
 
                   <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)]">
                     <div className="space-y-2 rounded-[0.95rem] border border-border/60 bg-background/50 p-3 dark:bg-white/[0.025]">
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Latest reply</p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး တုံ့ပြန်ချက်' : 'Latest reply'}</p>
                       <p className="text-sm leading-6 text-foreground">{latestPreview}</p>
                       {thread.latestReply?.mediaUrl ? (
                         <div className="rounded-[0.85rem] border border-border/60 bg-background/70 p-2 dark:bg-white/[0.03]">
@@ -655,7 +686,7 @@ export default function SupportCenterPage() {
                             >
                               <Image
                                 src={thread.latestReply.mediaUrl}
-                                alt={getLatestReplyAttachmentLabel(thread.latestReply) || 'Support attachment'}
+                                alt={getLatestReplyAttachmentLabel(thread.latestReply, isMyanmar) || (isMyanmar ? 'အကူအညီ ဖိုင်တွဲ' : 'Support attachment')}
                                 width={640}
                                 height={256}
                                 unoptimized
@@ -670,7 +701,7 @@ export default function SupportCenterPage() {
                               className="flex items-center gap-2 rounded-[0.7rem] px-2 py-2 text-sm text-foreground transition hover:bg-background/80"
                             >
                               <Paperclip className="h-4 w-4 text-primary" />
-                              <span className="truncate">{getLatestReplyAttachmentLabel(thread.latestReply)}</span>
+                              <span className="truncate">{getLatestReplyAttachmentLabel(thread.latestReply, isMyanmar)}</span>
                             </a>
                           )}
                         </div>
@@ -680,7 +711,7 @@ export default function SupportCenterPage() {
                           <span>{formatDateTime(thread.latestReply.createdAt)}</span>
                           {thread.latestReply.mediaKind ? (
                             <Badge variant="outline" className="text-[10px]">
-                              {thread.latestReply.mediaKind === 'IMAGE' ? 'Image attached' : 'File attached'}
+                              {thread.latestReply.mediaKind === 'IMAGE' ? (isMyanmar ? 'ပုံဖိုင်တွဲ ပါရှိသည်' : 'Image attached') : (isMyanmar ? 'ဖိုင်တွဲ ပါရှိသည်' : 'File attached')}
                             </Badge>
                           ) : null}
                         </div>
@@ -699,25 +730,25 @@ export default function SupportCenterPage() {
                       <div>
                         <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                           <ShieldAlert className="h-3.5 w-3.5" />
-                          Next action
+                          {isMyanmar ? 'နောက်လုပ်ဆောင်ရန်' : 'Next action'}
                         </p>
                         <p className="mt-2 text-sm font-medium">{nextAction.label}</p>
                         <p className="mt-1 text-sm text-muted-foreground">{nextAction.helper}</p>
                       </div>
                       <div className="grid gap-2 text-sm text-muted-foreground">
                         <p>
-                          <span className="font-medium text-foreground">Owner:</span>{' '}
-                          {thread.assignedAdminName || 'Unassigned'}
+                          <span className="font-medium text-foreground">{isMyanmar ? 'တာဝန်ခံ:' : 'Owner:'}</span>{' '}
+                          {thread.assignedAdminName || (isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned')}
                         </p>
                         <p>
-                          <span className="font-medium text-foreground">SLA:</span>{' '}
-                          {thread.firstResponseDueAt ? formatDateTime(thread.firstResponseDueAt) : 'Handled / no SLA'}
+                          <span className="font-medium text-foreground">{isMyanmar ? 'SLA:' : 'SLA:'}</span>{' '}
+                          {thread.firstResponseDueAt ? formatDateTime(thread.firstResponseDueAt) : (isMyanmar ? 'ဖြေရှင်းပြီး / ကတိချိန် မရှိ' : 'Handled / no SLA')}
                         </p>
                         <p>
-                          <span className="font-medium text-foreground">Context:</span> {linkedContext}
+                          <span className="font-medium text-foreground">{isMyanmar ? 'ဆက်စပ်အကြောင်းအရာ:' : 'Context:'}</span> {linkedContext}
                         </p>
                         <p>
-                          <span className="font-medium text-foreground">Opened:</span>{' '}
+                          <span className="font-medium text-foreground">{isMyanmar ? 'ဖွင့်ခဲ့သည့်အချိန်:' : 'Opened:'}</span>{' '}
                           {formatRelativeTime(thread.createdAt)}
                         </p>
                       </div>

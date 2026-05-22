@@ -66,29 +66,94 @@ import type { ScheduledReportsConfig } from '@/lib/services/scheduled-reports';
 /**
  * Format a date range nicely
  */
-function formatPeriod(start: Date, end: Date): string {
+function formatPeriod(start: Date, end: Date, isMyanmar = false): string {
   const s = new Date(start);
   const e = new Date(end);
-  return `${s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const locale = isMyanmar ? 'my-MM' : 'en-US';
+  return `${s.toLocaleDateString(locale, { month: 'short', day: 'numeric' })} - ${e.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
 
 /**
  * Get available months for report generation (last 12 months)
  */
-function getAvailableMonths(): Array<{ label: string; year: number; month: number }> {
+function getAvailableMonths(isMyanmar = false): Array<{ label: string; year: number; month: number }> {
   const months: Array<{ label: string; year: number; month: number }> = [];
   const now = new Date();
+  const locale = isMyanmar ? 'my-MM' : 'en-US';
 
   for (let i = 0; i < 12; i++) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({
-      label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      label: date.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
       year: date.getFullYear(),
       month: date.getMonth() + 1,
     });
   }
 
   return months;
+}
+
+function getReportStatusLabel(status: string, isMyanmar = false) {
+  switch (status) {
+    case 'READY':
+      return isMyanmar ? 'အသင့်ဖြစ်နေသည်' : 'Ready';
+    case 'GENERATING':
+      return isMyanmar ? 'ဖန်တီးနေသည်' : 'Generating';
+    case 'FAILED':
+      return isMyanmar ? 'မအောင်မြင်ပါ' : 'Failed';
+    default:
+      return status;
+  }
+}
+
+function getRunStatusLabel(status: string, isMyanmar = false) {
+  switch (status) {
+    case 'SUCCESS':
+      return isMyanmar ? 'အောင်မြင်သည်' : 'Success';
+    case 'FAILED':
+      return isMyanmar ? 'မအောင်မြင်ပါ' : 'Failed';
+    case 'PENDING':
+      return isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending';
+    case 'RUNNING':
+      return isMyanmar ? 'လည်ပတ်နေသည်' : 'Running';
+    default:
+      return status;
+  }
+}
+
+function getReportTypeLabel(type: string, isMyanmar = false) {
+  switch (type) {
+    case 'MONTHLY':
+      return isMyanmar ? 'လစဉ်' : 'Monthly';
+    case 'WEEKLY':
+      return isMyanmar ? 'အပတ်စဉ်' : 'Weekly';
+    default:
+      return type;
+  }
+}
+
+function getFrequencyLabel(frequency: string, isMyanmar = false) {
+  switch (frequency) {
+    case 'DAILY':
+      return isMyanmar ? 'နေ့စဉ်' : 'Daily';
+    case 'WEEKLY':
+      return isMyanmar ? 'အပတ်စဉ်' : 'Weekly';
+    default:
+      return frequency;
+  }
+}
+
+function getChannelTypeLabel(type: string, isMyanmar = false) {
+  switch (type) {
+    case 'EMAIL':
+      return isMyanmar ? 'အီးမေးလ်' : 'Email';
+    case 'WEBHOOK':
+      return isMyanmar ? 'ဝဘ်ဟုခ်' : 'Webhook';
+    case 'TELEGRAM':
+      return isMyanmar ? 'တယ်လီဂရမ်' : 'Telegram';
+    default:
+      return type;
+  }
 }
 
 /**
@@ -103,6 +168,8 @@ function ReportDetailDialog({
   onOpenChange: (open: boolean) => void;
   reportId: string | null;
 }) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { data: report, isLoading } = trpc.reports.getById.useQuery(
     { id: reportId! },
     { enabled: !!reportId && open }
@@ -119,10 +186,10 @@ function ReportDetailDialog({
         <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
-            {report?.name || 'Loading...'}
+            {report?.name || (isMyanmar ? 'တင်နေသည်...' : 'Loading...')}
           </DialogTitle>
           <DialogDescription>
-            {report ? formatPeriod(report.periodStart, report.periodEnd) : ''}
+            {report ? formatPeriod(report.periodStart, report.periodEnd, isMyanmar) : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -136,9 +203,11 @@ function ReportDetailDialog({
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Report snapshot</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'အစီရင်ခံစာ အနှစ်ချုပ်' : 'Report snapshot'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Review the key metrics, busiest servers, and export actions for this reporting window.
+                  {isMyanmar
+                    ? 'ဤအစီရင်ခံကာလအတွက် အဓိက ကိန်းဂဏန်းများ၊ အသုံးပြုမှုအများဆုံး ဆာဗာများနှင့် ထုတ်ယူမှု လုပ်ဆောင်ချက်များကို စစ်ဆေးပါ။'
+                    : 'Review the key metrics, busiest servers, and export actions for this reporting window.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -146,7 +215,7 @@ function ReportDetailDialog({
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Server className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Servers</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'ဆာဗာများ' : 'Servers'}</p>
                   </div>
                   <p className="text-xl font-bold">{usageSummary?.totalServers ?? 0}</p>
                 </CardContent>
@@ -155,11 +224,11 @@ function ReportDetailDialog({
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Key className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Total Keys</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'စုစုပေါင်း သော့များ' : 'Total Keys'}</p>
                   </div>
                   <p className="text-xl font-bold">{usageSummary?.totalKeys ?? 0}</p>
                   <p className="text-xs text-muted-foreground">
-                    {usageSummary?.activeKeys ?? 0} active
+                    {isMyanmar ? `${usageSummary?.activeKeys ?? 0} ခု အသက်ဝင်နေသည်` : `${usageSummary?.activeKeys ?? 0} active`}
                   </p>
                 </CardContent>
               </Card>
@@ -167,7 +236,7 @@ function ReportDetailDialog({
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Total Usage</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'စုစုပေါင်း အသုံးပြုမှု' : 'Total Usage'}</p>
                   </div>
                   <p className="text-xl font-bold">
                     {formatBytes(BigInt(usageSummary?.totalBytesUsed ?? 0))}
@@ -178,7 +247,7 @@ function ReportDetailDialog({
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Period Delta</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'ကာလအတွင်း ကွာဟချက်' : 'Period Delta'}</p>
                   </div>
                   <p className="text-xl font-bold">
                     {formatBytes(BigInt(usageSummary?.totalDeltaBytes ?? 0))}
@@ -191,29 +260,31 @@ function ReportDetailDialog({
             {isScheduledSummary ? (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Scheduled summary snapshot</CardTitle>
+                  <CardTitle className="text-sm">{isMyanmar ? 'အချိန်ဇယား အနှစ်ချုပ် အခြေအနေ' : 'Scheduled summary snapshot'}</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-3 md:grid-cols-2">
                   <div className="rounded-xl border px-3 py-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Revenue</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ဝင်ငွေ' : 'Revenue'}</p>
                     <p className="mt-2 text-lg font-semibold">
                       {report.reportData.summary.revenueAmount != null
                         ? `${report.reportData.summary.revenueAmount} ${report.reportData.summary.revenueCurrency ?? 'USD'}`
-                        : 'Not configured'}
+                        : isMyanmar ? 'မသတ်မှတ်ရသေးပါ' : 'Not configured'}
                     </p>
                   </div>
                   <div className="rounded-xl border px-3 py-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Failed logins</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ဝင်ရောက်မှု မအောင်မြင်ခြင်း' : 'Failed logins'}</p>
                     <p className="mt-2 text-lg font-semibold">{report.reportData.summary.failedLogins ?? 0}</p>
                   </div>
                   <div className="rounded-xl border px-3 py-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Expiring soon</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'မကြာမီ သက်တမ်းကုန်မည်' : 'Expiring soon'}</p>
                     <p className="mt-2 text-lg font-semibold">{report.reportData.summary.expiringSoon ?? 0}</p>
                   </div>
                   <div className="rounded-xl border px-3 py-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Server health</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ဆာဗာ ကျန်းမာရေး' : 'Server health'}</p>
                     <p className="mt-2 text-lg font-semibold">
-                      {(report.reportData.summary.serverHealth?.up ?? 0)} up / {(report.reportData.summary.serverHealth?.down ?? 0)} down
+                      {isMyanmar
+                        ? `${report.reportData.summary.serverHealth?.up ?? 0} ခု ကောင်း / ${report.reportData.summary.serverHealth?.down ?? 0} ခု ပျက်`
+                        : `${report.reportData.summary.serverHealth?.up ?? 0} up / ${report.reportData.summary.serverHealth?.down ?? 0} down`}
                     </p>
                   </div>
                 </CardContent>
@@ -224,16 +295,16 @@ function ReportDetailDialog({
             {!isScheduledSummary && report.reportData.topConsumers?.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Top 10 Consumers</CardTitle>
+                  <CardTitle className="text-sm">{isMyanmar ? 'အသုံးပြုမှု အများဆုံး ၁၀ ခု' : 'Top 10 Consumers'}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-8">#</TableHead>
-                        <TableHead>Key Name</TableHead>
-                        <TableHead>Server</TableHead>
-                        <TableHead className="text-right">Usage</TableHead>
+                        <TableHead>{isMyanmar ? 'သော့အမည်' : 'Key Name'}</TableHead>
+                        <TableHead>{isMyanmar ? 'ဆာဗာ' : 'Server'}</TableHead>
+                        <TableHead className="text-right">{isMyanmar ? 'အသုံးပြုမှု' : 'Usage'}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -268,7 +339,9 @@ function ReportDetailDialog({
                       )}
                     </CardTitle>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{server.activeKeys}/{server.totalKeys} keys</Badge>
+                      <Badge variant="secondary">
+                        {server.activeKeys}/{server.totalKeys} {isMyanmar ? 'ခု' : 'keys'}
+                      </Badge>
                       <Badge variant="outline">{formatBytes(BigInt(server.totalUsedBytes))}</Badge>
                     </div>
                   </div>
@@ -283,27 +356,29 @@ function ReportDetailDialog({
                 onClick={() => window.open(withBasePath(`/api/reports/download?id=${reportId}&format=csv`), '_blank')}
               >
                 <Download className="w-4 h-4 mr-2" />
-                Download CSV
+                {isMyanmar ? 'CSV ဖိုင် ထုတ်မည်' : 'Download CSV'}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => window.open(withBasePath(`/api/reports/download?id=${reportId}&format=json`), '_blank')}
               >
                 <FileJson className="w-4 h-4 mr-2" />
-                Download JSON
+                {isMyanmar ? 'JSON ဖိုင် ထုတ်မည်' : 'Download JSON'}
               </Button>
               <Button
                 variant="outline"
                 onClick={() => window.open(withBasePath(`/api/reports/download?id=${reportId}&format=pdf`), '_blank')}
               >
                 <FileDown className="w-4 h-4 mr-2" />
-                Download PDF
+                {isMyanmar ? 'PDF ဖိုင် ထုတ်မည်' : 'Download PDF'}
               </Button>
             </div>
           </DialogBody>
         ) : (
           <DialogBody>
-            <p className="py-8 text-center text-muted-foreground">No report data available.</p>
+            <p className="py-8 text-center text-muted-foreground">
+              {isMyanmar ? 'အစီရင်ခံစာ ဒေတာ မရှိပါ။' : 'No report data available.'}
+            </p>
           </DialogBody>
         )}
       </DialogContent>
@@ -315,7 +390,8 @@ function ReportDetailDialog({
  * Main Reports Page
  */
 export default function ReportsPage() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [page, setPage] = useState(1);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -325,7 +401,7 @@ export default function ReportsPage() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState<ScheduledReportsConfig | null>(null);
 
-  const availableMonths = getAvailableMonths();
+  const availableMonths = getAvailableMonths(isMyanmar);
 
   // Fetch reports
   const { data, isLoading, refetch } = trpc.reports.list.useQuery({
@@ -349,15 +425,17 @@ export default function ReportsPage() {
   const generateMutation = trpc.reports.generate.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Report generated',
-        description: `"${result.name}" has been generated successfully.`,
+        title: isMyanmar ? 'အစီရင်ခံစာ ဖန်တီးပြီးပါပြီ' : 'Report generated',
+        description: isMyanmar
+          ? `"${result.name}" ကို အောင်မြင်စွာ ဖန်တီးပြီးပါပြီ။`
+          : `"${result.name}" has been generated successfully.`,
       });
       setGenerateOpen(false);
       refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Generation failed',
+        title: isMyanmar ? 'ဖန်တီးမှု မအောင်မြင်ပါ' : 'Generation failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -368,14 +446,14 @@ export default function ReportsPage() {
   const deleteMutation = trpc.reports.delete.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Report deleted',
-        description: 'The report has been deleted.',
+        title: isMyanmar ? 'အစီရင်ခံစာကို ဖျက်ပြီးပါပြီ' : 'Report deleted',
+        description: isMyanmar ? 'အစီရင်ခံစာကို ဖယ်ရှားပြီးပါပြီ။' : 'The report has been deleted.',
       });
       refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Delete failed',
+        title: isMyanmar ? 'ဖျက်ခြင်း မအောင်မြင်ပါ' : 'Delete failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -386,14 +464,16 @@ export default function ReportsPage() {
     onSuccess: (result) => {
       setScheduleForm(result);
       toast({
-        title: 'Schedule updated',
-        description: 'Scheduled report delivery settings have been saved.',
+        title: isMyanmar ? 'အချိန်ဇယားကို ပြင်ဆင်ပြီးပါပြီ' : 'Schedule updated',
+        description: isMyanmar
+                    ? 'အချိန်ဇယားသတ်မှတ် အစီရင်ခံစာ ပေးပို့မှု ဆက်တင်များကို သိမ်းပြီးပါပြီ။'
+          : 'Scheduled report delivery settings have been saved.',
       });
       void scheduleQuery.refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Schedule update failed',
+        title: isMyanmar ? 'အချိန်ဇယား ပြင်ဆင်မှု မအောင်မြင်ပါ' : 'Schedule update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -403,10 +483,14 @@ export default function ReportsPage() {
   const runScheduledNowMutation = trpc.reports.runScheduledNow.useMutation({
     onSuccess: (result) => {
       toast({
-        title: result.skipped ? 'Run skipped' : 'Scheduled summary queued',
+        title: result.skipped
+          ? (isMyanmar ? 'လည်ပတ်မှုကို ကျော်ပြီးထားသည်' : 'Run skipped')
+          : (isMyanmar ? 'အချိန်ဇယား အနှစ်ချုပ်ကို စောင့်ဆိုင်းစာရင်းသို့ ထည့်ပြီးပါပြီ' : 'Scheduled summary queued'),
         description: result.skipped
-          ? `Reason: ${result.reason}`
-          : `${result.reportName} has been queued for delivery.`,
+          ? (isMyanmar ? `အကြောင်းရင်း: ${result.reason}` : `Reason: ${result.reason}`)
+          : (isMyanmar
+            ? `${result.reportName} ကို ပေးပို့ရန် queue ထဲ ထည့်ပြီးပါပြီ။`
+            : `${result.reportName} has been queued for delivery.`),
       });
       void refetch();
       void scheduleQuery.refetch();
@@ -414,7 +498,7 @@ export default function ReportsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Run failed',
+        title: isMyanmar ? 'လည်ပတ်မှု မအောင်မြင်ပါ' : 'Run failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -469,30 +553,32 @@ export default function ReportsPage() {
                 {t('nav.reports')}
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Generate exportable usage snapshots, schedule daily or weekly operational summaries, and review delivery history from one reporting surface.
+                {isMyanmar
+                  ? 'ထုတ်ယူနိုင်သော အသုံးပြုမှုအနှစ်ချုပ်များကို ဖန်တီးပါ၊ နေ့စဉ် သို့မဟုတ် အပတ်စဉ် လုပ်ငန်းဆိုင်ရာအနှစ်ချုပ်များကို အချိန်ဇယားသတ်မှတ်ပါ၊ ထို့ပြင် ပေးပို့မှုမှတ်တမ်းကို တစ်နေရာတည်းမှ စစ်ဆေးပါ။'
+                  : 'Generate exportable usage snapshots, schedule daily or weekly operational summaries, and review delivery history from one reporting surface.'}
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:max-w-4xl">
               <div className="ops-support-card">
-                <p className="text-sm font-semibold">Total reports</p>
+                <p className="text-sm font-semibold">{isMyanmar ? 'စုစုပေါင်း အစီရင်ခံစာများ' : 'Total reports'}</p>
                 <p className="mt-2 text-2xl font-semibold">{data?.total ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Stored report runs ready for export.</p>
+                <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'ထုတ်ယူရန် အသင့်ဖြစ်နေသော အစီရင်ခံစာ မှတ်တမ်းများ။' : 'Stored report runs ready for export.'}</p>
               </div>
               <div className="ops-support-card">
-                <p className="text-sm font-semibold">Latest period usage</p>
+                <p className="text-sm font-semibold">{isMyanmar ? 'နောက်ဆုံးကာလ အသုံးပြုမှု' : 'Latest period usage'}</p>
                 <p className="mt-2 text-2xl font-semibold">
                   {data?.reports[0] ? formatBytes(BigInt(data.reports[0].totalDeltaBytes)) : '0 B'}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">Most recent generated period delta.</p>
+                <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ဖန်တီးထားသော ကာလအလိုက် ကွာဟချက်။' : 'Most recent generated period delta.'}</p>
               </div>
               <div className="ops-support-card">
-                <p className="text-sm font-semibold">Last summary run</p>
+                <p className="text-sm font-semibold">{isMyanmar ? 'နောက်ဆုံး အနှစ်ချုပ် လည်ပတ်မှု' : 'Last summary run'}</p>
                 <p className="mt-2 text-sm font-semibold">
-                  {scheduleForm?.lastRunAt ? formatDateTime(scheduleForm.lastRunAt) : 'Never'}
+                  {scheduleForm?.lastRunAt ? formatDateTime(scheduleForm.lastRunAt) : isMyanmar ? 'မလုပ်ရသေးပါ' : 'Never'}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {scheduleForm?.lastRunStatus ?? 'No scheduled run recorded yet.'}
+                  {scheduleForm?.lastRunStatus ? getRunStatusLabel(scheduleForm.lastRunStatus, isMyanmar) : (isMyanmar ? 'အချိန်ဇယား လည်ပတ်မှု မှတ်တမ်း မရှိသေးပါ။' : 'No scheduled run recorded yet.')}
                 </p>
               </div>
             </div>
@@ -501,15 +587,17 @@ export default function ReportsPage() {
           <div className="ops-detail-rail">
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Report actions</p>
-                <h2 className="text-xl font-semibold">Generate and deliver</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'အစီရင်ခံစာ လုပ်ဆောင်ချက်များ' : 'Report actions'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'ဖန်တီးပြီး ပေးပို့မည်' : 'Generate and deliver'}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Create on-demand reports or hand scheduled summaries off to channels without leaving this page.
+                  {isMyanmar
+                    ? 'ဤစာမျက်နှာမှ မထွက်ဘဲ လိုအပ်သလို အစီရင်ခံစာများ ဖန်တီးနိုင်ပြီး အချိန်ဇယားသတ်မှတ်ထားသော အနှစ်ချုပ်များကို ပေးပို့မည့် လမ်းကြောင်းများသို့ တိုက်ရိုက် ပို့နိုင်သည်။'
+                    : 'Create on-demand reports or hand scheduled summaries off to channels without leaving this page.'}
                 </p>
               </div>
               <Button className="h-12 w-full rounded-full" onClick={() => setGenerateOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Generate Report
+                {isMyanmar ? 'အစီရင်ခံစာ ဖန်တီးမည်' : 'Generate Report'}
               </Button>
               <Button
                 variant="outline"
@@ -518,27 +606,27 @@ export default function ReportsPage() {
                 disabled={runScheduledNowMutation.isPending}
               >
                 <Send className="mr-2 h-4 w-4" />
-                Run scheduled summary
+                {isMyanmar ? 'အချိန်ဇယား အနှစ်ချုပ်ကို ယခုပင် လည်ပတ်မည်' : 'Run scheduled summary'}
               </Button>
             </div>
 
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Delivery pulse</p>
-                <h2 className="text-xl font-semibold">Schedule state</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'ပေးပို့မှု အခြေအနေ' : 'Delivery pulse'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'အချိန်ဇယား အခြေအနေ' : 'Schedule state'}</h2>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <div className="ops-row-card">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Enabled</p>
-                  <p className="mt-2 text-xl font-semibold">{scheduleForm?.enabled ? 'Active' : 'Paused'}</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဖွင့်ထားမှု' : 'Enabled'}</p>
+                  <p className="mt-2 text-xl font-semibold">{scheduleForm?.enabled ? (isMyanmar ? 'လည်ပတ်နေသည်' : 'Active') : isMyanmar ? 'ရပ်ထားသည်' : 'Paused'}</p>
                 </div>
                 <div className="ops-row-card">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Configured channels</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'သတ်မှတ်ထားသော လမ်းကြောင်းများ' : 'Configured channels'}</p>
                   <p className="mt-2 text-xl font-semibold">{scheduleForm?.channelIds.length ?? 0}</p>
                 </div>
                 <div className="ops-row-card">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Frequency</p>
-                  <p className="mt-2 text-xl font-semibold">{scheduleForm?.frequency ?? 'DAILY'}</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ကြိမ်နှုန်း' : 'Frequency'}</p>
+                  <p className="mt-2 text-xl font-semibold">{getFrequencyLabel(scheduleForm?.frequency ?? 'DAILY', isMyanmar)}</p>
                 </div>
               </div>
             </div>
@@ -551,10 +639,12 @@ export default function ReportsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock3 className="w-5 h-5 text-primary" />
-              Scheduled Reports
+              {isMyanmar ? 'အချိန်ဇယားသတ်မှတ် အစီရင်ခံစာများ' : 'Scheduled Reports'}
             </CardTitle>
             <CardDescription>
-              Deliver daily or weekly report summaries to email or webhook channels without generating them manually.
+              {isMyanmar
+                ? 'နေ့စဉ် သို့မဟုတ် အပတ်စဉ် အစီရင်ခံစာ အနှစ်ချုပ်များကို အီးမေးလ် သို့မဟုတ် ဝဘ်ဟုခ် လမ်းကြောင်းများသို့ လက်ဖြင့် မဖန်တီးဘဲ ပေးပို့ပါ။'
+                : 'Deliver daily or weekly report summaries to email or webhook channels without generating them manually.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -562,9 +652,9 @@ export default function ReportsPage() {
               <div className="ops-detail-card space-y-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <Label className="text-base">Enable automatic summaries</Label>
+                    <Label className="text-base">{isMyanmar ? 'အလိုအလျောက် အနှစ်ချုပ်များ ဖွင့်မည်' : 'Enable automatic summaries'}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Queue a summary report on the schedule below.
+                    {isMyanmar ? 'အောက်ပါ အချိန်ဇယားအတိုင်း အနှစ်ချုပ် အစီရင်ခံစာကို စောင့်ဆိုင်းစာရင်းသို့ ထည့်မည်။' : 'Queue a summary report on the schedule below.'}
                     </p>
                   </div>
                   <Switch
@@ -575,7 +665,7 @@ export default function ReportsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Frequency</Label>
+                    <Label>{isMyanmar ? 'ကြိမ်နှုန်း' : 'Frequency'}</Label>
                     <Select
                       value={scheduleForm.frequency}
                       onValueChange={(value) => updateScheduleField('frequency', value as ScheduledReportsConfig['frequency'])}
@@ -584,14 +674,14 @@ export default function ReportsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="DAILY">Daily</SelectItem>
-                        <SelectItem value="WEEKLY">Weekly</SelectItem>
+                        <SelectItem value="DAILY">{isMyanmar ? 'နေ့စဉ်' : 'Daily'}</SelectItem>
+                        <SelectItem value="WEEKLY">{isMyanmar ? 'အပတ်စဉ်' : 'Weekly'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Lookback window (days)</Label>
+                    <Label>{isMyanmar ? 'နောက်ကြည့်မည့် အချိန်အပိုင်း (ရက်)' : 'Lookback window (days)'}</Label>
                     <Input
                       type="number"
                       min={1}
@@ -602,7 +692,7 @@ export default function ReportsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Hour</Label>
+                    <Label>{isMyanmar ? 'နာရီ' : 'Hour'}</Label>
                     <Input
                       type="number"
                       min={0}
@@ -613,7 +703,7 @@ export default function ReportsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Minute</Label>
+                    <Label>{isMyanmar ? 'မိနစ်' : 'Minute'}</Label>
                     <Input
                       type="number"
                       min={0}
@@ -626,7 +716,7 @@ export default function ReportsPage() {
 
                 {scheduleForm.frequency === 'WEEKLY' ? (
                   <div className="space-y-2">
-                    <Label>Weekday</Label>
+                    <Label>{isMyanmar ? 'အပတ်၏ နေ့ရက်' : 'Weekday'}</Label>
                     <Select
                       value={String(scheduleForm.weekday)}
                       onValueChange={(value) => updateScheduleField('weekday', Number(value))}
@@ -635,13 +725,13 @@ export default function ReportsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="0">Sunday</SelectItem>
-                        <SelectItem value="1">Monday</SelectItem>
-                        <SelectItem value="2">Tuesday</SelectItem>
-                        <SelectItem value="3">Wednesday</SelectItem>
-                        <SelectItem value="4">Thursday</SelectItem>
-                        <SelectItem value="5">Friday</SelectItem>
-                        <SelectItem value="6">Saturday</SelectItem>
+                        <SelectItem value="0">{isMyanmar ? 'တနင်္ဂနွေ' : 'Sunday'}</SelectItem>
+                        <SelectItem value="1">{isMyanmar ? 'တနင်္လာ' : 'Monday'}</SelectItem>
+                        <SelectItem value="2">{isMyanmar ? 'အင်္ဂါ' : 'Tuesday'}</SelectItem>
+                        <SelectItem value="3">{isMyanmar ? 'ဗုဒ္ဓဟူး' : 'Wednesday'}</SelectItem>
+                        <SelectItem value="4">{isMyanmar ? 'ကြာသပတေး' : 'Thursday'}</SelectItem>
+                        <SelectItem value="5">{isMyanmar ? 'သောကြာ' : 'Friday'}</SelectItem>
+                        <SelectItem value="6">{isMyanmar ? 'စနေ' : 'Saturday'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -650,15 +740,15 @@ export default function ReportsPage() {
 
               <div className="ops-detail-card space-y-4">
                 <div>
-                  <Label className="text-base">Delivery channels</Label>
+                <Label className="text-base">{isMyanmar ? 'ပေးပို့မည့် လမ်းကြောင်းများ' : 'Delivery channels'}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Choose where scheduled summaries should be sent.
+                    {isMyanmar ? 'အချိန်ဇယား အနှစ်ချုပ်များကို ဘယ်နေရာသို့ ပေးပို့မည်ကို ရွေးပါ။' : 'Choose where scheduled summaries should be sent.'}
                   </p>
                 </div>
                 <div className="space-y-2">
                   {availableChannels.length === 0 ? (
                     <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      Create an email or webhook channel in Notifications before enabling scheduled delivery.
+                      {isMyanmar ? 'အချိန်ဇယားပေးပို့မှု မဖွင့်မီ အသိပေးချက်များ စာမျက်နှာတွင် အီးမေးလ် သို့မဟုတ် ဝဘ်ဟုခ် လမ်းကြောင်း တစ်ခု ဖန်တီးပါ။' : 'Create an email or webhook channel in Notifications before enabling scheduled delivery.'}
                     </p>
                   ) : (
                     availableChannels.map((channel) => (
@@ -668,7 +758,7 @@ export default function ReportsPage() {
                       >
                         <div>
                           <p className="font-medium">{channel.name}</p>
-                          <p className="text-xs text-muted-foreground">{channel.type}</p>
+                      <p className="text-xs text-muted-foreground">{getChannelTypeLabel(channel.type, isMyanmar)}</p>
                         </div>
                         <input
                           type="checkbox"
@@ -682,12 +772,12 @@ export default function ReportsPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Revenue amount (optional)</Label>
+                    <Label>{isMyanmar ? 'ဝင်ငွေ ပမာဏ (မဖြစ်မနေ မဟုတ်)' : 'Revenue amount (optional)'}</Label>
                     <Input
                       type="number"
                       min={0}
                       value={scheduleForm.revenueAmount ?? ''}
-                      placeholder="Leave blank if billing is not tracked"
+                      placeholder={isMyanmar ? 'ငွေတောင်းခံမှုကို မမှတ်တမ်းတင်ထားပါက အလွတ်ထားပါ' : 'Leave blank if billing is not tracked'}
                       onChange={(event) =>
                         updateScheduleField(
                           'revenueAmount',
@@ -697,7 +787,7 @@ export default function ReportsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Currency</Label>
+                    <Label>{isMyanmar ? 'ငွေကြေးယူနစ်' : 'Currency'}</Label>
                     <Input
                       value={scheduleForm.revenueCurrency}
                       onChange={(event) => updateScheduleField('revenueCurrency', event.target.value.toUpperCase().slice(0, 8) || 'USD')}
@@ -706,27 +796,31 @@ export default function ReportsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Subject template</Label>
+                  <Label>{isMyanmar ? 'ခေါင်းစဉ် ပုံစံ' : 'Subject template'}</Label>
                   <Input
                     value={scheduleForm.subjectTemplate}
                     onChange={(event) => updateScheduleField('subjectTemplate', event.target.value)}
                     placeholder="Atomic-UI {{frequency_label}} Summary"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Available placeholders: {'{{frequency_label}}'}, {'{{generated_at}}'}, {'{{period_start}}'}, {'{{period_end}}'}.
+                    {isMyanmar
+                      ? `အသုံးပြုနိုင်သော နေရာဖြည့်အမှတ်များ - {{frequency_label}}, {{generated_at}}, {{period_start}}, {{period_end}}`
+                      : 'Available placeholders: {{frequency_label}}, {{generated_at}}, {{period_start}}, {{period_end}}.'}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Body template</Label>
+                  <Label>{isMyanmar ? 'စာကိုယ် ပုံစံ' : 'Body template'}</Label>
                   <Textarea
                     value={scheduleForm.bodyTemplate}
                     onChange={(event) => updateScheduleField('bodyTemplate', event.target.value)}
                     className="min-h-[180px]"
-                    placeholder="Use placeholders like {{usage_line}} and {{server_health_line}}."
+                    placeholder={isMyanmar ? '{{usage_line}} နှင့် {{server_health_line}} ကဲ့သို့ နေရာဖြည့်အမှတ်များကို အသုံးပြုပါ။' : 'Use placeholders like {{usage_line}} and {{server_health_line}}.'}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Line placeholders: {'{{revenue_line}}'}, {'{{usage_line}}'}, {'{{expirations_line}}'}, {'{{failed_logins_line}}'}, {'{{server_health_line}}'}.
+                    {isMyanmar
+                      ? `လိုင်း နေရာဖြည့်အမှတ်များ - {{revenue_line}}, {{usage_line}}, {{expirations_line}}, {{failed_logins_line}}, {{server_health_line}}`
+                      : 'Line placeholders: {{revenue_line}}, {{usage_line}}, {{expirations_line}}, {{failed_logins_line}}, {{server_health_line}}.'}
                   </p>
                 </div>
               </div>
@@ -734,31 +828,31 @@ export default function ReportsPage() {
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <label className="ops-row-card flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">Revenue</span>
+                <span className="text-sm font-medium">{isMyanmar ? 'ဝင်ငွေ' : 'Revenue'}</span>
                 <Switch checked={scheduleForm.includeRevenue} onCheckedChange={(checked) => updateScheduleField('includeRevenue', checked)} />
               </label>
               <label className="ops-row-card flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">Usage</span>
+                <span className="text-sm font-medium">{isMyanmar ? 'အသုံးပြုမှု' : 'Usage'}</span>
                 <Switch checked={scheduleForm.includeUsage} onCheckedChange={(checked) => updateScheduleField('includeUsage', checked)} />
               </label>
               <label className="ops-row-card flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">Expirations</span>
+                <span className="text-sm font-medium">{isMyanmar ? 'သက်တမ်းကုန်မှု' : 'Expirations'}</span>
                 <Switch checked={scheduleForm.includeExpirations} onCheckedChange={(checked) => updateScheduleField('includeExpirations', checked)} />
               </label>
               <label className="ops-row-card flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">Failed logins</span>
+                <span className="text-sm font-medium">{isMyanmar ? 'ဝင်ရောက်မှု မအောင်မြင်ခြင်း' : 'Failed logins'}</span>
                 <Switch checked={scheduleForm.includeFailedLogins} onCheckedChange={(checked) => updateScheduleField('includeFailedLogins', checked)} />
               </label>
               <label className="ops-row-card flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">Server health</span>
+                <span className="text-sm font-medium">{isMyanmar ? 'ဆာဗာ ကျန်းမာရေး' : 'Server health'}</span>
                 <Switch checked={scheduleForm.includeServerHealth} onCheckedChange={(checked) => updateScheduleField('includeServerHealth', checked)} />
               </label>
             </div>
 
             <div className="ops-detail-card flex flex-col gap-3 border-dashed sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-muted-foreground">
-                <p>Last run: {scheduleForm.lastRunAt ? formatDateTime(scheduleForm.lastRunAt) : 'Never'}</p>
-                <p>Status: {scheduleForm.lastRunStatus}</p>
+                <p>{isMyanmar ? 'နောက်ဆုံး လည်ပတ်ချိန်:' : 'Last run:'} {scheduleForm.lastRunAt ? formatDateTime(scheduleForm.lastRunAt) : isMyanmar ? 'မလုပ်ရသေးပါ' : 'Never'}</p>
+                <p>{isMyanmar ? 'လည်ပတ်မှု အခြေအနေ:' : 'Status:'} {getRunStatusLabel(scheduleForm.lastRunStatus, isMyanmar)}</p>
                 {scheduleForm.lastRunSummary ? <p>{scheduleForm.lastRunSummary}</p> : null}
               </div>
               <div className="flex flex-wrap gap-2">
@@ -768,14 +862,14 @@ export default function ReportsPage() {
                   disabled={runScheduledNowMutation.isPending}
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  Run now
+                  {isMyanmar ? 'ယခုပင် လည်ပတ်မည်' : 'Run now'}
                 </Button>
                 <Button
                   onClick={() => saveScheduleMutation.mutate(scheduleForm)}
                   disabled={saveScheduleMutation.isPending}
                 >
                   {saveScheduleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Save schedule
+                  {isMyanmar ? 'အချိန်ဇယားကို သိမ်းမည်' : 'Save schedule'}
                 </Button>
               </div>
             </div>
@@ -787,10 +881,10 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Send className="w-5 h-5 text-primary" />
-            Scheduled Run History
+            {isMyanmar ? 'အချိန်ဇယား လည်ပတ်မှု မှတ်တမ်း' : 'Scheduled Run History'}
           </CardTitle>
           <CardDescription>
-            Recent daily or weekly summary runs with per-channel delivery status.
+            {isMyanmar ? 'နေ့စဉ် သို့မဟုတ် အပတ်စဉ် အနှစ်ချုပ် လည်ပတ်မှုများ၏ လမ်းကြောင်းအလိုက် ပေးပို့မှု အခြေအနေ။' : 'Recent daily or weekly summary runs with per-channel delivery status.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -805,7 +899,9 @@ export default function ReportsPage() {
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{run.frequency}</Badge>
+                        <Badge variant="outline">
+                          {getFrequencyLabel(run.frequency, isMyanmar)}
+                        </Badge>
                         <Badge
                           variant={
                             run.status === 'SUCCESS'
@@ -815,16 +911,16 @@ export default function ReportsPage() {
                                 : 'secondary'
                           }
                         >
-                          {run.status}
+                          {getRunStatusLabel(run.status, isMyanmar)}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           {formatDateTime(run.createdAt)}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {formatPeriod(run.periodStart, run.periodEnd)}
+                        {formatPeriod(run.periodStart, run.periodEnd, isMyanmar)}
                       </p>
-                      <p className="text-sm">{run.summaryMessage || 'No summary message stored.'}</p>
+                    <p className="text-sm">{run.summaryMessage || (isMyanmar ? 'အနှစ်ချုပ် စာကို မသိမ်းထားပါ။' : 'No summary message stored.')}</p>
                       {run.error ? <p className="text-sm text-destructive">{run.error}</p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -851,7 +947,7 @@ export default function ReportsPage() {
                   <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {run.deliveries.length === 0 ? (
                       <div className="ops-row-card border-dashed text-sm text-muted-foreground">
-                        No channel deliveries were recorded for this run.
+                        {isMyanmar ? 'ဤလည်ပတ်မှုအတွက် လမ်းကြောင်း ပေးပို့မှု မှတ်တမ်း မရှိပါ။' : 'No channel deliveries were recorded for this run.'}
                       </div>
                     ) : (
                       run.deliveries.map((delivery) => (
@@ -859,7 +955,7 @@ export default function ReportsPage() {
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="font-medium">{delivery.channelName}</p>
-                              <p className="text-xs text-muted-foreground">{delivery.channelType}</p>
+                              <p className="text-xs text-muted-foreground">{getChannelTypeLabel(delivery.channelType, isMyanmar)}</p>
                             </div>
                             <Badge
                               variant={
@@ -870,7 +966,7 @@ export default function ReportsPage() {
                                     : 'secondary'
                               }
                             >
-                              {delivery.status}
+                              {getRunStatusLabel(delivery.status, isMyanmar)}
                             </Badge>
                           </div>
                           {delivery.lastError ? (
@@ -890,7 +986,7 @@ export default function ReportsPage() {
             </div>
           ) : (
             <div className="ops-support-card border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-              No scheduled report runs recorded yet.
+              {isMyanmar ? 'အချိန်ဇယား လည်ပတ်မှု မှတ်တမ်း မရှိသေးပါ။' : 'No scheduled report runs recorded yet.'}
             </div>
           )}
         </CardContent>
@@ -900,10 +996,10 @@ export default function ReportsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            Generated Reports
+            {isMyanmar ? 'ဖန်တီးထားသော အစီရင်ခံစာများ' : 'Generated Reports'}
           </CardTitle>
           <CardDescription>
-            View, download, or delete your usage reports.
+            {isMyanmar ? 'အသုံးပြုမှု အစီရင်ခံစာများကို ကြည့်ရှု၊ ထုတ်ယူ သို့မဟုတ် ဖျက်နိုင်သည်။' : 'View, download, or delete your usage reports.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -920,7 +1016,7 @@ export default function ReportsPage() {
                       <div className="space-y-1">
                         <p className="font-medium">{report.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatPeriod(report.periodStart, report.periodEnd)}
+                          {formatPeriod(report.periodStart, report.periodEnd, isMyanmar)}
                         </p>
                       </div>
                       <Badge
@@ -933,20 +1029,20 @@ export default function ReportsPage() {
                         }
                         className="text-xs"
                       >
-                        {report.status === 'READY' ? 'READY' : report.status}
+                        {getReportStatusLabel(report.status, isMyanmar)}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Type</p>
-                        <p className="mt-1 text-sm font-medium">{report.type}</p>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အမျိုးအစား' : 'Type'}</p>
+                        <p className="mt-1 text-sm font-medium">{getReportTypeLabel(report.type, isMyanmar)}</p>
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Keys</p>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'သော့များ' : 'Keys'}</p>
                         <p className="mt-1 text-sm font-medium">{report.totalKeys}</p>
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Usage</p>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အသုံးပြုမှု' : 'Usage'}</p>
                         <p className="mt-1 text-sm font-medium">{formatBytes(BigInt(report.totalBytesUsed))}</p>
                       </div>
                     </div>
@@ -960,7 +1056,7 @@ export default function ReportsPage() {
                         disabled={report.status !== 'READY'}
                       >
                         <Eye className="mr-2 h-4 w-4" />
-                        View
+                        {isMyanmar ? 'ကြည့်မည်' : 'View'}
                       </Button>
                       <Button
                         variant="outline"
@@ -982,14 +1078,14 @@ export default function ReportsPage() {
                         variant="outline"
                         className="text-destructive"
                         onClick={() => {
-                          if (confirm('Delete this report?')) {
+                          if (confirm(isMyanmar ? 'ဤအစီရင်ခံစာကို ဖျက်လိုပါသလား။' : 'Delete this report?')) {
                             deleteMutation.mutate({ id: report.id });
                           }
                         }}
                         disabled={deleteMutation.isPending}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
+                        {isMyanmar ? 'ဖျက်မည်' : 'Delete'}
                       </Button>
                     </div>
                   </div>
@@ -1000,14 +1096,14 @@ export default function ReportsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Report Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Period</TableHead>
-                      <TableHead className="text-center">Servers</TableHead>
-                      <TableHead className="text-center">Keys</TableHead>
-                      <TableHead className="text-right">Total Usage</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{isMyanmar ? 'အစီရင်ခံစာ အမည်' : 'Report Name'}</TableHead>
+                      <TableHead>{isMyanmar ? 'အမျိုးအစား' : 'Type'}</TableHead>
+                      <TableHead>{isMyanmar ? 'ကာလ' : 'Period'}</TableHead>
+                      <TableHead className="text-center">{isMyanmar ? 'ဆာဗာများ' : 'Servers'}</TableHead>
+                      <TableHead className="text-center">{isMyanmar ? 'သော့များ' : 'Keys'}</TableHead>
+                      <TableHead className="text-right">{isMyanmar ? 'စုစုပေါင်း အသုံးပြုမှု' : 'Total Usage'}</TableHead>
+                      <TableHead>{isMyanmar ? 'အခြေအနေ' : 'Status'}</TableHead>
+                      <TableHead className="text-right">{isMyanmar ? 'လုပ်ဆောင်ချက်များ' : 'Actions'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1018,11 +1114,11 @@ export default function ReportsPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
-                            {report.type}
+                            {getReportTypeLabel(report.type, isMyanmar)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {formatPeriod(report.periodStart, report.periodEnd)}
+                          {formatPeriod(report.periodStart, report.periodEnd, isMyanmar)}
                         </TableCell>
                         <TableCell className="text-center">{report.totalServers}</TableCell>
                         <TableCell className="text-center">{report.totalKeys}</TableCell>
@@ -1040,7 +1136,9 @@ export default function ReportsPage() {
                             }
                             className="text-xs"
                           >
-                            {report.status === 'READY' ? '✓ Ready' : report.status}
+                            {report.status === 'READY'
+                              ? (isMyanmar ? '✓ အသင့်ဖြစ်နေသည်' : '✓ Ready')
+                              : getReportStatusLabel(report.status, isMyanmar)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -1087,7 +1185,7 @@ export default function ReportsPage() {
                               size="sm"
                               className="text-destructive hover:text-destructive"
                               onClick={() => {
-                                if (confirm('Delete this report?')) {
+                                if (confirm(isMyanmar ? 'ဤအစီရင်ခံစာကို ဖျက်လိုပါသလား။' : 'Delete this report?')) {
                                   deleteMutation.mutate({ id: report.id });
                                 }
                               }}
@@ -1107,7 +1205,9 @@ export default function ReportsPage() {
               {data.totalPages > 1 && (
                 <div className="ops-table-toolbar mt-4 rounded-none border-x-0 border-b-0 px-0 pt-4">
                   <p className="text-sm text-muted-foreground">
-                    Page {data.page} of {data.totalPages} ({data.total} reports)
+                    {isMyanmar
+                      ? `စာမျက်နှာ ${data.page} / ${data.totalPages} (${data.total} အစီရင်ခံစာ)`
+                      : `Page ${data.page} of ${data.totalPages} (${data.total} reports)`}
                   </p>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1133,13 +1233,15 @@ export default function ReportsPage() {
           ) : (
             <div className="text-center py-16 text-muted-foreground">
               <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
-              <h3 className="text-lg font-medium mb-2">No reports yet</h3>
+              <h3 className="text-lg font-medium mb-2">{isMyanmar ? 'အစီရင်ခံစာ မရှိသေးပါ' : 'No reports yet'}</h3>
               <p className="text-sm mb-6">
-                Generate your first usage report to see traffic data across all servers and keys.
+                {isMyanmar
+                  ? 'ဆာဗာနှင့် သော့အားလုံး၏ လမ်းကြောင်းဒေတာကို ကြည့်ရန် ပထမဆုံး အသုံးပြုမှု အစီရင်ခံစာကို ဖန်တီးပါ။'
+                  : 'Generate your first usage report to see traffic data across all servers and keys.'}
               </p>
               <Button onClick={() => setGenerateOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Generate Report
+                {isMyanmar ? 'အစီရင်ခံစာ ဖန်တီးမည်' : 'Generate Report'}
               </Button>
             </div>
           )}
@@ -1152,25 +1254,29 @@ export default function ReportsPage() {
           <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-primary" />
-              Generate Usage Report
+              {isMyanmar ? 'အသုံးပြုမှု အစီရင်ခံစာ ဖန်တီးမည်' : 'Generate Usage Report'}
             </DialogTitle>
             <DialogDescription>
-              Create a new report with aggregated traffic data for all servers and keys.
+              {isMyanmar
+                ? 'ဆာဗာနှင့် သော့အားလုံး၏ စုစည်းထားသော traffic ဒေတာဖြင့် အစီရင်ခံစာအသစ်ကို ဖန်တီးပါ။'
+                : 'Create a new report with aggregated traffic data for all servers and keys.'}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Report window</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'အစီရင်ခံကာလ' : 'Report window'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Choose whether to generate a full monthly summary or a rolling weekly snapshot.
+                  {isMyanmar
+                    ? 'လစဉ် အပြည့်အစုံ summary သို့မဟုတ် လှည့်ပတ်သော အပတ်စဉ် snapshot ကို ဖန်တီးမည်ကို ရွေးပါ။'
+                    : 'Choose whether to generate a full monthly summary or a rolling weekly snapshot.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Report type</Label>
+                  <Label>{isMyanmar ? 'အစီရင်ခံစာ အမျိုးအစား' : 'Report type'}</Label>
                   <Select
                     value={reportType}
                     onValueChange={(v) => setReportType(v as 'MONTHLY' | 'WEEKLY')}
@@ -1179,15 +1285,15 @@ export default function ReportsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="MONTHLY">Monthly report</SelectItem>
-                      <SelectItem value="WEEKLY">Weekly report (last 7 days)</SelectItem>
+                      <SelectItem value="MONTHLY">{isMyanmar ? 'လစဉ် အစီရင်ခံစာ' : 'Monthly report'}</SelectItem>
+                      <SelectItem value="WEEKLY">{isMyanmar ? 'အပတ်စဉ် အစီရင်ခံစာ (နောက်ဆုံး ၇ ရက်)' : 'Weekly report (last 7 days)'}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 {reportType === 'MONTHLY' && (
                   <div className="space-y-2">
-                    <Label>Select month</Label>
+                    <Label>{isMyanmar ? 'လကို ရွေးပါ' : 'Select month'}</Label>
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                       <SelectTrigger>
                         <SelectValue />
@@ -1201,14 +1307,14 @@ export default function ReportsPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Generates a report covering the entire selected month.
+                      {isMyanmar ? 'ရွေးထားသော လအပြည့်ကို ဖုံးလွှမ်းသည့် အစီရင်ခံစာကို ဖန်တီးမည်။' : 'Generates a report covering the entire selected month.'}
                     </p>
                   </div>
                 )}
 
                 {reportType === 'WEEKLY' && (
                   <div className="ops-modal-note">
-                    This generates a report for the last 7 days, including today.
+                    {isMyanmar ? 'ယနေ့အပါအဝင် နောက်ဆုံး ၇ ရက်အတွက် အစီရင်ခံစာကို ဖန်တီးမည်။' : 'This generates a report for the last 7 days, including today.'}
                   </div>
                 )}
               </div>
@@ -1217,7 +1323,7 @@ export default function ReportsPage() {
 
           <DialogFooter className="ops-modal-sticky-footer">
             <Button variant="outline" onClick={() => setGenerateOpen(false)}>
-              Cancel
+              {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
             </Button>
             <Button
               onClick={handleGenerate}
@@ -1226,7 +1332,7 @@ export default function ReportsPage() {
               {generateMutation.isPending && (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               )}
-              Generate Report
+              {isMyanmar ? 'အစီရင်ခံစာ ဖန်တီးမည်' : 'Generate Report'}
             </Button>
           </DialogFooter>
         </DialogContent>

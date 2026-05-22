@@ -121,7 +121,8 @@ function getReasonBadgeClass(reason: string): string {
 
 export default function ArchivedKeysPage() {
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const [page, setPage] = useState(1);
   const [reason, setReason] = useState<ArchiveReason>('ALL');
   const [search, setSearch] = useState('');
@@ -329,7 +330,7 @@ export default function ArchivedKeysPage() {
               className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
             >
               <Archive className="mr-2 h-3.5 w-3.5" />
-              Archive vault
+              {isMyanmar ? 'သိမ်းဆည်းမှတ်တမ်း ဗဟို' : 'Archive vault'}
             </Badge>
 
             <div className="space-y-3">
@@ -345,7 +346,11 @@ export default function ArchivedKeysPage() {
               <div className="ops-kpi-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.stats.total')}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.total || 0}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Archived keys retained before permanent purge.</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {isMyanmar
+                    ? 'အပြီးဖျက်မည့်အချိန် မတိုင်မီ သိမ်းဆည်းထားသော မှတ်တမ်းသိမ်း သော့များ။'
+                    : 'Archived keys retained before permanent purge.'}
+                </p>
               </div>
               <div className="ops-kpi-tile">
                 <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-400">
@@ -353,7 +358,11 @@ export default function ArchivedKeysPage() {
                   {t('archived.stats.expired')}
                 </p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.expired || 0}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Keys archived because their term ended.</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {isMyanmar
+                    ? 'သက်တမ်းကုန်သွားသောကြောင့် သိမ်းဆည်းမှတ်တမ်းထဲသို့ ရွှေ့ထားသည့် သော့များ။'
+                    : 'Keys archived because their term ended.'}
+                </p>
               </div>
               <div className="ops-kpi-tile">
                 <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-red-400">
@@ -361,7 +370,7 @@ export default function ArchivedKeysPage() {
                   {t('archived.stats.depleted')}
                 </p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.depleted || 0}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Quota-depleted keys stored for investigation.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{isMyanmar ? 'စုံစမ်းစစ်ဆေးရန် ဒေတာပမာဏ ပြည့်သွားသော သော့များကို သိမ်းဆည်းထားသည်။' : 'Quota-depleted keys stored for investigation.'}</p>
               </div>
               <div className="ops-kpi-tile">
                 <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
@@ -369,12 +378,12 @@ export default function ArchivedKeysPage() {
                   {t('archived.stats.deleted')}
                 </p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight">{stats?.deleted || 0}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Keys removed manually and kept for audit history.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{isMyanmar ? 'လက်ဖြင့် ဖယ်ရှားထားပြီး စစ်ဆေးမှတ်တမ်းအတွက် သိမ်းထားသော သော့များ။' : 'Keys removed manually and kept for audit history.'}</p>
               </div>
               <div className="ops-kpi-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('archived.stats.total_usage')}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight">{formatBytes(Number(stats?.totalUsedBytes || 0))}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Total traffic retained across archived inventory.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{isMyanmar ? 'သိမ်းဆည်းထားသော inventory တစ်ခုလုံး၏ စုစုပေါင်း traffic။' : 'Total traffic retained across archived inventory.'}</p>
               </div>
             </div>
           </div>
@@ -382,10 +391,12 @@ export default function ArchivedKeysPage() {
           <div className="ops-detail-rail">
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Archive actions</p>
-                <h2 className="text-xl font-semibold">Command rail</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'သိမ်းဆည်းမှတ်တမ်း လုပ်ဆောင်ချက်များ' : 'Archive actions'}</p>
+                <h2 className="text-xl font-semibold">{t('dashboard.command_rail')}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Export the archive for reporting or permanently purge selected records when retention is no longer required.
+                  {isMyanmar
+                    ? 'သိမ်းဆည်းမှတ်တမ်း စာရင်းကို အစီရင်ခံရန် ထုတ်ယူပါ၊ သို့မဟုတ် ထိန်းသိမ်းရန် မလိုအပ်တော့သည့်အခါ ရွေးထားသော မှတ်တမ်းများကို အပြီးဖျက်ပါ။'
+                    : 'Export the archive for reporting or permanently purge selected records when retention is no longer required.'}
                 </p>
               </div>
 
@@ -401,21 +412,23 @@ export default function ArchivedKeysPage() {
 
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Retention note</p>
-                <h2 className="text-xl font-semibold">Auto-purge window</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'ထိန်းသိမ်းမှု မှတ်ချက်' : 'Retention note'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'အလိုအလျောက် ဖျက်မည့်ကာလ' : 'Auto-purge window'}</h2>
               </div>
               <div className="ops-detail-card space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Archived keys remain available for audit, export, and forensic review until their configured delete-after date is reached.
+                  {isMyanmar
+                    ? 'သိမ်းဆည်းမှတ်တမ်း သော့များသည် သတ်မှတ်ထားသော ဖျက်သိမ်းရက် မရောက်မချင်း စစ်ဆေးမှု၊ ထုတ်ယူမှု နှင့် အထောက်အထားစစ်ဆေးမှုများအတွက် ဆက်လက် အသုံးပြုနိုင်သည်။'
+                    : 'Archived keys remain available for audit, export, and forensic review until their configured delete-after date is reached.'}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Bulk actions</p>
-                    <p className="mt-2 text-sm font-medium">{selectedIds.length} currently selected</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အစုလိုက် လုပ်ဆောင်ချက်များ' : 'Bulk actions'}</p>
+                    <p className="mt-2 text-sm font-medium">{isMyanmar ? `ယခု ${selectedIds.length} ခု ရွေးထားသည်` : `${selectedIds.length} currently selected`}</p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Scope</p>
-                    <p className="mt-2 text-sm font-medium">{reason === 'ALL' ? 'All archive reasons' : reason.toLowerCase()}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အကျုံးဝင်မှု' : 'Scope'}</p>
+                    <p className="mt-2 text-sm font-medium">{reason === 'ALL' ? (isMyanmar ? 'သိမ်းဆည်းမှတ်တမ်း အကြောင်းပြချက် အားလုံး' : 'All archive reasons') : reason.toLowerCase()}</p>
                   </div>
                 </div>
               </div>
@@ -427,7 +440,7 @@ export default function ArchivedKeysPage() {
       <div className="ops-panel space-y-4">
         <div className="ops-filter-bar grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-end">
           <div className="space-y-2">
-            <Label htmlFor="archived-search">Search</Label>
+            <Label htmlFor="archived-search">{isMyanmar ? 'ရှာဖွေမည်' : 'Search'}</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -466,14 +479,22 @@ export default function ArchivedKeysPage() {
           </div>
 
           <div className="ops-table-meta">
-            {data ? `${data.total} archived keys` : 'Archive inventory'}
+            {data
+              ? isMyanmar
+                ? `သိမ်းဆည်းထားသော သော့ ${data.total} ခု`
+                : `${data.total} archived keys`
+              : isMyanmar
+                ? 'သိမ်းဆည်းမှတ်တမ်း စာရင်း'
+                : 'Archive inventory'}
           </div>
         </div>
 
         {selectedIds.length > 0 ? (
           <div className="ops-mobile-action-bar lg:grid-cols-[minmax(0,1fr)_auto]">
             <div className="text-sm text-muted-foreground">
-              {selectedIds.length} selected for permanent deletion.
+              {isMyanmar
+                ? `အပြီးဖျက်ရန် ${selectedIds.length} ခု ရွေးထားသည်။`
+                : `${selectedIds.length} selected for permanent deletion.`}
             </div>
             <Button variant="destructive" onClick={handleBulkDelete} className="rounded-full">
               <Trash2 className="mr-2 h-4 w-4" />
@@ -516,7 +537,7 @@ export default function ArchivedKeysPage() {
                     <TableCell colSpan={8} className="p-6">
                       <EmptyState
                         icon={Archive}
-                        title="Archive is empty"
+                        title={isMyanmar ? 'သိမ်းဆည်းမှတ်တမ်းတွင် မရှိသေးပါ' : 'Archive is empty'}
                         description={t('archived.empty')}
                         className="min-h-[220px]"
                       />
@@ -569,7 +590,7 @@ export default function ArchivedKeysPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDeleteClick(key.id)}
-                          title="Permanently delete"
+                          title={isMyanmar ? 'အပြီးဖျက်မည်' : 'Permanently delete'}
                           className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -641,7 +662,9 @@ export default function ArchivedKeysPage() {
         {data && data.totalPages > 1 ? (
           <div className="ops-mobile-action-bar lg:grid-cols-[minmax(0,1fr)_auto]">
             <div className="text-sm text-muted-foreground">
-              Page {data.page} of {data.totalPages} ({data.total} total)
+              {isMyanmar
+                ? `စာမျက်နှာ ${data.page} / ${data.totalPages} (စုစုပေါင်း ${data.total} ခု)`
+                : `Page ${data.page} of ${data.totalPages} (${data.total} total)`}
             </div>
             <div className="flex items-center gap-2 justify-end">
               <Button

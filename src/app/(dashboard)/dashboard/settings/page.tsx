@@ -106,20 +106,20 @@ const AUDIT_ALERT_RULE_MAX_MATCH_WINDOW_MINUTES = 24 * 60;
 const AUDIT_ALERT_RULE_MAX_MIN_MATCHES = 50;
 const ACTIVE_RESTORE_JOB_STATUSES = new Set<RestoreJobStatus>(['SCHEDULED', 'STOPPING_SERVICE', 'RESTORING', 'STARTING_SERVICE']);
 
-function formatRestoreJobStatus(status: RestoreJobStatus) {
+function formatRestoreJobStatus(status: RestoreJobStatus, isMyanmar: boolean) {
   switch (status) {
     case 'SCHEDULED':
-      return 'Scheduled';
+      return isMyanmar ? 'အစီအစဉ်သတ်မှတ်ပြီး' : 'Scheduled';
     case 'STOPPING_SERVICE':
-      return 'Stopping service';
+      return isMyanmar ? 'ဝန်ဆောင်မှု ရပ်နေသည်' : 'Stopping service';
     case 'RESTORING':
-      return 'Restoring backup';
+      return isMyanmar ? 'အရန်ဖိုင် ပြန်လည်ရယူနေသည်' : 'Restoring backup';
     case 'STARTING_SERVICE':
-      return 'Starting service';
+      return isMyanmar ? 'ဝန်ဆောင်မှု ပြန်စနေသည်' : 'Starting service';
     case 'SUCCEEDED':
-      return 'Succeeded';
+      return isMyanmar ? 'အောင်မြင်ပါသည်' : 'Succeeded';
     case 'FAILED':
-      return 'Failed';
+      return isMyanmar ? 'မအောင်မြင်ပါ' : 'Failed';
     default:
       return status;
   }
@@ -294,7 +294,8 @@ function SettingsShortcutGrid({
 export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const [openSection, setOpenSection] = useState<SectionId>(null);
   const utils = trpc.useUtils();
   const isBackupSectionOpen = openSection === 'backup';
@@ -474,8 +475,8 @@ export default function SettingsPage() {
       toast({
         title: t('settings.backup.create_success'),
         description: result.verification.restoreReady
-          ? 'Backup created and verified successfully.'
-          : result.verification.error ?? 'Backup created, but verification failed.',
+          ? (isMyanmar ? 'အရန်သိမ်းကို ဖန်တီးပြီး ပြန်လည်တင်နိုင်ကြောင်း အတည်ပြုပြီးပါပြီ။' : 'Backup created and verified successfully.')
+          : result.verification.error ?? (isMyanmar ? 'အရန်သိမ်းကို ဖန်တီးပြီးပါပြီ၊ သို့သော် အတည်ပြုစစ်ဆေးမှု မအောင်မြင်ပါ။' : 'Backup created, but verification failed.'),
         variant: result.verification.restoreReady ? 'default' : 'destructive',
       });
       await Promise.all([
@@ -484,7 +485,7 @@ export default function SettingsPage() {
       ]);
     },
     onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: isMyanmar ? 'အမှား' : 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -497,10 +498,12 @@ export default function SettingsPage() {
   const verifyBackupMutation = trpc.backup.verify.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: result.restoreReady ? 'Backup verification passed' : 'Backup verification failed',
+        title: result.restoreReady
+          ? (isMyanmar ? 'အရန်သိမ်း အတည်ပြုစစ်ဆေးမှု အောင်မြင်ပါသည်' : 'Backup verification passed')
+          : (isMyanmar ? 'အရန်သိမ်း အတည်ပြုစစ်ဆေးမှု မအောင်မြင်ပါ' : 'Backup verification failed'),
         description: result.restoreReady
-          ? `${result.filename} is ready to restore.`
-          : result.error ?? 'Backup verification failed.',
+          ? (isMyanmar ? `${result.filename} ကို ပြန်လည်တင်ရန် အသင့်ဖြစ်ပါသည်။` : `${result.filename} is ready to restore.`)
+          : result.error ?? (isMyanmar ? 'အရန်သိမ်း အတည်ပြုစစ်ဆေးမှု မအောင်မြင်ပါ။' : 'Backup verification failed.'),
         variant: result.restoreReady ? 'default' : 'destructive',
       });
       await Promise.all([
@@ -510,7 +513,7 @@ export default function SettingsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Backup verification failed',
+        title: isMyanmar ? 'အရန်သိမ်း အတည်ပြုစစ်ဆေးမှု မအောင်မြင်ပါ' : 'Backup verification failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -519,8 +522,10 @@ export default function SettingsPage() {
   const restoreBackupMutation = trpc.backup.restore.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: 'Restore scheduled',
-        description: `Atomic-UI will restart in a few seconds while restoring ${result.filename}. Safety backup: ${result.safetyBackupFilename}. You may need to sign in again after it finishes.`,
+        title: isMyanmar ? 'Restore ကို စီစဉ်ထားပြီး' : 'Restore scheduled',
+        description: isMyanmar
+          ? `${result.filename} ကို restore လုပ်နေစဉ် Atomic-UI သည် စက္ကန့်အနည်းငယ်အတွင်း ပြန်လည်စတင်မည်။ Safety backup: ${result.safetyBackupFilename}။ ပြီးဆုံးပြီးနောက် ပြန်လည်ဝင်ရောက်ရန် လိုနိုင်သည်။`
+          : `Atomic-UI will restart in a few seconds while restoring ${result.filename}. Safety backup: ${result.safetyBackupFilename}. You may need to sign in again after it finishes.`,
       });
       await Promise.all([
         refetchBackups(),
@@ -529,7 +534,7 @@ export default function SettingsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Restore failed to start',
+        title: isMyanmar ? 'Restore ကို စတင်မရပါ' : 'Restore failed to start',
         description: error.message,
         variant: 'destructive',
       });
@@ -538,17 +543,17 @@ export default function SettingsPage() {
   const updateAuditRetentionMutation = trpc.audit.updateRetention.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: 'Audit retention updated',
+        title: isMyanmar ? 'Audit retention ကို အပ်ဒိတ်လုပ်ပြီး' : 'Audit retention updated',
         description: result.cleanupEnabled
-          ? `Audit logs older than ${result.retentionDays} days will be cleaned up automatically.`
-          : 'Automatic audit log cleanup is disabled.',
+          ? (isMyanmar ? `${result.retentionDays} ရက်ထက်ဟောင်းသော audit log များကို အလိုအလျောက် ရှင်းလင်းမည်။` : `Audit logs older than ${result.retentionDays} days will be cleaned up automatically.`)
+          : (isMyanmar ? 'Audit log အလိုအလျောက် ရှင်းလင်းခြင်းကို ပိတ်ထားသည်။' : 'Automatic audit log cleanup is disabled.'),
       });
       await utils.audit.retentionStatus.invalidate();
       await utils.audit.list.invalidate();
     },
     onError: (error) => {
       toast({
-        title: 'Failed to update retention',
+        title: isMyanmar ? 'Retention ကို အပ်ဒိတ်မလုပ်နိုင်ပါ' : 'Failed to update retention',
         description: error.message,
         variant: 'destructive',
       });
@@ -557,10 +562,10 @@ export default function SettingsPage() {
   const cleanupAuditLogsMutation = trpc.audit.cleanupOld.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: 'Audit cleanup complete',
+        title: isMyanmar ? 'Audit cleanup ပြီးဆုံးပါပြီ' : 'Audit cleanup complete',
         description: result.cleanupEnabled
-          ? `Removed ${result.deletedCount} audit entries older than ${result.retentionDays} days.`
-          : 'Automatic cleanup is disabled, so no audit entries were removed.',
+          ? (isMyanmar ? `${result.retentionDays} ရက်ထက်ဟောင်းသော audit entry ${result.deletedCount} ခုကို ဖယ်ရှားပြီးပါပြီ။` : `Removed ${result.deletedCount} audit entries older than ${result.retentionDays} days.`)
+          : (isMyanmar ? 'အလိုအလျောက် cleanup ကို ပိတ်ထားသောကြောင့် audit entry များကို မဖယ်ရှားပါ။' : 'Automatic cleanup is disabled, so no audit entries were removed.'),
       });
       await Promise.all([
         utils.audit.retentionStatus.invalidate(),
@@ -569,7 +574,7 @@ export default function SettingsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Audit cleanup failed',
+        title: isMyanmar ? 'Audit cleanup မအောင်မြင်ပါ' : 'Audit cleanup failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -578,8 +583,12 @@ export default function SettingsPage() {
   const upsertAuditAlertRuleMutation = trpc.audit.upsertAlertRule.useMutation({
     onSuccess: async (rule) => {
       toast({
-        title: auditRuleForm.id ? 'Audit rule updated' : 'Audit rule created',
-        description: `Rule "${rule.name}" is now ${rule.isActive ? 'active' : 'disabled'}.`,
+        title: auditRuleForm.id
+          ? (isMyanmar ? 'Audit rule ကို အပ်ဒိတ်လုပ်ပြီး' : 'Audit rule updated')
+          : (isMyanmar ? 'Audit rule အသစ် ဖန်တီးပြီး' : 'Audit rule created'),
+        description: isMyanmar
+          ? `Rule "${rule.name}" သည် ယခု ${rule.isActive ? 'အသုံးပြုနေ' : 'ပိတ်ထား'} ပါသည်။`
+          : `Rule "${rule.name}" is now ${rule.isActive ? 'active' : 'disabled'}.`,
       });
       setAuditRuleDialogOpen(false);
       setAuditRuleForm(buildAuditAlertRuleForm());
@@ -590,7 +599,7 @@ export default function SettingsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to save audit rule',
+        title: isMyanmar ? 'Audit rule ကို မသိမ်းနိုင်ပါ' : 'Failed to save audit rule',
         description: error.message,
         variant: 'destructive',
       });
@@ -599,7 +608,7 @@ export default function SettingsPage() {
   const deleteAuditAlertRuleMutation = trpc.audit.deleteAlertRule.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Audit rule deleted',
+        title: isMyanmar ? 'Audit rule ကို ဖျက်ပြီး' : 'Audit rule deleted',
       });
       await Promise.all([
         utils.audit.listAlertRules.invalidate(),
@@ -608,7 +617,7 @@ export default function SettingsPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to delete audit rule',
+        title: isMyanmar ? 'Audit rule ကို မဖျက်နိုင်ပါ' : 'Failed to delete audit rule',
         description: error.message,
         variant: 'destructive',
       });
@@ -617,13 +626,15 @@ export default function SettingsPage() {
   const testAuditAlertRuleMutation = trpc.audit.testAlertRule.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Audit alert test sent',
-        description: `Delivered ${result.delivered} alert(s) across ${result.recipients} recipient target(s).`,
+        title: isMyanmar ? 'စစ်ဆေးမှု သတိပေးချက် စမ်းသပ်ချက် ပို့ပြီး' : 'Audit alert test sent',
+        description: isMyanmar
+          ? `လက်ခံသူပစ်မှတ် ${result.recipients} ခုအတွင်း သတိပေးချက် ${result.delivered} ခု ပို့ပြီးပါပြီ။`
+          : `Delivered ${result.delivered} alert(s) across ${result.recipients} recipient target(s).`,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Audit alert test failed',
+        title: isMyanmar ? 'စစ်ဆေးမှု သတိပေးချက် စမ်းသပ်ချက် မအောင်မြင်ပါ' : 'Audit alert test failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -662,7 +673,7 @@ export default function SettingsPage() {
         throw new Error(
           typeof payload?.error === 'string' && payload.error.trim().length > 0
             ? payload.error
-            : 'Backup upload failed.',
+            : isMyanmar ? 'အရန်သိမ်းဖိုင်တင်ခြင်း မအောင်မြင်ပါ။' : 'Backup upload failed.',
         );
       }
 
@@ -670,8 +681,8 @@ export default function SettingsPage() {
         title: t('settings.backup.upload_success'),
         description:
           payload?.verification?.restoreReady
-            ? `${payload.filename} is ready to restore from the backup list.`
-            : payload?.verification?.error || `${payload.filename} uploaded, but verification failed.`,
+            ? (isMyanmar ? `${payload.filename} ကို အရန်သိမ်းစာရင်းမှ ပြန်လည်တင်ရန် အသင့်ဖြစ်ပါသည်။` : `${payload.filename} is ready to restore from the backup list.`)
+            : payload?.verification?.error || (isMyanmar ? `${payload.filename} ကို တင်ပြီးသော်လည်း အတည်ပြုစစ်ဆေးမှု မအောင်မြင်ပါ။` : `${payload.filename} uploaded, but verification failed.`),
         variant: payload?.verification?.restoreReady ? 'default' : 'destructive',
       });
       await Promise.all([
@@ -680,8 +691,8 @@ export default function SettingsPage() {
       ]);
     } catch (error) {
       toast({
-        title: 'Backup upload failed',
-        description: error instanceof Error ? error.message : 'Backup upload failed.',
+        title: isMyanmar ? 'အရန်သိမ်းဖိုင်တင်ခြင်း မအောင်မြင်ပါ' : 'Backup upload failed',
+        description: error instanceof Error ? error.message : isMyanmar ? 'အရန်သိမ်းဖိုင်တင်ခြင်း မအောင်မြင်ပါ။' : 'Backup upload failed.',
         variant: 'destructive',
       });
     } finally {
@@ -690,7 +701,11 @@ export default function SettingsPage() {
   };
 
   const handleRestoreBackup = (filename: string) => {
-    if (!confirm('This will overwrite current data, restart Atomic-UI, and may sign you out if the restored backup contains older sessions. A fresh safety backup will be created first. Continue?')) {
+    if (!confirm(
+      isMyanmar
+        ? 'လက်ရှိဒေတာကို အစားထိုးရေးသားမည်၊ Atomic-UI ကို ပြန်လည်စတင်မည်၊ restore လုပ်မည့် backup ထဲတွင် session ဟောင်းများပါပါက သင့်ကို sign out လုပ်နိုင်သည်။ အရင် safety backup အသစ် ဖန်တီးမည်။ ဆက်လုပ်မလား?'
+        : 'This will overwrite current data, restart Atomic-UI, and may sign you out if the restored backup contains older sessions. A fresh safety backup will be created first. Continue?',
+    )) {
       return;
     }
 
@@ -698,7 +713,7 @@ export default function SettingsPage() {
   };
 
   const handleDeleteBackup = (filename: string) => {
-    if (confirm('Are you sure you want to delete this backup?')) {
+    if (confirm(isMyanmar ? 'ဤ backup ကို ဖျက်လိုသည်မှာ သေချာပါသလား?' : 'Are you sure you want to delete this backup?')) {
       deleteBackupMutation.mutate({ filename });
     }
   };
@@ -1528,7 +1543,7 @@ export default function SettingsPage() {
                       disabled={verifyBackupMutation.isPending}
                     >
                       <RefreshCw className="w-4 h-4 mr-2" />
-                      Refresh
+                      {isMyanmar ? 'ပြန်လည်ရယူမည်' : 'Refresh'}
                     </Button>
                   </div>
 
@@ -1554,8 +1569,12 @@ export default function SettingsPage() {
                                 }
                               >
                                 {verification.restoreReady && verification.status === 'SUCCESS'
-                                  ? 'Restore ready'
-                                  : 'Failed'}
+                                  ? isMyanmar
+                                    ? 'ပြန်ယူရန် အသင့်ဖြစ်နေသည်'
+                                    : 'Restore ready'
+                                  : isMyanmar
+                                    ? 'မအောင်မြင်ပါ'
+                                    : 'Failed'}
                               </Badge>
                               <Badge variant="outline">
                                 {verification.triggeredBy || 'manual'}
@@ -1587,14 +1606,14 @@ export default function SettingsPage() {
                             ) : (
                               <TestTube className="w-4 h-4 mr-2" />
                             )}
-                            Verify Again
+                            {isMyanmar ? 'ထပ်စစ်မည်' : 'Verify Again'}
                           </Button>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                      No backup verification history yet.
+                      {isMyanmar ? 'အရန်သိမ်း အတည်ပြု မှတ်တမ်း မရှိသေးပါ။' : 'No backup verification history yet.'}
                     </div>
                   )}
                 </div>
@@ -1602,13 +1621,15 @@ export default function SettingsPage() {
                 <div className="rounded-lg border p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-semibold">Restore Job Status</h3>
+                      <h3 className="text-sm font-semibold">{isMyanmar ? 'ပြန်ယူမှု အလုပ် အခြေအနေ' : 'Restore Job Status'}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Dashboard restores run as a detached host job and restart the app when complete.
+                        {isMyanmar
+                          ? 'Dashboard မှ ပြန်ယူမှုများသည် သီးခြား host job အဖြစ် လည်ပတ်ပြီး ပြီးဆုံးသည့်အခါ app ကို ပြန်လည်စတင်မည်။'
+                          : 'Dashboard restores run as a detached host job and restart the app when complete.'}
                       </p>
                     </div>
                     {activeRestoreJob ? (
-                      <Badge variant="warning">Restore in progress</Badge>
+                      <Badge variant="warning">{isMyanmar ? 'ပြန်ယူနေသည်' : 'Restore in progress'}</Badge>
                     ) : null}
                   </div>
 
@@ -1629,12 +1650,12 @@ export default function SettingsPage() {
                               </p>
                             </div>
                             <Badge variant={getRestoreJobBadgeVariant(job.status as RestoreJobStatus)}>
-                              {formatRestoreJobStatus(job.status as RestoreJobStatus)}
+                              {formatRestoreJobStatus(job.status as RestoreJobStatus, isMyanmar)}
                             </Badge>
                           </div>
                           {job.safetyBackupFilename ? (
                             <p className="mt-2 text-xs text-muted-foreground">
-                              Safety backup: <span className="font-mono">{job.safetyBackupFilename}</span>
+                              {isMyanmar ? 'အရန်ကာကွယ်မှု:' : 'Safety backup:'} <span className="font-mono">{job.safetyBackupFilename}</span>
                             </p>
                           ) : null}
                           {job.error ? (
@@ -1645,7 +1666,7 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                      No restore jobs yet.
+                      {isMyanmar ? 'ပြန်ယူမှု အလုပ် မရှိသေးပါ။' : 'No restore jobs yet.'}
                     </div>
                   )}
                 </div>
@@ -1810,15 +1831,15 @@ export default function SettingsPage() {
                             </Badge>
                           </div>
                           <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                            <p>Actions: {rule.actions.length > 0 ? rule.actions.join(', ') : 'Any action'}</p>
-                            <p>Entities: {rule.entities.length > 0 ? rule.entities.join(', ') : 'Any entity'}</p>
-                            <p>Actors: {rule.actorIds.length > 0 ? rule.actorIds.join(', ') : 'Any actor'}</p>
-                            <p>Keywords: {rule.keywords.length > 0 ? rule.keywords.join(', ') : 'No keyword filter'}</p>
-                            <p>Burst window: {rule.matchWindowMinutes} minutes</p>
-                            <p>Minimum matches: {rule.minMatches}</p>
+                            <p>{isMyanmar ? 'လုပ်ဆောင်ချက်များ:' : 'Actions:'} {rule.actions.length > 0 ? rule.actions.join(', ') : isMyanmar ? 'မည်သည့်လုပ်ဆောင်ချက်မဆို' : 'Any action'}</p>
+                            <p>{isMyanmar ? 'Entity များ:' : 'Entities:'} {rule.entities.length > 0 ? rule.entities.join(', ') : isMyanmar ? 'မည်သည့် entity မဆို' : 'Any entity'}</p>
+                            <p>{isMyanmar ? 'လုပ်ဆောင်သူများ:' : 'Actors:'} {rule.actorIds.length > 0 ? rule.actorIds.join(', ') : isMyanmar ? 'မည်သည့်လုပ်ဆောင်သူမဆို' : 'Any actor'}</p>
+                            <p>{isMyanmar ? 'စကားလုံးများ:' : 'Keywords:'} {rule.keywords.length > 0 ? rule.keywords.join(', ') : isMyanmar ? 'စကားလုံး စစ်ထုတ်မှု မရှိပါ' : 'No keyword filter'}</p>
+                            <p>{isMyanmar ? 'Burst အချိန်ပြတင်း:' : 'Burst window:'} {rule.matchWindowMinutes} {isMyanmar ? 'မိနစ်' : 'minutes'}</p>
+                            <p>{isMyanmar ? 'အနည်းဆုံး ကိုက်ညီရမည့်အရေအတွက်:' : 'Minimum matches:'} {rule.minMatches}</p>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Updated {new Date(rule.updatedAt).toLocaleString()}
+                            {isMyanmar ? 'နောက်ဆုံး ပြင်ဆင်ချိန်' : 'Updated'} {new Date(rule.updatedAt).toLocaleString()}
                           </p>
                         </div>
 
@@ -1834,11 +1855,11 @@ export default function SettingsPage() {
                             ) : (
                               <TestTube className="w-4 h-4 mr-2" />
                             )}
-                            Test
+                            {isMyanmar ? 'စမ်းမည်' : 'Test'}
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => openEditAuditRuleDialog(rule)}>
                             <Pencil className="w-4 h-4 mr-2" />
-                            Edit
+                            {isMyanmar ? 'ပြင်မည်' : 'Edit'}
                           </Button>
                           <Button
                             variant="outline"
@@ -1865,7 +1886,9 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                  No audit alert rules yet. Create a rule for high-risk actions like `BACKUP_RESTORE`, `USER_DELETE`, or `SERVER_DELETE`.
+                  {isMyanmar
+                    ? 'Audit alert rule မရှိသေးပါ။ `BACKUP_RESTORE`၊ `USER_DELETE` သို့မဟုတ် `SERVER_DELETE` ကဲ့သို့သော အန္တရာယ်မြင့် လုပ်ဆောင်ချက်များအတွက် rule တစ်ခု ဖန်တီးပါ။'
+                    : 'No audit alert rules yet. Create a rule for high-risk actions like `BACKUP_RESTORE`, `USER_DELETE`, or `SERVER_DELETE`.'}
                 </div>
               )}
             </div>
@@ -1874,7 +1897,7 @@ export default function SettingsPage() {
               <Button variant="outline" size="sm" asChild>
                 <Link href="/dashboard/audit">
                   <ExternalLink className="w-4 h-4 mr-2" />
-                  Open Full Audit Log
+                  {isMyanmar ? 'Audit log အပြည့်အစုံ ဖွင့်မည်' : 'Open Full Audit Log'}
                 </Link>
               </Button>
             </div>
@@ -1882,7 +1905,7 @@ export default function SettingsPage() {
             <div className="space-y-3 md:hidden">
               {auditLogs?.items.length === 0 ? (
                 <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
-                  No audit entries yet.
+                  {isMyanmar ? 'Audit မှတ်တမ်း မရှိသေးပါ။' : 'No audit entries yet.'}
                 </div>
               ) : (
                 auditLogs?.items.map((log) => (
@@ -1896,11 +1919,11 @@ export default function SettingsPage() {
                     </p>
                     <div className="grid gap-2 text-xs sm:grid-cols-2">
                       <div>
-                        <p className="text-muted-foreground">Actor</p>
-                        <p className="break-all">{log.userEmail || log.userId || 'System'}</p>
+                        <p className="text-muted-foreground">{isMyanmar ? 'လုပ်ဆောင်သူ' : 'Actor'}</p>
+                        <p className="break-all">{log.userEmail || log.userId || (isMyanmar ? 'စနစ်' : 'System')}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Target</p>
+                        <p className="text-muted-foreground">{isMyanmar ? 'ဦးတည်ရာ' : 'Target'}</p>
                         <p className="break-all font-mono">{log.entityId || '-'}</p>
                       </div>
                     </div>
@@ -1911,16 +1934,16 @@ export default function SettingsPage() {
 
             <div className="hidden overflow-hidden rounded-lg border md:block">
               <div className="grid grid-cols-12 gap-2 p-3 bg-muted/50 text-xs font-medium text-muted-foreground">
-                <div className="col-span-3">Time</div>
-                <div className="col-span-3">Action</div>
+                <div className="col-span-3">{isMyanmar ? 'အချိန်' : 'Time'}</div>
+                <div className="col-span-3">{isMyanmar ? 'လုပ်ဆောင်ချက်' : 'Action'}</div>
                 <div className="col-span-2">Entity</div>
-                <div className="col-span-2">Actor</div>
-                <div className="col-span-2">Target</div>
+                <div className="col-span-2">{isMyanmar ? 'လုပ်ဆောင်သူ' : 'Actor'}</div>
+                <div className="col-span-2">{isMyanmar ? 'ဦးတည်ရာ' : 'Target'}</div>
               </div>
               <div className="max-h-[260px] overflow-y-auto">
                 {auditLogs?.items.length === 0 ? (
                   <div className="p-6 text-center text-sm text-muted-foreground">
-                    No audit entries yet.
+                    {isMyanmar ? 'Audit မှတ်တမ်း မရှိသေးပါ။' : 'No audit entries yet.'}
                   </div>
                 ) : (
                   auditLogs?.items.map((log) => (
@@ -1935,7 +1958,7 @@ export default function SettingsPage() {
                         {log.entity}
                       </div>
                       <div className="col-span-2 text-xs text-muted-foreground break-all">
-                        {log.userEmail || log.userId || 'System'}
+                        {log.userEmail || log.userId || (isMyanmar ? 'စနစ်' : 'System')}
                       </div>
                       <div className="col-span-2 text-xs font-mono text-muted-foreground break-all">
                         {log.entityId || '-'}
@@ -1953,28 +1976,40 @@ export default function SettingsPage() {
         <Dialog open={auditRuleDialogOpen} onOpenChange={setAuditRuleDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>{auditRuleForm.id ? 'Edit Audit Alert Rule' : 'Create Audit Alert Rule'}</DialogTitle>
+              <DialogTitle>
+                {auditRuleForm.id
+                  ? isMyanmar
+                    ? 'စစ်ဆေးမှု သတိပေး စည်းမျဉ်းကို ပြင်မည်'
+                    : 'Edit Audit Alert Rule'
+                  : isMyanmar
+                    ? 'စစ်ဆေးမှု သတိပေး စည်းမျဉ်း ဖန်တီးမည်'
+                    : 'Create Audit Alert Rule'}
+              </DialogTitle>
               <DialogDescription>
-                Match new audit entries by action, entity, actor, or keywords and send notifications to configured admin recipients.
+                {isMyanmar
+                  ? 'လုပ်ဆောင်ချက်၊ entity၊ actor သို့မဟုတ် keyword များအလိုက် audit entries အသစ်များကို ကိုက်ညီစေပြီး သတ်မှတ်ထားသော admin လက်ခံသူများထံ အသိပေးချက် ပို့ပါ။'
+                  : 'Match new audit entries by action, entity, actor, or keywords and send notifications to configured admin recipients.'}
               </DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-4 py-2">
               <div className="space-y-2">
-                <Label htmlFor="auditRuleName">Rule Name</Label>
+                <Label htmlFor="auditRuleName">{isMyanmar ? 'စည်းမျဉ်း အမည်' : 'Rule Name'}</Label>
                 <Input
                   id="auditRuleName"
                   value={auditRuleForm.name}
                   onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Restore operations"
+                  placeholder={isMyanmar ? 'ဥပမာ - restore လုပ်ဆောင်ချက်များ' : 'Restore operations'}
                 />
               </div>
 
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Rule Enabled</p>
+                  <p className="text-sm font-medium">{isMyanmar ? 'စည်းမျဉ်း ဖွင့်ထားသည်' : 'Rule Enabled'}</p>
                   <p className="text-xs text-muted-foreground">
-                    Disabled rules stay saved but do not trigger notifications.
+                    {isMyanmar
+                      ? 'ပိတ်ထားသော စည်းမျဉ်းများကို သိမ်းထားမည်ဖြစ်သော်လည်း အသိပေးချက် မပို့ပါ။'
+                      : 'Disabled rules stay saved but do not trigger notifications.'}
                   </p>
                 </div>
                 <Switch
@@ -1985,42 +2020,48 @@ export default function SettingsPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="auditRuleActions">Actions</Label>
+                  <Label htmlFor="auditRuleActions">{isMyanmar ? 'လုပ်ဆောင်ချက်များ' : 'Actions'}</Label>
                   <Input
                     id="auditRuleActions"
                     value={auditRuleForm.actions}
                     onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, actions: e.target.value }))}
                     placeholder="USER_DELETE, BACKUP_RESTORE"
                   />
-                  <p className="text-xs text-muted-foreground">Comma-separated. Leave blank to match any action.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isMyanmar ? 'ကော်မာဖြင့် ခွဲရေးပါ။ မည်သည့်လုပ်ဆောင်ချက်နှင့်မဆို ကိုက်ညီစေရန် ဗလာထားနိုင်သည်။' : 'Comma-separated. Leave blank to match any action.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="auditRuleEntities">Entities</Label>
+                  <Label htmlFor="auditRuleEntities">{isMyanmar ? 'Entities' : 'Entities'}</Label>
                   <Input
                     id="auditRuleEntities"
                     value={auditRuleForm.entities}
                     onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, entities: e.target.value }))}
                     placeholder="USER, BACKUP, SERVER"
                   />
-                  <p className="text-xs text-muted-foreground">Comma-separated. Leave blank to match any entity.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isMyanmar ? 'ကော်မာဖြင့် ခွဲရေးပါ။ မည်သည့် entity နှင့်မဆို ကိုက်ညီစေရန် ဗလာထားနိုင်သည်။' : 'Comma-separated. Leave blank to match any entity.'}
+                  </p>
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="auditRuleActors">Actor User IDs</Label>
+                  <Label htmlFor="auditRuleActors">{isMyanmar ? 'Actor User ID များ' : 'Actor User IDs'}</Label>
                   <Input
                     id="auditRuleActors"
                     value={auditRuleForm.actorIds}
                     onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, actorIds: e.target.value }))}
                     placeholder="clx..., cly..."
                   />
-                  <p className="text-xs text-muted-foreground">Optional. Limit alerts to specific actor IDs.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isMyanmar ? 'မဖြစ်မနေ မဟုတ်ပါ။ သတ်မှတ်ထားသော actor ID များကိုသာ အသိပေးရန် သုံးနိုင်သည်။' : 'Optional. Limit alerts to specific actor IDs.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="auditRuleThrottle">Throttle (minutes)</Label>
+                  <Label htmlFor="auditRuleThrottle">{isMyanmar ? 'Throttle (မိနစ်)' : 'Throttle (minutes)'}</Label>
                   <Input
                     id="auditRuleThrottle"
                     type="number"
@@ -2029,11 +2070,13 @@ export default function SettingsPage() {
                     value={auditRuleForm.throttleMinutes}
                     onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, throttleMinutes: e.target.value }))}
                   />
-                  <p className="text-xs text-muted-foreground">Set to `0` to alert every time the threshold is reached.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isMyanmar ? '`0` သတ်မှတ်ပါက သတ်မှတ်ချက်ရောက်တိုင်း အသိပေးမည်။' : 'Set to `0` to alert every time the threshold is reached.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="auditRuleMatchWindow">Burst Window (minutes)</Label>
+                  <Label htmlFor="auditRuleMatchWindow">{isMyanmar ? 'ဆက်တိုက်ဖြစ်မှု အချိန်ကာလ (မိနစ်)' : 'Burst Window (minutes)'}</Label>
                   <Input
                     id="auditRuleMatchWindow"
                     type="number"
@@ -2043,14 +2086,14 @@ export default function SettingsPage() {
                     onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, matchWindowMinutes: e.target.value }))}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Matching audit entries inside this rolling window count toward the threshold.
+                    {isMyanmar ? 'ဤရွေ့လျားအချိန်ကာလအတွင်း ကိုက်ညီသော audit entries များကို သတ်မှတ်ချက်အတွက် ရေတွက်မည်။' : 'Matching audit entries inside this rolling window count toward the threshold.'}
                   </p>
                 </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="auditRuleMinMatches">Minimum Matches</Label>
+                  <Label htmlFor="auditRuleMinMatches">{isMyanmar ? 'အနည်းဆုံး ကိုက်ညီမှုအရေအတွက်' : 'Minimum Matches'}</Label>
                   <Input
                     id="auditRuleMinMatches"
                     type="number"
@@ -2060,7 +2103,7 @@ export default function SettingsPage() {
                     onChange={(e) => setAuditRuleForm((prev) => ({ ...prev, minMatches: e.target.value }))}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Set to `1` for immediate alerts, or higher for burst and threshold rules.
+                    {isMyanmar ? 'ချက်ချင်း အသိပေးရန် `1` သတ်မှတ်ပြီး ဆက်တိုက်ဖြစ်မှု သို့မဟုတ် သတ်မှတ်ချက်စည်းမျဉ်းများအတွက် ပိုမြင့်သောတန်ဖိုး သတ်မှတ်နိုင်သည်။' : 'Set to `1` for immediate alerts, or higher for burst and threshold rules.'}
                   </p>
                 </div>
 

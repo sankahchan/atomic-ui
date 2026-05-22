@@ -53,6 +53,8 @@ function ForecastTooltip({
   keyId: string;
   keyType: 'ACCESS_KEY' | 'DYNAMIC_KEY';
 }) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { data: forecast, isLoading } = trpc.analytics.forecast.useQuery(
     { keyId, keyType },
     { staleTime: 60_000 }
@@ -61,7 +63,7 @@ function ForecastTooltip({
   if (isLoading) {
     return (
       <TooltipContent className="max-w-xs">
-        <p className="text-xs">Loading forecast...</p>
+        <p className="text-xs">{isMyanmar ? 'ခန့်မှန်းချက်ကို တင်နေသည်...' : 'Loading forecast...'}</p>
       </TooltipContent>
     );
   }
@@ -69,7 +71,9 @@ function ForecastTooltip({
   if (!forecast || !forecast.hasQuota) {
     return (
       <TooltipContent className="max-w-xs">
-        <p className="text-xs text-muted-foreground">No quota limit set</p>
+        <p className="text-xs text-muted-foreground">
+          {isMyanmar ? 'ဒေတာကန့်သတ်ချက် မသတ်မှတ်ထားပါ' : 'No quota limit set'}
+        </p>
       </TooltipContent>
     );
   }
@@ -79,21 +83,21 @@ function ForecastTooltip({
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Usage Forecast</span>
+          <span className="text-sm font-medium">{isMyanmar ? 'အသုံးပြုမှု ခန့်မှန်းချက်' : 'Usage Forecast'}</span>
           <Badge variant="outline" className="text-xs">
-            {forecast.confidence} confidence
+            {isMyanmar ? `${forecast.confidence} ယုံကြည်စိတ်ချရမှု` : `${forecast.confidence} confidence`}
           </Badge>
         </div>
 
         <div className="space-y-1 text-xs">
           <p>
-            <span className="text-muted-foreground">Current:</span>{' '}
+            <span className="text-muted-foreground">{isMyanmar ? 'လက်ရှိ:' : 'Current:'}</span>{' '}
             {formatBytes(BigInt(forecast.currentUsageBytes || '0'))} /{' '}
             {formatBytes(BigInt(forecast.dataLimitBytes || '0'))} ({forecast.usagePercent}%)
           </p>
           {forecast.dailyRateBytes ? (
             <p>
-              <span className="text-muted-foreground">Daily rate:</span>{' '}
+              <span className="text-muted-foreground">{isMyanmar ? 'နေ့စဉ်နှုန်း:' : 'Daily rate:'}</span>{' '}
               ~{formatBytes(BigInt(forecast.dailyRateBytes))}/day
             </p>
           ) : null}
@@ -118,7 +122,7 @@ function ForecastTooltip({
         </div>
 
         <p className="text-[10px] italic text-muted-foreground">
-          * Estimated from recent usage patterns
+          {isMyanmar ? '* လတ်တလော အသုံးပြုမှု ပုံစံများအပေါ် အခြေခံ၍ ခန့်မှန်းထားသည်' : '* Estimated from recent usage patterns'}
         </p>
       </div>
     </TooltipContent>
@@ -145,26 +149,26 @@ function AnalyticsStatCard({
   );
 }
 
-function getShareEventLabel(eventType: string) {
+function getShareEventLabel(eventType: string, isMyanmar = false) {
   switch (eventType) {
     case 'PAGE_VIEW':
-      return 'Page view';
+      return isMyanmar ? 'စာမျက်နှာ ကြည့်ရှုမှု' : 'Page view';
     case 'INVITE_OPEN':
-      return 'Invite opened';
+      return isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် ဖွင့်ထားသည်' : 'Invite opened';
     case 'COPY_URL':
-      return 'Copy URL';
+      return isMyanmar ? 'URL ကူးယူမှု' : 'Copy URL';
     case 'OPEN_QR':
-      return 'Open QR';
+      return isMyanmar ? 'QR ဖွင့်မှု' : 'Open QR';
     case 'DOWNLOAD_QR':
-      return 'QR downloaded';
+      return isMyanmar ? 'QR ဒေါင်းလုဒ်လုပ်မှု' : 'QR downloaded';
     case 'OPEN_APP':
-      return 'Open in app';
+      return isMyanmar ? 'အက်ပ်ထဲတွင် ဖွင့်ထားသည်' : 'Open in app';
     case 'DOWNLOAD_CONFIG':
-      return 'Config downloaded';
+      return isMyanmar ? 'သတ်မှတ်ချက်ဖိုင်ကို ဒေါင်းလုဒ်လုပ်ထားသည်' : 'Config downloaded';
     case 'TELEGRAM_SENT':
-      return 'Telegram send';
+      return isMyanmar ? 'တယ်လီဂရမ်သို့ ပေးပို့ထားသည်' : 'Telegram send';
     case 'TELEGRAM_CONNECTED':
-      return 'Telegram connected';
+      return isMyanmar ? 'တယ်လီဂရမ်နှင့် ချိတ်ဆက်ပြီး' : 'Telegram connected';
     default:
       return eventType.replaceAll('_', ' ');
   }
@@ -234,8 +238,9 @@ function FinanceChartTooltip({
 }
 
 export default function AnalyticsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
+  const isMyanmar = locale === 'my';
   const [days, setDays] = useState(30);
   const [topConsumersRange, setTopConsumersRange] = useState<'24h' | '7d' | '30d'>('24h');
   const [shareRange, setShareRange] = useState<'24h' | '7d' | '30d'>('7d');
@@ -271,13 +276,13 @@ export default function AnalyticsPage() {
     onSuccess: (result) => {
       downloadCsvFile(result.filename, result.csv);
       toast({
-        title: 'Finance export ready',
-        description: `${result.filename} downloaded.`,
+        title: isMyanmar ? 'ဘဏ္ဍာရေး မှတ်တမ်းထုတ်ယူမှု အသင့်ဖြစ်ပါပြီ' : 'Finance export ready',
+        description: isMyanmar ? `${result.filename} ကို ဒေါင်းလုဒ်လုပ်ပြီးပါပြီ။` : `${result.filename} downloaded.`,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Finance export failed',
+        title: isMyanmar ? 'ဘဏ္ဍာရေး မှတ်တမ်းထုတ်ယူမှု မအောင်မြင်ပါ' : 'Finance export failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -326,27 +331,27 @@ export default function AnalyticsPage() {
     const rawSteps = [
       {
         key: 'created',
-        label: 'Orders created',
+        label: isMyanmar ? 'အမှာစာ ဖန်တီးထားသည်' : 'Orders created',
         value: created,
       },
       {
         key: 'method',
-        label: 'Method selected',
+        label: isMyanmar ? 'ငွေပေးချေမှုနည်းလမ်း ရွေးထားသည်' : 'Method selected',
         value: telegramSalesDashboard?.funnel.paymentMethodSelected || 0,
       },
       {
         key: 'proof',
-        label: 'Proof uploaded',
+        label: isMyanmar ? 'ငွေလွှဲအထောက်အထား တင်ထားသည်' : 'Proof uploaded',
         value: telegramSalesDashboard?.funnel.proofUploaded || 0,
       },
       {
         key: 'reviewed',
-        label: 'Reviewed',
+        label: isMyanmar ? 'စစ်ဆေးပြီး' : 'Reviewed',
         value: telegramSalesDashboard?.funnel.reviewed || 0,
       },
       {
         key: 'fulfilled',
-        label: 'Fulfilled',
+        label: isMyanmar ? 'ပြီးမြောက်ပြီး' : 'Fulfilled',
         value: telegramSalesDashboard?.funnel.fulfilled || 0,
       },
     ];
@@ -360,7 +365,7 @@ export default function AnalyticsPage() {
         dropOff: index === 0 ? 0 : Math.max(previousValue - step.value, 0),
       };
     });
-  }, [telegramSalesDashboard]);
+  }, [isMyanmar, telegramSalesDashboard]);
 
   const daysOfWeek = [
     t('days.sunday') || 'Sun',
@@ -405,38 +410,40 @@ export default function AnalyticsPage() {
                 className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
               >
                 <BarChart3 className="mr-2 h-3.5 w-3.5" />
-                Analytics Command Center
+                {isMyanmar ? 'သုံးသပ်ချက် ထိန်းချုပ်ရေးဌာန' : 'Analytics Command Center'}
               </Badge>
 
               <div className="space-y-3">
                 <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
-                  Analytics
+                  {isMyanmar ? 'သုံးသပ်ချက်များ' : 'Analytics'}
                 </h1>
                 <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                  Review period traffic, detect unusual usage, and identify the keys driving your highest bandwidth demand.
+                  {isMyanmar
+                    ? 'ကာလအလိုက် လမ်းကြောင်းအသုံးပြုမှုကို စစ်ဆေးပါ၊ မူမမှန်သော အသုံးပြုမှုများကို ရှာဖွေပါ၊ bandwidth အများဆုံး အသုံးပြုနေသော သော့များကို ခွဲခြားသတ်မှတ်ပါ။'
+                    : 'Review period traffic, detect unusual usage, and identify the keys driving your highest bandwidth demand.'}
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <AnalyticsStatCard
-                  label="Active keys"
+                  label={isMyanmar ? 'အသက်ဝင် သော့များ' : 'Active keys'}
                   value={loadingSummary ? '…' : analyticsSummary?.activeKeysCount || 0}
-                  helper="Keys contributing to recent traffic activity."
+                  helper={isMyanmar ? 'မကြာသေးမီ လမ်းကြောင်းအသုံးပြုမှုတွင် ပါဝင်နေသော သော့များ။' : 'Keys contributing to recent traffic activity.'}
                 />
                 <AnalyticsStatCard
-                  label="Period usage"
+                  label={isMyanmar ? 'ကာလအသုံးပြုမှု' : 'Period usage'}
                   value={loadingSummary ? '…' : formatBytes(BigInt(analyticsSummary?.totalDeltaBytes || '0'))}
-                  helper={`Transferred in the selected ${topConsumersRange} window.`}
+                  helper={isMyanmar ? `ရွေးချယ်ထားသော ${topConsumersRange} window အတွင်း လွှဲပြောင်းထားသည့် ပမာဏ။` : `Transferred in the selected ${topConsumersRange} window.`}
                 />
                 <AnalyticsStatCard
-                  label="Anomalies"
+                  label={isMyanmar ? 'မူမမှန်မှုများ' : 'Anomalies'}
                   value={loadingSummary ? '…' : analyticsSummary?.anomalyCount || 0}
-                  helper="Usage spikes above the detected baseline."
+                  helper={isMyanmar ? 'သတ်မှတ်ထားသော အခြေခံမျဉ်းထက် အသုံးပြုမှု မြင့်တက်လာမှုများ။' : 'Usage spikes above the detected baseline.'}
                 />
                 <AnalyticsStatCard
-                  label="Snapshots"
+                  label={isMyanmar ? 'မှတ်တမ်းပုံများ' : 'Snapshots'}
                   value={loadingSummary ? '…' : analyticsSummary?.snapshotCount || 0}
-                  helper="Historical samples available for advanced reporting."
+                  helper={isMyanmar ? 'အဆင့်မြင့် အစီရင်ခံမှုအတွက် သမိုင်းမှတ်တမ်း နမူနာများ။' : 'Historical samples available for advanced reporting.'}
                 />
               </div>
             </div>
@@ -444,33 +451,35 @@ export default function AnalyticsPage() {
             <div className="ops-detail-rail">
               <div className="ops-panel space-y-3">
                 <div className="space-y-1">
-                  <p className="ops-section-heading">Analytics controls</p>
-                  <h2 className="text-xl font-semibold">Command rail</h2>
+                  <p className="ops-section-heading">{isMyanmar ? 'သုံးသပ်ချက် ထိန်းချုပ်မှုများ' : 'Analytics controls'}</p>
+                  <h2 className="text-xl font-semibold">{t('dashboard.command_rail')}</h2>
                   <p className="text-sm text-muted-foreground">
-                    Change the history window, inspect operational summaries, or jump to exported reports and incidents.
+                    {isMyanmar
+                      ? 'သမိုင်းကာလကို ပြောင်းပါ၊ လုပ်ငန်းဆိုင်ရာ အနှစ်ချုပ်များကို စစ်ဆေးပါ၊ သို့မဟုတ် ထုတ်ထားသော အစီရင်ခံစာများနှင့် အဖြစ်အပျက်များသို့ တိုက်ရိုက်ဝင်ပါ။'
+                      : 'Change the history window, inspect operational summaries, or jump to exported reports and incidents.'}
                   </p>
                 </div>
 
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Traffic window
+                      {isMyanmar ? 'လမ်းကြောင်း ကာလ' : 'Traffic window'}
                     </p>
                     <Select value={days.toString()} onValueChange={(value) => setDays(parseInt(value, 10))}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="7">Last 7 days</SelectItem>
-                        <SelectItem value="30">Last 30 days</SelectItem>
-                        <SelectItem value="90">Last 90 days</SelectItem>
+                        <SelectItem value="7">{isMyanmar ? 'နောက်ဆုံး ၇ ရက်' : 'Last 7 days'}</SelectItem>
+                        <SelectItem value="30">{isMyanmar ? 'နောက်ဆုံး ၃၀ ရက်' : 'Last 30 days'}</SelectItem>
+                        <SelectItem value="90">{isMyanmar ? 'နောက်ဆုံး ၉၀ ရက်' : 'Last 90 days'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Consumer range
+                      {isMyanmar ? 'အသုံးပြုသူ ကာလ' : 'Consumer range'}
                     </p>
                     <Select value={topConsumersRange} onValueChange={(v) => setTopConsumersRange(v as '24h' | '7d' | '30d')}>
                       <SelectTrigger>
@@ -478,8 +487,8 @@ export default function AnalyticsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="24h">24h</SelectItem>
-                        <SelectItem value="7d">7 days</SelectItem>
-                        <SelectItem value="30d">30 days</SelectItem>
+                        <SelectItem value="7d">{isMyanmar ? '၇ ရက်' : '7 days'}</SelectItem>
+                        <SelectItem value="30d">{isMyanmar ? '၃၀ ရက်' : '30 days'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -489,22 +498,22 @@ export default function AnalyticsPage() {
                   <Link href="/dashboard/reports" className="ops-action-tile">
                     <span className="inline-flex items-center gap-2 text-sm font-medium">
                       <TrendingUp className="h-4 w-4 text-primary" />
-                      Open reports
+                      {isMyanmar ? 'အစီရင်ခံစာများကို ဖွင့်မည်' : 'Open reports'}
                     </span>
-                    <span className="text-xs text-muted-foreground">Open</span>
+                    <span className="text-xs text-muted-foreground">{t('dashboard.open')}</span>
                   </Link>
                   <Link href="/dashboard/incidents" className="ops-action-tile">
                     <span className="inline-flex items-center gap-2 text-sm font-medium">
                       <AlertTriangle className="h-4 w-4 text-primary" />
-                      Review incidents
+                      {isMyanmar ? 'အဖြစ်အပျက်များကို စစ်ဆေးမည်' : 'Review incidents'}
                     </span>
-                    <span className="text-xs text-muted-foreground">Open</span>
+                    <span className="text-xs text-muted-foreground">{t('dashboard.open')}</span>
                   </Link>
                 </div>
 
                 <div className="space-y-2 rounded-[1.2rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Finance exports
+                    {isMyanmar ? 'ဘဏ္ဍာရေး ထုတ်ယူမှုများ' : 'Finance exports'}
                   </p>
                   <Button
                     variant="outline"
@@ -519,7 +528,7 @@ export default function AnalyticsPage() {
                     }
                   >
                     {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Export order ledger CSV
+                    {isMyanmar ? 'အမှာစာစာရင်း CSV ထုတ်မည်' : 'Export order ledger CSV'}
                   </Button>
                   <Button
                     variant="outline"
@@ -534,7 +543,7 @@ export default function AnalyticsPage() {
                     }
                   >
                     {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Export finance actions CSV
+                    {isMyanmar ? 'ဘဏ္ဍာရေးလုပ်ဆောင်ချက် CSV ထုတ်မည်' : 'Export finance actions CSV'}
                   </Button>
                   <Button
                     variant="outline"
@@ -549,7 +558,7 @@ export default function AnalyticsPage() {
                     }
                   >
                     {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Export monthly revenue CSV
+                    {isMyanmar ? 'လစဉ်ဝင်ငွေ CSV ထုတ်မည်' : 'Export monthly revenue CSV'}
                   </Button>
                   <Button
                     variant="outline"
@@ -564,7 +573,7 @@ export default function AnalyticsPage() {
                     }
                   >
                     {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Export receipt register CSV
+                    {isMyanmar ? 'လက်ခံပြေစာမှတ်တမ်း CSV ထုတ်မည်' : 'Export receipt register CSV'}
                   </Button>
                   <Button
                     variant="outline"
@@ -579,35 +588,39 @@ export default function AnalyticsPage() {
                     }
                   >
                     {financeExportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Export refund register CSV
+                    {isMyanmar ? 'ငွေပြန်အမ်းမှတ်တမ်း CSV ထုတ်မည်' : 'Export refund register CSV'}
                   </Button>
                 </div>
               </div>
 
               <div className="ops-panel space-y-3">
                 <div className="space-y-1">
-                  <p className="ops-section-heading">Worker note</p>
-                  <h2 className="text-xl font-semibold">Snapshot health</h2>
+                  <p className="ops-section-heading">{isMyanmar ? 'လုပ်ဆောင်သူ မှတ်ချက်' : 'Worker note'}</p>
+                  <h2 className="text-xl font-semibold">{isMyanmar ? 'မှတ်တမ်းပုံ အခြေအနေ' : 'Snapshot health'}</h2>
                 </div>
                 <div className="ops-detail-card space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    Advanced analytics depend on periodic usage snapshots. Forecasts, anomalies, and top-consumer rankings improve as more samples are collected.
+                    {isMyanmar
+                      ? 'အဆင့်မြင့် သုံးသပ်ချက်များသည် ကာလအလိုက် သိမ်းဆည်းထားသော အသုံးပြုမှု မှတ်တမ်းပုံများအပေါ် မူတည်ပါသည်။ နမူနာများ ပိုများလာသရွေ့ ခန့်မှန်းချက်များ၊ မူမမှန်မှုရှာဖွေမှုများနှင့် ထိပ်တန်းအသုံးပြုသူ အဆင့်သတ်မှတ်ချက်များ ပိုမိုကောင်းမွန်လာမည်။'
+                      : 'Advanced analytics depend on periodic usage snapshots. Forecasts, anomalies, and top-consumer rankings improve as more samples are collected.'}
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                     <div className="ops-mini-tile">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Snapshot worker
+                        {isMyanmar ? 'မှတ်တမ်းပုံ လုပ်ဆောင်စနစ်' : 'Snapshot worker'}
                       </p>
                       <p className="mt-2 text-sm font-medium">
-                        {(analyticsSummary?.snapshotCount || 0) > 0 ? 'Collecting data' : 'Needs attention'}
+                        {(analyticsSummary?.snapshotCount || 0) > 0
+                          ? (isMyanmar ? 'ဒေတာ စုဆောင်းနေသည်' : 'Collecting data')
+                          : (isMyanmar ? 'စစ်ဆေးရန် လိုအပ်သည်' : 'Needs attention')}
                       </p>
                     </div>
                     <div className="ops-mini-tile">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Forecast coverage
+                        {isMyanmar ? 'ခန့်မှန်းချက် လွှမ်းခြုံမှု' : 'Forecast coverage'}
                       </p>
                       <p className="mt-2 text-sm font-medium">
-                        {topConsumers?.filter((consumer) => consumer.dataLimitBytes).length || 0} quota-aware keys
+                        {(topConsumers?.filter((consumer) => consumer.dataLimitBytes).length || 0)} {isMyanmar ? 'ဒေတာကန့်သတ်ချက် သိထားသော သော့များ' : 'quota-aware keys'}
                       </p>
                     </div>
                   </div>
@@ -621,41 +634,43 @@ export default function AnalyticsPage() {
           <CardHeader className="px-0 pt-0">
             <CardTitle className="flex items-center gap-2 text-xl">
               <TrendingUp className="h-5 w-5 text-primary" />
-              Traffic overview
+              {isMyanmar ? 'လမ်းကြောင်း အနှစ်ချုပ်' : 'Traffic overview'}
             </CardTitle>
             <CardDescription>
-              {formatBytes(totalTraffic)} transferred in the last {days} days.
+              {isMyanmar
+                ? `နောက်ဆုံး ${days} ရက်အတွင်း ${formatBytes(totalTraffic)} လွှဲပြောင်းခဲ့သည်။`
+                : `${formatBytes(totalTraffic)} transferred in the last ${days} days.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 px-0 pb-0">
             <div className="grid gap-3 md:grid-cols-4">
               <div className="ops-mini-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Total traffic
+                  {isMyanmar ? 'စုစုပေါင်း လမ်းကြောင်း' : 'Total traffic'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{formatBytes(totalTraffic)}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Across the selected chart range.</p>
+                <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'ရွေးထားသော ဇယားကာလအတွင်း။' : 'Across the selected chart range.'}</p>
               </div>
               <div className="ops-mini-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Online servers
+                  {isMyanmar ? 'အွန်လိုင်း သော့များ' : 'Online keys'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{loadingSummary ? '…' : analyticsSummary?.activeKeysCount || 0}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Keys currently showing recent traffic.</p>
+                <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'လတ်တလော လမ်းကြောင်းအသုံးပြုမှု ပြနေသော သော့များ။' : 'Keys currently showing recent traffic.'}</p>
               </div>
               <div className="ops-mini-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Active keys
+                  {isMyanmar ? 'အသက်ဝင် သော့များ' : 'Active keys'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{loadingSummary ? '…' : analyticsSummary?.activeKeysCount || 0}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Keys contributing to current data samples.</p>
+                <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'လက်ရှိ ဒေတာနမူနာများတွင် ပါဝင်နေသော သော့များ။' : 'Keys contributing to current data samples.'}</p>
               </div>
               <div className="ops-mini-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Detected spikes
+                  {isMyanmar ? 'တွေ့ရှိထားသော မြင့်တက်မှုများ' : 'Detected spikes'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{loadingSummary ? '…' : analyticsSummary?.anomalyCount || 0}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Flagged by the anomaly detector.</p>
+                <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'မူမမှန်မှု စစ်ဆေးကိရိယာမှ အမှတ်အသားပြုထားသည်။' : 'Flagged by the anomaly detector.'}</p>
               </div>
             </div>
 
@@ -670,9 +685,11 @@ export default function AnalyticsPage() {
                 <div className="ops-chart-empty h-full">
                   <div className="space-y-2 text-center">
                     <TrendingUp className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                    <p className="font-medium text-foreground">No traffic history yet</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'လမ်းကြောင်း မှတ်တမ်း မရှိသေးပါ' : 'No traffic history yet'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Traffic samples will appear here once the analytics worker has collected usage snapshots.
+                      {isMyanmar
+                        ? 'analytics worker က အသုံးပြုမှု မှတ်တမ်းပုံများ စုဆောင်းပြီးသည်နှင့် ဤနေရာတွင် လမ်းကြောင်းနမူနာများ ပေါ်လာမည်။'
+                        : 'Traffic samples will appear here once the analytics worker has collected usage snapshots.'}
                     </p>
                   </div>
                 </div>
@@ -688,9 +705,9 @@ export default function AnalyticsPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <Share2 className="h-5 w-5 text-primary" />
-                    Public share performance
+                    {isMyanmar ? 'အများသုံး မျှဝေမှု စွမ်းဆောင်ရည်' : 'Public share performance'}
                   </CardTitle>
-                  <CardDescription>How users interact with public share pages, copied configs, and Telegram deliveries.</CardDescription>
+                  <CardDescription>{isMyanmar ? 'အသုံးပြုသူများက အများသုံး မျှဝေစာမျက်နှာများ၊ ကူးယူထားသော ဆက်တင်အချက်အလက်များနှင့် Telegram ပေးပို့မှုများကို မည်သို့ အသုံးပြုနေသလဲ။' : 'How users interact with public share pages, copied configs, and Telegram deliveries.'}</CardDescription>
                 </div>
                 <Select value={shareRange} onValueChange={(value) => setShareRange(value as '24h' | '7d' | '30d')}>
                   <SelectTrigger className="w-[120px]">
@@ -707,76 +724,94 @@ export default function AnalyticsPage() {
             <CardContent className="space-y-4 px-0 pb-0">
               <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-9">
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public links</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အများသုံး လင့်ခ်များ' : 'Public links'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.activePublicLinks || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Access + dynamic links currently exposed.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'လက်ရှိ ဖွင့်ထားသော အသုံးပြုခွင့်နှင့် ပြောင်းလဲသတ်မှတ် လင့်ခ်များ။' : 'Access + dynamic links currently exposed.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Page views</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'စာမျက်နှာ ကြည့်ရှုမှု' : 'Page views'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.pageViews || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Share page opens in the selected range.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'ရွေးထားသော ကာလအတွင်း မျှဝေစာမျက်နှာ ဖွင့်မှုများ။' : 'Share page opens in the selected range.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invite opens</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဖိတ်ခေါ် လင့်ခ်ဖွင့်မှု' : 'Invite opens'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.inviteOpens || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Distribution-link opens before the share page.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'မျှဝေစာမျက်နှာ မတိုင်မီ ဖြန့်ဝေမှု လင့်ခ်ဖွင့်မှုများ။' : 'Distribution-link opens before the share page.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Copy clicks</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ကူးယူမှု နှိပ်ချက်များ' : 'Copy clicks'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.copyClicks || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Raw URLs copied from public pages.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'အများသုံး စာမျက်နှာများမှ မူလ URL များကို ကူးယူထားမှု။' : 'Raw URLs copied from public pages.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">QR opens</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'QR ဖွင့်မှုများ' : 'QR opens'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.qrOpens || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Manual setup / QR-focused interactions.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'လက်ဖြင့် တပ်ဆင်မှုနှင့် QR အခြေပြု အပြန်အလှန်များ။' : 'Manual setup / QR-focused interactions.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">QR downloads</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'QR ဒေါင်းလုဒ်များ' : 'QR downloads'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.qrDownloads || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">QR PNG files downloaded from public pages.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'အများသုံး စာမျက်နှာမှ ဒေါင်းလုဒ်ဆွဲထားသော QR PNG ဖိုင်များ။' : 'QR PNG files downloaded from public pages.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">App opens</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အက်ပ် ဖွင့်မှုများ' : 'App opens'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.appOpens || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">One-click import attempts from the share page.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'မျှဝေစာမျက်နှာမှ တစ်ချက်နှိပ် ထည့်သွင်းမှု ကြိုးပမ်းချက်များ။' : 'One-click import attempts from the share page.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Config downloads</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဆက်တင်ဖိုင် ဒေါင်းလုဒ်များ' : 'Config downloads'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.configDownloads || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Client config files downloaded by users.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'အသုံးပြုသူများ ဒေါင်းလုဒ်ဆွဲထားသော ကလိုင်းယင့် ဆက်တင်ဖိုင်များ။' : 'Client config files downloaded by users.'}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Telegram sends</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'တယ်လီဂရမ် ပေးပို့မှုများ' : 'Telegram sends'}</p>
                   <p className="mt-2 text-2xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.summary.telegramSends || 0}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Deliveries initiated through Telegram sharing.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'တယ်လီဂရမ် မျှဝေမှုမှ စတင်ထားသော ပေးပို့မှုများ။' : 'Deliveries initiated through Telegram sharing.'}</p>
                 </div>
               </div>
 
               <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Access-key invites</p>
-                    <h3 className="mt-2 text-lg font-semibold">Invite-link performance</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'အသုံးပြုခွင့်သော့ ဖိတ်ခေါ်လင့်ခ်များ' : 'Access-key invites'}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">
+                      {isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် စွမ်းဆောင်ရည်' : 'Invite-link performance'}
+                    </h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Track how access-key invite links are opened before users reach the public share page.
+                      {isMyanmar
+                        ? 'အသုံးပြုသူများ အများသုံး မျှဝေစာမျက်နှာသို့ မရောက်မီ အသုံးပြုခွင့်သော့ ဖိတ်ခေါ်လင့်ခ်များကို မည်သို့ ဖွင့်သည်ကို စောင့်ကြည့်ပါ။'
+                        : 'Track how access-key invite links are opened before users reach the public share page.'}
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active invites</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {isMyanmar ? 'လက်ရှိဖိတ်ခေါ်လင့်ခ်များ' : 'Active invites'}
+                      </p>
                       <p className="mt-2 text-xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.accessInviteSummary.activeInviteLinks || 0}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Currently usable access-key invite links.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {isMyanmar ? 'လက်ရှိ အသုံးပြုနိုင်သော အသုံးပြုခွင့်သော့ ဖိတ်ခေါ်လင့်ခ်များ။' : 'Currently usable access-key invite links.'}
+                      </p>
                     </div>
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Tracked keys</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {isMyanmar ? 'စောင့်ကြည့်ထားသော သော့များ' : 'Tracked keys'}
+                      </p>
                       <p className="mt-2 text-xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.accessInviteSummary.trackedAccessKeys || 0}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Access keys with invite links configured.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် တပ်ဆင်ထားသော အသုံးပြုခွင့်သော့များ။' : 'Access keys with invite links configured.'}
+                      </p>
                     </div>
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Invite opens</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် ဖွင့်မှုများ' : 'Invite opens'}
+                      </p>
                       <p className="mt-2 text-xl font-semibold">{loadingShareDashboard ? '…' : shareDashboard?.accessInviteSummary.inviteOpens || 0}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Invite redirects recorded in the selected range.</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {isMyanmar ? 'ရွေးထားသော ကာလအတွင်း မှတ်တမ်းတင်ထားသော ဖိတ်ခေါ်လင့်ခ် ပြန်လည်ညွှန်ပေးမှုများ။' : 'Invite redirects recorded in the selected range.'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -797,23 +832,27 @@ export default function AnalyticsPage() {
                               {key.name}
                             </Link>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {key.publicSlug ? `/s/${key.publicSlug}` : 'Token share link'}
+                              {key.publicSlug ? `/s/${key.publicSlug}` : isMyanmar ? 'တိုကင် မျှဝေလင့်ခ်' : 'Token share link'}
                             </p>
                           </div>
-                          <Badge variant="outline">{key.inviteOpens} opens</Badge>
+                          <Badge variant="outline">{key.inviteOpens} {isMyanmar ? 'ဖွင့်မှု' : 'opens'}</Badge>
                         </div>
                         <div className="mt-4 grid gap-3 sm:grid-cols-2">
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Active links</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              {isMyanmar ? 'လက်ရှိလင့်ခ်များ' : 'Active links'}
+                            </p>
                             <p className="mt-2 text-lg font-semibold">{key.activeInviteLinks}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{key.totalInviteLinks} total</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{key.totalInviteLinks} {isMyanmar ? 'စုစုပေါင်း' : 'total'}</p>
                           </div>
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Last invite open</p>
-                            <p className="mt-2 text-sm font-medium">
-                              {key.lastInviteOpenAt ? formatRelativeTime(key.lastInviteOpenAt) : 'No invite hits yet'}
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                              {isMyanmar ? 'နောက်ဆုံး ဖွင့်မှု' : 'Last invite open'}
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground">{key.pageViews} share-page views</p>
+                            <p className="mt-2 text-sm font-medium">
+                              {key.lastInviteOpenAt ? formatRelativeTime(key.lastInviteOpenAt) : isMyanmar ? 'ဖွင့်မှု မရှိသေးပါ' : 'No invite hits yet'}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">{key.pageViews} {isMyanmar ? 'မျှဝေစာမျက်နှာ ကြည့်ရှုမှု' : 'share-page views'}</p>
                           </div>
                         </div>
                       </div>
@@ -823,9 +862,11 @@ export default function AnalyticsPage() {
                   <div className="ops-chart-empty mt-4">
                     <div className="space-y-2 text-center">
                       <ExternalLink className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                      <p className="font-medium text-foreground">No access-key invite activity yet</p>
+                      <p className="font-medium text-foreground">{isMyanmar ? 'အသုံးပြုခွင့်သော့ ဖိတ်ခေါ်လင့်ခ် လှုပ်ရှားမှု မရှိသေးပါ' : 'No access-key invite activity yet'}</p>
                       <p className="text-sm text-muted-foreground">
-                        Create invite links on an access-key detail page to start tracking opens and conversions here.
+                        {isMyanmar
+                          ? 'အသုံးပြုခွင့်သော့ အသေးစိတ်စာမျက်နှာတွင် ဖိတ်ခေါ်လင့်ခ် ဖန်တီးပြီး ဤနေရာတွင် ဖွင့်မှုနှင့် ပြောင်းလဲမှုများကို စတင်စောင့်ကြည့်ပါ။'
+                          : 'Create invite links on an access-key detail page to start tracking opens and conversions here.'}
                       </p>
                     </div>
                   </div>
@@ -852,25 +893,33 @@ export default function AnalyticsPage() {
                               {link.name}
                             </Link>
                             <p className="text-xs text-muted-foreground">
-                              {link.type === 'ACCESS_KEY' ? 'Access key' : 'Dynamic key'}
+                              {link.type === 'ACCESS_KEY' ? (isMyanmar ? 'အသုံးပြုခွင့်သော့' : 'Access key') : (isMyanmar ? 'ပြောင်းလဲသတ်မှတ်သော့' : 'Dynamic key')}
                               {link.publicSlug ? ` · /s/${link.publicSlug}` : ''}
                             </p>
                           </div>
-                          <Badge variant="outline">{link.metrics.pageViews} views</Badge>
+                          <Badge variant="outline">{link.metrics.pageViews} {isMyanmar ? 'ကြည့်ရှုမှု' : 'views'}</Badge>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div className="ops-mini-tile">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Events</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {isMyanmar ? 'ဖြစ်ရပ်များ' : 'Events'}
+                            </p>
                             <p className="mt-2 text-lg font-semibold">{link.metrics.totalEvents}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">Invites {link.metrics.inviteOpens} · Copies {link.metrics.copyClicks} · App opens {link.metrics.appOpens}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {isMyanmar
+                                ? `ဖိတ်ခေါ်မှု ${link.metrics.inviteOpens} · ကူးယူမှု ${link.metrics.copyClicks} · အက်ပ်ဖွင့်မှု ${link.metrics.appOpens}`
+                                : `Invites ${link.metrics.inviteOpens} · Copies ${link.metrics.copyClicks} · App opens ${link.metrics.appOpens}`}
+                            </p>
                           </div>
                           <div className="ops-mini-tile">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Last activity</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {isMyanmar ? 'နောက်ဆုံး လှုပ်ရှားမှု' : 'Last activity'}
+                            </p>
                             <p className="mt-2 text-sm font-medium">
-                              {link.lastEventAt ? formatRelativeTime(link.lastEventAt) : 'No recent activity'}
+                              {link.lastEventAt ? formatRelativeTime(link.lastEventAt) : isMyanmar ? 'မကြာသေးသော လှုပ်ရှားမှု မရှိပါ' : 'No recent activity'}
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {link.lastEventType ? getShareEventLabel(link.lastEventType) : 'Waiting for first hit'}
+                              {link.lastEventType ? getShareEventLabel(link.lastEventType, isMyanmar) : isMyanmar ? 'ပထမဆုံး လှုပ်ရှားမှုကို စောင့်နေသည်' : 'Waiting for first hit'}
                             </p>
                           </div>
                         </div>
@@ -882,14 +931,14 @@ export default function AnalyticsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Public link</TableHead>
-                          <TableHead className="text-right">Views</TableHead>
-                          <TableHead className="text-right">Invites</TableHead>
-                          <TableHead className="text-right">Copies</TableHead>
-                          <TableHead className="text-right">Downloads</TableHead>
-                          <TableHead className="text-right">App opens</TableHead>
-                          <TableHead className="text-right">Telegram</TableHead>
-                          <TableHead>Last activity</TableHead>
+                          <TableHead>{isMyanmar ? 'အများသုံး လင့်ခ်' : 'Public link'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'ကြည့်ရှုမှု' : 'Views'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'ဖိတ်ခေါ်မှု' : 'Invites'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'ကူးယူမှု' : 'Copies'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'ဒေါင်းလုဒ်' : 'Downloads'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'အက်ပ်ဖွင့်မှု' : 'App opens'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'တယ်လီဂရမ်' : 'Telegram'}</TableHead>
+                          <TableHead>{isMyanmar ? 'နောက်ဆုံး လှုပ်ရှားမှု' : 'Last activity'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -904,7 +953,7 @@ export default function AnalyticsPage() {
                                   {link.name}
                                 </Link>
                                 <p className="text-xs text-muted-foreground">
-                                  {link.type === 'ACCESS_KEY' ? 'Access key' : 'Dynamic key'}
+                                  {link.type === 'ACCESS_KEY' ? (isMyanmar ? 'အသုံးပြုခွင့်သော့' : 'Access key') : (isMyanmar ? 'ပြောင်းလဲသတ်မှတ်သော့' : 'Dynamic key')}
                                   {link.publicSlug ? ` · /s/${link.publicSlug}` : ''}
                                 </p>
                               </div>
@@ -919,10 +968,10 @@ export default function AnalyticsPage() {
                               {link.lastEventAt ? (
                                 <>
                                   <div>{formatRelativeTime(link.lastEventAt)}</div>
-                                  <div className="text-xs">{link.lastEventType ? getShareEventLabel(link.lastEventType) : ''}</div>
+                                  <div className="text-xs">{link.lastEventType ? getShareEventLabel(link.lastEventType, isMyanmar) : ''}</div>
                                 </>
                               ) : (
-                                'No recent activity'
+                                isMyanmar ? 'မကြာသေးသော လှုပ်ရှားမှု မရှိပါ' : 'No recent activity'
                               )}
                             </TableCell>
                           </TableRow>
@@ -935,9 +984,11 @@ export default function AnalyticsPage() {
                 <div className="ops-chart-empty">
                   <div className="space-y-2 text-center">
                     <Share2 className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                    <p className="font-medium text-foreground">No public-share traffic yet</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'အများသုံး မျှဝေမှု လမ်းကြောင်းဒေတာ မရှိသေးပါ' : 'No public-share traffic yet'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Share-link events will appear here after users open pages, copy configs, or launch client apps.
+                      {isMyanmar
+                        ? 'အသုံးပြုသူများ စာမျက်နှာဖွင့်ခြင်း၊ config ကူးယူခြင်း သို့မဟုတ် client app ဖွင့်ခြင်းများ စတင်သောအခါ share-link ဖြစ်ရပ်များကို ဤနေရာတွင် တွေ့ရပါမည်။'
+                        : 'Share-link events will appear here after users open pages, copy configs, or launch client apps.'}
                     </p>
                   </div>
                 </div>
@@ -949,9 +1000,13 @@ export default function AnalyticsPage() {
             <CardHeader className="px-0 pt-0">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Clock className="h-5 w-5 text-primary" />
-                Recent share activity
+                {isMyanmar ? 'မကြာသေးသော မျှဝေလှုပ်ရှားမှု' : 'Recent share activity'}
               </CardTitle>
-              <CardDescription>Latest page views, copy actions, app launches, and Telegram handoffs across public links.</CardDescription>
+              <CardDescription>
+                {isMyanmar
+                  ? 'အများသုံး လင့်ခ်များအပေါ် နောက်ဆုံး page views၊ copy actions၊ app launches နှင့် Telegram handoff များ။'
+                  : 'Latest page views, copy actions, app launches, and Telegram handoffs across public links.'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 px-0 pb-0">
               {loadingShareDashboard ? (
@@ -989,11 +1044,11 @@ export default function AnalyticsPage() {
                               <span className="truncate font-medium">{event.entityName}</span>
                             )}
                             <Badge variant="outline" className="text-[10px]">
-                              {event.type === 'ACCESS_KEY' ? 'Access key' : 'Dynamic key'}
+                              {event.type === 'ACCESS_KEY' ? (isMyanmar ? 'အသုံးပြုခွင့်သော့' : 'Access key') : (isMyanmar ? 'ပြောင်းလဲသတ်မှတ်သော့' : 'Dynamic key')}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {getShareEventLabel(event.eventType)}
+                            {getShareEventLabel(event.eventType, isMyanmar)}
                             {event.platform ? ` · ${event.platform}` : ''}
                             {event.source ? ` · ${event.source}` : ''}
                             {event.publicSlug ? ` · /s/${event.publicSlug}` : ''}
@@ -1010,9 +1065,11 @@ export default function AnalyticsPage() {
                 <div className="ops-chart-empty">
                   <div className="space-y-2 text-center">
                     <Clock className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                    <p className="font-medium text-foreground">No recent share activity</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'မကြာသေးသော မျှဝေလှုပ်ရှားမှု မရှိပါ' : 'No recent share activity'}</p>
                     <p className="text-sm text-muted-foreground">
-                      The latest public interactions will appear here once users start using share links.
+                      {isMyanmar
+                        ? 'အသုံးပြုသူများ share လင့်ခ်များကို စတင်အသုံးပြုသောအခါ နောက်ဆုံး အများသုံး လှုပ်ရှားမှုများကို ဤနေရာတွင် တွေ့ရပါမည်။'
+                        : 'The latest public interactions will appear here once users start using share links.'}
                     </p>
                   </div>
                 </div>
@@ -1026,10 +1083,12 @@ export default function AnalyticsPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <Send className="h-5 w-5 text-primary" />
-                    Telegram sales
+                    {isMyanmar ? 'တယ်လီဂရမ် အရောင်း' : 'Telegram sales'}
                   </CardTitle>
                   <CardDescription>
-                    Track Telegram order volume, review speed, plan performance, and collected pricing signals.
+                    {isMyanmar
+                      ? 'Telegram order ပမာဏ၊ စစ်ဆေးနှုန်း၊ plan စွမ်းဆောင်ရည်နှင့် လက်ခံရရှိသော ဝင်ငွေ အချက်အလက်များကို စောင့်ကြည့်ပါ။'
+                      : 'Track Telegram order volume, review speed, plan performance, and collected pricing signals.'}
                   </CardDescription>
                 </div>
                 <Select
@@ -1050,35 +1109,43 @@ export default function AnalyticsPage() {
             <CardContent className="space-y-4 px-0 pb-0">
               <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Orders</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အော်ဒါများ' : 'Orders'}</p>
                   <p className="mt-2 text-2xl font-semibold">
                     {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.totalOrders || 0}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">Total Telegram sales orders in the selected range.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isMyanmar ? 'ရွေးထားသော ကာလအတွင်း စုစုပေါင်း တယ်လီဂရမ် အရောင်း အော်ဒါများ။' : 'Total Telegram sales orders in the selected range.'}
+                  </p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pending review</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'စစ်ဆေးရန် စောင့်နေ' : 'Pending review'}</p>
                   <p className="mt-2 text-2xl font-semibold">
                     {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.pendingReview || 0}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">Orders waiting for payment-proof review.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isMyanmar ? 'ငွေပေးချေမှု အထောက်အထားကို စီမံခန့်ခွဲသူ စစ်ဆေးရန် စောင့်နေသော အော်ဒါများ။' : 'Orders waiting for payment-proof review.'}
+                  </p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fulfilled</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြီးမြောက်ပြီး' : 'Fulfilled'}</p>
                   <p className="mt-2 text-2xl font-semibold">
                     {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.fulfilled || 0}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">Orders that created or renewed keys successfully.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isMyanmar ? 'သော့အသစ် ဖန်တီးခြင်း သို့မဟုတ် သက်တမ်းတိုးမှု အောင်မြင်ပြီးသော အော်ဒါများ။' : 'Orders that created or renewed keys successfully.'}
+                  </p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Awaiting proof</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အထောက်အထား စောင့်နေ' : 'Awaiting proof'}</p>
                   <p className="mt-2 text-2xl font-semibold">
                     {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.summary.awaitingPayment || 0}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">Users still choosing a payment method or uploading proof.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isMyanmar ? 'အသုံးပြုသူများသည် ငွေပေးချေ နည်းလမ်း ရွေးနေဆဲ သို့မဟုတ် အထောက်အထား တင်နေဆဲ ဖြစ်သည်။' : 'Users still choosing a payment method or uploading proof.'}
+                  </p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg review time</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပျမ်းမျှ စစ်ဆေးချိန်' : 'Avg review time'}</p>
                   <p className="mt-2 text-2xl font-semibold">
                     {loadingTelegramSalesDashboard
                       ? '…'
@@ -1087,10 +1154,12 @@ export default function AnalyticsPage() {
                         ? `${Math.round(telegramSalesDashboard.averages.reviewMinutes)}m`
                         : '—'}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">From proof upload to admin review.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isMyanmar ? 'အထောက်အထား တင်ပြီးမှ စီမံခန့်ခွဲသူ စစ်ဆေးချိန်အထိ ပျမ်းမျှကြာချိန်။' : 'From proof upload to admin review.'}
+                  </p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg fulfillment</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပျမ်းမျှ ပေးပို့ချိန်' : 'Avg fulfillment'}</p>
                   <p className="mt-2 text-2xl font-semibold">
                     {loadingTelegramSalesDashboard
                       ? '…'
@@ -1099,50 +1168,62 @@ export default function AnalyticsPage() {
                         ? `${Math.round(telegramSalesDashboard.averages.fulfillmentMinutes)}m`
                         : '—'}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">From proof upload to delivered access.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isMyanmar ? 'အထောက်အထား တင်ပြီးမှ အသုံးပြုခွင့် ပေးပို့ပြီးချိန်အထိ ပျမ်းမျှကြာချိန်။' : 'From proof upload to delivered access.'}
+                  </p>
                 </div>
               </div>
 
               <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium dynamic sales</p>
-                    <h3 className="mt-2 text-lg font-semibold">Premium support and demand</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် ပြောင်းလဲသတ်မှတ်သော့ အရောင်း' : 'Premium dynamic sales'}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'အဆင့်မြင့် အကူအညီနှင့် လိုအပ်ချက်' : 'Premium support and demand'}</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Split premium dynamic-key sales, region demand, and support workload from the normal Telegram storefront.
+                      {isMyanmar
+                        ? 'ပုံမှန် တယ်လီဂရမ် အရောင်းမျက်နှာစာမှ အဆင့်မြင့် ပြောင်းလဲသတ်မှတ်သော့ အရောင်း၊ ဒေသလိုအပ်ချက်နှင့် အကူအညီ စာရင်းကို သီးခြားကြည့်ရှုပါ။'
+                        : 'Split premium dynamic-key sales, region demand, and support workload from the normal Telegram storefront.'}
                     </p>
                   </div>
                   <Badge variant="outline">
                     {loadingTelegramSalesDashboard
                       ? '…'
-                      : `${telegramSalesDashboard?.premium.summary.openSupportRequests || 0} open support`}
+                      : isMyanmar
+                        ? `${telegramSalesDashboard?.premium.summary.openSupportRequests || 0} ခု ဖွင့်ထားသည်`
+                        : `${telegramSalesDashboard?.premium.summary.openSupportRequests || 0} open support`}
                   </Badge>
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium orders</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် အော်ဒါများ' : 'Premium orders'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.premium.summary.premiumOrders || 0}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">Telegram premium orders delivered as dynamic keys.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {isMyanmar ? 'ပြောင်းလဲသတ်မှတ်သော့အဖြစ် ပေးပို့ပြီးသော တယ်လီဂရမ် အဆင့်မြင့် အော်ဒါများ။' : 'Telegram premium orders delivered as dynamic keys.'}
+                    </p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active premium users</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အသက်ဝင် အဆင့်မြင့် အသုံးပြုသူ' : 'Active premium users'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.premium.summary.activeUsers || 0}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">Unique Telegram users with fulfilled premium dynamic orders in range.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {isMyanmar ? 'ရွေးထားသော ကာလအတွင်း အဆင့်မြင့် ပြောင်းလဲသတ်မှတ် အော်ဒါ ပြီးမြောက်ခဲ့သော ထူးခြား တယ်လီဂရမ် အသုံးပြုသူများ။' : 'Unique Telegram users with fulfilled premium dynamic orders in range.'}
+                    </p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active premium keys</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အသက်ဝင် အဆင့်မြင့် သော့များ' : 'Active premium keys'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.premium.summary.activeDynamicKeys || 0}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">Premium dynamic keys fulfilled in the selected range.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {isMyanmar ? 'ရွေးထားသော ကာလအတွင်း ပေးပို့ပြီးသော အဆင့်မြင့် ပြောင်းလဲသတ်မှတ်သော့များ။' : 'Premium dynamic keys fulfilled in the selected range.'}
+                    </p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Handled support</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြီးစီးသော အကူအညီ တောင်းဆိုမှု' : 'Handled support'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard
                         ? '…'
@@ -1152,14 +1233,16 @@ export default function AnalyticsPage() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {loadingTelegramSalesDashboard
                         ? '…'
-                        : `${telegramSalesDashboard?.premium.summary.dismissedSupportRequests || 0} dismissed`}
+                        : isMyanmar
+                          ? `${telegramSalesDashboard?.premium.summary.dismissedSupportRequests || 0} ခု ပယ်ဖျက်`
+                          : `${telegramSalesDashboard?.premium.summary.dismissedSupportRequests || 0} dismissed`}
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg first response</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပထမဆုံး ပြန်ကြားချိန် ပျမ်းမျှ' : 'Avg first response'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard
                         ? '…'
@@ -1167,10 +1250,10 @@ export default function AnalyticsPage() {
                             telegramSalesDashboard?.premium.sla.avgFirstResponseMinutes,
                           )}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">From request submission to first admin review.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'တောင်းဆိုချက် တင်သွင်းချိန်မှ ပထမဆုံး စီမံခန့်ခွဲသူ စစ်ဆေးချိန်အထိ။' : 'From request submission to first admin review.'}</p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Avg resolution</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဖြေရှင်းချိန် ပျမ်းမျှ' : 'Avg resolution'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard
                         ? '…'
@@ -1178,10 +1261,10 @@ export default function AnalyticsPage() {
                             telegramSalesDashboard?.premium.sla.avgResolutionMinutes,
                           )}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">From request submission to approved, handled, or dismissed.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'တောင်းဆိုချက် တင်သွင်းချိန်မှ အတည်ပြု၊ ကိုင်တွယ်ပြီး သို့မဟုတ် ပယ်ဖျက်သည်အထိ။' : 'From request submission to approved, handled, or dismissed.'}</p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Backlog &gt; 6h</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? '၆ နာရီကျော် စောင့်ဆိုင်းမှု' : 'Backlog > 6h'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard
                         ? '…'
@@ -1190,11 +1273,13 @@ export default function AnalyticsPage() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {loadingTelegramSalesDashboard
                         ? '…'
-                        : `${telegramSalesDashboard?.premium.sla.openOlderThan24Hours || 0} older than 24h`}
+                          : isMyanmar
+                            ? `၂၄ နာရီကျော် ${telegramSalesDashboard?.premium.sla.openOlderThan24Hours || 0} ခု`
+                            : `${telegramSalesDashboard?.premium.sla.openOlderThan24Hours || 0} older than 24h`}
                     </p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Oldest open</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အကြာဆုံး စောင့်ဆိုင်းနေမှု' : 'Oldest open'}</p>
                     <p className="mt-2 text-2xl font-semibold">
                       {loadingTelegramSalesDashboard
                         ? '…'
@@ -1202,13 +1287,13 @@ export default function AnalyticsPage() {
                             telegramSalesDashboard?.premium.sla.oldestOpenMinutes,
                           )}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">Oldest pending premium support request in the queue.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'စောင့်ဆိုင်းစာရင်းထဲရှိ အကြာဆုံး အဆင့်မြင့် အကူအညီ တောင်းဆိုမှု။' : 'Oldest pending premium support request in the queue.'}</p>
                   </div>
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-3">
                   <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium revenue</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် ဝင်ငွေ' : 'Premium revenue'}</p>
                     <div className="mt-3 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(2)].map((_, i) => (
@@ -1222,13 +1307,13 @@ export default function AnalyticsPage() {
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-muted-foreground">No premium revenue yet.</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် ဝင်ငွေ မရှိသေးပါ။' : 'No premium revenue yet.'}</p>
                       )}
                     </div>
                   </div>
 
                   <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Region demand</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဒေသ လိုအပ်ချက်' : 'Region demand'}</p>
                     <div className="mt-3 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -1244,13 +1329,13 @@ export default function AnalyticsPage() {
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-muted-foreground">No premium region requests yet.</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် ဒေသ တောင်းဆိုမှု မရှိသေးပါ။' : 'No premium region requests yet.'}</p>
                       )}
                     </div>
                   </div>
 
                   <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Route issues by server</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဆာဗာအလိုက် လမ်းကြောင်း ပြဿနာများ' : 'Route issues by server'}</p>
                     <div className="mt-3 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -1266,7 +1351,7 @@ export default function AnalyticsPage() {
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-muted-foreground">No premium route issues yet.</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် လမ်းကြောင်း ပြဿနာ မရှိသေးပါ။' : 'No premium route issues yet.'}</p>
                       )}
                     </div>
                   </div>
@@ -1274,7 +1359,7 @@ export default function AnalyticsPage() {
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-3">
                   <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Most degraded region</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အဆိုးဆုံး ဒေသ' : 'Most degraded region'}</p>
                     <div className="mt-3 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -1290,13 +1375,13 @@ export default function AnalyticsPage() {
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-muted-foreground">No degraded premium regions yet.</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'ထိခိုက်နေသော အဆင့်မြင့် ဒေသ မရှိသေးပါ။' : 'No degraded premium regions yet.'}</p>
                       )}
                     </div>
                   </div>
 
                   <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Most requested fallback</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အများဆုံး တောင်းဆိုသော အရန်ဒေသ' : 'Most requested fallback'}</p>
                     <div className="mt-3 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -1312,13 +1397,13 @@ export default function AnalyticsPage() {
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-muted-foreground">No fallback activity yet.</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'အရန်ပြောင်းလဲ လှုပ်ရှားမှု မရှိသေးပါ။' : 'No fallback activity yet.'}</p>
                       )}
                     </div>
                   </div>
 
                   <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recovery time by region</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဒေသအလိုက် ပြန်ကောင်းချိန်' : 'Recovery time by region'}</p>
                     <div className="mt-3 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -1332,19 +1417,25 @@ export default function AnalyticsPage() {
                               <Badge variant="outline">{region.recoveries}</Badge>
                             </div>
                             <p className="mt-2 text-xs text-muted-foreground">
-                              {region.avgMinutes !== null ? `${Math.round(region.avgMinutes)} min avg` : 'No recovery time yet'}
+                              {region.avgMinutes !== null
+                                ? isMyanmar
+                                  ? `ပျမ်းမျှ ${Math.round(region.avgMinutes)} မိနစ်`
+                                  : `${Math.round(region.avgMinutes)} min avg`
+                                : isMyanmar
+                                  ? 'ပြန်ကောင်းချိန် မရှိသေးပါ'
+                                  : 'No recovery time yet'}
                             </p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-muted-foreground">No recovered premium incidents yet.</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'ပြန်ကောင်းပြီးသော အဆင့်မြင့် ဖြစ်ရပ် မရှိသေးပါ။' : 'No recovered premium incidents yet.'}</p>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 rounded-[1.2rem] border border-border/60 bg-background/60 p-4 dark:bg-white/[0.02]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Affected premium users by incident</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဖြစ်ရပ်တစ်ခုချင်းစီအလိုက် ထိခိုက်သော အဆင့်မြင့် အသုံးပြုသူများ' : 'Affected premium users by incident'}</p>
                   <div className="mt-3 space-y-3">
                     {loadingTelegramSalesDashboard ? (
                       [...Array(3)].map((_, i) => (
@@ -1365,7 +1456,7 @@ export default function AnalyticsPage() {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-muted-foreground">No premium incidents recorded yet.</p>
+                      <p className="text-sm text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် ဖြစ်ရပ် မှတ်တမ်း မရှိသေးပါ။' : 'No premium incidents recorded yet.'}</p>
                     )}
                   </div>
                 </div>
@@ -1375,14 +1466,20 @@ export default function AnalyticsPage() {
                 <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Top plans</p>
-                      <h3 className="mt-2 text-lg font-semibold">Plan performance</h3>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ထိပ်ဆုံး အစီအစဉ်များ' : 'Top plans'}</p>
+                      <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'အစီအစဉ် စွမ်းဆောင်ရည်' : 'Plan performance'}</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Best-performing Telegram plans by order volume and fulfilled revenue.
+                        {isMyanmar
+                          ? 'Order ပမာဏနှင့် ပြီးမြောက်သော ဝင်ငွေအလိုက် အကောင်းဆုံး Telegram plan များ။'
+                          : 'Best-performing Telegram plans by order volume and fulfilled revenue.'}
                       </p>
                     </div>
                     <Badge variant="outline">
-                      {loadingTelegramSalesDashboard ? '…' : `${telegramSalesDashboard?.summary.newOrders || 0} new / ${telegramSalesDashboard?.summary.renewalOrders || 0} renew`}
+                      {loadingTelegramSalesDashboard
+                        ? '…'
+                        : isMyanmar
+                          ? `${telegramSalesDashboard?.summary.newOrders || 0} ခု အသစ် / ${telegramSalesDashboard?.summary.renewalOrders || 0} ခု renewal`
+                          : `${telegramSalesDashboard?.summary.newOrders || 0} new / ${telegramSalesDashboard?.summary.renewalOrders || 0} renew`}
                     </Badge>
                   </div>
 
@@ -1400,21 +1497,27 @@ export default function AnalyticsPage() {
                             <div className="min-w-0">
                               <p className="truncate font-medium">{plan.planName}</p>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                {plan.planCode || 'Custom plan'}
+                                {plan.planCode || (isMyanmar ? 'စိတ်ကြိုက် အစီအစဉ်' : 'Custom plan')}
                               </p>
                             </div>
-                            <Badge variant="outline">{plan.orders} orders</Badge>
+                            <Badge variant="outline">{isMyanmar ? `${plan.orders} ခု` : `${plan.orders} orders`}</Badge>
                           </div>
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
                             <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Fulfilled</p>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ပြီးမြောက်ပြီး' : 'Fulfilled'}</p>
                               <p className="mt-2 text-lg font-semibold">{plan.fulfilled}</p>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                {plan.orders > 0 ? `${Math.round((plan.fulfilled / plan.orders) * 100)}% success` : 'No approvals yet'}
+                                {plan.orders > 0
+                                  ? isMyanmar
+                                    ? `${Math.round((plan.fulfilled / plan.orders) * 100)}% အောင်မြင်`
+                                    : `${Math.round((plan.fulfilled / plan.orders) * 100)}% success`
+                                  : isMyanmar
+                                    ? 'Approve မရှိသေးပါ'
+                                    : 'No approvals yet'}
                               </p>
                             </div>
                             <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Revenue</p>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ဝင်ငွေ' : 'Revenue'}</p>
                               <div className="mt-2 space-y-1">
                                 {plan.revenueByCurrency.length > 0 ? (
                                   plan.revenueByCurrency.map((revenue) => (
@@ -1423,12 +1526,16 @@ export default function AnalyticsPage() {
                                     </p>
                                   ))
                                 ) : (
-                                  <p className="text-sm text-muted-foreground">No priced fulfillments yet</p>
+                                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'စျေးနှုန်းပါသော ပြီးမြောက်မှု မရှိသေးပါ' : 'No priced fulfillments yet'}</p>
                                 )}
                                 <p className="mt-2 text-xs text-muted-foreground">
                                   {plan.orders > 0
-                                    ? `${Math.round(plan.conversionRate)}% conversion`
-                                    : 'No conversions yet'}
+                                    ? isMyanmar
+                                      ? `${Math.round(plan.conversionRate)}% ပြောင်းလဲမှု`
+                                      : `${Math.round(plan.conversionRate)}% conversion`
+                                    : isMyanmar
+                                      ? 'ပြောင်းလဲမှု မရှိသေးပါ'
+                                      : 'No conversions yet'}
                                 </p>
                               </div>
                             </div>
@@ -1440,9 +1547,11 @@ export default function AnalyticsPage() {
                     <div className="ops-chart-empty mt-4">
                       <div className="space-y-2 text-center">
                         <Send className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                        <p className="font-medium text-foreground">No Telegram sales data yet</p>
+                        <p className="font-medium text-foreground">{isMyanmar ? 'တယ်လီဂရမ် အရောင်းဒေတာ မရှိသေးပါ' : 'No Telegram sales data yet'}</p>
                         <p className="text-sm text-muted-foreground">
-                          Orders created from the bot will show plan performance and revenue here.
+                          {isMyanmar
+                            ? 'ဘော့မှ စတင်သော အော်ဒါများ ပေါ်လာသည်နှင့် အစီအစဉ် စွမ်းဆောင်ရည်နှင့် ဝင်ငွေကို ဤနေရာတွင် ပြမည်။'
+                            : 'Orders created from the bot will show plan performance and revenue here.'}
                         </p>
                       </div>
                     </div>
@@ -1451,52 +1560,60 @@ export default function AnalyticsPage() {
 
                 <div className="space-y-4">
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Conversion funnel</p>
-                    <h3 className="mt-2 text-lg font-semibold">Telegram storefront flow</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြောင်းလဲမှု လမ်းကြောင်း' : 'Conversion funnel'}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'တယ်လီဂရမ် ဝယ်ယူမှု လုပ်ငန်းစဉ်' : 'Telegram storefront flow'}</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="ops-mini-tile">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Review velocity
+                          {isMyanmar ? 'စစ်ဆေးနှုန်း' : 'Review velocity'}
                         </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard
                             ? '…'
                             : formatDurationMetric(telegramSalesDashboard?.averages.reviewMinutes)}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Average time from proof to review</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isMyanmar ? 'ငွေလွှဲအထောက်အထား တင်ပြီးမှ စစ်ဆေးချိန်အထိ ပျမ်းမျှကြာချိန်' : 'Average time from proof to review'}
+                        </p>
                       </div>
                       <div className="ops-mini-tile">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Fulfillment velocity
+                          {isMyanmar ? 'ပေးပို့နှုန်း' : 'Fulfillment velocity'}
                         </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard
                             ? '…'
                             : formatDurationMetric(telegramSalesDashboard?.averages.fulfillmentMinutes)}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Average time from proof to delivery</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isMyanmar ? 'ငွေလွှဲအထောက်အထား တင်ပြီးမှ ပေးပို့ချိန်အထိ ပျမ်းမျှကြာချိန်' : 'Average time from proof to delivery'}
+                        </p>
                       </div>
                       <div className="ops-mini-tile">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Final conversion
+                          {isMyanmar ? 'နောက်ဆုံး ပြောင်းလဲမှု' : 'Final conversion'}
                         </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard
                             ? '…'
                             : `${Math.round(telegramFunnelSteps[telegramFunnelSteps.length - 1]?.cumulativeRate || 0)}%`}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Created orders that became fulfilled</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isMyanmar ? 'စတင်ဖန်တီးခဲ့သော အော်ဒါများအနက် ပြီးမြောက်သွားသော အချိုး' : 'Created orders that became fulfilled'}
+                        </p>
                       </div>
                       <div className="ops-mini-tile">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Largest drop-off
+                          {isMyanmar ? 'အများဆုံး ကျဆင်းရာအဆင့်' : 'Largest drop-off'}
                         </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard
                             ? '…'
                             : `${Math.max(...telegramFunnelSteps.map((step) => step.dropOff))}`}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Users lost between one step and the next</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isMyanmar ? 'အဆင့်တစ်ခုနှင့် နောက်အဆင့်ကြား လက်လွတ်သွားသော အသုံးပြုသူများ' : 'Users lost between one step and the next'}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1513,8 +1630,10 @@ export default function AnalyticsPage() {
                             </div>
                             <Badge variant="outline" className="border-cyan-400/30 bg-cyan-500/10 text-cyan-100">
                               {step.key === 'created'
-                                ? '100% start'
-                                : `${Math.round(step.stepRate)}% from prev`}
+                                ? isMyanmar ? '100% စတင်' : '100% start'
+                                : isMyanmar
+                                  ? `ယခင်အဆင့်မှ ${Math.round(step.stepRate)}%`
+                                  : `${Math.round(step.stepRate)}% from prev`}
                             </Badge>
                           </div>
                           <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
@@ -1525,8 +1644,12 @@ export default function AnalyticsPage() {
                           </div>
                           <p className="mt-2 text-xs text-muted-foreground">
                             {step.key === 'created'
-                              ? 'Baseline for the storefront funnel'
-                              : `${step.dropOff} dropped before this step • ${Math.round(step.cumulativeRate)}% of created orders reached here`}
+                              ? isMyanmar
+                                ? 'ဝယ်ယူမှု လမ်းကြောင်းအတွက် စတင်အခြေခံ'
+                                : 'Baseline for the storefront funnel'
+                              : isMyanmar
+                                ? `ဤအဆင့်မရောက်မီ ${step.dropOff} ခု ကျဆင်းခဲ့သည် • စတင်ခဲ့သော အော်ဒါများ၏ ${Math.round(step.cumulativeRate)}% သည် ဤနေရာသို့ ရောက်သည်`
+                                : `${step.dropOff} dropped before this step • ${Math.round(step.cumulativeRate)}% of created orders reached here`}
                           </p>
                         </div>
                       ))}
@@ -1534,69 +1657,77 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Reminder conversion</p>
-                    <h3 className="mt-2 text-lg font-semibold">Reminder effectiveness</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'သတိပေးစာ ပြောင်းလဲမှု' : 'Reminder conversion'}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'သတိပေးစာ ထိရောက်မှု' : 'Reminder effectiveness'}</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Payment reminders</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ငွေပေးချေမှု သတိပေးစာများ' : 'Payment reminders'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.paymentReminderSent || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.reminders.paymentReminderConverted || 0} progressed after reminder`}
+                            : isMyanmar
+                              ? `သတိပေးစာ နောက်ပိုင်း ${telegramSalesDashboard?.reminders.paymentReminderConverted || 0} ခု ရှေ့ဆက်သွားသည်`
+                              : `${telegramSalesDashboard?.reminders.paymentReminderConverted || 0} progressed after reminder`}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Review reminders</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'စစ်ဆေးမှု သတိပေးစာများ' : 'Review reminders'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.pendingReviewReminderSent || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.reminders.pendingReviewReminderConverted || 0} fulfilled after reminder`}
+                            : isMyanmar
+                              ? `သတိပေးစာ နောက်ပိုင်း ${telegramSalesDashboard?.reminders.pendingReviewReminderConverted || 0} ခု ပြီးမြောက်သည်`
+                              : `${telegramSalesDashboard?.reminders.pendingReviewReminderConverted || 0} fulfilled after reminder`}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rejected follow-ups</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ငြင်းပယ်ပြီးနောက် နောက်ဆက်တွဲ' : 'Rejected follow-ups'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.rejectedFollowUpSent || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.reminders.rejectedFollowUpConverted || 0} retried after reminder`}
+                            : isMyanmar
+                              ? `သတိပေးစာ နောက်ပိုင်း ${telegramSalesDashboard?.reminders.rejectedFollowUpConverted || 0} ခု ပြန်ကြိုးစားသည်`
+                              : `${telegramSalesDashboard?.reminders.rejectedFollowUpConverted || 0} retried after reminder`}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Retry nudges</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြန်ကြိုးစားရန် တွန်းအားပေးစာများ' : 'Retry nudges'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.reminders.retryReminderSent || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.reminders.retryReminderConverted || 0} resumed after reminder`}
+                            : isMyanmar
+                              ? `သတိပေးစာ နောက်ပိုင်း ${telegramSalesDashboard?.reminders.retryReminderConverted || 0} ခု ပြန်စသည်`
+                              : `${telegramSalesDashboard?.reminders.retryReminderConverted || 0} resumed after reminder`}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Renewal conversion</p>
-                    <h3 className="mt-2 text-lg font-semibold">Renewal retention</h3>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'သက်တမ်းတိုး ပြောင်းလဲနှုန်း' : 'Renewal conversion'}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'သက်တမ်းတိုး ထိန်းသိမ်းမှု' : 'Renewal retention'}</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Renewal orders</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'သက်တမ်းတိုး အော်ဒါများ' : 'Renewal orders'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.renewalConversion.totalOrders || 0}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Renew requests created from Telegram.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'တယ်လီဂရမ်မှ စတင်သော သက်တမ်းတိုး တောင်းဆိုမှုများ။' : 'Renew requests created from Telegram.'}</p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Renewal rate</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'သက်တမ်းတိုး နှုန်း' : 'Renewal rate'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard
                             ? '…'
@@ -1608,76 +1739,94 @@ export default function AnalyticsPage() {
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.renewalConversion.fulfilledOrders || 0} fulfilled renewals`}
+                            : isMyanmar
+                              ? `သက်တမ်းတိုး ${telegramSalesDashboard?.renewalConversion.fulfilledOrders || 0} ခု ပြီးမြောက်သည်`
+                              : `${telegramSalesDashboard?.renewalConversion.fulfilledOrders || 0} fulfilled renewals`}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recovery flows</p>
-                    <h3 className="mt-2 text-lg font-semibold">Recovered sales</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြန်လည်ရယူမှု လုပ်ငန်းစဉ်များ' : 'Recovery flows'}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'ပြန်လည်ရရှိသော အရောင်း' : 'Recovered sales'}</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Retried orders</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြန်ကြိုးစားသော အော်ဒါများ' : 'Retried orders'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.retriedOrders || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.retention.retriedFulfilled || 0} fulfilled after retry`}
+                            : isMyanmar
+                              ? `Retry နောက်ပိုင်း ${telegramSalesDashboard?.retention.retriedFulfilled || 0} ခု ပြီးမြောက်သည်`
+                              : `${telegramSalesDashboard?.retention.retriedFulfilled || 0} fulfilled after retry`}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Trial upsells</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အစမ်းသုံးမှ အဆင့်မြှင့် ဝယ်ယူမှုများ' : 'Trial upsells'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.trialUpsellOrders || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.retention.trialUpsellFulfilled || 0} fulfilled from trial-ending prompts`}
+                            : isMyanmar
+                              ? `Trial ပြီးဆုံးချိန် prompt များမှ ${telegramSalesDashboard?.retention.trialUpsellFulfilled || 0} ခု ပြီးမြောက်သည်`
+                              : `${telegramSalesDashboard?.retention.trialUpsellFulfilled || 0} fulfilled from trial-ending prompts`}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Expired recovery</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'သက်တမ်းကုန်ပြီးနောက် ပြန်ရယူမှု' : 'Expired recovery'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.expiredRecoveryOrders || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.retention.expiredRecoveryFulfilled || 0} fulfilled after expiry recovery`}
+                            : isMyanmar
+                              ? `သက်တမ်းကုန်ပြီးနောက် ပြန်ရယူမှုမှ ${telegramSalesDashboard?.retention.expiredRecoveryFulfilled || 0} ခု ပြီးမြောက်သည်`
+                              : `${telegramSalesDashboard?.retention.expiredRecoveryFulfilled || 0} fulfilled after expiry recovery`}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Premium renewal prompts</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အဆင့်မြင့် သက်တမ်းတိုး သတိပေးချက်များ' : 'Premium renewal prompts'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.retention.premiumRenewalOrders || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.retention.premiumRenewalFulfilled || 0} fulfilled from premium renewal prompts`}
+                            : isMyanmar
+                              ? `အဆင့်မြင့် သက်တမ်းတိုး သတိပေးချက်များမှ ${telegramSalesDashboard?.retention.premiumRenewalFulfilled || 0} ခု ပြီးမြောက်သည်`
+                              : `${telegramSalesDashboard?.retention.premiumRenewalFulfilled || 0} fulfilled from premium renewal prompts`}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon performance</p>
-                    <h3 className="mt-2 text-lg font-semibold">Promo conversion</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'ကူပွန် လုပ်ဆောင်ရည်' : 'Coupon performance'}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'ပရိုမိုးရှင်း ပြောင်းလဲမှု' : 'Promo conversion'}</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupons issued</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {isMyanmar ? 'ထုတ်ပေးထားသော ကူပွန်များ' : 'Coupons issued'}
+                        </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.coupons.summary.issued || 0}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Campaign coupons sent in this range.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isMyanmar ? 'ဤအချိန်အပိုင်းအခြားအတွင်း ကမ်ပိန်း လျှော့ဈေးကူပွန်များ ပို့ထားသည်။' : 'Campaign coupons sent in this range.'}
+                        </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupons redeemed</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {isMyanmar ? 'အသုံးပြုပြီးသော ကူပွန်များ' : 'Coupons redeemed'}
+                        </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.coupons.summary.redeemed || 0}
                         </p>
@@ -1686,23 +1835,33 @@ export default function AnalyticsPage() {
                             ? '…'
                             : telegramSalesDashboard?.coupons.summary.redemptionRate !== null &&
                                 telegramSalesDashboard?.coupons.summary.redemptionRate !== undefined
-                              ? `${Math.round(telegramSalesDashboard.coupons.summary.redemptionRate)}% redemption rate`
-                              : 'No redemptions yet'}
+                              ? isMyanmar
+                                ? `${Math.round(telegramSalesDashboard.coupons.summary.redemptionRate)}% အသုံးပြုနှုန်း`
+                                : `${Math.round(telegramSalesDashboard.coupons.summary.redemptionRate)}% redemption rate`
+                              : isMyanmar
+                                ? 'အသုံးပြုထားသော coupon မရှိသေးပါ'
+                                : 'No redemptions yet'}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon-backed orders</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {isMyanmar ? 'ကူပွန်နှင့် ဆက်စပ်သော အော်ဒါများ' : 'Coupon-backed orders'}
+                        </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.coupons.summary.attributedOrders || 0}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {loadingTelegramSalesDashboard
                             ? '…'
-                            : `${telegramSalesDashboard?.coupons.summary.attributedFulfilled || 0} fulfilled with coupon pricing`}
+                            : isMyanmar
+                              ? `ကူပွန်ဈေးနှုန်းဖြင့် ${telegramSalesDashboard?.coupons.summary.attributedFulfilled || 0} ခု ပြီးမြောက်သည်`
+                              : `${telegramSalesDashboard?.coupons.summary.attributedFulfilled || 0} fulfilled with coupon pricing`}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon conversion</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {isMyanmar ? 'ကူပွန် ပြောင်းလဲမှုနှုန်း' : 'Coupon conversion'}
+                        </p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard
                             ? '…'
@@ -1711,7 +1870,9 @@ export default function AnalyticsPage() {
                               ? `${Math.round(telegramSalesDashboard.coupons.summary.attributedConversionRate)}%`
                               : '0%'}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">From coupon-attributed checkout starts.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isMyanmar ? 'ကူပွန်ဖြင့် စတင်သော ငွေရှင်းလုပ်ငန်းစဉ်များမှ တွက်ချက်ထားသည်။' : 'From coupon-attributed checkout starts.'}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_0.85fr]">
@@ -1723,10 +1884,10 @@ export default function AnalyticsPage() {
                         ) : telegramSalesDashboard && telegramSalesDashboard.coupons.byCampaign.length > 0 ? (
                           telegramSalesDashboard.coupons.byCampaign.map((campaign) => {
                             const labelMap: Record<string, string> = {
-                              TRIAL_TO_PAID: 'Trial to paid',
-                              RENEWAL_SOON: 'Renewal coupon',
-                              PREMIUM_UPSELL: 'Premium upsell',
-                              WINBACK: 'Win-back',
+                              TRIAL_TO_PAID: isMyanmar ? 'အစမ်းသုံးမှ ငွေပေးချေမှုသို့' : 'Trial to paid',
+                              RENEWAL_SOON: isMyanmar ? 'သက်တမ်းတိုး ကူပွန်' : 'Renewal coupon',
+                              PREMIUM_UPSELL: isMyanmar ? 'အဆင့်မြှင့် ဝယ်ယူမှု အကြံပြု' : 'Premium upsell',
+                              WINBACK: isMyanmar ? 'ပြန်လည်ဖိတ်ခေါ်မှု' : 'Win-back',
                             };
                             return (
                               <div
@@ -1739,19 +1900,31 @@ export default function AnalyticsPage() {
                                       {labelMap[campaign.campaignType] || campaign.campaignType}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                      {campaign.issued} issued • {campaign.redeemed} redeemed • {campaign.attributedOrders} orders
+                                      {isMyanmar
+                                        ? `${campaign.issued} ခု ထုတ်ပေး • ${campaign.redeemed} ခု အသုံးပြု • ${campaign.attributedOrders} ခု order`
+                                        : `${campaign.issued} issued • ${campaign.redeemed} redeemed • ${campaign.attributedOrders} orders`}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
                                       {campaign.redemptionRate !== null && campaign.redemptionRate !== undefined
-                                        ? `${Math.round(campaign.redemptionRate)}% redemption`
-                                        : 'No redemption yet'}
+                                        ? isMyanmar
+                                          ? `${Math.round(campaign.redemptionRate)}% အသုံးပြုနှုန်း`
+                                          : `${Math.round(campaign.redemptionRate)}% redemption`
+                                        : isMyanmar
+                                          ? 'အသုံးပြုထားမှု မရှိသေးပါ'
+                                          : 'No redemption yet'}
                                       {' • '}
                                       {campaign.conversionRate !== null && campaign.conversionRate !== undefined
-                                        ? `${Math.round(campaign.conversionRate)}% checkout conversion`
-                                        : 'No checkout conversion yet'}
+                                        ? isMyanmar
+                                          ? `${Math.round(campaign.conversionRate)}% checkout ပြောင်းလဲမှု`
+                                          : `${Math.round(campaign.conversionRate)}% checkout conversion`
+                                        : isMyanmar
+                                          ? 'checkout ပြောင်းလဲမှု မရှိသေးပါ'
+                                          : 'No checkout conversion yet'}
                                     </p>
                                   </div>
-                                  <Badge variant="outline">{campaign.fulfilledOrders} fulfilled</Badge>
+                                  <Badge variant="outline">
+                                    {isMyanmar ? `${campaign.fulfilledOrders} ခု ပြီးမြောက်` : `${campaign.fulfilledOrders} fulfilled`}
+                                  </Badge>
                                 </div>
                                 {campaign.revenueByCurrency.length > 0 ? (
                                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1769,9 +1942,11 @@ export default function AnalyticsPage() {
                           <div className="ops-chart-empty">
                             <div className="space-y-2 text-center">
                               <Wallet className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                              <p className="font-medium text-foreground">No coupon campaigns yet</p>
+                              <p className="font-medium text-foreground">{isMyanmar ? 'ကူပွန် ကမ်ပိန်း မရှိသေးပါ' : 'No coupon campaigns yet'}</p>
                               <p className="text-sm text-muted-foreground">
-                                Enable trial, renewal, upsell, or win-back coupons to see promo performance here.
+                                {isMyanmar
+                                  ? 'အစမ်းသုံး၊ သက်တမ်းတိုး၊ အဆင့်မြှင့်တင်ဝယ်ယူမှု သို့မဟုတ် ပြန်လည်ဖိတ်ခေါ်မှု ကူပွန်များကို ဖွင့်ပြီး ပရိုမိုးရှင်း လုပ်ဆောင်ရည်ကို ဤနေရာတွင် ကြည့်ပါ။'
+                                  : 'Enable trial, renewal, upsell, or win-back coupons to see promo performance here.'}
                               </p>
                             </div>
                           </div>
@@ -1779,7 +1954,9 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="space-y-3">
                         <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Discount value</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {isMyanmar ? 'လျှော့ဈေးတန်ဖိုး' : 'Discount value'}
+                          </p>
                           <div className="mt-3 space-y-2">
                             {loadingTelegramSalesDashboard ? (
                               <div className="h-24 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
@@ -1792,16 +1969,22 @@ export default function AnalyticsPage() {
                                   <p className="mt-2 text-xl font-semibold">
                                     {formatRevenueLabel(entry.currency, entry.amount)}
                                   </p>
-                                  <p className="mt-1 text-xs text-muted-foreground">Redeemed discount value.</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {isMyanmar ? 'အသုံးပြုပြီးသော လျှော့ဈေးတန်ဖိုး။' : 'Redeemed discount value.'}
+                                  </p>
                                 </div>
                               ))
                             ) : (
-                              <p className="text-sm text-muted-foreground">No redeemed discounts in this range.</p>
+                              <p className="text-sm text-muted-foreground">
+                                {isMyanmar ? 'ဤအချိန်အပိုင်းအခြားတွင် အသုံးပြုပြီးသော လျှော့ဈေး မရှိသေးပါ။' : 'No redeemed discounts in this range.'}
+                              </p>
                             )}
                           </div>
                         </div>
                         <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Top coupon codes</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {isMyanmar ? 'အထိပ်တန်း ကူပွန်ကုဒ်များ' : 'Top coupon codes'}
+                          </p>
                           <div className="mt-3 space-y-2">
                             {loadingTelegramSalesDashboard ? (
                               <div className="h-24 animate-pulse rounded-[1rem] bg-muted/40 dark:bg-white/[0.04]" />
@@ -1818,7 +2001,9 @@ export default function AnalyticsPage() {
                                 </div>
                               ))
                             ) : (
-                              <p className="text-sm text-muted-foreground">No coupon codes issued yet.</p>
+                              <p className="text-sm text-muted-foreground">
+                                {isMyanmar ? 'ထုတ်ပေးထားသော ကူပွန်ကုဒ် မရှိသေးပါ။' : 'No coupon codes issued yet.'}
+                              </p>
                             )}
                           </div>
                         </div>
@@ -1827,16 +2012,16 @@ export default function AnalyticsPage() {
                     <div className="mt-4 grid gap-4 xl:grid-cols-2">
                       <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Coupon vs no-coupon conversion
+                          {isMyanmar ? 'ကူပွန် ပါ/မပါ ပြောင်းလဲမှုနှုန်း' : 'Coupon vs no-coupon conversion'}
                         </p>
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
                           {[
                             {
-                              label: 'With coupon',
+                              label: isMyanmar ? 'ကူပွန်ပါသော အော်ဒါ' : 'With coupon',
                               data: telegramSalesDashboard?.coupons.couponVsNonCoupon.withCoupon,
                             },
                             {
-                              label: 'Without coupon',
+                              label: isMyanmar ? 'ကူပွန်မပါသော အော်ဒါ' : 'Without coupon',
                               data: telegramSalesDashboard?.coupons.couponVsNonCoupon.withoutCoupon,
                             },
                           ].map((entry) => (
@@ -1858,7 +2043,9 @@ export default function AnalyticsPage() {
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {loadingTelegramSalesDashboard
                                   ? '…'
-                                  : `${entry.data?.fulfilled || 0}/${entry.data?.orders || 0} fulfilled`}
+                                  : isMyanmar
+                                    ? `${entry.data?.fulfilled || 0}/${entry.data?.orders || 0} ခု ပြီးမြောက်`
+                                    : `${entry.data?.fulfilled || 0}/${entry.data?.orders || 0} fulfilled`}
                               </p>
                               <div className="mt-3 space-y-1">
                                 {(entry.data?.revenueByCurrency || []).length > 0 ? (
@@ -1868,7 +2055,9 @@ export default function AnalyticsPage() {
                                     </p>
                                   ))
                                 ) : (
-                                  <p className="text-xs text-muted-foreground">No fulfilled revenue yet.</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {isMyanmar ? 'ပြီးမြောက်သော ဝင်ငွေ မရှိသေးပါ။' : 'No fulfilled revenue yet.'}
+                                  </p>
                                 )}
                               </div>
                             </div>
@@ -1878,7 +2067,7 @@ export default function AnalyticsPage() {
 
                       <div className="rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Recovery revenue by campaign
+                          {isMyanmar ? 'ကမ်ပိန်းအလိုက် ပြန်လည်ရရှိသော ဝင်ငွေ' : 'Recovery revenue by campaign'}
                         </p>
                         <div className="mt-3 space-y-2">
                           {loadingTelegramSalesDashboard ? (
@@ -1892,24 +2081,32 @@ export default function AnalyticsPage() {
                                   <p className="text-sm font-medium">{bucket.label}</p>
                                   <Badge variant="outline">
                                     {bucket.conversionRate !== null && bucket.conversionRate !== undefined
-                                      ? `${Math.round(bucket.conversionRate)}% conv.`
-                                      : '0% conv.'}
+                                      ? isMyanmar
+                                        ? `${Math.round(bucket.conversionRate)}% ပြောင်းလဲမှု`
+                                        : `${Math.round(bucket.conversionRate)}% conv.`
+                                      : isMyanmar
+                                        ? '0% ပြောင်းလဲမှု'
+                                        : '0% conv.'}
                                   </Badge>
                                 </div>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                  {bucket.fulfilled}/{bucket.orders} fulfilled
+                                  {isMyanmar ? `${bucket.fulfilled}/${bucket.orders} ခု ပြီးမြောက်` : `${bucket.fulfilled}/${bucket.orders} fulfilled`}
                                 </p>
                                 <p className="mt-2 text-xs text-muted-foreground">
                                   {bucket.revenueByCurrency.length > 0
                                     ? bucket.revenueByCurrency
                                         .map((revenue) => formatRevenueLabel(revenue.currency, revenue.amount))
                                         .join(' • ')
-                                    : 'No fulfilled revenue yet'}
+                                    : isMyanmar
+                                      ? 'ပြီးမြောက်သော ဝင်ငွေ မရှိသေးပါ။'
+                                      : 'No fulfilled revenue yet'}
                                 </p>
                               </div>
                             ))
                           ) : (
-                            <p className="text-sm text-muted-foreground">No recovery revenue yet.</p>
+                            <p className="text-sm text-muted-foreground">
+                          {isMyanmar ? 'ပြန်လည်ရရှိသော ဝင်ငွေ မရှိသေးပါ။' : 'No recovery revenue yet.'}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -1917,18 +2114,20 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Trial conversion</p>
-                    <h3 className="mt-2 text-lg font-semibold">Free trial to paid</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အစမ်းသုံး ပြောင်းလဲမှု' : 'Trial conversion'}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'အခမဲ့ အစမ်းသုံးမှ ငွေပေးချေမှုသို့' : 'Free trial to paid'}</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fulfilled trials</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြီးမြောက်သော အစမ်းသုံးများ' : 'Fulfilled trials'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.trialConversion.fulfilledTrials || 0}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">Trial orders that were actually delivered.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {isMyanmar ? 'အမှန်တကယ် ပေးပို့ပြီးခဲ့သော အစမ်းသုံး အော်ဒါများ။' : 'Trial orders that were actually delivered.'}
+                        </p>
                       </div>
                       <div className="ops-mini-tile">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Converted users</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ငွေပေးချေမှုသို့ ပြောင်းလဲထားသော အသုံးပြုသူများ' : 'Converted users'}</p>
                         <p className="mt-2 text-2xl font-semibold">
                           {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.trialConversion.convertedUsers || 0}
                         </p>
@@ -1937,25 +2136,33 @@ export default function AnalyticsPage() {
                             ? '…'
                             : telegramSalesDashboard?.trialConversion.conversionRate !== null &&
                                 telegramSalesDashboard?.trialConversion.conversionRate !== undefined
-                              ? `${Math.round(telegramSalesDashboard.trialConversion.conversionRate)}% trial-to-paid conversion`
-                              : 'No paid conversions yet'}
+                              ? (isMyanmar
+                                ? `အစမ်းသုံးမှ ငွေပေးချေမှုသို့ ပြောင်းလဲမှု ${Math.round(telegramSalesDashboard.trialConversion.conversionRate)}%`
+                                : `${Math.round(telegramSalesDashboard.trialConversion.conversionRate)}% trial-to-paid conversion`)
+                              : (isMyanmar ? 'ငွေပေးချေမှုသို့ ပြောင်းလဲမှု မရှိသေးပါ' : 'No paid conversions yet')}
                         </p>
                       </div>
                     </div>
                     <div className="mt-3 rounded-[1.2rem] border border-border/60 bg-background/60 p-3 dark:bg-white/[0.02]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Converted paid orders</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {isMyanmar ? 'ငွေပေးချေသော အော်ဒါအဖြစ် ပြောင်းလဲထားမှု' : 'Converted paid orders'}
+                      </p>
                       <p className="mt-2 text-xl font-semibold">
                         {loadingTelegramSalesDashboard ? '…' : telegramSalesDashboard?.trialConversion.convertedPaidOrders || 0}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Paid Telegram orders linked to users who had a fulfilled free trial first.
+                        {isMyanmar
+                          ? 'အရင် fulfilled free trial ရရှိခဲ့သော အသုံးပြုသူများနှင့် ချိတ်ဆက်ထားသော paid Telegram order များ။'
+                          : 'Paid Telegram orders linked to users who had a fulfilled free trial first.'}
                       </p>
                     </div>
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rejection reasons</p>
-                    <h3 className="mt-2 text-lg font-semibold">Why proofs are rejected</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'ငြင်းပယ်ရသည့် အကြောင်းများ' : 'Rejection reasons'}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'ငွေလွှဲအထောက်အထားများကို အဘယ်ကြောင့် ငြင်းပယ်ရသည်' : 'Why proofs are rejected'}</h3>
                     <div className="mt-4 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -1980,9 +2187,11 @@ export default function AnalyticsPage() {
                         <div className="ops-chart-empty">
                           <div className="space-y-2 text-center">
                             <AlertTriangle className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                            <p className="font-medium text-foreground">No rejection reasons yet</p>
+                            <p className="font-medium text-foreground">{isMyanmar ? 'ငြင်းပယ်ရသည့် အကြောင်းအရာ မရှိသေးပါ' : 'No rejection reasons yet'}</p>
                             <p className="text-sm text-muted-foreground">
-                              Once orders are rejected with a preset reason, the breakdown will appear here.
+                              {isMyanmar
+                                  ? 'ကြိုတင်သတ်မှတ်ထားသော အကြောင်းပြချက်ဖြင့် အော်ဒါများကို ငြင်းပယ်ပြီးမှ ဤနေရာတွင် အကြောင်းအရာခွဲခြမ်းကို ပြသပါမည်။'
+                                  : 'Once orders are rejected with a preset reason, the breakdown will appear here.'}
                             </p>
                           </div>
                         </div>
@@ -1991,8 +2200,10 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Revenue by currency</p>
-                    <h3 className="mt-2 text-lg font-semibold">Collected pricing</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'ငွေကြေးအလိုက် ဝင်ငွေ' : 'Revenue by currency'}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'ကောက်ခံထားသော စျေးနှုန်း' : 'Collected pricing'}</h3>
                     <div className="mt-4 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -2005,16 +2216,20 @@ export default function AnalyticsPage() {
                               {revenue.currency}
                             </p>
                             <p className="mt-2 text-xl font-semibold">{formatRevenueLabel(revenue.currency, revenue.amount)}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">From fulfilled Telegram orders in this range.</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {isMyanmar ? 'ဤကာလအတွင်း ပြီးမြောက်သော တယ်လီဂရမ် အော်ဒါများမှ ကောက်ခံထားသည်။' : 'From fulfilled Telegram orders in this range.'}
+                            </p>
                           </div>
                         ))
                       ) : (
                         <div className="ops-chart-empty">
                           <div className="space-y-2 text-center">
                             <TrendingUp className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                            <p className="font-medium text-foreground">No revenue signals yet</p>
+                            <p className="font-medium text-foreground">{isMyanmar ? 'ဝင်ငွေ အချက်အလက် မရှိသေးပါ' : 'No revenue signals yet'}</p>
                             <p className="text-sm text-muted-foreground">
-                              Set plan pricing in Telegram sales settings to track collected amounts here.
+                              {isMyanmar
+                                ? 'တယ်လီဂရမ် အရောင်းဆက်တင်များတွင် အစီအစဉ် ဈေးနှုန်း သတ်မှတ်ပြီး ဤနေရာတွင် ကောက်ခံငွေကို ခြေရာခံနိုင်သည်။'
+                                : 'Set plan pricing in Telegram sales settings to track collected amounts here.'}
                             </p>
                           </div>
                         </div>
@@ -2023,8 +2238,10 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Payment methods</p>
-                    <h3 className="mt-2 text-lg font-semibold">Checkout choices</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'ငွေပေးချေမှု နည်းလမ်းများ' : 'Payment methods'}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'ငွေရှင်း ရွေးချယ်မှုများ' : 'Checkout choices'}</h3>
                     <div className="mt-4 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(3)].map((_, i) => (
@@ -2037,15 +2254,15 @@ export default function AnalyticsPage() {
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium">{method.paymentMethodLabel}</p>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                {method.orders} orders • {method.fulfilled} fulfilled
+                                {isMyanmar ? `${method.orders} ခု အော်ဒါ • ${method.fulfilled} ခု ပြီးမြောက်` : `${method.orders} orders • ${method.fulfilled} fulfilled`}
                               </p>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 {method.orders > 0
-                                  ? `${Math.round(method.conversionRate)}% conversion`
-                                  : 'No conversions yet'}
+                                  ? (isMyanmar ? `${Math.round(method.conversionRate)}% ပြောင်းလဲမှု` : `${Math.round(method.conversionRate)}% conversion`)
+                                  : (isMyanmar ? 'ပြောင်းလဲမှု မရှိသေးပါ' : 'No conversions yet')}
                               </p>
                             </div>
-                              <Badge variant="outline">{method.paymentMethodCode || 'custom'}</Badge>
+                              <Badge variant="outline">{method.paymentMethodCode || (isMyanmar ? 'စိတ်ကြိုက်' : 'custom')}</Badge>
                             </div>
                             <div className="mt-3 space-y-1">
                               {method.revenueByCurrency.length > 0 ? (
@@ -2055,7 +2272,7 @@ export default function AnalyticsPage() {
                                   </p>
                                 ))
                               ) : (
-                                <p className="text-xs text-muted-foreground">No fulfilled revenue yet</p>
+                                <p className="text-xs text-muted-foreground">{isMyanmar ? 'ပြီးမြောက်သော ဝင်ငွေ မရှိသေးပါ' : 'No fulfilled revenue yet'}</p>
                               )}
                             </div>
                           </div>
@@ -2064,9 +2281,11 @@ export default function AnalyticsPage() {
                         <div className="ops-chart-empty">
                           <div className="space-y-2 text-center">
                             <Copy className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                            <p className="font-medium text-foreground">No payment method data yet</p>
+                            <p className="font-medium text-foreground">{isMyanmar ? 'ငွေပေးချေမှုနည်းလမ်း ဒေတာ မရှိသေးပါ' : 'No payment method data yet'}</p>
                             <p className="text-sm text-muted-foreground">
-                              Orders will show whether customers picked KPay, Wave Pay, AYA Pay, or another method.
+                              {isMyanmar
+                                ? 'ဖောက်သည်များက KPay၊ Wave Pay၊ AYA Pay သို့မဟုတ် အခြားနည်းလမ်းများ ရွေးထားမှုကို အော်ဒါများတွင် ပြသမည်။'
+                                : 'Orders will show whether customers picked KPay, Wave Pay, AYA Pay, or another method.'}
                             </p>
                           </div>
                         </div>
@@ -2075,8 +2294,10 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recent orders</p>
-                    <h3 className="mt-2 text-lg font-semibold">Latest Telegram orders</h3>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'နောက်ဆုံး အော်ဒါများ' : 'Recent orders'}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'နောက်ဆုံး တယ်လီဂရမ် အော်ဒါများ' : 'Latest Telegram orders'}</h3>
                     <div className="mt-4 space-y-3">
                       {loadingTelegramSalesDashboard ? (
                         [...Array(4)].map((_, i) => (
@@ -2117,9 +2338,13 @@ export default function AnalyticsPage() {
                         <div className="ops-chart-empty">
                           <div className="space-y-2 text-center">
                             <Users className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                            <p className="font-medium text-foreground">No recent Telegram orders</p>
+                            <p className="font-medium text-foreground">
+                              {isMyanmar ? 'နောက်ဆုံး တယ်လီဂရမ် အော်ဒါ မရှိသေးပါ။' : 'No recent Telegram orders'}
+                            </p>
                             <p className="text-sm text-muted-foreground">
-                              The latest customer buy and renew requests will appear here.
+                              {isMyanmar
+                                ? 'ဖောက်သည်များ၏ ဝယ်ယူမှုနှင့် သက်တမ်းတိုး တောင်းဆိုမှု နောက်ဆုံးများကို ဤနေရာတွင် ပြသမည်။'
+                                : 'The latest customer buy and renew requests will appear here.'}
                             </p>
                           </div>
                         </div>
@@ -2138,20 +2363,20 @@ export default function AnalyticsPage() {
               <div>
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Calendar className="h-5 w-5 text-primary" />
-                  Monthly finance dashboard
+                  {isMyanmar ? 'လစဉ် ငွေကြေး ခြုံငုံမြင်ကွင်း' : 'Monthly finance dashboard'}
                 </CardTitle>
                 <CardDescription>
-                  Revenue, renewals, and churn signals for the last 6 months.
+                  {isMyanmar ? 'နောက်ဆုံး ၆ လအတွင်း ဝင်ငွေ၊ သက်တမ်းတိုးမှုများနှင့် ထွက်ခွာမှု လက္ခဏာများကို ပြသထားသည်။' : 'Revenue, renewals, and churn signals for the last 6 months.'}
                 </CardDescription>
               </div>
-              <Badge variant="outline">6 months</Badge>
+              <Badge variant="outline">{isMyanmar ? '၆ လ' : '6 months'}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 px-0 pb-0">
             <div className="grid gap-3 md:grid-cols-3">
               <div className="ops-mini-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Total revenue
+                  {isMyanmar ? 'စုစုပေါင်း ဝင်ငွေ' : 'Total revenue'}
                 </p>
                 <p className="mt-2 text-lg font-semibold">
                   {loadingMonthlyBusinessDashboard
@@ -2159,35 +2384,45 @@ export default function AnalyticsPage() {
                     : monthlyBusinessDashboard
                       ? Object.entries(monthlyBusinessDashboard.summary.totalRevenueByCurrency)
                           .map(([currency, amount]) => formatRevenueLabel(currency, amount))
-                          .join(' • ') || 'No revenue'
-                      : 'No revenue'}
+                          .join(' • ') || (isMyanmar ? 'ဝင်ငွေ မရှိသေးပါ' : 'No revenue')
+                      : isMyanmar ? 'ဝင်ငွေ မရှိသေးပါ' : 'No revenue'}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">Fulfilled Telegram order revenue.</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isMyanmar ? 'ပြီးမြောက်ပြီးသော တယ်လီဂရမ် အော်ဒါများမှ ရရှိသော ဝင်ငွေ။' : 'Fulfilled Telegram order revenue.'}
+                </p>
               </div>
               <div className="ops-mini-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Renewals
+                  {isMyanmar ? 'သက်တမ်းတိုးမှုများ' : 'Renewals'}
                 </p>
                 <p className="mt-2 text-lg font-semibold">
                   {loadingMonthlyBusinessDashboard ? '…' : monthlyBusinessDashboard?.summary.totalRenewals || 0}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {monthlyBusinessDashboard?.summary.monthOverMonth
-                    ? `${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta} vs previous month`
-                    : 'No month-over-month comparison yet'}
+                    ? isMyanmar
+                      ? `ယခင်လနှင့် နှိုင်းယှဉ်လျှင် ${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta}`
+                      : `${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.renewalDelta} vs previous month`
+                    : isMyanmar
+                      ? 'လစဉ် နှိုင်းယှဉ်ချက် မရှိသေးပါ'
+                      : 'No month-over-month comparison yet'}
                 </p>
               </div>
               <div className="ops-mini-tile">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Churn signal
+                  {isMyanmar ? 'ထွက်ခွာမှု လက္ခဏာ' : 'Churn signal'}
                 </p>
                 <p className="mt-2 text-lg font-semibold">
                   {loadingMonthlyBusinessDashboard ? '…' : monthlyBusinessDashboard?.summary.totalChurnSignals || 0}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {monthlyBusinessDashboard?.summary.monthOverMonth
-                    ? `${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta} vs previous month`
-                    : 'Uses expired, depleted, disabled, and archived churn signals'}
+                    ? isMyanmar
+                      ? `ယခင်လနှင့် နှိုင်းယှဉ်လျှင် ${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta}`
+                      : `${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta >= 0 ? '+' : ''}${monthlyBusinessDashboard.summary.monthOverMonth.churnDelta} vs previous month`
+                    : isMyanmar
+                      ? 'သက်တမ်းကုန်၊ ပမာဏကုန်၊ ပိတ်ထားပြီး မှတ်တမ်းတင်ထားသော အခြေအနေများကို ထွက်ခွာမှု လက္ခဏာအဖြစ် တွက်ချက်ထားသည်'
+                      : 'Uses expired, depleted, disabled, and archived churn signals'}
                 </p>
               </div>
             </div>
@@ -2195,15 +2430,19 @@ export default function AnalyticsPage() {
             <div className="grid gap-4 xl:grid-cols-2">
               <div className="rounded-[1.3rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                 <div className="mb-3 space-y-1">
-                  <p className="text-sm font-semibold">Revenue trend</p>
+                  <p className="text-sm font-semibold">{isMyanmar ? 'ဝင်ငွေ လမ်းကြောင်း' : 'Revenue trend'}</p>
                   <p className="text-xs text-muted-foreground">
                     {monthlyBusinessDashboard && Object.keys(monthlyBusinessDashboard.summary.totalRevenueByCurrency).length > 1
-                      ? `Showing ${primaryRevenueCurrency} revenue to keep the chart readable when multiple currencies are active.`
-                      : `Monthly revenue trend in ${primaryRevenueCurrency}.`}
+                      ? isMyanmar
+                        ? `ငွေကြေးအမျိုးအစား အများအပြား ရှိနေသောကြောင့် ဇယားကို ဖတ်ရလွယ်စေရန် ${primaryRevenueCurrency} ဝင်ငွေကိုသာ ပြထားသည်။`
+                        : `Showing ${primaryRevenueCurrency} revenue to keep the chart readable when multiple currencies are active.`
+                      : isMyanmar
+                        ? `${primaryRevenueCurrency} ဖြင့် လစဉ် ဝင်ငွေ လမ်းကြောင်း`
+                        : `Monthly revenue trend in ${primaryRevenueCurrency}.`}
                   </p>
                 </div>
                 {loadingMonthlyBusinessDashboard ? (
-                  <div className="ops-chart-empty h-[240px]">Loading finance chart...</div>
+                  <div className="ops-chart-empty h-[240px]">{isMyanmar ? 'ငွေကြေး ဇယားကို တင်နေသည်...' : 'Loading finance chart...'}</div>
                 ) : financeTrendRows.length > 0 ? (
                   <ResponsiveContainer width="100%" height={240}>
                     <RechartsAreaChart data={financeTrendRows} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
@@ -2241,7 +2480,7 @@ export default function AnalyticsPage() {
                       <RechartsArea
                         type="monotone"
                         dataKey="revenue"
-                        name="Revenue"
+                        name={isMyanmar ? 'ဝင်ငွေ' : 'Revenue'}
                         stroke="rgba(34,197,94,0.95)"
                         strokeWidth={2.5}
                         fillOpacity={1}
@@ -2254,9 +2493,9 @@ export default function AnalyticsPage() {
                   <div className="ops-chart-empty h-[240px]">
                     <div className="space-y-2 text-center">
                       <Wallet className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                      <p className="font-medium text-foreground">No finance trend yet</p>
+                      <p className="font-medium text-foreground">{isMyanmar ? 'ငွေကြေး လမ်းကြောင်း မရှိသေးပါ' : 'No finance trend yet'}</p>
                       <p className="text-sm text-muted-foreground">
-                        Monthly fulfilled-order revenue will appear here.
+                        {isMyanmar ? 'လစဉ် ပြီးမြောက်သော အော်ဒါများမှ ဝင်ငွေကို ဤနေရာတွင် ပြသမည်။' : 'Monthly fulfilled-order revenue will appear here.'}
                       </p>
                     </div>
                   </div>
@@ -2265,13 +2504,13 @@ export default function AnalyticsPage() {
 
               <div className="rounded-[1.3rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                 <div className="mb-3 space-y-1">
-                  <p className="text-sm font-semibold">Renewal vs churn trend</p>
+                  <p className="text-sm font-semibold">{isMyanmar ? 'သက်တမ်းတိုးမှုနှင့် ထွက်ခွာမှု လမ်းကြောင်း' : 'Renewal vs churn trend'}</p>
                   <p className="text-xs text-muted-foreground">
-                    Compare new paid orders, renewals, and churn signals month over month.
+                    {isMyanmar ? 'လစဉ် အသစ် ငွေပေးချေ အော်ဒါများ၊ သက်တမ်းတိုးမှုများနှင့် ထွက်ခွာမှု လက္ခဏာများကို နှိုင်းယှဉ်ပြထားသည်။' : 'Compare new paid orders, renewals, and churn signals month over month.'}
                   </p>
                 </div>
                 {loadingMonthlyBusinessDashboard ? (
-                  <div className="ops-chart-empty h-[240px]">Loading finance chart...</div>
+                  <div className="ops-chart-empty h-[240px]">{isMyanmar ? 'ငွေကြေး ဇယားကို တင်နေသည်...' : 'Loading finance chart...'}</div>
                 ) : financeTrendRows.length > 0 ? (
                   <ResponsiveContainer width="100%" height={240}>
                     <RechartsBarChart data={financeTrendRows} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
@@ -2300,18 +2539,18 @@ export default function AnalyticsPage() {
                           />
                         }
                       />
-                      <RechartsBar dataKey="newOrders" name="New paid" fill="rgba(34,211,238,0.92)" radius={[6, 6, 0, 0]} />
-                      <RechartsBar dataKey="renewals" name="Renewals" fill="rgba(168,85,247,0.92)" radius={[6, 6, 0, 0]} />
-                      <RechartsBar dataKey="churn" name="Churn" fill="rgba(251,191,36,0.92)" radius={[6, 6, 0, 0]} />
+                      <RechartsBar dataKey="newOrders" name={isMyanmar ? 'အသစ် ငွေပေးချေ အော်ဒါ' : 'New paid'} fill="rgba(34,211,238,0.92)" radius={[6, 6, 0, 0]} />
+                      <RechartsBar dataKey="renewals" name={isMyanmar ? 'သက်တမ်းတိုးမှု' : 'Renewals'} fill="rgba(168,85,247,0.92)" radius={[6, 6, 0, 0]} />
+                      <RechartsBar dataKey="churn" name={isMyanmar ? 'ထွက်ခွာမှု' : 'Churn'} fill="rgba(251,191,36,0.92)" radius={[6, 6, 0, 0]} />
                     </RechartsBarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="ops-chart-empty h-[240px]">
                     <div className="space-y-2 text-center">
                       <TrendingUp className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                      <p className="font-medium text-foreground">No trend history yet</p>
+                      <p className="font-medium text-foreground">{isMyanmar ? 'လမ်းကြောင်း မှတ်တမ်း မရှိသေးပါ' : 'No trend history yet'}</p>
                       <p className="text-sm text-muted-foreground">
-                        Renewal and churn signals will appear once monthly data builds up.
+                        {isMyanmar ? 'လစဉ် ဒေတာ လုံလောက်လာသောအခါ သက်တမ်းတိုးမှုနှင့် ထွက်ခွာမှု လက္ခဏာများကို ဤနေရာတွင် ပြသမည်။' : 'Renewal and churn signals will appear once monthly data builds up.'}
                       </p>
                     </div>
                   </div>
@@ -2323,18 +2562,18 @@ export default function AnalyticsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Revenue</TableHead>
-                    <TableHead>New paid</TableHead>
-                    <TableHead>Renewals</TableHead>
-                    <TableHead>Churn signal</TableHead>
+                    <TableHead>{isMyanmar ? 'လ' : 'Month'}</TableHead>
+                    <TableHead>{isMyanmar ? 'ဝင်ငွေ' : 'Revenue'}</TableHead>
+                    <TableHead>{isMyanmar ? 'အသစ် ငွေပေးချေ အော်ဒါ' : 'New paid'}</TableHead>
+                    <TableHead>{isMyanmar ? 'သက်တမ်းတိုးမှုများ' : 'Renewals'}</TableHead>
+                    <TableHead>{isMyanmar ? 'ထွက်ခွာမှု လက္ခဏာ' : 'Churn signal'}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loadingMonthlyBusinessDashboard ? (
                     <TableRow>
                       <TableCell colSpan={5} className="h-24 text-center">
-                        Loading monthly business metrics...
+                        {isMyanmar ? 'လစဉ် စီးပွားရေး အချက်အလက်များကို တင်နေသည်...' : 'Loading monthly business metrics...'}
                       </TableCell>
                     </TableRow>
                   ) : monthlyBusinessDashboard && monthlyBusinessDashboard.months.length > 0 ? (
@@ -2346,7 +2585,9 @@ export default function AnalyticsPage() {
                             ? month.revenueByCurrency
                                 .map((entry) => formatRevenueLabel(entry.currency, entry.amount))
                                 .join(' • ')
-                            : 'No revenue'}
+                            : isMyanmar
+                              ? 'ဝင်ငွေ မရှိသေးပါ'
+                              : 'No revenue'}
                         </TableCell>
                         <TableCell>{month.newOrders}</TableCell>
                         <TableCell>{month.renewalOrders}</TableCell>
@@ -2356,7 +2597,7 @@ export default function AnalyticsPage() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={5} className="h-24 text-center">
-                        No monthly finance data yet.
+                        {isMyanmar ? 'လစဉ် ငွေကြေးဒေတာ မရှိသေးပါ။' : 'No monthly finance data yet.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -2373,9 +2614,11 @@ export default function AnalyticsPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <Zap className="h-5 w-5 text-primary" />
-                    Top consumers
+                    {isMyanmar ? 'အသုံးပြုမှု အများဆုံးများ' : 'Top consumers'}
                   </CardTitle>
-                  <CardDescription>Highest traffic keys in the selected snapshot window.</CardDescription>
+                  <CardDescription>
+                    {isMyanmar ? 'ရွေးချယ်ထားသော အချိန်အပိုင်းအတွင်း အသုံးပြုမှုအများဆုံး သော့များ။' : 'Highest traffic keys in the selected snapshot window.'}
+                  </CardDescription>
                 </div>
                 <Select value={topConsumersRange} onValueChange={(v) => setTopConsumersRange(v as '24h' | '7d' | '30d')}>
                   <SelectTrigger className="w-[120px]">
@@ -2383,8 +2626,8 @@ export default function AnalyticsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="24h">24h</SelectItem>
-                    <SelectItem value="7d">7 days</SelectItem>
-                    <SelectItem value="30d">30 days</SelectItem>
+                    <SelectItem value="7d">{isMyanmar ? '၇ ရက်' : '7 days'}</SelectItem>
+                    <SelectItem value="30d">{isMyanmar ? '၃၀ ရက်' : '30 days'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2410,31 +2653,39 @@ export default function AnalyticsPage() {
                               {consumer.name}
                             </Link>
                             <p className="text-xs text-muted-foreground">
-                              {consumer.serverName ? `${consumer.countryCode ? `${getCountryFlag(consumer.countryCode)} ` : ''}${consumer.serverName}` : 'Dynamic key'}
+                              {consumer.serverName
+                                ? `${consumer.countryCode ? `${getCountryFlag(consumer.countryCode)} ` : ''}${consumer.serverName}`
+                                : isMyanmar
+                                  ? 'အလှုပ်ရှားသော သော့'
+                                  : 'Dynamic key'}
                             </p>
                           </div>
-                          <Badge variant="outline">{consumer.type === 'ACCESS_KEY' ? 'Key' : 'Dynamic'}</Badge>
+                          <Badge variant="outline">{consumer.type === 'ACCESS_KEY' ? (isMyanmar ? 'သော့' : 'Key') : (isMyanmar ? 'ပြောင်းလဲသတ်မှတ်' : 'Dynamic')}</Badge>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div className="ops-mini-tile">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Usage</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {isMyanmar ? 'အသုံးပြုမှု' : 'Usage'}
+                            </p>
                             <p className="mt-2 text-lg font-semibold">{formatBytes(BigInt(consumer.deltaBytes))}</p>
                           </div>
                           <div className="ops-mini-tile">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Forecast</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                              {isMyanmar ? 'ခန့်မှန်းချက်' : 'Forecast'}
+                            </p>
                             <div className="mt-2 text-sm">
                               {consumer.dataLimitBytes ? (
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <button className="inline-flex items-center gap-1 text-primary">
-                                      View quota outlook
+                                      {isMyanmar ? 'ခွင့်ပြုပမာဏ ခန့်မှန်းချက် ကြည့်မည်' : 'View quota outlook'}
                                       <Info className="h-3.5 w-3.5" />
                                     </button>
                                   </TooltipTrigger>
                                   <ForecastTooltip keyId={consumer.id} keyType={consumer.type} />
                                 </Tooltip>
                               ) : (
-                                <span className="text-muted-foreground">No quota</span>
+                                <span className="text-muted-foreground">{isMyanmar ? 'ခွင့်ပြုပမာဏ မရှိပါ' : 'No quota'}</span>
                               )}
                             </div>
                           </div>
@@ -2447,10 +2698,10 @@ export default function AnalyticsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Key</TableHead>
-                          <TableHead>Server</TableHead>
-                          <TableHead>Forecast</TableHead>
-                          <TableHead className="text-right">Period usage</TableHead>
+                          <TableHead>{isMyanmar ? 'သော့' : 'Key'}</TableHead>
+                          <TableHead>{isMyanmar ? 'ဆာဗာ' : 'Server'}</TableHead>
+                          <TableHead>{isMyanmar ? 'ခန့်မှန်းချက်' : 'Forecast'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'ကာလအသုံးပြုမှု' : 'Period usage'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -2477,11 +2728,13 @@ export default function AnalyticsPage() {
                                   <span>{consumer.serverName}</span>
                                 </div>
                               ) : (
-                                <Badge variant="outline" className="text-xs">Dynamic</Badge>
+                                <Badge variant="outline" className="text-xs">{isMyanmar ? 'ပြောင်းလဲသတ်မှတ်' : 'Dynamic'}</Badge>
                               )}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {consumer.dataLimitBytes ? 'Quota tracked' : 'No quota'}
+                              {consumer.dataLimitBytes
+                                ? (isMyanmar ? 'ခွင့်ပြုပမာဏကို ခြေရာခံထားသည်' : 'Quota tracked')
+                                : (isMyanmar ? 'ခွင့်ပြုပမာဏ မရှိပါ' : 'No quota')}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatBytes(BigInt(consumer.deltaBytes))}
@@ -2496,9 +2749,11 @@ export default function AnalyticsPage() {
                 <div className="ops-chart-empty">
                   <div className="space-y-2 text-center">
                     <Activity className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                    <p className="font-medium text-foreground">No usage data yet</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'အသုံးပြုမှု ဒေတာ မရှိသေးပါ' : 'No usage data yet'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Highest-usage keys will appear after snapshot collection starts.
+                      {isMyanmar
+                        ? 'Snapshot စုဆောင်းမှု စတင်ပြီးနောက် အသုံးပြုမှုအများဆုံး key များကို ဤနေရာတွင် ပြသမည်။'
+                        : 'Highest-usage keys will appear after snapshot collection starts.'}
                     </p>
                   </div>
                 </div>
@@ -2510,9 +2765,11 @@ export default function AnalyticsPage() {
             <CardHeader className="px-0 pt-0">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                Usage anomalies
+                {isMyanmar ? 'အသုံးပြုမှု မမှန်ကန်မှုများ' : 'Usage anomalies'}
               </CardTitle>
-              <CardDescription>Keys operating outside their normal traffic baseline.</CardDescription>
+              <CardDescription>
+                {isMyanmar ? 'ပုံမှန် အသုံးပြုမှု အခြေခံစံထက် လွန်ကဲစွာ မြင့်တက်နေသော သော့များ။' : 'Keys operating outside their normal traffic baseline.'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="px-0 pb-0">
               {loadingAnomalies ? (
@@ -2536,12 +2793,14 @@ export default function AnalyticsPage() {
                           >
                             {anomaly.name}
                           </Link>
-                          <p className="text-xs text-muted-foreground">{anomaly.serverName || 'Dynamic key'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {anomaly.serverName || (isMyanmar ? 'အလှုပ်ရှားသော သော့' : 'Dynamic key')}
+                          </p>
                         </div>
                       </div>
                       <div className="text-right">
                         <Badge variant="destructive" className="mb-1">
-                          {anomaly.ratio}x spike
+                          {isMyanmar ? `${anomaly.ratio}x မြင့်တက်မှု` : `${anomaly.ratio}x spike`}
                         </Badge>
                         <p className="text-xs text-muted-foreground">
                           {formatBytes(BigInt(anomaly.recentDeltaBytes))} vs {formatBytes(BigInt(anomaly.baselineDeltaBytes))}
@@ -2554,9 +2813,9 @@ export default function AnalyticsPage() {
                 <div className="ops-chart-empty">
                   <div className="space-y-2 text-center">
                     <Activity className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                    <p className="font-medium text-foreground">No anomalies detected</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'မမှန်ကန်မှု မတွေ့ရပါ' : 'No anomalies detected'}</p>
                     <p className="text-sm text-muted-foreground">
-                      Current traffic patterns are within the expected baseline.
+                      {isMyanmar ? 'လက်ရှိ လမ်းကြောင်းအသုံးပြုမှုပုံစံများသည် မျှော်မှန်းထားသော အခြေခံပမာဏအတွင်း ရှိနေသည်။' : 'Current traffic patterns are within the expected baseline.'}
                     </p>
                   </div>
                 </div>
@@ -2570,9 +2829,11 @@ export default function AnalyticsPage() {
             <CardHeader className="px-0 pt-0">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Users className="h-5 w-5 text-primary" />
-                Top users
+                {isMyanmar ? 'အသုံးပြုမှု အများဆုံး အသုံးပြုသူများ' : 'Top users'}
               </CardTitle>
-              <CardDescription>Highest-consuming access keys across all recorded time.</CardDescription>
+              <CardDescription>
+                {isMyanmar ? 'မှတ်တမ်းတင်ထားသည့် ကာလတစ်လျှောက် အသုံးပြုမှုအများဆုံး အသုံးပြုခွင့်သော့များ။' : 'Highest-consuming access keys across all recorded time.'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="px-0 pb-0">
               {loadingTopUsers ? (
@@ -2602,9 +2863,9 @@ export default function AnalyticsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>User / key</TableHead>
-                          <TableHead>Server</TableHead>
-                          <TableHead className="text-right">Usage</TableHead>
+                          <TableHead>{isMyanmar ? 'အသုံးပြုသူ / သော့' : 'User / key'}</TableHead>
+                          <TableHead>{isMyanmar ? 'ဆာဗာ' : 'Server'}</TableHead>
+                          <TableHead className="text-right">{isMyanmar ? 'အသုံးပြုမှု' : 'Usage'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -2628,9 +2889,11 @@ export default function AnalyticsPage() {
                 <div className="ops-chart-empty">
                   <div className="space-y-2 text-center">
                     <Users className="mx-auto h-8 w-8 text-muted-foreground/60" />
-                    <p className="font-medium text-foreground">No usage data found</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'အသုံးပြုမှု ဒေတာ မတွေ့ရပါ' : 'No usage data found'}</p>
                     <p className="text-sm text-muted-foreground">
-                      This ranking appears once at least one key has recorded traffic.
+                      {isMyanmar
+                        ? 'အနည်းဆုံး key တစ်ခုတွင် traffic မှတ်တမ်းရှိလာသောအခါ ဤအဆင့်သတ်မှတ်ချက်ကို ပြသမည်။'
+                        : 'This ranking appears once at least one key has recorded traffic.'}
                     </p>
                   </div>
                 </div>
@@ -2642,9 +2905,9 @@ export default function AnalyticsPage() {
             <CardHeader className="px-0 pt-0">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Calendar className="h-5 w-5 text-primary" />
-                Peak usage hours
+                {isMyanmar ? 'အသုံးပြုမှု အမြင့်ဆုံး အချိန်များ' : 'Peak usage hours'}
               </CardTitle>
-              <CardDescription>Traffic intensity by day and hour (UTC).</CardDescription>
+              <CardDescription>{isMyanmar ? 'နေ့နှင့် နာရီအလိုက် လမ်းကြောင်းအသုံးပြုမှု ပြင်းထန်ချက် (UTC)' : 'Traffic intensity by day and hour (UTC).'}</CardDescription>
             </CardHeader>
             <CardContent className="px-0 pb-0">
               {loadingPeakHours ? (
@@ -2690,7 +2953,7 @@ export default function AnalyticsPage() {
                     </div>
 
                     <div className="mt-4 flex items-center justify-end gap-2 text-xs text-muted-foreground">
-                      <span>Low</span>
+                      <span>{isMyanmar ? 'နည်း' : 'Low'}</span>
                       <div className="flex gap-0.5">
                         <div className="h-3 w-3 rounded-sm bg-cyan-400/20" />
                         <div className="h-3 w-3 rounded-sm bg-cyan-400/35" />
@@ -2698,7 +2961,7 @@ export default function AnalyticsPage() {
                         <div className="h-3 w-3 rounded-sm bg-cyan-400/70" />
                         <div className="h-3 w-3 rounded-sm bg-cyan-300" />
                       </div>
-                      <span>High</span>
+                      <span>{isMyanmar ? 'မြင့်' : 'High'}</span>
                     </div>
                   </div>
                 </div>
@@ -2715,9 +2978,11 @@ export default function AnalyticsPage() {
                   <Info className="h-6 w-6 text-blue-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Usage snapshot worker</h3>
+                  <h3 className="font-medium">{isMyanmar ? 'အသုံးပြုမှု မှတ်တမ်းပုံ လုပ်ဆောင်စနစ်' : 'Usage snapshot worker'}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Advanced analytics like anomaly detection and quota forecasting depend on the background worker collecting periodic usage snapshots.
+                    {isMyanmar
+                      ? 'Anomaly detection နှင့် quota forecasting ကဲ့သို့သော advanced analytics များသည် background worker က ပုံမှန် usage snapshot များ စုဆောင်းပေးရန် လိုအပ်သည်။'
+                      : 'Advanced analytics like anomaly detection and quota forecasting depend on the background worker collecting periodic usage snapshots.'}
                   </p>
                   <code className="mt-3 block rounded-xl bg-muted px-3 py-2 font-mono text-xs dark:bg-white/[0.04]">
                     npx ts-node src/server/worker.ts

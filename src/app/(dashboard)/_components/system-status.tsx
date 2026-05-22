@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Activity, Cpu, HardDrive, Clock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { useEffect, useState } from "react";
+import { useLocale } from "@/hooks/use-locale";
 
 function formatBytes(bytes: number, decimals = 2) {
     if (bytes === 0) return '0 Bytes';
@@ -29,6 +29,9 @@ function formatUptime(seconds: number) {
 }
 
 export function SystemStatus() {
+    const { locale } = useLocale();
+    const isMyanmar = locale === 'my';
+
     // Poll every 5 seconds
     const { data: stats, isLoading } = trpc.system.getStats.useQuery(undefined, {
         refetchInterval: 5000,
@@ -38,7 +41,9 @@ export function SystemStatus() {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg font-medium">System Status</CardTitle>
+                    <CardTitle className="text-lg font-medium">
+                        {isMyanmar ? 'စနစ် အခြေအနေ' : 'System Status'}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
@@ -56,7 +61,7 @@ export function SystemStatus() {
             <CardHeader className="pb-2">
                 <CardTitle className="text-base font-medium flex items-center gap-2">
                     <Activity className="h-4 w-4" />
-                    System Status
+                    {isMyanmar ? 'စနစ် အခြေအနေ' : 'System Status'}
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -65,13 +70,13 @@ export function SystemStatus() {
                     <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                             <Cpu className="h-3 w-3 text-muted-foreground" />
-                            <span>CPU Load</span>
+                            <span>{isMyanmar ? 'CPU အသုံးပြုမှု' : 'CPU Load'}</span>
                         </div>
                         <span className="font-medium">{stats.cpu.percent}%</span>
                     </div>
                     <Progress value={stats.cpu.percent} className="h-1.5" />
                     <p className="text-[10px] text-muted-foreground text-right">
-                        {stats.cpu.cores} Cores
+                        {stats.cpu.cores} {isMyanmar ? 'လုံး' : 'Cores'}
                     </p>
                 </div>
 
@@ -80,7 +85,7 @@ export function SystemStatus() {
                     <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                             <Activity className="h-3 w-3 text-muted-foreground" />
-                            <span>Memory</span>
+                            <span>{isMyanmar ? 'မှတ်ဉာဏ်' : 'Memory'}</span>
                         </div>
                         <span className="font-medium">{stats.memory.percent}%</span>
                     </div>
@@ -95,7 +100,7 @@ export function SystemStatus() {
                     <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                             <HardDrive className="h-3 w-3 text-muted-foreground" />
-                            <span>Disk Storage</span>
+                            <span>{isMyanmar ? 'သိုလှောင်မှု' : 'Disk Storage'}</span>
                         </div>
                         <span className="font-medium">{stats.disk.percent}%</span>
                     </div>
@@ -109,7 +114,7 @@ export function SystemStatus() {
                 <div className="pt-2 border-t flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        <span>Uptime</span>
+                        <span>{isMyanmar ? 'လည်ပတ်နေချိန်' : 'Uptime'}</span>
                     </div>
                     <span className="font-medium font-mono">
                         {formatUptime(stats.os.uptime)}

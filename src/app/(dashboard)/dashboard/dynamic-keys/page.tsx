@@ -249,6 +249,7 @@ function CreateDAKDialog({
   onSuccess: () => void;
 }) {
   const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const utils = trpc.useUtils();
   const { data: templates } = trpc.dynamicKeys.listTemplates.useQuery(undefined, {
@@ -622,22 +623,24 @@ function CreateDAKDialog({
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Basics</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'အခြေခံအချက်အလက်' : 'Basics'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Choose the template, short link identity, and dynamic-key type before you move into routing policy.
+                  {locale === 'my'
+                    ? 'routing policy သို့ မဝင်မီ တမ်းပလိတ်၊ အတိုလင့်ခ် အမှတ်အသားနှင့် dynamic key အမျိုးအစားကို ရွေးပါ။'
+                    : 'Choose the template, short link identity, and dynamic-key type before you move into routing policy.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
           <div className="space-y-2">
-            <Label>Routing Template</Label>
+            <Label>{locale === 'my' ? 'routing တမ်းပလိတ်' : 'Routing Template'}</Label>
             <Select
               value={formData.appliedTemplateId || '__none__'}
               onValueChange={(value) => handleTemplateChange(value === '__none__' ? '' : value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Start from scratch or apply a saved template" />
+                <SelectValue placeholder={locale === 'my' ? 'အစမှ စတင်ပါ သို့မဟုတ် သိမ်းထားသော တမ်းပလိတ်ကို အသုံးပြုပါ' : 'Start from scratch or apply a saved template'} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">No template</SelectItem>
+                <SelectItem value="__none__">{locale === 'my' ? 'တမ်းပလိတ် မသုံးပါ' : 'No template'}</SelectItem>
                 {(templates ?? []).map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.name}
@@ -646,7 +649,9 @@ function CreateDAKDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Applying a template pre-fills routing, rotation, and quota defaults. You can still adjust everything before create.
+              {locale === 'my'
+                ? 'တမ်းပလိတ်ကို အသုံးပြုပါက routing၊ rotation နှင့် quota မူလသတ်မှတ်ချက်များကို ကြိုတင်ဖြည့်ပေးမည်။ ဖန်တီးမီ အရာအားလုံးကို ဆက်လက်ညှိနိုင်သေးသည်။'
+                : 'Applying a template pre-fills routing, rotation, and quota defaults. You can still adjust everything before create.'}
             </p>
           </div>
 
@@ -663,7 +668,7 @@ function CreateDAKDialog({
 
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="dakPublicSlug">Short Link Slug</Label>
+              <Label htmlFor="dakPublicSlug">{locale === 'my' ? 'အတိုလင့်ခ် အမည်' : 'Short Link Slug'}</Label>
               <Input
                 id="dakPublicSlug"
                 placeholder="premium-users-pool"
@@ -675,19 +680,23 @@ function CreateDAKDialog({
               />
               <p className="text-xs text-muted-foreground">
                 {slugTouched
-                  ? 'Used for the short client URL and short share page URL.'
-                  : 'Auto-generated from the name until you edit it.'}
+                  ? (locale === 'my'
+                    ? 'အတို ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်နှင့် အတို မျှဝေစာမျက်နှာ URL အတွက် အသုံးပြုသည်။'
+                    : 'Used for the short client URL and short share page URL.')
+                  : (locale === 'my'
+                    ? 'သင် မပြင်မချင်း အမည်မှ အလိုအလျောက် ဖန်တီးပေးမည်။'
+                    : 'Auto-generated from the name until you edit it.')}
               </p>
             </div>
 
             {previewSlug ? (
               <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-medium text-foreground">Slug status:</span>
+                  <span className="font-medium text-foreground">{locale === 'my' ? 'အတိုအမည် အခြေအနေ:' : 'Slug status:'}</span>
                   {slugAvailabilityQuery.isFetching ? (
                     <span className="inline-flex items-center gap-1 text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Checking availability
+                      {locale === 'my' ? 'အသုံးပြုနိုင်မှုကို စစ်ဆေးနေသည်' : 'Checking availability'}
                     </span>
                   ) : hasPreviewSlug && slugAvailabilityQuery.data?.available ? (
                     <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
@@ -698,8 +707,8 @@ function CreateDAKDialog({
                     <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                       <XCircle className="h-3.5 w-3.5" />
                       {hasPreviewSlug
-                        ? (slugAvailabilityQuery.data?.message || 'This short link is unavailable.')
-                        : 'Enter at least 3 characters.'}
+                        ? (slugAvailabilityQuery.data?.message || (locale === 'my' ? 'ဤအတိုလင့်ခ်ကို အသုံးမပြုနိုင်ပါ။' : 'This short link is unavailable.'))
+                        : (locale === 'my' ? 'အနည်းဆုံး စာလုံး ၃ လုံး ထည့်ပါ။' : 'Enter at least 3 characters.')}
                     </span>
                   )}
                 </div>
@@ -707,18 +716,18 @@ function CreateDAKDialog({
                 <div className="grid gap-3">
                   <div className="space-y-1">
                     <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                      Short Client URL
+                      {locale === 'my' ? 'အတို ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်' : 'Short Client URL'}
                     </Label>
                     <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
-                      {previewClientUrl || 'Enter a valid slug to preview the client URL.'}
+                      {previewClientUrl || (locale === 'my' ? 'ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ် အကြိုကြည့်ရန် မှန်ကန်သော အတိုအမည်ကို ထည့်ပါ။' : 'Enter a valid slug to preview the client URL.')}
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                      Short Share Page
+                      {locale === 'my' ? 'အတို မျှဝေစာမျက်နှာ' : 'Short Share Page'}
                     </Label>
                     <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
-                      {previewShareUrl || 'Enter a valid slug to preview the share page.'}
+                      {previewShareUrl || (locale === 'my' ? 'မျှဝေစာမျက်နှာ အကြိုကြည့်ရန် မှန်ကန်သော အတိုအမည်ကို ထည့်ပါ။' : 'Enter a valid slug to preview the share page.')}
                     </div>
                   </div>
                 </div>
@@ -1039,26 +1048,30 @@ function CreateDAKDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dakMaxDevices">Managed device limit (estimated)</Label>
+            <Label htmlFor="dakMaxDevices">{isMyanmar ? 'စီမံထားသော စက်အရေအတွက် ကန့်သတ်ချက် (ခန့်မှန်း)' : 'Managed device limit (estimated)'}</Label>
             <Input
               id="dakMaxDevices"
               type="number"
               min="1"
               max="20"
-              placeholder="Leave blank for no limit"
+              placeholder={isMyanmar ? 'ကန့်သတ်ချက် မလိုလျှင် ဗလာထားပါ' : 'Leave blank for no limit'}
               value={formData.maxDevices}
               onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              Recommended for stronger anti-sharing. Customers stay on the managed share page or Outline client URL instead of receiving one reusable raw ss:// secret.
+              {isMyanmar
+                ? 'အခြားသူနှင့် မျှဝေသုံးစွဲခြင်းကို ပိုကာကွယ်လိုလျှင် အကြံပြုပါသည်။ ဖောက်သည်များသည် raw ss:// secret မရဘဲ စီမံထားသော မျှဝေစာမျက်နှာ သို့မဟုတ် Outline ကလိုင်းယင့် URL ကိုသာ အသုံးပြုမည်။'
+                : 'Recommended for stronger anti-sharing. Customers stay on the managed share page or Outline client URL instead of receiving one reusable raw ss:// secret.'}
             </p>
           </div>
 
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium">Keep managed install flow only</p>
+              <p className="text-sm font-medium">{isMyanmar ? 'စီမံထားသော ထည့်သွင်းလမ်းကြောင်းကိုသာ ထိန်းမည်' : 'Keep managed install flow only'}</p>
               <p className="text-xs text-muted-foreground">
-                Recommended. The share page and Outline client link stay usable, while the raw reusable config stays hidden from customers.
+                {isMyanmar
+                  ? 'အကြံပြုပါသည်။ share page နှင့် Outline client link ကို ဆက်သုံးနိုင်ပြီး raw reusable config ကို ဖောက်သည်များမမြင်ရအောင် ဖုံးထားမည်။'
+                  : 'Recommended. The share page and Outline client link stay usable, while the raw reusable config stays hidden from customers.'}
               </p>
             </div>
             <Switch
@@ -1155,17 +1168,21 @@ function CreateDAKDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>After create</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'ဖန်တီးပြီးနောက်' : 'After create'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Decide what should happen immediately after the dynamic key is created so the next admin step is automatic.
+                  {locale === 'my'
+                    ? 'ပြောင်းလဲသတ်မှတ် သော့ကို ဖန်တီးပြီးသည်နှင့် နောက်ထပ် စီမံခန့်ခွဲရေး အဆင့်ကို အလိုအလျောက် ဆက်သွားစေရန် ဘာလုပ်မည်ကို သတ်မှတ်ပါ။'
+                    : 'Decide what should happen immediately after the dynamic key is created so the next admin step is automatic.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
           <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
             <div className="space-y-1">
-              <p className="text-sm font-medium">After create</p>
+              <p className="text-sm font-medium">{locale === 'my' ? 'ဖန်တီးပြီးနောက်' : 'After create'}</p>
               <p className="text-xs text-muted-foreground">
-                The share page link is generated with the dynamic key. Choose what should happen as soon as creation finishes.
+                {locale === 'my'
+                  ? 'မျှဝေစာမျက်နှာလင့်ခ်ကို ပြောင်းလဲသတ်မှတ် သော့နှင့်အတူ ထုတ်ပေးပါသည်။ ဖန်တီးမှုပြီးသည့်အခါ ချက်ချင်း ဘာလုပ်မည်ကို ရွေးပါ။'
+                  : 'The share page link is generated with the dynamic key. Choose what should happen as soon as creation finishes.'}
               </p>
             </div>
             <div className="mt-4 space-y-3">
@@ -1176,9 +1193,11 @@ function CreateDAKDialog({
                   className="mt-0.5"
                 />
                 <span className="space-y-1">
-                  <span className="block text-sm font-medium">Open preview after create</span>
+                  <span className="block text-sm font-medium">{locale === 'my' ? 'ဖန်တီးပြီးနောက် preview ကို ဖွင့်မည်' : 'Open preview after create'}</span>
                   <span className="block text-xs text-muted-foreground">
-                    Opens the new dynamic share page in a separate tab right after the key is created.
+                    {locale === 'my'
+                      ? 'သော့ ဖန်တီးပြီးသည်နှင့် dynamic share page အသစ်ကို tab သီးသန့်တစ်ခုတွင် ချက်ချင်းဖွင့်ပါသည်။'
+                      : 'Opens the new dynamic share page in a separate tab right after the key is created.'}
                   </span>
                 </span>
               </label>
@@ -1189,9 +1208,11 @@ function CreateDAKDialog({
                   className="mt-0.5"
                 />
                 <span className="space-y-1">
-                  <span className="block text-sm font-medium">Copy share page link after create</span>
+                  <span className="block text-sm font-medium">{locale === 'my' ? 'ဖန်တီးပြီးနောက် မျှဝေစာမျက်နှာလင့်ခ်ကို ကူးယူမည်' : 'Copy share page link after create'}</span>
                   <span className="block text-xs text-muted-foreground">
-                    Copies the generated share page link immediately instead of making you open the detail page first.
+                    {locale === 'my'
+                      ? 'detail page ကို အရင်မဖွင့်ဘဲ ထုတ်ပေးထားသော မျှဝေစာမျက်နှာလင့်ခ်ကို ချက်ချင်း ကူးယူပေးပါသည်။'
+                      : 'Copies the generated share page link immediately instead of making you open the detail page first.'}
                   </span>
                 </span>
               </label>
@@ -1202,9 +1223,11 @@ function CreateDAKDialog({
                   className="mt-0.5"
                 />
                 <span className="space-y-1">
-                  <span className="block text-sm font-medium">Send share page via Telegram after create</span>
+                  <span className="block text-sm font-medium">{locale === 'my' ? 'ဖန်တီးပြီးနောက် မျှဝေစာမျက်နှာကို Telegram မှ ပို့မည်' : 'Send share page via Telegram after create'}</span>
                   <span className="block text-xs text-muted-foreground">
-                    Uses the dynamic key&apos;s Telegram ID or the assigned user&apos;s linked Telegram chat if one exists.
+                    {locale === 'my'
+                      ? 'ရှိပါက dynamic key ၏ Telegram ID သို့မဟုတ် သတ်မှတ်ထားသော အသုံးပြုသူ၏ ချိတ်ဆက်ထားသည့် Telegram chat ကို အသုံးပြုပါသည်။'
+                      : 'Uses the dynamic key&apos;s Telegram ID or the assigned user&apos;s linked Telegram chat if one exists.'}
                   </span>
                 </span>
               </label>
@@ -1266,7 +1289,8 @@ function QRCodeDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -1381,7 +1405,8 @@ function QRCodeDialog({
  * Online indicator component with blinking animation
  */
 function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
 
   if (!isOnline) return null;
 
@@ -1696,7 +1721,8 @@ function EditDAKDialog({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const [formData, setFormData] = useState({
     name: dakData.name,
     email: dakData.email || '',
@@ -1881,26 +1907,30 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editMaxDevices">Managed device limit (estimated)</Label>
+                  <Label htmlFor="editMaxDevices">{isMyanmar ? 'စီမံထားသော စက်အရေအတွက် ကန့်သတ်ချက် (ခန့်မှန်း)' : 'Managed device limit (estimated)'}</Label>
                   <Input
                     id="editMaxDevices"
                     type="number"
                     min="1"
                     max="20"
-                    placeholder="Leave blank for no limit"
+                    placeholder={isMyanmar ? 'ကန့်သတ်ချက် မရှိစေရန် ဗလာထားပါ' : 'Leave blank for no limit'}
                     value={formData.maxDevices}
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Leave this empty to allow unlimited devices. This managed flow is the recommended path when you need stronger anti-sharing than a reusable standard key can provide.
+                    {isMyanmar
+                      ? 'စက်အရေအတွက် မကန့်သတ်လိုပါက ဤအကွက်ကို ဗလာထားပါ။ Standard key ကို ပြန်လည်မျှဝေနိုင်ခြင်းထက် ပိုမိုခိုင်မာသော anti-sharing လိုအပ်ပါက ဤ managed flow ကို အသုံးပြုရန် အကြံပြုပါသည်။'
+                      : 'Leave this empty to allow unlimited devices. This managed flow is the recommended path when you need stronger anti-sharing than a reusable standard key can provide.'}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3 sm:col-span-2">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Keep managed install flow only</p>
+                    <p className="text-sm font-medium">{isMyanmar ? 'စီမံထားသော ထည့်သွင်းလမ်းကြောင်းကိုသာ ထိန်းမည်' : 'Keep managed install flow only'}</p>
                     <p className="text-xs text-muted-foreground">
-                      Hide the reusable raw config from customer-facing install surfaces and keep installs on the share page or Outline client link.
+                      {isMyanmar
+                        ? 'ဖောက်သည်မြင်ရသော ထည့်သွင်းမျက်နှာပြင်များတွင် ပြန်သုံးနိုင်သော raw config ကို ဖျောက်ထားပြီး ထည့်သွင်းမှုများကို မျှဝေစာမျက်နှာ သို့မဟုတ် Outline ကလိုင်းယင့်လင့်ခ်မှတစ်ဆင့်သာ လုပ်ဆောင်စေပါမည်။'
+                        : 'Hide the reusable raw config from customer-facing install surfaces and keep installs on the share page or Outline client link.'}
                     </p>
                   </div>
                   <Switch
@@ -1941,15 +1971,17 @@ function EditDAKDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Routing preferences</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'လမ်းကြောင်း ဦးစားပေး ဆက်တင်များ' : 'Routing preferences'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Tune the balancing model and preferred destinations for this dynamic route.
+                  {isMyanmar
+                    ? 'ဤ dynamic route အတွက် balance မော်ဒယ်နှင့် ဦးစားပေး လမ်းကြောင်းများကို ချိန်ညှိပါ။'
+                    : 'Tune the balancing model and preferred destinations for this dynamic route.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Load balancer algorithm</Label>
+                  <Label>{isMyanmar ? 'Load balancer algorithm' : 'Load balancer algorithm'}</Label>
                   <Select
                     value={formData.loadBalancerAlgorithm}
                     onValueChange={(value) =>
@@ -1957,19 +1989,19 @@ function EditDAKDialog({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select algorithm" />
+                      <SelectValue placeholder={isMyanmar ? 'algorithm ကို ရွေးပါ' : 'Select algorithm'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="IP_HASH">IP hash (consistent)</SelectItem>
-                      <SelectItem value="RANDOM">Random</SelectItem>
-                      <SelectItem value="ROUND_ROBIN">Round robin</SelectItem>
-                      <SelectItem value="LEAST_LOAD">Least load</SelectItem>
+                      <SelectItem value="IP_HASH">{isMyanmar ? 'IP hash (တည်ငြိမ်)' : 'IP hash (consistent)'}</SelectItem>
+                      <SelectItem value="RANDOM">{isMyanmar ? 'ကျပန်း' : 'Random'}</SelectItem>
+                      <SelectItem value="ROUND_ROBIN">{isMyanmar ? 'အလှည့်ကျ' : 'Round robin'}</SelectItem>
+                      <SelectItem value="LEAST_LOAD">{isMyanmar ? 'ဖိအားအနည်းဆုံး' : 'Least load'}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Preferred routing order</Label>
+                  <Label>{isMyanmar ? 'ဦးစားပေး လမ်းကြောင်း အစီအစဉ်' : 'Preferred routing order'}</Label>
                   <DynamicRoutingPreferencesEditor
                     preferredRegionMode={formData.preferredRegionMode}
                     serverTagIds={formData.serverTagIds}
@@ -2319,7 +2351,8 @@ function DAKRow({
  * DynamicKeysPage Component
  */
 export default function DynamicKeysPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -2740,11 +2773,13 @@ export default function DynamicKeysPage() {
                   <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.45rem]">{t('dynamic_keys.title')}</h1>
                   <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
                     <Shuffle className="mr-1 h-3.5 w-3.5" />
-                    Adaptive
+                    {isMyanmar ? 'အလိုက်သင့်' : 'Adaptive'}
                   </Badge>
                 </div>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  Manage stable subscription URLs, routing policies, and live sync state without leaving the first screen full of empty space.
+                  {isMyanmar
+                    ? 'တည်ငြိမ်သော စာရင်းသွင်း URL များ၊ routing policy များနှင့် live sync အခြေအနေကို ပထမမျက်နှာပြင်ပေါ်တွင်ပင် နေရာလွတ်မဖြုန်းဘဲ စီမံပါ။'
+                    : 'Manage stable subscription URLs, routing policies, and live sync state without leaving the first screen full of empty space.'}
                 </p>
               </div>
             </div>
@@ -2752,7 +2787,7 @@ export default function DynamicKeysPage() {
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setCreateDialogOpen(true)} className="h-10 rounded-full px-4">
                 <Plus className="mr-2 h-4 w-4" />
-                Create dynamic key
+                {isMyanmar ? 'ပြောင်းလဲနိုင်သော သော့ ဖန်တီးရန်' : 'Create dynamic key'}
               </Button>
               <Button
                 variant="outline"
@@ -2761,7 +2796,7 @@ export default function DynamicKeysPage() {
                 disabled={syncAllMutation.isPending}
               >
                 <RefreshCw className={cn('mr-2 h-4 w-4', syncAllMutation.isPending && 'animate-spin')} />
-                {syncAllMutation.isPending ? t('dynamic_keys.syncing') : 'Sync routing'}
+                {syncAllMutation.isPending ? t('dynamic_keys.syncing') : isMyanmar ? 'လမ်းကြောင်းချိန်ကိုက်မည်' : 'Sync routing'}
               </Button>
               <Button
                 variant="outline"
@@ -2770,7 +2805,7 @@ export default function DynamicKeysPage() {
               >
                 <Link href="/dashboard/archived">
                   <Archive className="mr-2 h-4 w-4" />
-                  View archive
+                  {isMyanmar ? 'အဟောင်းမှတ်တမ်းကို ကြည့်မည်' : 'View archive'}
                 </Link>
               </Button>
             </div>
@@ -2778,9 +2813,11 @@ export default function DynamicKeysPage() {
             <div className="ops-support-card space-y-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-sm font-semibold">Current routing view</p>
+                  <p className="text-sm font-semibold">{isMyanmar ? 'လက်ရှိ လမ်းကြောင်းမြင်ကွင်း' : 'Current routing view'}</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Keep routing filters, quota checks, and live activity visible while you work through the fleet.
+                    {isMyanmar
+                      ? 'လမ်းကြောင်းစစ်ထုတ်မှုများ၊ quota စစ်ဆေးမှုများနှင့် live activity များကို စနစ်တစ်လျှောက် လုပ်ဆောင်နေစဉ် မြင်သာစွာ ထားရှိပါ။'
+                      : 'Keep routing filters, quota checks, and live activity visible while you work through the fleet.'}
                   </p>
                 </div>
                 {hasAnyFilters ? (
@@ -2793,15 +2830,27 @@ export default function DynamicKeysPage() {
               <div className="flex flex-wrap gap-2">
                 <span className={cn('ops-pill', hasAnyFilters ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200' : '')}>
                   <Filter className="h-3.5 w-3.5" />
-                  {hasAnyFilters ? 'Filtered routes' : 'Showing all routes'}
+                  {hasAnyFilters
+                    ? isMyanmar
+                      ? 'စစ်ထုတ်ထားသော လမ်းကြောင်းများ'
+                      : 'Filtered routes'
+                    : isMyanmar
+                      ? 'လမ်းကြောင်းအားလုံးကို ပြနေသည်'
+                      : 'Showing all routes'}
                 </span>
                 <span className="ops-pill">
                   <Wifi className="h-3.5 w-3.5" />
-                  {onlineCount} online now
+                  {isMyanmar ? `ယခု အလုပ်လုပ်နေသည် ${onlineCount} ခု` : `${onlineCount} online now`}
                 </span>
                 <span className="ops-pill">
                   <AlertTriangle className="h-3.5 w-3.5" />
-                  {filters.quickFilters.overQuota ? 'Quota watch active' : 'Quota watch ready'}
+                  {filters.quickFilters.overQuota
+                    ? isMyanmar
+                      ? 'Quota စောင့်ကြည့်မှု အသက်ဝင်နေသည်'
+                      : 'Quota watch active'
+                    : isMyanmar
+                      ? 'Quota စောင့်ကြည့်မှု အဆင်သင့်'
+                      : 'Quota watch ready'}
                 </span>
               </div>
             </div>
@@ -2809,42 +2858,56 @@ export default function DynamicKeysPage() {
 
           <div className="ops-hero-aside space-y-4">
             <div className="space-y-1">
-              <p className="ops-section-heading">Routing overview</p>
-              <p className="text-sm font-semibold">Live fleet state</p>
+              <p className="ops-section-heading">{isMyanmar ? 'လမ်းကြောင်း အကျဉ်းချုပ်' : 'Routing overview'}</p>
+              <p className="text-sm font-semibold">{isMyanmar ? 'လက်ရှိ စနစ်စုစုပေါင်း အခြေအနေ' : 'Live fleet state'}</p>
               <p className="text-sm text-muted-foreground">
-                Watch active links, current traffic, and how much of the fleet is self-managed versus manual.
+                {isMyanmar
+                  ? 'အသက်ဝင်နေသော link များ၊ လက်ရှိ traffic နှင့် စနစ်အတွင်း self-managed/manual profile အချိုးကို စောင့်ကြည့်ပါ။'
+                  : 'Watch active links, current traffic, and how much of the fleet is self-managed versus manual.'}
               </p>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Active keys
+                  {isMyanmar ? 'အသက်ဝင်သော သော့များ' : 'Active keys'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{stats?.total ?? 0} total routing identities</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isMyanmar ? `စုစုပေါင်း routing identity ${stats?.total ?? 0} ခု` : `${stats?.total ?? 0} total routing identities`}
+                </p>
               </div>
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Recent traffic
+                  {isMyanmar ? 'မကြာသေးမီ traffic' : 'Recent traffic'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Keys with recent activity</p>
+                <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'မကြာသေးမီ activity ရှိသော သော့များ' : 'Keys with recent activity'}</p>
               </div>
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Self-managed
+                  {isMyanmar ? 'ကိုယ်တိုင်စီမံ' : 'Self-managed'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold leading-none">{stats?.selfManaged ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{stats?.manual ?? 0} manual profiles</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isMyanmar ? `လက်ဖြင့်စီမံ profile ${stats?.manual ?? 0} ခု` : `${stats?.manual ?? 0} manual profiles`}
+                </p>
               </div>
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  List scope
+                  {isMyanmar ? 'စာရင်း အကျယ်အဝန်း' : 'List scope'}
                 </p>
-                <p className="mt-2 text-2xl font-semibold leading-none">{hasAnyFilters ? 'Filtered' : 'Full'}</p>
+                <p className="mt-2 text-2xl font-semibold leading-none">
+                  {hasAnyFilters ? (isMyanmar ? 'စစ်ထုတ်ထား' : 'Filtered') : isMyanmar ? 'အပြည့်' : 'Full'}
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {hasAnyFilters ? 'Filters are narrowing the routing list' : 'You are seeing the complete routing fleet'}
+                  {hasAnyFilters
+                    ? isMyanmar
+                      ? 'စစ်ထုတ်မှုများကြောင့် routing စာရင်းကို ကျဉ်းအောင် ပြထားသည်'
+                      : 'Filters are narrowing the routing list'
+                    : isMyanmar
+                      ? 'routing စာရင်းတစ်ခုလုံးကို အပြည့်အဝ မြင်နေရသည်'
+                      : 'You are seeing the complete routing fleet'}
                 </p>
               </div>
             </div>

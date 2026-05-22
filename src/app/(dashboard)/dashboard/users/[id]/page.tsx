@@ -37,6 +37,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import { formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import { trpc } from '@/lib/trpc';
@@ -176,32 +177,140 @@ type CommunicationThreadEvent = {
   meta?: string;
 };
 
-function getSupportThreadCategoryLabel(category: string) {
+function getSupportThreadCategoryLabel(category: string, isMyanmar = false) {
   switch ((category || '').trim().toUpperCase()) {
     case 'ORDER':
-      return 'Order / payment';
+      return isMyanmar ? 'အော်ဒါ / ငွေပေးချေမှု' : 'Order / payment';
     case 'KEY':
-      return 'Key / usage';
+      return isMyanmar ? 'သော့ / အသုံးပြုမှု' : 'Key / usage';
     case 'SERVER':
-      return 'Server / route issue';
+      return isMyanmar ? 'ဆာဗာ / လမ်းကြောင်း ပြဿနာ' : 'Server / route issue';
     case 'BILLING':
-      return 'Billing / refund';
+      return isMyanmar ? 'ငွေတောင်းခံမှု / ငွေပြန်အမ်း' : 'Billing / refund';
     default:
-      return 'General help';
+      return isMyanmar ? 'အထွေထွေ အကူအညီ' : 'General help';
   }
 }
 
-function getSupportThreadStateLabel(status: string, waitingOn: string) {
+function getSupportThreadStateLabel(status: string, waitingOn: string, isMyanmar = false) {
   if (status === 'HANDLED') {
-    return 'Handled';
+    return isMyanmar ? 'ကိုင်တွယ်ပြီး' : 'Handled';
   }
   if (status === 'ESCALATED') {
-    return 'Escalated to panel';
+    return isMyanmar ? 'ဒက်ရှ်ဘုတ်သို့ တင်ပို့ထားသည်' : 'Escalated to panel';
   }
   if ((waitingOn || '').toUpperCase() === 'USER') {
-    return 'Waiting for customer';
+    return isMyanmar ? 'ဖောက်သည်ကို စောင့်နေသည်' : 'Waiting for customer';
   }
-  return 'Waiting for admin';
+  return isMyanmar ? 'စီမံခန့်ခွဲသူကို စောင့်နေသည်' : 'Waiting for admin';
+}
+
+function getServerChangeRequestStatusLabel(status: string, isMyanmar = false) {
+  switch ((status || '').trim().toUpperCase()) {
+    case 'PENDING':
+    case 'PENDING_REVIEW':
+      return isMyanmar ? 'စောင့်ဆိုင်းနေ' : 'Pending review';
+    case 'APPROVED':
+      return isMyanmar ? 'အတည်ပြုပြီး' : 'Approved';
+    case 'REJECTED':
+      return isMyanmar ? 'ပယ်ချပြီး' : 'Rejected';
+    case 'COMPLETED':
+      return isMyanmar ? 'ပြီးဆုံးပြီး' : 'Completed';
+    default:
+      return status;
+  }
+}
+
+function getPremiumSupportRequestTypeLabel(requestType: string, isMyanmar = false) {
+  switch ((requestType || '').trim().toUpperCase()) {
+    case 'REGION_CHANGE':
+      return isMyanmar ? 'ဒေသ ပြောင်းရန်' : 'Region change';
+    case 'ROUTE_ISSUE':
+      return isMyanmar ? 'လမ်းကြောင်း ပြဿနာ' : 'Route issue';
+    default:
+      return requestType;
+  }
+}
+
+function getPremiumSupportRequestStatusLabel(status: string, isMyanmar = false) {
+  switch ((status || '').trim().toUpperCase()) {
+    case 'PENDING':
+    case 'PENDING_REVIEW':
+      return isMyanmar ? 'စောင့်ဆိုင်းနေ' : 'Pending review';
+    case 'APPROVED':
+      return isMyanmar ? 'အတည်ပြုပြီး' : 'Approved';
+    case 'HANDLED':
+      return isMyanmar ? 'ကိုင်တွယ်ပြီး' : 'Handled';
+    case 'DISMISSED':
+      return isMyanmar ? 'ပယ်ဖျက်ပြီး' : 'Dismissed';
+    default:
+      return status;
+  }
+}
+
+function getCrmTemplateCategoryLabel(category: string, isMyanmar = false) {
+  switch (category) {
+    case 'Support':
+      return isMyanmar ? 'အကူအညီ' : 'Support';
+    case 'Payments':
+      return isMyanmar ? 'ငွေပေးချေမှု' : 'Payments';
+    case 'Outage':
+      return isMyanmar ? 'ပြတ်တောက်မှု' : 'Outage';
+    case 'Billing':
+      return isMyanmar ? 'ငွေကြေး' : 'Billing';
+    case 'Retention':
+      return isMyanmar ? 'ဆက်လက်အသုံးပြုမှု' : 'Retention';
+    case 'Promo':
+      return isMyanmar ? 'ပရိုမိုးရှင်း' : 'Promo';
+    default:
+      return category;
+  }
+}
+
+function getCrmTemplateLabel(label: string, isMyanmar = false) {
+  switch (label) {
+    case 'Support follow-up':
+      return isMyanmar ? 'အကူအညီ နောက်ဆက်တွဲ' : 'Support follow-up';
+    case 'Need screenshot':
+      return isMyanmar ? 'စကရင်ရှော့ လိုအပ်သည်' : 'Need screenshot';
+    case 'Server issue':
+      return isMyanmar ? 'ဆာဗာ ပြဿနာ' : 'Server issue';
+    case 'Resolved':
+      return isMyanmar ? 'ပြေလည်ပြီး' : 'Resolved';
+    case 'Receipt follow-up':
+      return isMyanmar ? 'ပြေစာ နောက်ဆက်တွဲ' : 'Receipt follow-up';
+    case 'Renewal reminder':
+      return isMyanmar ? 'သက်တမ်းတိုး သတိပေးချက်' : 'Renewal reminder';
+    case 'Promo follow-up':
+      return isMyanmar ? 'ပရိုမိုးရှင်း နောက်ဆက်တွဲ' : 'Promo follow-up';
+    default:
+      return label;
+  }
+}
+
+function getCrmTemplateBody(label: string, fallbackBody: string, isMyanmar = false) {
+  if (!isMyanmar) {
+    return fallbackBody;
+  }
+
+  switch (label) {
+    case 'Support follow-up':
+      return 'မင်္ဂလာပါ။ သင့်စာကို ရရှိထားပြီး ပြဿနာကို စစ်ဆေးနေပါသည်။ ရှိပါက သော့အမည် သို့မဟုတ် အော်ဒါကုဒ်ကို ပေးပို့ပါ။';
+    case 'Need screenshot':
+      return 'ငွေပေးချေမှု စကရင်ရှော့ကို ပိုမိုရှင်းလင်းစွာ ထပ်ပို့ပေးပါ။ ငွေပမာဏ၊ အကောင့်အမည်နှင့် ငွေလွှဲချိန် ပါဝင်ရပါမည်။';
+    case 'Server issue':
+      return 'ဆာဗာအခြေအနေ မမှန်ကြောင်း နားလည်ပါသည်။ ယခု စစ်ဆေးနေပါသည်။ ခဏစောင့်ပေးပါ၊ မကြာမီ ထပ်မံအသိပေးပါမည်။';
+    case 'Resolved':
+      return 'သင့်ပြဿနာကို ပြေလည်အောင် လုပ်ဆောင်ပြီးပါပြီ။ ထပ်မံ စမ်းသုံးကြည့်ပြီး ပြဿနာ ဆက်ရှိပါက ပြန်ပြောပါ။';
+    case 'Receipt follow-up':
+      return 'ပြေစာကို ထပ်မံ ပို့ထားပြီးပါပြီ။ Telegram တွင် မတွေ့သေးပါက ပြန်ပြောပါ၊ ကိုယ်တိုင် ထပ်ပို့ပေးပါမည်။';
+    case 'Renewal reminder':
+      return 'သင့်သော့၏ သက်တမ်းကုန်ချိန် နီးလာပါသည်။ အနှောင့်အယှက် မဖြစ်စေရန် ကြိုတင် သက်တမ်းတိုးပါ။ /renew ကို အသုံးပြုနိုင်သလို admin ကိုလည်း ဆက်သွယ်နိုင်ပါသည်။';
+    case 'Promo follow-up':
+      return 'သင့်အကောင့်အတွက် ပရိုမိုးရှင်းအသစ် ရရှိနိုင်ပါသည်။ သင့်တော်သော အစီအစဉ်ကို ရွေးရာတွင် အကူအညီလိုပါက ဒီနေရာတွင် ပြန်စာပို့ပါ။';
+    default:
+      return fallbackBody;
+  }
 }
 
 function getSupportThreadTone(status: string, waitingOn: string): SupportTimelineEvent['tone'] {
@@ -256,6 +365,8 @@ export default function UserLedgerPage() {
   const params = useParams();
   const userId = params.id as string;
   const { toast } = useToast();
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
   const [financeDialog, setFinanceDialog] = useState<{
     orderId: string;
@@ -293,8 +404,8 @@ export default function UserLedgerPage() {
   const reconcileMutation = trpc.users.reconcileTelegramOrder.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Finance action saved',
-        description: 'The order finance state was updated.',
+        title: locale === 'my' ? 'ငွေကြေး လုပ်ဆောင်ချက်ကို သိမ်းပြီးပါပြီ' : 'Finance action saved',
+        description: locale === 'my' ? 'အော်ဒါ၏ ငွေကြေး အခြေအနေကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The order finance state was updated.',
       });
       setFinanceDialog(null);
       setFinanceAmount('');
@@ -303,7 +414,7 @@ export default function UserLedgerPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Finance action failed',
+        title: locale === 'my' ? 'ငွေကြေး လုပ်ဆောင်ချက် မအောင်မြင်ပါ' : 'Finance action failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -313,14 +424,16 @@ export default function UserLedgerPage() {
   const reviewRefundRequestMutation = trpc.users.reviewRefundRequest.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Refund request updated',
-        description: 'The customer was notified about the refund request decision.',
+        title: locale === 'my' ? 'ပြန်အမ်းငွေ တောင်းဆိုမှုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Refund request updated',
+        description: locale === 'my'
+          ? 'ပြန်အမ်းငွေ တောင်းဆိုမှု ဆိုင်ရာ ဆုံးဖြတ်ချက်ကို အသုံးပြုသူထံ အသိပေးပြီးပါပြီ။'
+          : 'The customer was notified about the refund request decision.',
       });
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Refund review failed',
+        title: locale === 'my' ? 'ပြန်အမ်းငွေ စစ်ဆေးမှု မအောင်မြင်ပါ' : 'Refund review failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -330,14 +443,14 @@ export default function UserLedgerPage() {
   const updateNotificationPreferencesMutation = trpc.users.updateNotificationPreferences.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Notification preferences saved',
-        description: 'The customer notification settings were updated.',
+        title: locale === 'my' ? 'အသိပေးချက် သတ်မှတ်ချက်များကို သိမ်းပြီးပါပြီ' : 'Notification preferences saved',
+        description: locale === 'my' ? 'ဖောက်သည်၏ အသိပေးချက် ဆက်တင်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The customer notification settings were updated.',
       });
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Preference update failed',
+        title: locale === 'my' ? 'သတ်မှတ်ချက် အပ်ဒိတ်လုပ်မှု မအောင်မြင်ပါ' : 'Preference update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -347,8 +460,8 @@ export default function UserLedgerPage() {
   const sendDirectTelegramMessageMutation = trpc.users.sendDirectTelegramMessage.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Telegram message sent',
-        description: 'The direct customer message was delivered.',
+        title: locale === 'my' ? 'Telegram စာကို ပို့ပြီးပါပြီ' : 'Telegram message sent',
+        description: locale === 'my' ? 'ဖောက်သည်ထံ တိုက်ရိုက်စာကို ပို့ပြီးပါပြီ။' : 'The direct customer message was delivered.',
       });
       setCrmDirectMessageTitle('');
       setCrmDirectMessage('');
@@ -359,7 +472,7 @@ export default function UserLedgerPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Telegram message failed',
+        title: locale === 'my' ? 'Telegram စာ မပို့နိုင်ပါ' : 'Telegram message failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -369,15 +482,15 @@ export default function UserLedgerPage() {
   const updateMarketingTagsMutation = trpc.users.updateMarketingTags.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: 'Customer tags saved',
-        description: 'Promotion tags/segments were updated for this customer.',
+        title: locale === 'my' ? 'ဖောက်သည် အမှတ်အသားများကို သိမ်းပြီးပါပြီ' : 'Customer tags saved',
+        description: locale === 'my' ? 'ဤဖောက်သည်အတွက် ပရိုမိုးရှင်း အမှတ်အသားများနှင့် အုပ်စုခွဲမှုများကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Promotion tags/segments were updated for this customer.',
       });
       setCrmMarketingTags(result.marketingTags || '');
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Customer tags failed',
+        title: locale === 'my' ? 'ဖောက်သည် အမှတ်အသား အပ်ဒိတ်လုပ်မှု မအောင်မြင်ပါ' : 'Customer tags failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -387,14 +500,14 @@ export default function UserLedgerPage() {
   const updatePromoEligibilityOverrideMutation = trpc.users.updatePromoEligibilityOverride.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Promo override saved',
-        description: 'Customer promo eligibility was updated.',
+        title: locale === 'my' ? 'ပရိုမိုးရှင်း အစားထိုးသတ်မှတ်ချက်ကို သိမ်းပြီးပါပြီ' : 'Promo override saved',
+        description: locale === 'my' ? 'ဖောက်သည်၏ ပရိုမိုးရှင်း အကျုံးဝင်မှုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Customer promo eligibility was updated.',
       });
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Promo override failed',
+        title: locale === 'my' ? 'ပရိုမိုးရှင်း အစားထိုးသတ်မှတ်ချက် မအောင်မြင်ပါ' : 'Promo override failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -404,13 +517,13 @@ export default function UserLedgerPage() {
   const resendTelegramOrderReceiptMutation = trpc.users.resendTelegramOrderReceipt.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Receipt resent',
-        description: 'The Telegram receipt was sent again.',
+        title: locale === 'my' ? 'ပြေစာကို ပြန်ပို့ပြီးပါပြီ' : 'Receipt resent',
+        description: locale === 'my' ? 'Telegram ပြေစာကို ထပ်မံ ပို့ပြီးပါပြီ။' : 'The Telegram receipt was sent again.',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Receipt resend failed',
+        title: locale === 'my' ? 'ပြေစာ ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Receipt resend failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -420,13 +533,15 @@ export default function UserLedgerPage() {
   const resendCustomerSharePageMutation = trpc.users.resendCustomerSharePage.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Share page resent',
-        description: 'The customer received the share page again in Telegram.',
+        title: locale === 'my' ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့ပြီးပါပြီ' : 'Share page resent',
+        description: locale === 'my'
+          ? 'အသုံးပြုသူထံ Telegram မှ share page ကို ထပ်မံပို့ပြီးပါပြီ။'
+          : 'The customer received the share page again in Telegram.',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Share resend failed',
+        title: locale === 'my' ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့မရပါ' : 'Share resend failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -436,15 +551,15 @@ export default function UserLedgerPage() {
   const sendCustomerOutageUpdateMutation = trpc.users.sendCustomerOutageUpdate.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Outage update sent',
-        description: 'The customer received the outage update in Telegram.',
+        title: locale === 'my' ? 'ပြတ်တောက်မှု အသိပေးချက်ကို ပို့ပြီးပါပြီ' : 'Outage update sent',
+        description: locale === 'my' ? 'ဖောက်သည်သည် Telegram မှ ပြတ်တောက်မှု အသိပေးချက်ကို ရရှိပြီးပါပြီ။' : 'The customer received the outage update in Telegram.',
       });
       setCrmOutageMessage('');
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Outage update failed',
+        title: locale === 'my' ? 'ပြတ်တောက်မှု အသိပေးချက် မပို့နိုင်ပါ' : 'Outage update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -454,15 +569,15 @@ export default function UserLedgerPage() {
   const addSupportNoteMutation = trpc.users.addSupportNote.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Support note added',
-        description: 'The internal support note was saved.',
+        title: locale === 'my' ? 'အတွင်းသုံး အကူအညီ မှတ်စုကို သိမ်းပြီးပါပြီ' : 'Support note added',
+        description: locale === 'my' ? 'အတွင်းသုံး အကူအညီ မှတ်စုကို သိမ်းပြီးပါပြီ။' : 'The internal support note was saved.',
       });
       setCrmSupportNote('');
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Support note failed',
+        title: locale === 'my' ? 'အကူအညီ မှတ်စု သိမ်းဆည်းမှု မအောင်မြင်ပါ' : 'Support note failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -472,14 +587,18 @@ export default function UserLedgerPage() {
   const updateCouponStatusMutation = trpc.users.updateCouponStatus.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: result.status === 'CANCELLED' ? 'Coupon revoked' : 'Coupon expired',
-        description: `${result.couponCode} is no longer available to this customer.`,
+        title: result.status === 'CANCELLED'
+          ? (locale === 'my' ? 'ကူပွန်ကို ရုပ်သိမ်းပြီးပါပြီ' : 'Coupon revoked')
+          : (locale === 'my' ? 'ကူပွန် သက်တမ်းကုန်ပြီးပါပြီ' : 'Coupon expired'),
+        description: locale === 'my'
+          ? `${result.couponCode} ကို ဤဖောက်သည်အတွက် မသုံးနိုင်တော့ပါ။`
+          : `${result.couponCode} is no longer available to this customer.`,
       });
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Coupon update failed',
+        title: locale === 'my' ? 'ကူပွန် အပ်ဒိတ်လုပ်မှု မအောင်မြင်ပါ' : 'Coupon update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -489,14 +608,14 @@ export default function UserLedgerPage() {
   const resendAnnouncementToCustomerMutation = trpc.users.resendAnnouncementToCustomer.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Announcement resent',
-        description: 'The selected announcement was sent again to this customer only.',
+        title: locale === 'my' ? 'ကြေညာချက်ကို ထပ်ပို့ပြီးပါပြီ' : 'Announcement resent',
+        description: locale === 'my' ? 'ရွေးထားသော ကြေညာချက်ကို ဤဖောက်သည်ထံသာ ထပ်မံ ပို့ပြီးပါပြီ။' : 'The selected announcement was sent again to this customer only.',
       });
       await utils.users.getLedger.invalidate({ id: userId });
     },
     onError: (error) => {
       toast({
-        title: 'Announcement resend failed',
+        title: locale === 'my' ? 'ကြေညာချက် ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Announcement resend failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -506,24 +625,24 @@ export default function UserLedgerPage() {
   const revenueSummary = useMemo(() => {
     const summary = ledgerQuery.data?.summary;
     if (!summary || summary.revenueByCurrency.length === 0) {
-      return 'No paid orders yet';
+      return locale === 'my' ? 'ငွေပေးချေပြီးသော အော်ဒါ မရှိသေးပါ။' : 'No paid orders yet';
     }
 
     return summary.revenueByCurrency
       .map((entry) => formatMoney(entry.amount, entry.currency))
       .join(' • ');
-  }, [ledgerQuery.data]);
+  }, [ledgerQuery.data, locale]);
 
   const refundedSummary = useMemo(() => {
     const summary = ledgerQuery.data?.summary;
     if (!summary || summary.refundedByCurrency.length === 0) {
-      return 'No refunds yet';
+      return locale === 'my' ? 'ပြန်အမ်းငွေ မရှိသေးပါ။' : 'No refunds yet';
     }
 
     return summary.refundedByCurrency
       .map((entry) => formatMoney(entry.amount, entry.currency))
       .join(' • ');
-  }, [ledgerQuery.data]);
+  }, [ledgerQuery.data, locale]);
 
   useEffect(() => {
     if (!ledgerQuery.data) {
@@ -602,7 +721,7 @@ export default function UserLedgerPage() {
         events.push({
           id: `${order.id}:refund-requested`,
           at: new Date(order.refundRequestedAt),
-          title: 'Refund requested',
+          title: isMyanmar ? 'Refund တောင်းခံထားသည်' : 'Refund requested',
           detail: `${order.orderCode}${order.refundRequestMessage ? ` • ${order.refundRequestMessage}` : ''}`,
           tone: 'warning',
           orderCode: order.orderCode,
@@ -616,8 +735,8 @@ export default function UserLedgerPage() {
           at: new Date(order.refundRequestReviewedAt),
           title:
             order.refundRequestStatus === 'APPROVED'
-              ? 'Refund approved'
-              : 'Refund declined',
+              ? (isMyanmar ? 'Refund အတည်ပြုပြီး' : 'Refund approved')
+              : (isMyanmar ? 'Refund ငြင်းဆိုပြီး' : 'Refund declined'),
           detail: [
             order.orderCode,
             order.refundReviewReasonCode
@@ -640,10 +759,10 @@ export default function UserLedgerPage() {
           at: new Date(action.createdAt),
           title:
             action.actionType === 'VERIFY'
-              ? 'Payment verified'
+              ? (isMyanmar ? 'ငွေပေးချေမှု အတည်ပြုပြီး' : 'Payment verified')
               : action.actionType === 'REFUND'
-                ? 'Refund recorded'
-                : 'Credit applied',
+                ? (isMyanmar ? 'Refund မှတ်တမ်းတင်ပြီး' : 'Refund recorded')
+                : (isMyanmar ? 'Credit အသုံးချပြီး' : 'Credit applied'),
           detail: [
             order.orderCode,
             actionAmount !== '—' ? actionAmount : null,
@@ -667,7 +786,7 @@ export default function UserLedgerPage() {
     return events
       .sort((left, right) => right.at.getTime() - left.at.getTime())
       .slice(0, 24);
-  }, [ledgerQuery.data]);
+  }, [isMyanmar, ledgerQuery.data]);
 
   const supportTimeline = useMemo<SupportTimelineEvent[]>(() => {
     if (!ledgerQuery.data) {
@@ -680,8 +799,8 @@ export default function UserLedgerPage() {
       events.push({
         id: `server-change:${request.id}`,
         at: new Date(request.createdAt),
-        title: 'Server change request',
-        detail: `${request.requestCode} • ${request.currentServerName} → ${request.requestedServerName} • ${request.status}`,
+        title: isMyanmar ? 'ဆာဗာ ပြောင်းလဲရန် တောင်းဆိုမှု' : 'Server change request',
+        detail: `${request.requestCode} • ${request.currentServerName} → ${request.requestedServerName} • ${getServerChangeRequestStatusLabel(request.status, isMyanmar)}`,
         tone: request.status === 'REJECTED' ? 'danger' : request.status === 'APPROVED' ? 'positive' : 'warning',
       });
     }
@@ -690,8 +809,8 @@ export default function UserLedgerPage() {
       events.push({
         id: `premium-support:${request.id}`,
         at: new Date(request.createdAt),
-        title: 'Premium support request',
-        detail: `${request.requestCode} • ${request.requestType} • ${request.status}${request.followUpPending ? ' • waiting for follow-up' : ''}`,
+        title: isMyanmar ? 'ပရီမီယံ အကူအညီ တောင်းဆိုမှု' : 'Premium support request',
+        detail: `${request.requestCode} • ${getPremiumSupportRequestTypeLabel(request.requestType, isMyanmar)} • ${getPremiumSupportRequestStatusLabel(request.status, isMyanmar)}${request.followUpPending ? ` • ${isMyanmar ? 'နောက်ဆက်တွဲကို စောင့်နေသည်' : 'waiting for follow-up'}` : ''}`,
         tone: request.status === 'DISMISSED' ? 'danger' : request.status === 'HANDLED' ? 'positive' : 'warning',
       });
     }
@@ -718,17 +837,17 @@ export default function UserLedgerPage() {
         at: new Date(alert.createdAt),
         title:
           alert.eventType === 'AUTO_FALLBACK_PIN_APPLIED'
-            ? 'Premium fallback pinned'
+            ? (isMyanmar ? 'ပရီမီယံ အစားထိုးလမ်းကြောင်းကို ပင်ထားပြီး' : 'Premium fallback pinned')
             : alert.eventType === 'PREFERRED_REGION_RECOVERED'
-              ? 'Premium region recovered'
-              : 'Premium region degraded',
+              ? (isMyanmar ? 'ပရီမီယံ ဒေသ ပြန်ကောင်းလာပြီး' : 'Premium region recovered')
+              : (isMyanmar ? 'ပရီမီယံ ဒေသ အရည်အသွေးကျဆင်း' : 'Premium region degraded'),
         detail: [
           alert.dynamicAccessKeyName,
           currentRegionCode ? `${currentRegionCode}${currentStatus ? ` • ${currentStatus}` : ''}` : null,
-          fallbackRegionCode ? `fallback ${fallbackRegionCode}` : null,
-          fallbackRegions.length > 0 ? `fallback ${fallbackRegions.join(', ')}` : null,
-          healthyPreferredRegions.length > 0 ? `recovered ${healthyPreferredRegions.join(', ')}` : null,
-          recoveryMinutes ? `${Math.round(recoveryMinutes)} min` : null,
+          fallbackRegionCode ? `${isMyanmar ? 'အစားထိုး လမ်းကြောင်း' : 'fallback'} ${fallbackRegionCode}` : null,
+          fallbackRegions.length > 0 ? `${isMyanmar ? 'အစားထိုး လမ်းကြောင်းများ' : 'fallback'} ${fallbackRegions.join(', ')}` : null,
+          healthyPreferredRegions.length > 0 ? `${isMyanmar ? 'ပြန်လည် ကောင်းမွန်လာသော ဒေသများ' : 'recovered'} ${healthyPreferredRegions.join(', ')}` : null,
+          recoveryMinutes ? `${Math.round(recoveryMinutes)} ${isMyanmar ? 'မိနစ်' : 'min'}` : null,
         ]
           .filter(Boolean)
           .join(' • '),
@@ -746,8 +865,10 @@ export default function UserLedgerPage() {
       events.push({
         id: `announcement:${delivery.id}`,
         at: new Date(delivery.sentAt || delivery.createdAt),
-        title: delivery.isPinned ? 'Pinned announcement delivered' : 'Announcement delivered',
-        detail: `${delivery.announcement.title} • ${delivery.status}${delivery.readAt ? ' • read' : ' • unread'}`,
+        title: delivery.isPinned
+          ? (isMyanmar ? 'ပင်ထားသော ကြေညာချက်ကို ပို့ပြီး' : 'Pinned announcement delivered')
+          : (isMyanmar ? 'ကြေညာချက်ကို ပို့ပြီး' : 'Announcement delivered'),
+        detail: `${delivery.announcement.title} • ${delivery.status}${delivery.readAt ? ` • ${isMyanmar ? 'ဖတ်ပြီး' : 'read'}` : ` • ${isMyanmar ? 'မဖတ်ရသေး' : 'unread'}`}`,
         tone: delivery.isPinned ? 'warning' : 'default',
       });
     }
@@ -757,26 +878,28 @@ export default function UserLedgerPage() {
         id: `notice:${log.id}`,
         at: new Date(log.sentAt),
         title: log.event,
-        detail: `${log.accessKeyName || 'Unlinked key'} • ${log.status}`,
+        detail: `${log.accessKeyName || (isMyanmar ? 'မချိတ်ထားသော သော့' : 'Unlinked key')} • ${log.status}`,
         tone: log.status === 'FAILED' ? 'danger' : 'default',
       });
     }
 
     for (const thread of ledgerQuery.data.supportThreads) {
       const latestReply = thread.replies[thread.replies.length - 1];
-      const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn);
+      const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn, isMyanmar);
       const threadHref = withBasePath(`/dashboard/support/threads/${thread.id}`);
 
       events.push({
         id: `support-thread:${thread.id}`,
         at: new Date(thread.updatedAt || thread.createdAt),
-        title: 'Telegram support thread',
+        title: isMyanmar ? 'Telegram အကူအညီ စကားပြောခန်း' : 'Telegram support thread',
         detail: [
           thread.threadCode,
-          getSupportThreadCategoryLabel(thread.issueCategory),
+          getSupportThreadCategoryLabel(thread.issueCategory, isMyanmar),
           stateLabel,
           latestReply
-            ? `${latestReply.senderType === 'ADMIN' ? 'Admin' : 'Customer'}: ${latestReply.message}`
+            ? `${latestReply.senderType === 'ADMIN'
+              ? (isMyanmar ? 'စီမံခန့်ခွဲသူ' : 'Admin')
+              : (isMyanmar ? 'ဖောက်သည်' : 'Customer')}: ${latestReply.message}`
             : thread.subject || null,
         ]
           .filter(Boolean)
@@ -790,7 +913,11 @@ export default function UserLedgerPage() {
       events.push({
         id: `support-note:${note.id}`,
         at: new Date(note.createdAt),
-        title: note.kind === 'OUTAGE_UPDATE' ? 'Outage update sent' : note.kind === 'DIRECT_MESSAGE' ? 'Direct Telegram message' : 'Internal support note',
+        title: note.kind === 'OUTAGE_UPDATE'
+          ? (isMyanmar ? 'ပြတ်တောက်မှု အသိပေးချက် ပို့ပြီး' : 'Outage update sent')
+          : note.kind === 'DIRECT_MESSAGE'
+            ? (isMyanmar ? 'Telegram တိုက်ရိုက်စာ ပို့ပြီး' : 'Direct Telegram message')
+            : (isMyanmar ? 'အတွင်းသုံး အကူအညီ မှတ်စု' : 'Internal support note'),
         detail: `${note.note}${note.createdBy?.email ? ` • ${note.createdBy.email}` : ''}`,
         tone: note.kind === 'OUTAGE_UPDATE' ? 'warning' : 'default',
       });
@@ -799,7 +926,7 @@ export default function UserLedgerPage() {
     return events
       .sort((left, right) => right.at.getTime() - left.at.getTime())
       .slice(0, 24);
-  }, [ledgerQuery.data]);
+  }, [isMyanmar, ledgerQuery.data]);
 
   const communicationHistory = useMemo<CommunicationThreadEvent[]>(() => {
     if (!ledgerQuery.data) {
@@ -818,11 +945,11 @@ export default function UserLedgerPage() {
         category: 'announcement',
         customerFacing: true,
         meta: [
-          'Announcement',
+          isMyanmar ? 'ကြေညာချက်' : 'Announcement',
           delivery.announcement.type,
-          delivery.readAt ? `Read ${formatRelativeTime(delivery.readAt)}` : 'Unread',
-          `${delivery.openCount || 0} opens`,
-          `${delivery.clickCount || 0} clicks`,
+          delivery.readAt ? `${isMyanmar ? 'ဖတ်ပြီး' : 'Read'} ${formatRelativeTime(delivery.readAt)}` : (isMyanmar ? 'မဖတ်ရသေး' : 'Unread'),
+          `${delivery.openCount || 0} ${isMyanmar ? 'ကြိမ် ဖွင့်ထား' : 'opens'}`,
+          `${delivery.clickCount || 0} ${isMyanmar ? 'ကြိမ် နှိပ်ထား' : 'clicks'}`,
         ].join(' • '),
       });
     }
@@ -836,7 +963,7 @@ export default function UserLedgerPage() {
         tone: log.status === 'FAILED' ? 'danger' : 'warning',
         category: 'key_notice',
         customerFacing: true,
-        meta: [log.accessKeyName || 'Unlinked key', log.status].join(' • '),
+        meta: [log.accessKeyName || (isMyanmar ? 'မချိတ်ထားသော သော့' : 'Unlinked key'), log.status].join(' • '),
       });
     }
 
@@ -848,18 +975,20 @@ export default function UserLedgerPage() {
       events.push({
         id: `support-thread-thread:${thread.id}`,
         at: new Date(thread.updatedAt || thread.createdAt),
-        title: `Support thread ${thread.threadCode}`,
-        detail: latestReply?.message || thread.subject || 'Thread created',
+        title: isMyanmar ? `အကူအညီ စကားပြောခန်း ${thread.threadCode}` : `Support thread ${thread.threadCode}`,
+        detail: latestReply?.message || thread.subject || (isMyanmar ? 'စကားပြောခန်းကို ဖန်တီးခဲ့သည်' : 'Thread created'),
         tone: getSupportThreadTone(thread.status, thread.waitingOn),
         category: 'support_thread',
         customerFacing: true,
         href: threadHref,
         meta: [
-          getSupportThreadCategoryLabel(thread.issueCategory),
+          getSupportThreadCategoryLabel(thread.issueCategory, isMyanmar),
           stateLabel,
-          thread.assignedAdminName ? `Assigned ${thread.assignedAdminName}` : null,
+          thread.assignedAdminName ? `${isMyanmar ? 'တာဝန်ပေးထားသူ' : 'Assigned'} ${thread.assignedAdminName}` : null,
           latestReply
-            ? `${latestReply.senderType === 'ADMIN' ? 'Latest admin reply' : 'Latest customer reply'} ${formatRelativeTime(latestReply.createdAt)}`
+            ? `${latestReply.senderType === 'ADMIN'
+              ? (isMyanmar ? 'နောက်ဆုံး စီမံခန့်ခွဲသူ တုံ့ပြန်ချက်' : 'Latest admin reply')
+              : (isMyanmar ? 'နောက်ဆုံး ဖောက်သည် တုံ့ပြန်ချက်' : 'Latest customer reply')} ${formatRelativeTime(latestReply.createdAt)}`
             : null,
         ]
           .filter(Boolean)
@@ -875,13 +1004,15 @@ export default function UserLedgerPage() {
         events.push({
           id: `order-receipt:${order.id}`,
           at: new Date(order.reviewedAt),
-          title: order.kind === 'TRIAL' ? 'Trial delivery' : 'Receipt delivered',
-          detail: `${order.orderCode} • ${order.planName || order.planCode || 'Order fulfilled'}`,
+          title: order.kind === 'TRIAL'
+              ? (isMyanmar ? 'အခမဲ့စမ်းသုံးခွင့် ပို့ပြီး' : 'Trial delivery')
+            : (isMyanmar ? 'ပြေစာ ပို့ပြီး' : 'Receipt delivered'),
+          detail: `${order.orderCode} • ${order.planName || order.planCode || (isMyanmar ? 'အော်ဒါ ပြီးဆုံးပြီး' : 'Order fulfilled')}`,
           tone: 'positive',
           category: 'receipt',
           customerFacing: true,
           href: orderHref,
-          meta: order.couponCode ? `Coupon ${order.couponCode}` : undefined,
+          meta: order.couponCode ? `${isMyanmar ? 'ကူပွန်' : 'Coupon'} ${order.couponCode}` : undefined,
         });
       }
       if (order.refundRequestReviewedAt && order.refundRequestStatus) {
@@ -890,8 +1021,8 @@ export default function UserLedgerPage() {
           at: new Date(order.refundRequestReviewedAt),
           title:
             order.refundRequestStatus === 'APPROVED'
-              ? 'Refund decision sent'
-              : 'Refund decline sent',
+              ? (isMyanmar ? 'ငွေပြန်အမ်း ဆုံးဖြတ်ချက် ပို့ပြီး' : 'Refund decision sent')
+              : (isMyanmar ? 'ငွေပြန်အမ်း ငြင်းဆိုချက် ပို့ပြီး' : 'Refund decline sent'),
           detail: `${order.orderCode}${order.refundRequestCustomerMessage ? ` • ${order.refundRequestCustomerMessage}` : ''}`,
           tone: order.refundRequestStatus === 'APPROVED' ? 'positive' : 'danger',
           category: 'refund',
@@ -910,16 +1041,16 @@ export default function UserLedgerPage() {
         at: new Date(note.createdAt),
         title:
           note.kind === 'DIRECT_MESSAGE'
-            ? 'Direct Telegram message'
+            ? (isMyanmar ? 'Telegram တိုက်ရိုက်စာ' : 'Direct Telegram message')
             : note.kind === 'OUTAGE_UPDATE'
-              ? 'Outage update'
-              : note.kind === 'RECEIPT_RESENT'
-                ? 'Receipt resent'
-                : note.kind === 'SHARE_PAGE_RESENT'
-                  ? 'Share page resent'
+              ? (isMyanmar ? 'ပြတ်တောက်မှု အသိပေးချက်' : 'Outage update')
+            : note.kind === 'RECEIPT_RESENT'
+                ? (isMyanmar ? 'ပြေစာကို ထပ်ပို့ခဲ့သည်' : 'Receipt resent')
+            : note.kind === 'SHARE_PAGE_RESENT'
+                  ? (isMyanmar ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့ခဲ့သည်' : 'Share page resent')
                   : note.kind === 'ANNOUNCEMENT_RESEND'
-                    ? 'Announcement resent'
-                    : 'Internal support note',
+                    ? (isMyanmar ? 'ကြေညာချက်ကို ထပ်ပို့ခဲ့သည်' : 'Announcement resent')
+                    : (isMyanmar ? 'အတွင်းသုံး အကူအညီ မှတ်စု' : 'Internal support note'),
         detail: note.note,
         tone:
           note.kind === 'OUTAGE_UPDATE'
@@ -942,10 +1073,14 @@ export default function UserLedgerPage() {
         customerFacing: note.kind !== 'INTERNAL',
         href: note.telegramMediaUrl || undefined,
         meta: [
-          note.createdBy?.email ? `By ${note.createdBy.email}` : null,
-          note.telegramMessageTitle ? `Title ${note.telegramMessageTitle}` : null,
-          note.telegramCardStyle ? `${note.telegramCardStyle.toLowerCase()} card` : null,
-          note.telegramMediaKind ? `Media ${note.telegramMediaKind.toLowerCase()}` : null,
+          note.createdBy?.email ? `${isMyanmar ? 'ရေးသားသူ' : 'By'} ${note.createdBy.email}` : null,
+          note.telegramMessageTitle ? `${isMyanmar ? 'ခေါင်းစဉ်' : 'Title'} ${note.telegramMessageTitle}` : null,
+          note.telegramCardStyle
+            ? `${isMyanmar ? 'ကတ်ပုံစံ' : 'Card'} ${note.telegramCardStyle.toLowerCase()}`
+            : null,
+          note.telegramMediaKind
+            ? `${isMyanmar ? 'မီဒီယာ' : 'Media'} ${note.telegramMediaKind.toLowerCase()}`
+            : null,
         ]
           .filter(Boolean)
           .join(' • ') || undefined,
@@ -955,7 +1090,7 @@ export default function UserLedgerPage() {
     return events
       .sort((left, right) => right.at.getTime() - left.at.getTime())
       .slice(0, 40);
-  }, [ledgerQuery.data]);
+  }, [isMyanmar, ledgerQuery.data]);
 
   const promotionAttributionSummary = useMemo(() => {
     if (!ledgerQuery.data) {
@@ -1025,11 +1160,13 @@ export default function UserLedgerPage() {
   if (!ledgerQuery.data) {
     return (
       <div className="space-y-4">
-        <BackButton href="/dashboard/users" label="Back to users" />
+        <BackButton href="/dashboard/users" label={isMyanmar ? 'အသုံးပြုသူများထံ ပြန်မည်' : 'Back to users'} />
         <Card>
           <CardHeader>
-            <CardTitle>Customer not found</CardTitle>
-            <CardDescription>This user ledger could not be loaded.</CardDescription>
+            <CardTitle>{isMyanmar ? 'ဖောက်သည်ကို မတွေ့ပါ' : 'Customer not found'}</CardTitle>
+            <CardDescription>
+              {isMyanmar ? 'ဤအသုံးပြုသူ၏ ledger ကို မဖွင့်နိုင်ပါ။' : 'This user ledger could not be loaded.'}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -1065,7 +1202,7 @@ export default function UserLedgerPage() {
   const pinnedAnnouncementCount = announcementDeliveries.filter((delivery) => delivery.isPinned).length;
   const directIdentityLabel = telegramProfile?.username
     ? `@${telegramProfile.username}`
-    : telegramProfile?.telegramChatId || user.telegramChatId || 'Not linked';
+    : telegramProfile?.telegramChatId || user.telegramChatId || (isMyanmar ? 'မချိတ်ထားပါ' : 'Not linked');
   const latestDeliveredOrder = telegramOrders
     .filter((order) => order.status === 'FULFILLED' && order.reviewedAt)
     .sort((left, right) => new Date(right.reviewedAt || right.createdAt).getTime() - new Date(left.reviewedAt || left.createdAt).getTime())[0] || null;
@@ -1077,86 +1214,140 @@ export default function UserLedgerPage() {
           <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <BackButton href="/dashboard/users" label="Back" />
+                <BackButton href="/dashboard/users" label={isMyanmar ? 'နောက်သို့' : 'Back'} />
                 <Badge
                   variant="outline"
                   className="ops-pill border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
                 >
                   <Wallet className="mr-2 h-3.5 w-3.5" />
-                  Customer CRM
+                {isMyanmar ? 'ဖောက်သည် စီမံခန့်ခွဲမှု' : 'Customer CRM'}
                 </Badge>
               </div>
 
               <Button variant="outline" className="rounded-full" onClick={() => ledgerQuery.refetch()} disabled={ledgerQuery.isFetching}>
                 {ledgerQuery.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                Refresh
+                {isMyanmar ? 'ပြန်လည်ဖွင့်မည်' : 'Refresh'}
               </Button>
             </div>
 
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{user.email}</h1>
               <p className="max-w-3xl text-sm text-muted-foreground sm:text-base">
-                Review keys, Telegram orders, refunds, receipts, announcements, support requests, and server-change history for this customer from one place.
+                {isMyanmar
+                  ? 'ဤဖောက်သည်၏ သော့များ၊ Telegram အော်ဒါများ၊ ငွေပြန်အမ်းမှုများ၊ ပြေစာများ၊ ကြေညာချက်များ၊ အကူအညီ တောင်းဆိုမှုများနှင့် ဆာဗာပြောင်းလဲမှု မှတ်တမ်းကို တစ်နေရာတည်းမှ စီမံနိုင်သည်။'
+                  : 'Review keys, Telegram orders, refunds, receipts, announcements, support requests, and server-change history for this customer from one place.'}
               </p>
             </div>
 
             <DetailMetricGrid>
               <DetailKpiTile
-                label="Active keys"
+                label={isMyanmar ? 'လက်ရှိအသုံးပြုနေသော သော့များ' : 'Active keys'}
                 value={summary.activeAccessKeys + summary.activeDynamicKeys}
-                meta={`${summary.activeAccessKeys} standard • ${summary.activeDynamicKeys} premium dynamic`}
+                meta={
+                  isMyanmar
+                    ? `${summary.activeAccessKeys} သာမန် • ${summary.activeDynamicKeys} ပရီမီယံ အလှုပ်ရှားသော သော့`
+                    : `${summary.activeAccessKeys} standard • ${summary.activeDynamicKeys} premium dynamic`
+                }
                 valueClassName="text-3xl tracking-tight"
               />
               <DetailKpiTile
-                label="Paid purchases"
+                label={isMyanmar ? 'ငွေပေးချေပြီး ဝယ်ယူမှုများ' : 'Paid purchases'}
                 value={summary.fulfilledPaidOrders}
-                meta="Refund unlocks after more than 3 fulfilled paid purchases."
+                meta={
+                  isMyanmar
+                    ? 'ငွေပေးချေပြီး အပြီးသတ် ဝယ်ယူမှု ၃ ခုကျော်ပြီးမှ ငွေပြန်အမ်းမှုကို ဖွင့်နိုင်သည်။'
+                    : 'Refund unlocks after more than 3 fulfilled paid purchases.'
+                }
                 valueClassName="text-3xl tracking-tight"
               />
               <DetailKpiTile
-                label="Gross revenue"
+                label={isMyanmar ? 'စုစုပေါင်း ဝင်ငွေ' : 'Gross revenue'}
                 value={revenueSummary}
-                meta="Total fulfilled Telegram order value for this customer."
+                meta={
+                  isMyanmar
+                    ? 'ဤဖောက်သည်၏ အပြီးသတ် Telegram order စုစုပေါင်းတန်ဖိုး'
+                    : 'Total fulfilled Telegram order value for this customer.'
+                }
                 valueClassName="tracking-tight"
               />
               <DetailKpiTile
-                label="Refundable now"
+                label={isMyanmar ? 'ယခု ငွေပြန်အမ်းပေးနိုင်သည့် အရေအတွက်' : 'Refundable now'}
                 value={summary.refundEligibleCount}
-                meta={`Refund closes automatically above 5 GB usage. Refunded: ${refundedSummary}`}
+                meta={
+                  isMyanmar
+                    ? `အသုံးပြုမှု 5 GB ကျော်သွားပါက ငွေပြန်အမ်းမှုကို အလိုအလျောက် ပိတ်မည်။ ငွေပြန်ထားပြီး: ${refundedSummary}`
+                    : `Refund closes automatically above 5 GB usage. Refunded: ${refundedSummary}`
+                }
                 valueClassName="text-3xl tracking-tight"
               />
             </DetailMetricGrid>
             {!financePermissions.canManage ? (
               <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                You can view the ledger, but only finance-authorized admins can verify, refund, or credit orders.
+                {isMyanmar
+                  ? 'ဤစာရင်းကို ကြည့်နိုင်သော်လည်း ငွေကြေးခွင့်ပြုချက်ရှိသော စီမံခန့်ခွဲသူများသာ အော်ဒါများကို အတည်ပြု၊ ငွေပြန်အမ်း သို့မဟုတ် ခရက်ဒစ် ထည့်နိုင်သည်။'
+                  : 'You can view the ledger, but only finance-authorized admins can verify, refund, or credit orders.'}
               </div>
             ) : null}
           </div>
 
           <DetailHeroAside
-            title="Customer state"
-            description="Keep the customer’s contact channel, support load, and recent delivery status visible while you work through CRM actions."
+            title={isMyanmar ? 'ဖောက်သည် အခြေအနေ' : 'Customer state'}
+            description={
+              isMyanmar
+                ? 'ဖောက်သည် စီမံလုပ်ဆောင်မှုများကို ဆက်လုပ်နေစဉ် ဖောက်သည်၏ ဆက်သွယ်ရေးလမ်းကြောင်း၊ အကူအညီ ဝန်အားနှင့် နောက်ဆုံးပို့ဆောင်မှုအခြေအနေကို မြင်နိုင်အောင် ထားပါ။'
+                : 'Keep the customer’s contact channel, support load, and recent delivery status visible while you work through CRM actions.'
+            }
           >
             <DetailMiniTileGrid>
               <DetailMiniTile
-                label="Telegram identity"
+                label={isMyanmar ? 'Telegram အထောက်အထား' : 'Telegram identity'}
                 value={directIdentityLabel}
-                meta={telegramProfile?.locale ? `Locale ${telegramProfile.locale}` : 'Locale not set'}
+                meta={
+                  telegramProfile?.locale
+                    ? isMyanmar
+                    ? `အသုံးပြုနေသော ဘာသာစကား ${telegramProfile.locale}`
+                      : `Locale ${telegramProfile.locale}`
+                    : isMyanmar
+                      ? 'အသုံးပြုနေသော ဘာသာစကား မသတ်မှတ်ရသေးပါ'
+                      : 'Locale not set'
+                }
               />
               <DetailMiniTile
-                label="Support load"
-                value={`${openSupportThreadCount} open thread${openSupportThreadCount === 1 ? '' : 's'}`}
-                meta={`${waitingOnCustomerCount} waiting for customer • ${premiumSupportRequests.length} premium support request${premiumSupportRequests.length === 1 ? '' : 's'}`}
+                label={isMyanmar ? 'အကူအညီ ဝန်အား' : 'Support load'}
+                value={
+                  isMyanmar
+                    ? `ဖွင့်ထားသော စကားပြောခန်း ${openSupportThreadCount} ခု`
+                    : `${openSupportThreadCount} open thread${openSupportThreadCount === 1 ? '' : 's'}`
+                }
+                meta={
+                  isMyanmar
+                    ? `ဖောက်သည်ထံမှ စောင့်နေ ${waitingOnCustomerCount} ခု • ပရီမီယံ အကူအညီ တောင်းဆိုမှု ${premiumSupportRequests.length} ခု`
+                    : `${waitingOnCustomerCount} waiting for customer • ${premiumSupportRequests.length} premium support request${premiumSupportRequests.length === 1 ? '' : 's'}`
+                }
               />
               <DetailMiniTile
-                label="Inbox delivery"
-                value={`${unreadAnnouncementCount} unread announcement${unreadAnnouncementCount === 1 ? '' : 's'}`}
-                meta={`${pinnedAnnouncementCount} pinned • ${customerNotifications.summary.openCount} opens • ${customerNotifications.summary.clickCount} clicks`}
+                label={isMyanmar ? 'စာဝင်ပုံး ပို့ဆောင်မှု' : 'Inbox delivery'}
+                value={
+                  isMyanmar
+                    ? `မဖတ်ရသေးသော ကြေညာချက် ${unreadAnnouncementCount} ခု`
+                    : `${unreadAnnouncementCount} unread announcement${unreadAnnouncementCount === 1 ? '' : 's'}`
+                }
+                meta={
+                  isMyanmar
+                    ? `ပင်ထားသည် ${pinnedAnnouncementCount} ခု • ဖွင့်ကြည့်မှု ${customerNotifications.summary.openCount} ကြိမ် • နှိပ်မှု ${customerNotifications.summary.clickCount} ကြိမ်`
+                    : `${pinnedAnnouncementCount} pinned • ${customerNotifications.summary.openCount} opens • ${customerNotifications.summary.clickCount} clicks`
+                }
               />
               <DetailMiniTile
-                label="Latest fulfillment"
-                value={latestDeliveredOrder ? latestDeliveredOrder.orderCode : 'No fulfilled order'}
-                meta={latestDeliveredOrder?.reviewedAt ? formatRelativeTime(latestDeliveredOrder.reviewedAt) : 'No receipt delivered yet'}
+                label={isMyanmar ? 'နောက်ဆုံး ပို့ဆောင်မှုပြီးသော အော်ဒါ' : 'Latest fulfillment'}
+                value={latestDeliveredOrder ? latestDeliveredOrder.orderCode : isMyanmar ? 'ပို့ဆောင်မှုပြီးသော အော်ဒါ မရှိသေးပါ' : 'No fulfilled order'}
+                meta={
+                  latestDeliveredOrder?.reviewedAt
+                    ? formatRelativeTime(latestDeliveredOrder.reviewedAt)
+                    : isMyanmar
+                      ? 'ပြေစာ မပို့ရသေးပါ'
+                      : 'No receipt delivered yet'
+                }
               />
             </DetailMiniTileGrid>
           </DetailHeroAside>
@@ -1169,16 +1360,18 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BadgeDollarSign className="h-5 w-5 text-primary" />
-                Billing and reconciliation
+                {isMyanmar ? 'ငွေပေးချေမှုနှင့် စာရင်းညှိနှိုင်းမှု' : 'Billing and reconciliation'}
               </CardTitle>
               <CardDescription>
-                Verify payments, apply credits, and issue refunds only when the purchase-count and usage policy allows it.
+                {isMyanmar
+                  ? 'ဝယ်ယူမှုအရေအတွက်နှင့် အသုံးပြုမှု မူဝါဒက ခွင့်ပြုမှသာ ငွေပေးချေမှု စစ်ဆေးခြင်း၊ ခရက်ဒစ် ထည့်ခြင်းနှင့် ပြန်အမ်းငွေ လုပ်ဆောင်ခြင်းများကို ဆောင်ရွက်ပါ။'
+                  : 'Verify payments, apply credits, and issue refunds only when the purchase-count and usage policy allows it.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {telegramOrders.length === 0 ? (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                  No Telegram orders are linked to this customer yet.
+                  {isMyanmar ? 'ဤဖောက်သည်နှင့် ချိတ်ထားသော Telegram အော်ဒါ မရှိသေးပါ။' : 'No Telegram orders are linked to this customer yet.'}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1214,12 +1407,12 @@ export default function UserLedgerPage() {
                               <FinanceStatusBadge status={order.financeStatus} />
                               {order.refundEligible ? (
                                 <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                                  Refund eligible
+                                  {isMyanmar ? 'ပြန်အမ်းငွေ ခွင့်ပြုသည်' : 'Refund eligible'}
                                 </Badge>
                               ) : null}
                               {order.refundRequestStatus ? (
                                 <Badge variant="outline">
-                                  Refund request: {order.refundRequestStatus}
+                                  {isMyanmar ? 'ပြန်အမ်းငွေ တောင်းဆိုမှု' : 'Refund request'}: {order.refundRequestStatus}
                                 </Badge>
                               ) : null}
                             </div>
@@ -1227,59 +1420,59 @@ export default function UserLedgerPage() {
                             <div className="grid gap-3 md:grid-cols-2">
                               <div className="space-y-1 text-sm text-muted-foreground">
                                 <p>
-                                  <span className="font-medium text-foreground">Plan:</span>{' '}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'အစီအစဉ်:' : 'Plan:'}</span>{' '}
                                   {order.planName || order.planCode || '—'}
                                 </p>
                                 <p>
-                                  <span className="font-medium text-foreground">Amount:</span>{' '}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'ငွေပမာဏ:' : 'Amount:'}</span>{' '}
                                   {formatMoney(order.priceAmount, order.priceCurrency)}
                                 </p>
                                 <p>
-                                  <span className="font-medium text-foreground">Usage on delivered key:</span>{' '}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'ပို့ဆောင်ပြီးသော သော့ အသုံးပြုမှု:' : 'Usage on delivered key:'}</span>{' '}
                                   {formatBytes(BigInt(order.usedBytes || '0'))}
                                 </p>
                                 <p>
-                                  <span className="font-medium text-foreground">Paid purchases for this Telegram user:</span>{' '}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'ဤ Telegram အသုံးပြုသူ၏ ငွေပေးပြီးသော ဝယ်ယူမှုများ:' : 'Paid purchases for this Telegram user:'}</span>{' '}
                                   {order.fulfilledPaidPurchaseCount}
                                 </p>
                               </div>
                               <div className="space-y-1 text-sm text-muted-foreground">
                                 <p>
-                                  <span className="font-medium text-foreground">Created:</span>{' '}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'ဖန်တီးချိန်:' : 'Created:'}</span>{' '}
                                   {formatDateTime(order.createdAt)}
                                 </p>
                                 <p>
-                                  <span className="font-medium text-foreground">Reviewed:</span>{' '}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'စစ်ဆေးချိန်:' : 'Reviewed:'}</span>{' '}
                                   {order.reviewedAt ? formatDateTime(order.reviewedAt) : '—'}
                                 </p>
                                 <p>
-                                  <span className="font-medium text-foreground">Reviewer:</span>{' '}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'စစ်ဆေးသူ:' : 'Reviewer:'}</span>{' '}
                                   {order.reviewedBy?.email || '—'}
                                 </p>
                                 <p>
-                                  <span className="font-medium text-foreground">Finance updated:</span>{' '}
-                                  {order.financeUpdatedAt ? formatRelativeTime(order.financeUpdatedAt) : 'Never'}
+                                  <span className="font-medium text-foreground">{isMyanmar ? 'ငွေကြေးပိုင်း အပ်ဒိတ်:' : 'Finance updated:'}</span>{' '}
+                                  {order.financeUpdatedAt ? formatRelativeTime(order.financeUpdatedAt) : isMyanmar ? 'မရှိသေးပါ' : 'Never'}
                                 </p>
                               </div>
                             </div>
 
                             {!order.refundEligible && order.refundBlockedReason ? (
                               <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                                <span className="font-medium">Refund blocked:</span> {order.refundBlockedReason}
+                                <span className="font-medium">{isMyanmar ? 'ပြန်အမ်းငွေ ပိတ်ထားသည်:' : 'Refund blocked:'}</span> {order.refundBlockedReason}
                               </div>
                             ) : null}
 
                             {order.refundRequestStatus === 'PENDING' ? (
                               <div className="rounded-[1rem] border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
-                                <span className="font-medium">Refund requested:</span>{' '}
-                                {order.refundRequestedAt ? formatDateTime(order.refundRequestedAt) : 'Pending review'}
+                                <span className="font-medium">{isMyanmar ? 'ပြန်အမ်းငွေ တောင်းဆိုထားသည်:' : 'Refund requested:'}</span>{' '}
+                                {order.refundRequestedAt ? formatDateTime(order.refundRequestedAt) : isMyanmar ? 'စစ်ဆေးနေဆဲ' : 'Pending review'}
                                 {order.refundRequestMessage ? ` • ${order.refundRequestMessage}` : ''}
                               </div>
                             ) : null}
 
                             {order.refundRequestStatus && order.refundRequestStatus !== 'PENDING' ? (
                               <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                                <span className="font-medium text-foreground">Refund review:</span>{' '}
+                                <span className="font-medium text-foreground">{isMyanmar ? 'ပြန်အမ်းငွေ စစ်ဆေးမှု:' : 'Refund review:'}</span>{' '}
                                 {order.refundRequestStatus}
                                 {order.refundRequestReviewedAt ? ` • ${formatDateTime(order.refundRequestReviewedAt)}` : ''}
                                 {order.refundReviewReasonCode
@@ -1291,9 +1484,9 @@ export default function UserLedgerPage() {
 
                             {latestFinanceAction ? (
                               <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                                <span className="font-medium text-foreground">Latest finance action:</span>{' '}
+                                <span className="font-medium text-foreground">{isMyanmar ? 'နောက်ဆုံး ငွေကြေးပိုင်း လုပ်ဆောင်ချက်:' : 'Latest finance action:'}</span>{' '}
                                 {latestFinanceAction.actionType} •{' '}
-                                {latestFinanceAction.createdBy?.email || 'Unknown reviewer'} •{' '}
+                                {latestFinanceAction.createdBy?.email || (isMyanmar ? 'မသိရသော စစ်ဆေးသူ' : 'Unknown reviewer')} •{' '}
                                 {formatRelativeTime(latestFinanceAction.createdAt)}
                                 {latestFinanceAction.note ? ` • ${latestFinanceAction.note}` : ''}
                               </div>
@@ -1304,19 +1497,19 @@ export default function UserLedgerPage() {
                             <Button asChild variant="outline" size="sm">
                               <Link href={orderHref}>
                                 <ExternalLink className="mr-2 h-4 w-4" />
-                                Open order
+                                {isMyanmar ? 'အော်ဒါ စာမျက်နှာ ဖွင့်မည်' : 'Open order'}
                               </Link>
                             </Button>
                             {order.status === 'FULFILLED' ? (
                               <>
                                 <Button asChild variant="outline" size="sm">
                                   <Link href={receiptHtmlUrl} target="_blank">
-                                    Printable receipt
+                                    {isMyanmar ? 'ငွေလက်ခံပြေစာကို ကြည့်မည်' : 'Printable receipt'}
                                   </Link>
                                 </Button>
                                 <Button asChild variant="outline" size="sm">
                                   <Link href={receiptPdfUrl} target="_blank">
-                                    Download receipt PDF
+                                    {isMyanmar ? 'ပြေစာ PDF ကို ဒေါင်းလုဒ်လုပ်မည်' : 'Download receipt PDF'}
                                   </Link>
                                 </Button>
                               </>
@@ -1325,12 +1518,12 @@ export default function UserLedgerPage() {
                               <>
                                 <Button asChild variant="outline" size="sm">
                                   <Link href={refundHtmlUrl} target="_blank">
-                                    Printable refund
+                                    {isMyanmar ? 'ငွေပြန်အမ်းစာရွက်ကို ကြည့်မည်' : 'Printable refund'}
                                   </Link>
                                 </Button>
                                 <Button asChild variant="outline" size="sm">
                                   <Link href={refundPdfUrl} target="_blank">
-                                    Download refund PDF
+                                    {isMyanmar ? 'ငွေပြန်အမ်း PDF ကို ဒေါင်းလုဒ်လုပ်မည်' : 'Download refund PDF'}
                                   </Link>
                                 </Button>
                               </>
@@ -1349,7 +1542,7 @@ export default function UserLedgerPage() {
                                   })
                                 }
                               >
-                                Verify payment
+                                {isMyanmar ? 'ငွေပေးချေမှုကို စစ်မည်' : 'Verify payment'}
                               </Button>
                             ) : null}
                             <Button
@@ -1366,7 +1559,7 @@ export default function UserLedgerPage() {
                                 })
                               }
                             >
-                              Apply credit
+                              {isMyanmar ? 'ခရက်ဒစ် ထည့်မည်' : 'Apply credit'}
                             </Button>
                             <Button
                               size="sm"
@@ -1382,7 +1575,7 @@ export default function UserLedgerPage() {
                                 })
                               }
                             >
-                              Refund
+                              {isMyanmar ? 'ပြန်အမ်းငွေ လုပ်မည်' : 'Refund'}
                             </Button>
                             {order.refundRequestStatus === 'PENDING' ? (
                               <>
@@ -1398,7 +1591,7 @@ export default function UserLedgerPage() {
                                     })
                                   }
                                 >
-                                  Approve request
+                                  {isMyanmar ? 'တောင်းဆိုမှုကို အတည်ပြုမည်' : 'Approve request'}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -1413,7 +1606,7 @@ export default function UserLedgerPage() {
                                   }
                                 >
                                   <XCircle className="mr-2 h-4 w-4" />
-                                  Decline request
+                                  {isMyanmar ? 'တောင်းဆိုမှုကို ငြင်းမည်' : 'Decline request'}
                                 </Button>
                               </>
                             ) : null}
@@ -1431,33 +1624,35 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Coins className="h-5 w-5 text-primary" />
-                Promotions and coupons
+                {isMyanmar ? 'ပရိုမိုးရှင်းနှင့် ကူပွန်များ' : 'Promotions and coupons'}
               </CardTitle>
               <CardDescription>
-                Coupon history, manual coupon controls, and the latest promo attribution for this customer.
+                {isMyanmar
+                  ? 'ဤဖောက်သည်အတွက် ကူပွန်မှတ်တမ်း၊ ကိုယ်တိုင် စီမံသည့် ကူပွန်ထိန်းချုပ်မှုများနှင့် နောက်ဆုံး ပရိုမိုးရှင်း attribution ကို ပြပါသည်။'
+                  : 'Coupon history, manual coupon controls, and the latest promo attribution for this customer.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Attributed orders</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ချိတ်ဆက်ထားသော အော်ဒါများ' : 'Attributed orders'}</p>
                   <p className="mt-2 text-2xl font-semibold">{promotionAttributionSummary.attributedOrders}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Orders with coupon or promo-touch attribution.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'ကူပွန် သို့မဟုတ် ပရိုမိုးရှင်း ထိတွေ့ချိတ်ဆက်မှု ပါသော အော်ဒါများ။' : 'Orders with coupon or promo-touch attribution.'}</p>
                 </div>
                 <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Coupon orders</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ကူပွန်သုံး အော်ဒါများ' : 'Coupon orders'}</p>
                   <p className="mt-2 text-2xl font-semibold">{promotionAttributionSummary.couponOrders}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Orders that carried an applied coupon code.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'အသုံးပြုထားသော ကူပွန်ကုဒ် ပါသည့် အော်ဒါများ။' : 'Orders that carried an applied coupon code.'}</p>
                 </div>
                 <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Promo touchpoints</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပရိုမိုးရှင်း ထိတွေ့မှုများ' : 'Promo touchpoints'}</p>
                   <p className="mt-2 text-2xl font-semibold">{promotionAttributionSummary.announcementOrders}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Orders matched to a recent promo announcement.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{isMyanmar ? 'မကြာသေးမီက ပရိုမိုးရှင်း ကြေညာချက်နှင့် ကိုက်ညီသော အော်ဒါများ။' : 'Orders matched to a recent promo announcement.'}</p>
                 </div>
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Campaign eligibility</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'ကမ်ပိန်း ရရှိနိုင်မှု' : 'Campaign eligibility'}</p>
                 <div className="grid gap-3 md:grid-cols-2">
                   {couponEligibility.map((campaign: CouponEligibilityItem) => (
                     <div
@@ -1468,9 +1663,11 @@ export default function UserLedgerPage() {
                         <div>
                           <p className="font-medium">{campaign.label}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Remaining eligibility {campaign.remainingUses}/{campaign.maxUsesPerUser}
+                            {isMyanmar ? 'ကျန်ရှိသေးသော အသုံးပြုခွင့်' : 'Remaining eligibility'} {campaign.remainingUses}/{campaign.maxUsesPerUser}
                             {campaign.cooldownUntil
-                              ? ` • cooldown until ${formatDateTime(campaign.cooldownUntil)}`
+                              ? isMyanmar
+                                ? ` • စောင့်ဆိုင်းကာလ ပြီးဆုံးချိန် ${formatDateTime(campaign.cooldownUntil)}`
+                                : ` • cooldown until ${formatDateTime(campaign.cooldownUntil)}`
                               : ''}
                           </p>
                         </div>
@@ -1489,56 +1686,78 @@ export default function UserLedgerPage() {
                       <div className="mt-3 grid gap-2 sm:grid-cols-4">
                         <div className="rounded-xl border border-border/50 px-3 py-2">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Active
+                            {isMyanmar ? 'အသုံးပြုနိုင်ဆဲ' : 'Active'}
                           </p>
                           <p className="mt-2 text-lg font-semibold">{campaign.activeCoupons}</p>
                         </div>
                         <div className="rounded-xl border border-border/50 px-3 py-2">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Redeemed
+                            {isMyanmar ? 'အသုံးပြုပြီး' : 'Redeemed'}
                           </p>
                           <p className="mt-2 text-lg font-semibold">{campaign.redeemedCoupons}</p>
                         </div>
                         <div className="rounded-xl border border-border/50 px-3 py-2">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Expired
+                            {isMyanmar ? 'သက်တမ်းကုန်' : 'Expired'}
                           </p>
                           <p className="mt-2 text-lg font-semibold">{campaign.expiredCoupons}</p>
                         </div>
                         <div className="rounded-xl border border-border/50 px-3 py-2">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Revoked
+                            {isMyanmar ? 'ရုပ်သိမ်း' : 'Revoked'}
                           </p>
                           <p className="mt-2 text-lg font-semibold">{campaign.revokedCoupons}</p>
                         </div>
                       </div>
                       <p className="mt-3 text-xs text-muted-foreground">
                         {!campaign.enabled
-                          ? 'This campaign is disabled in Telegram sales settings.'
+                          ? isMyanmar
+                            ? 'ဤကမ်ပိန်းကို Telegram အရောင်းဆက်တင်များတွင် ပိတ်ထားသည်။'
+                            : 'This campaign is disabled in Telegram sales settings.'
                           : campaign.paused
-                            ? 'This campaign is paused and will not issue new coupons.'
+                            ? isMyanmar
+                              ? 'ဤကမ်ပိန်းကို ယာယီရပ်ထားပြီး ကူပွန်အသစ် မထုတ်ပေးပါ။'
+                              : 'This campaign is paused and will not issue new coupons.'
                             : campaign.blockedReason === 'MANUAL_BLOCK'
-                              ? 'This campaign is manually suppressed for this customer.'
-                            : campaign.blockedReason === 'ACTIVE_COUPON'
-                              ? 'This customer already has an active coupon for this campaign.'
-                              : campaign.overrideMode === 'FORCE_ALLOW'
-                                ? 'This customer is manually allowed to receive this campaign even when automatic promo rules would normally block it.'
-                              : campaign.blockedReason === 'CONVERTED'
-                                ? 'This customer already converted, so this campaign stops automatically.'
-                                : campaign.blockedReason === 'COOLDOWN'
-                                  ? 'This customer is inside the promo cool-down window.'
-                                  : campaign.blockedReason === 'RECENT_REFUND'
-                                    ? 'Recent refund activity blocks new promos for this customer.'
-                                    : campaign.blockedReason === 'SUPPORT_HEAVY'
-                                      ? 'Recent support volume blocks new promos for this customer.'
-                                      : campaign.blockedReason === 'LIMIT_REACHED'
-                                        ? 'This customer already used the maximum number of coupons for this campaign.'
-                                        : 'This customer can receive this promo if they enter the matching campaign segment.'}
+                              ? isMyanmar
+                                ? 'ဤဖောက်သည်အတွက် ဤကမ်ပိန်းကို ကိုယ်တိုင် တားဆီးထားသည်။'
+                                : 'This campaign is manually suppressed for this customer.'
+                              : campaign.blockedReason === 'ACTIVE_COUPON'
+                                ? isMyanmar
+                                  ? 'ဤဖောက်သည်တွင် ဤကမ်ပိန်းအတွက် အသုံးပြုနိုင်ဆဲ ကူပွန် ရှိပြီးဖြစ်သည်။'
+                                  : 'This customer already has an active coupon for this campaign.'
+                                : campaign.overrideMode === 'FORCE_ALLOW'
+                                  ? isMyanmar
+                                    ? 'ပုံမှန် ပရိုမိုးရှင်း စည်းမျဉ်းများက တားဆီးသော်လည်း ဤဖောက်သည်ကို ဤကမ်ပိန်း ရရှိရန် ကိုယ်တိုင် ခွင့်ပြုထားသည်။'
+                                    : 'This customer is manually allowed to receive this campaign even when automatic promo rules would normally block it.'
+                                  : campaign.blockedReason === 'CONVERTED'
+                                    ? isMyanmar
+                                      ? 'ဤဖောက်သည်သည် ဝယ်ယူပြီးဖြစ်သဖြင့် ဤကမ်ပိန်းကို အလိုအလျောက် ရပ်ထားသည်။'
+                                      : 'This customer already converted, so this campaign stops automatically.'
+                                    : campaign.blockedReason === 'COOLDOWN'
+                                      ? isMyanmar
+                                        ? 'ဤဖောက်သည်သည် ပရိုမိုးရှင်း စောင့်ဆိုင်းကာလအတွင်း ရှိနေသည်။'
+                                        : 'This customer is inside the promo cool-down window.'
+                                      : campaign.blockedReason === 'RECENT_REFUND'
+                                        ? isMyanmar
+                                          ? 'မကြာသေးမီက ပြန်အမ်းငွေ လုပ်ဆောင်မှုကြောင့် ဤဖောက်သည်အတွက် ပရိုမိုးရှင်း အသစ်များကို တားဆီးထားသည်။'
+                                          : 'Recent refund activity blocks new promos for this customer.'
+                                        : campaign.blockedReason === 'SUPPORT_HEAVY'
+                                          ? isMyanmar
+                                            ? 'မကြာသေးမီက အကူအညီ တောင်းဆိုမှုများ များနေသောကြောင့် ဤဖောက်သည်အတွက် ပရိုမိုးရှင်း အသစ်များကို တားဆီးထားသည်။'
+                                            : 'Recent support volume blocks new promos for this customer.'
+                                          : campaign.blockedReason === 'LIMIT_REACHED'
+                                            ? isMyanmar
+                                              ? 'ဤဖောက်သည်သည် ဤကမ်ပိန်းအတွက် ကူပွန် အများဆုံး အသုံးပြုခွင့်ကို ပြည့်သွားပြီ။'
+                                              : 'This customer already used the maximum number of coupons for this campaign.'
+                                            : isMyanmar
+                                              ? 'ကိုက်ညီသော ကမ်ပိန်း အုပ်စုထဲ ဝင်ပါက ဤဖောက်သည်သည် ဤပရိုမိုးရှင်းကို ရနိုင်သည်။'
+                                              : 'This customer can receive this promo if they enter the matching campaign segment.'}
                       </p>
                       {campaign.overrideMode ? (
                         <p className="mt-2 text-xs text-muted-foreground">
-                          Manual override: {campaign.overrideMode === 'FORCE_ALLOW' ? 'Force allow' : 'Suppress'}
-                          {campaign.overrideUpdatedByEmail ? ` by ${campaign.overrideUpdatedByEmail}` : ''}
+                          {isMyanmar ? 'ကိုယ်တိုင် သတ်မှတ်ချက်:' : 'Manual override:'} {campaign.overrideMode === 'FORCE_ALLOW' ? (isMyanmar ? 'အတင်းအကျပ် ခွင့်ပြု' : 'Force allow') : (isMyanmar ? 'တားဆီး' : 'Suppress')}
+                          {campaign.overrideUpdatedByEmail ? isMyanmar ? ` • ${campaign.overrideUpdatedByEmail} က ပြင်ဆင်သည်` : ` by ${campaign.overrideUpdatedByEmail}` : ''}
                           {campaign.overrideUpdatedAt ? ` • ${formatRelativeTime(campaign.overrideUpdatedAt)}` : ''}
                           {campaign.overrideNote ? ` • ${campaign.overrideNote}` : ''}
                         </p>
@@ -1558,7 +1777,7 @@ export default function UserLedgerPage() {
                               })
                             }
                           >
-                            Force allow
+                            {isMyanmar ? 'အတင်းအကျပ် ခွင့်ပြု' : 'Force allow'}
                           </Button>
                           <Button
                             type="button"
@@ -1573,7 +1792,7 @@ export default function UserLedgerPage() {
                               })
                             }
                           >
-                            Suppress
+                            {isMyanmar ? 'တားဆီး' : 'Suppress'}
                           </Button>
                           <Button
                             type="button"
@@ -1588,7 +1807,7 @@ export default function UserLedgerPage() {
                               })
                             }
                           >
-                            Use rules
+                            {isMyanmar ? 'မူရင်း စည်းမျဉ်းသို့ ပြန်မည်' : 'Use rules'}
                           </Button>
                         </div>
                       ) : null}
@@ -1598,9 +1817,9 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Coupon history</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'ကူပွန် မှတ်တမ်း' : 'Coupon history'}</p>
                 {couponHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No coupon history for this customer yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'ဤဖောက်သည်အတွက် ကူပွန်မှတ်တမ်း မရှိသေးပါ။' : 'No coupon history for this customer yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {couponHistory.map((coupon: CouponHistoryItem) => (
@@ -1613,15 +1832,15 @@ export default function UserLedgerPage() {
                               <CouponLifecycleBadge status={coupon.status as 'ISSUED' | 'REDEEMED' | 'EXPIRED' | 'CANCELLED'} />
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              {coupon.couponDiscountLabel || formatMoney(coupon.couponDiscountAmount, coupon.currency)} • per-user limit {coupon.maxUsesPerUser} • stop after conversion {coupon.stopAfterConversion ? 'yes' : 'no'}
+                              {coupon.couponDiscountLabel || formatMoney(coupon.couponDiscountAmount, coupon.currency)} • {isMyanmar ? 'တစ်ဦးချင်း ကန့်သတ်ချက်' : 'per-user limit'} {coupon.maxUsesPerUser} • {isMyanmar ? 'ဝယ်ယူပြီးနောက် ရပ်မည်' : 'stop after conversion'} {coupon.stopAfterConversion ? (isMyanmar ? 'ဟုတ်သည်' : 'yes') : (isMyanmar ? 'မဟုတ်ပါ' : 'no')}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Issued {formatRelativeTime(coupon.issuedAt)}
-                              {coupon.expiresAt ? ` • expires ${formatRelativeTime(coupon.expiresAt)}` : ''}
-                              {coupon.redeemedOrderCode ? ` • redeemed on ${coupon.redeemedOrderCode}` : ''}
+                              {isMyanmar ? 'ထုတ်ပေးချိန်' : 'Issued'} {formatRelativeTime(coupon.issuedAt)}
+                              {coupon.expiresAt ? isMyanmar ? ` • သက်တမ်းကုန်ချိန် ${formatRelativeTime(coupon.expiresAt)}` : ` • expires ${formatRelativeTime(coupon.expiresAt)}` : ''}
+                              {coupon.redeemedOrderCode ? isMyanmar ? ` • ${coupon.redeemedOrderCode} တွင် အသုံးပြုခဲ့သည်` : ` • redeemed on ${coupon.redeemedOrderCode}` : ''}
                             </p>
                             {coupon.statusUpdatedReason ? (
-                              <p className="text-xs text-muted-foreground">Reason: {coupon.statusUpdatedReason}</p>
+                              <p className="text-xs text-muted-foreground">{isMyanmar ? 'အကြောင်းရင်း' : 'Reason'}: {coupon.statusUpdatedReason}</p>
                             ) : null}
                           </div>
                           {coupon.status === 'ISSUED' ? (
@@ -1638,7 +1857,7 @@ export default function UserLedgerPage() {
                                   })
                                 }
                               >
-                                Expire coupon
+                                {isMyanmar ? 'ကူပွန် သက်တမ်းကုန်စေမည်' : 'Expire coupon'}
                               </Button>
                               <Button
                                 size="sm"
@@ -1652,7 +1871,7 @@ export default function UserLedgerPage() {
                                   })
                                 }
                               >
-                                Revoke coupon
+                                {isMyanmar ? 'ကူပွန် ရုပ်သိမ်းမည်' : 'Revoke coupon'}
                               </Button>
                             </div>
                           ) : null}
@@ -1664,9 +1883,9 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Promotion attribution by order</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'အော်ဒါအလိုက် ပရိုမိုးရှင်း ချိတ်ဆက်မှု' : 'Promotion attribution by order'}</p>
                 {telegramOrders.filter((order) => order.promotionAttribution || order.couponCode).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No attributed orders yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'ပရိုမိုးရှင်းနှင့် ချိတ်ထားသော အော်ဒါ မရှိသေးပါ။' : 'No attributed orders yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {telegramOrders
@@ -1682,21 +1901,25 @@ export default function UserLedgerPage() {
                             {order.planName || order.planCode || 'Order'} • {formatMoney(order.priceAmount, order.priceCurrency)}
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            {order.couponCode ? <Badge variant="secondary">Coupon: {order.couponCode}</Badge> : null}
+                            {order.couponCode ? <Badge variant="secondary">{isMyanmar ? 'ကူပွန်' : 'Coupon'}: {order.couponCode}</Badge> : null}
                             {order.promotionAttribution?.templateName ? (
-                              <Badge variant="secondary">Template: {order.promotionAttribution.templateName}</Badge>
+                              <Badge variant="secondary">{isMyanmar ? 'တမ်းပလိတ်' : 'Template'}: {order.promotionAttribution.templateName}</Badge>
                             ) : null}
                             {order.promotionAttribution?.targetSegment ? (
-                              <Badge variant="secondary">Segment: {order.promotionAttribution.targetSegment}</Badge>
+                              <Badge variant="secondary">{isMyanmar ? 'အုပ်စု' : 'Segment'}: {order.promotionAttribution.targetSegment}</Badge>
                             ) : null}
                           </div>
                           {order.promotionAttribution ? (
                             <p className="mt-2 text-xs text-muted-foreground">
-                              Triggered by “{order.promotionAttribution.announcementTitle}” • {order.promotionAttribution.audience} • {order.promotionAttribution.minutesFromSend} min after send
+                              {isMyanmar
+                                ? `“${order.promotionAttribution.announcementTitle}” မှ စတင်ခဲ့သည် • ${order.promotionAttribution.audience} • ပို့ပြီး ${order.promotionAttribution.minutesFromSend} မိနစ်အကြာ`
+                                : `Triggered by “${order.promotionAttribution.announcementTitle}” • ${order.promotionAttribution.audience} • ${order.promotionAttribution.minutesFromSend} min after send`}
                             </p>
                           ) : (
                             <p className="mt-2 text-xs text-muted-foreground">
-                              Coupon attribution only. No matching promo announcement was found in the recent send window.
+                              {isMyanmar
+                                ? 'ကူပွန် ချိတ်ဆက်မှုသာ တွေ့ရသည်။ မကြာသေးမီ ပို့ထားသည့် ပရိုမိုးရှင်း ကြေညာချက်တွင် ကိုက်ညီသည့် အရာမတွေ့ပါ။'
+                                : 'Coupon attribution only. No matching promo announcement was found in the recent send window.'}
                             </p>
                           )}
                         </div>
@@ -1711,10 +1934,12 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-primary" />
-                Communication thread
+                {isMyanmar ? 'ဆက်သွယ်မှု မှတ်တမ်း အချည်' : 'Communication thread'}
               </CardTitle>
               <CardDescription>
-                One thread for support notes, Telegram support threads, direct messages, announcements, receipts, refund decisions, and key notices.
+                {isMyanmar
+                  ? 'အကူအညီ မှတ်စုများ၊ Telegram အကူအညီ စကားပြောခန်းများ၊ တိုက်ရိုက်စာများ၊ ကြေညာချက်များ၊ ပြေစာများ၊ ငွေပြန်အမ်း ဆုံးဖြတ်ချက်များနှင့် သော့ အသိပေးချက်များကို အချိန်လိုင်း တစ်ခုတည်းတွင် စုစည်းထားသည်။'
+                  : 'One thread for support notes, Telegram support threads, direct messages, announcements, receipts, refund decisions, and key notices.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1722,7 +1947,7 @@ export default function UserLedgerPage() {
                 <Input
                   value={communicationSearch}
                   onChange={(event) => setCommunicationSearch(event.target.value)}
-                  placeholder="Search messages, announcements, receipts, notes, or meta…"
+                  placeholder={isMyanmar ? 'စာများ၊ ကြေညာချက်များ၊ ပြေစာများ၊ မှတ်စုများ သို့မဟုတ် နောက်ခံအချက်အလက်ကို ရှာမည်…' : 'Search messages, announcements, receipts, notes, or meta…'}
                 />
                 <Select
                   value={communicationFilter}
@@ -1736,37 +1961,37 @@ export default function UserLedgerPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All activity</SelectItem>
-                    <SelectItem value="CUSTOMER">Customer-facing</SelectItem>
-                    <SelectItem value="INTERNAL">Internal only</SelectItem>
-                    <SelectItem value="announcement">Announcements</SelectItem>
-                    <SelectItem value="message">Direct messages</SelectItem>
-                    <SelectItem value="support_thread">Support threads</SelectItem>
-                    <SelectItem value="receipt">Receipts</SelectItem>
-                    <SelectItem value="refund">Refund decisions</SelectItem>
-                    <SelectItem value="key_notice">Key notices</SelectItem>
-                    <SelectItem value="support_note">Support notes</SelectItem>
+                    <SelectItem value="ALL">{isMyanmar ? 'လုပ်ဆောင်ချက် အားလုံး' : 'All activity'}</SelectItem>
+                    <SelectItem value="CUSTOMER">{isMyanmar ? 'ဖောက်သည်မြင်ရ' : 'Customer-facing'}</SelectItem>
+                    <SelectItem value="INTERNAL">{isMyanmar ? 'အတွင်းသုံးသာ' : 'Internal only'}</SelectItem>
+                    <SelectItem value="announcement">{isMyanmar ? 'ကြေညာချက်များ' : 'Announcements'}</SelectItem>
+                    <SelectItem value="message">{isMyanmar ? 'တိုက်ရိုက်စာများ' : 'Direct messages'}</SelectItem>
+                    <SelectItem value="support_thread">{isMyanmar ? 'အကူအညီ စကားပြောခန်းများ' : 'Support threads'}</SelectItem>
+                    <SelectItem value="receipt">{isMyanmar ? 'ပြေစာများ' : 'Receipts'}</SelectItem>
+                    <SelectItem value="refund">{isMyanmar ? 'ပြန်အမ်းငွေ ဆုံးဖြတ်ချက်များ' : 'Refund decisions'}</SelectItem>
+                    <SelectItem value="key_notice">{isMyanmar ? 'သော့ အသိပေးချက်များ' : 'Key notices'}</SelectItem>
+                    <SelectItem value="support_note">{isMyanmar ? 'အကူအညီ မှတ်စုများ' : 'Support notes'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">Showing {filteredCommunicationHistory.length}</Badge>
+                <Badge variant="outline">{isMyanmar ? `ပြသနေသည် ${filteredCommunicationHistory.length}` : `Showing ${filteredCommunicationHistory.length}`}</Badge>
                 <Badge variant="secondary">
                   {communicationFilter === 'ALL'
-                    ? 'All categories'
+                    ? (isMyanmar ? 'အမျိုးအစား အားလုံး' : 'All categories')
                     : communicationFilter === 'CUSTOMER'
-                      ? 'Customer-facing'
+                      ? (isMyanmar ? 'ဖောက်သည်မြင်ရ' : 'Customer-facing')
                       : communicationFilter === 'INTERNAL'
-                        ? 'Internal only'
+                        ? (isMyanmar ? 'အတွင်းသုံးသာ' : 'Internal only')
                         : communicationFilter.replace('_', ' ')}
                 </Badge>
-                {communicationSearch.trim() ? <Badge variant="outline">Search: {communicationSearch.trim()}</Badge> : null}
+                {communicationSearch.trim() ? <Badge variant="outline">{isMyanmar ? 'ရှာဖွေချက်' : 'Search'}: {communicationSearch.trim()}</Badge> : null}
               </div>
 
               {filteredCommunicationHistory.length === 0 ? (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                  No customer communication matches the current filters.
+                  {isMyanmar ? 'လက်ရှိ filter များနှင့် ကိုက်ညီသော ဖောက်သည် ဆက်သွယ်မှု မရှိပါ။' : 'No customer communication matches the current filters.'}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1788,21 +2013,21 @@ export default function UserLedgerPage() {
                               <p className="font-medium text-foreground">{event.title}</p>
                               <Badge variant="outline">
                                 {event.category === 'announcement'
-                                  ? 'Announcement'
+                                  ? isMyanmar ? 'ကြေညာချက်' : 'Announcement'
                                   : event.category === 'message'
-                                    ? 'Direct message'
+                                    ? isMyanmar ? 'တိုက်ရိုက် စာပို့ခြင်း' : 'Direct message'
                                     : event.category === 'support_thread'
-                                      ? 'Support thread'
+                                      ? isMyanmar ? 'အကူအညီ စကားပြောခန်း' : 'Support thread'
                                     : event.category === 'receipt'
-                                      ? 'Receipt'
+                                      ? isMyanmar ? 'ပြေစာ' : 'Receipt'
                                       : event.category === 'refund'
-                                        ? 'Refund'
+                                        ? isMyanmar ? 'ပြန်အမ်းငွေ' : 'Refund'
                                         : event.category === 'key_notice'
-                                          ? 'Key notice'
-                                          : 'Support note'}
+                                          ? isMyanmar ? 'သော့ အသိပေးချက်' : 'Key notice'
+                                          : isMyanmar ? 'အကူအညီ မှတ်စု' : 'Support note'}
                               </Badge>
                               <Badge variant={event.customerFacing ? 'secondary' : 'outline'}>
-                                {event.customerFacing ? 'Customer-facing' : 'Internal'}
+                                {event.customerFacing ? (isMyanmar ? 'ဖောက်သည်မြင်ရ' : 'Customer-facing') : (isMyanmar ? 'အတွင်းသုံး' : 'Internal')}
                               </Badge>
                             </div>
                             <p className="whitespace-pre-wrap text-sm">{event.detail}</p>
@@ -1815,14 +2040,14 @@ export default function UserLedgerPage() {
                                 <Button asChild size="sm" variant="outline">
                                   <a href={event.href} target="_blank" rel="noreferrer">
                                     <ExternalLink className="mr-2 h-4 w-4" />
-                                    Open
+                                    {isMyanmar ? 'ဖွင့်မည်' : 'Open'}
                                   </a>
                                 </Button>
                               ) : (
                                 <Button asChild size="sm" variant="outline">
                                   <Link href={event.href}>
                                     <ExternalLink className="mr-2 h-4 w-4" />
-                                    Open
+                                    {isMyanmar ? 'ဖွင့်မည်' : 'Open'}
                                   </Link>
                                 </Button>
                               )
@@ -1841,18 +2066,18 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <KeyRound className="h-5 w-5 text-primary" />
-                Key inventory
+                {isMyanmar ? 'သော့ စာရင်း' : 'Key inventory'}
               </CardTitle>
               <CardDescription>
-                Standard and premium keys currently linked to this customer.
+                {isMyanmar ? 'ဤဖောက်သည်နှင့် လက်ရှိချိတ်ထားသော ရိုးရိုးနှင့် ပရီမီယံ သော့များကို ကြည့်ရှုပါ။' : 'Standard and premium keys currently linked to this customer.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-3">
-                <p className="text-sm font-medium">Standard keys</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'ရိုးရိုး သော့များ' : 'Standard keys'}</p>
                 {accessKeys.length === 0 ? (
                   <p className="rounded-[1rem] border border-dashed border-border/60 px-4 py-3 text-sm text-muted-foreground">
-                    No standard keys assigned.
+                    {isMyanmar ? 'ရိုးရိုး သော့ မချိတ်ထားသေးပါ။' : 'No standard keys assigned.'}
                   </p>
                 ) : (
                   accessKeys.map((key: AccessKeyItem) => (
@@ -1865,13 +2090,13 @@ export default function UserLedgerPage() {
                           </p>
                         </div>
                         <Button asChild variant="outline" size="sm">
-                          <Link href={`/dashboard/keys/${key.id}`}>Open</Link>
+                          <Link href={`/dashboard/keys/${key.id}`}>{isMyanmar ? 'ဖွင့်မည်' : 'Open'}</Link>
                         </Button>
                       </div>
                       <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-                        <p>Usage: {formatBytes(BigInt(key.usedBytes))}{key.dataLimitBytes ? ` / ${formatBytes(BigInt(key.dataLimitBytes))}` : ''}</p>
-                        <p>Expiry: {key.expiresAt ? formatDateTime(key.expiresAt) : 'Never'}</p>
-                        <p>Last traffic: {key.lastTrafficAt ? formatRelativeTime(key.lastTrafficAt) : 'No recent traffic'}</p>
+                        <p>{isMyanmar ? 'အသုံးပြုမှု:' : 'Usage:'} {formatBytes(BigInt(key.usedBytes))}{key.dataLimitBytes ? ` / ${formatBytes(BigInt(key.dataLimitBytes))}` : ''}</p>
+                        <p>{isMyanmar ? 'သက်တမ်းကုန်:' : 'Expiry:'} {key.expiresAt ? formatDateTime(key.expiresAt) : isMyanmar ? 'မကုန်ဆုံးပါ' : 'Never'}</p>
+                        <p>{isMyanmar ? 'နောက်ဆုံး အသုံးပြုမှု:' : 'Last traffic:'} {key.lastTrafficAt ? formatRelativeTime(key.lastTrafficAt) : isMyanmar ? 'လတ်တလော အသုံးပြုမှု မရှိပါ' : 'No recent traffic'}</p>
                       </div>
                     </div>
                   ))
@@ -1879,10 +2104,10 @@ export default function UserLedgerPage() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-medium">Premium dynamic keys</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'ပရီမီယံ အလှုပ်ရှားသော သော့များ' : 'Premium dynamic keys'}</p>
                 {dynamicKeys.length === 0 ? (
                   <p className="rounded-[1rem] border border-dashed border-border/60 px-4 py-3 text-sm text-muted-foreground">
-                    No premium dynamic keys assigned.
+                    {isMyanmar ? 'ပရီမီယံ အလှုပ်ရှားသော သော့ မချိတ်ထားသေးပါ။' : 'No premium dynamic keys assigned.'}
                   </p>
                 ) : (
                   dynamicKeys.map((key: DynamicKeyItem) => (
@@ -1893,13 +2118,13 @@ export default function UserLedgerPage() {
                           <p className="text-sm text-muted-foreground">{key.status}</p>
                         </div>
                         <Button asChild variant="outline" size="sm">
-                          <Link href={`/dashboard/dynamic-keys/${key.id}`}>Open</Link>
+                          <Link href={`/dashboard/dynamic-keys/${key.id}`}>{isMyanmar ? 'ဖွင့်မည်' : 'Open'}</Link>
                         </Button>
                       </div>
                       <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-                        <p>Usage: {formatBytes(BigInt(key.usedBytes))}{key.dataLimitBytes ? ` / ${formatBytes(BigInt(key.dataLimitBytes))}` : ''}</p>
-                        <p>Expiry: {key.expiresAt ? formatDateTime(key.expiresAt) : 'Never'}</p>
-                        <p>Last traffic: {key.lastTrafficAt ? formatRelativeTime(key.lastTrafficAt) : 'No recent traffic'}</p>
+                        <p>{isMyanmar ? 'အသုံးပြုမှု:' : 'Usage:'} {formatBytes(BigInt(key.usedBytes))}{key.dataLimitBytes ? ` / ${formatBytes(BigInt(key.dataLimitBytes))}` : ''}</p>
+                        <p>{isMyanmar ? 'သက်တမ်းကုန်:' : 'Expiry:'} {key.expiresAt ? formatDateTime(key.expiresAt) : isMyanmar ? 'မကုန်ဆုံးပါ' : 'Never'}</p>
+                        <p>{isMyanmar ? 'နောက်ဆုံး အသုံးပြုမှု:' : 'Last traffic:'} {key.lastTrafficAt ? formatRelativeTime(key.lastTrafficAt) : isMyanmar ? 'လတ်တလော အသုံးပြုမှု မရှိပါ' : 'No recent traffic'}</p>
                       </div>
                     </div>
                   ))
@@ -1912,16 +2137,16 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5 text-primary" />
-                Finance timeline
+                {isMyanmar ? 'ငွေကြေးပိုင်း အချိန်လိုင်း' : 'Finance timeline'}
               </CardTitle>
               <CardDescription>
-                Follow payments, receipts, refund requests, decisions, credits, and finance actions for this customer.
+                {isMyanmar ? 'ဤဖောက်သည်အတွက် ငွေပေးချေမှု၊ ပြေစာ၊ ပြန်အမ်းတောင်းဆိုမှု၊ ဆုံးဖြတ်ချက်နှင့် ငွေကြေးပိုင်း လုပ်ဆောင်ချက်များကို လိုက်ကြည့်ပါ။' : 'Follow payments, receipts, refund requests, decisions, credits, and finance actions for this customer.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {financeTimeline.length === 0 ? (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                  No finance events have been recorded for this customer yet.
+                  {isMyanmar ? 'ဤဖောက်သည်အတွက် ငွေကြေးပိုင်း ဖြစ်ရပ်များ မမှတ်တမ်းတင်ရသေးပါ။' : 'No finance events have been recorded for this customer yet.'}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1951,7 +2176,7 @@ export default function UserLedgerPage() {
                               <Button asChild size="sm" variant="outline">
                                 <Link href={event.href}>
                                   <ExternalLink className="mr-2 h-4 w-4" />
-                                  Open order
+                                  {isMyanmar ? 'အော်ဒါ ဖွင့်မည်' : 'Open order'}
                                 </Link>
                               </Button>
                             ) : null}
@@ -1971,30 +2196,30 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Coins className="h-5 w-5 text-primary" />
-                Customer snapshot
+                {isMyanmar ? 'ဖောက်သည် အကျဉ်းချုပ်' : 'Customer snapshot'}
               </CardTitle>
-              <CardDescription>Quick billing and support context for this user.</CardDescription>
+              <CardDescription>{isMyanmar ? 'ဤအသုံးပြုသူအတွက် ငွေကြေးပိုင်းနှင့် အကူအညီဆိုင်ရာ အချက်အလက် အကျဉ်းချုပ်ကို ပြထားသည်။' : 'Quick billing and support context for this user.'}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
-                <p className="text-muted-foreground">Account role</p>
+                <p className="text-muted-foreground">{isMyanmar ? 'အကောင့် အခန်းကဏ္ဍ' : 'Account role'}</p>
                 <p className="mt-1 font-medium">{user.role}</p>
               </div>
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
-                <p className="text-muted-foreground">Telegram chat</p>
-                <p className="mt-1 font-medium">{telegramProfile?.telegramChatId || user.telegramChatId || 'Not linked'}</p>
+                <p className="text-muted-foreground">{isMyanmar ? 'တယ်လီဂရမ် စကားပြောခန်း' : 'Telegram chat'}</p>
+                <p className="mt-1 font-medium">{telegramProfile?.telegramChatId || user.telegramChatId || (isMyanmar ? 'မချိတ်ထားပါ' : 'Not linked')}</p>
               </div>
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
-                <p className="text-muted-foreground">Telegram profile</p>
+                <p className="text-muted-foreground">{isMyanmar ? 'တယ်လီဂရမ် ပရိုဖိုင်' : 'Telegram profile'}</p>
                 <p className="mt-1 font-medium">
-                  {telegramProfile?.username ? `@${telegramProfile.username}` : 'No username'}
+                  {telegramProfile?.username ? `@${telegramProfile.username}` : isMyanmar ? 'အသုံးပြုသူအမည် မရှိပါ' : 'No username'}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Locale: {telegramProfile?.locale || 'Not set'}
+                  {isMyanmar ? 'ဘာသာစကား:' : 'Locale:'} {telegramProfile?.locale || (isMyanmar ? 'မသတ်မှတ်ရသေးပါ' : 'Not set')}
                 </p>
               </div>
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
-                <p className="text-muted-foreground">Joined</p>
+                <p className="text-muted-foreground">{isMyanmar ? 'စတင်ဝင်ရောက်ချိန်' : 'Joined'}</p>
                 <p className="mt-1 font-medium">{formatDateTime(user.createdAt)}</p>
               </div>
             </CardContent>
@@ -2004,18 +2229,18 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-primary" />
-                CRM action center
+                {isMyanmar ? 'ဖောက်သည် စီမံလုပ်ဆောင်ချက် စင်တာ' : 'CRM action center'}
               </CardTitle>
               <CardDescription>
-                Send direct Telegram updates, resend delivery assets, and keep internal support notes from one place.
+                {isMyanmar ? 'Telegram တိုက်ရိုက်စာ ပို့ခြင်း၊ ပို့ဆောင်ရေးပစ္စည်းများကို ထပ်ပို့ခြင်းနှင့် အတွင်းသုံး အကူအညီ မှတ်စုများကို တစ်နေရာတည်းတွင် စီမံပါ။' : 'Send direct Telegram updates, resend delivery assets, and keep internal support notes from one place.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">Direct Telegram message</p>
-                    <p className="text-xs text-muted-foreground">Send a one-off support or service message to this customer.</p>
+                    <p className="text-sm font-medium">{isMyanmar ? 'Telegram တိုက်ရိုက်စာ' : 'Direct Telegram message'}</p>
+                    <p className="text-xs text-muted-foreground">{isMyanmar ? 'ဤဖောက်သည်ထံ အကူအညီ သို့မဟုတ် ဝန်ဆောင်မှု စာတစ်စောင်ကို တိုက်ရိုက် ပို့ပါ။' : 'Send a one-off support or service message to this customer.'}</p>
                   </div>
                   <Switch
                     checked={crmIncludeSupportButton}
@@ -2027,21 +2252,21 @@ export default function UserLedgerPage() {
                   className="mt-3 min-h-[110px]"
                   value={crmDirectMessage}
                   onChange={(event) => setCrmDirectMessage(event.target.value)}
-                  placeholder="Write a direct Telegram message for this customer…"
+                  placeholder={isMyanmar ? 'ဤဖောက်သည်အတွက် Telegram စာကို ရေးပါ…' : 'Write a direct Telegram message for this customer…'}
                   disabled={!crmPermissions.canMessageCustomer}
                 />
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Message title</Label>
+                    <Label>{isMyanmar ? 'စာ ခေါင်းစဉ်' : 'Message title'}</Label>
                     <Input
                       value={crmDirectMessageTitle}
                       onChange={(event) => setCrmDirectMessageTitle(event.target.value)}
-                      placeholder="Optional headline"
+                      placeholder={isMyanmar ? 'ရွေးချယ်နိုင်သော ခေါင်းစဉ်' : 'Optional headline'}
                       disabled={!crmPermissions.canMessageCustomer}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Card style</Label>
+                    <Label>{isMyanmar ? 'ကတ် ပုံစံ' : 'Card style'}</Label>
                     <Select
                       value={crmDirectMessageCardStyle}
                       onValueChange={(value) =>
@@ -2052,17 +2277,17 @@ export default function UserLedgerPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="DEFAULT">Default card</SelectItem>
-                        <SelectItem value="PROMO">Promo card</SelectItem>
-                        <SelectItem value="PREMIUM">Premium card</SelectItem>
-                        <SelectItem value="OPERATIONS">Operations card</SelectItem>
+                        <SelectItem value="DEFAULT">{isMyanmar ? 'မူလ ကတ်' : 'Default card'}</SelectItem>
+                        <SelectItem value="PROMO">{isMyanmar ? 'ပရိုမိုးရှင်း ကတ်' : 'Promo card'}</SelectItem>
+                        <SelectItem value="PREMIUM">{isMyanmar ? 'ပရီမီယံ ကတ်' : 'Premium card'}</SelectItem>
+                        <SelectItem value="OPERATIONS">{isMyanmar ? 'လုပ်ဆောင်ချက် ကတ်' : 'Operations card'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
                   <div className="space-y-2">
-                    <Label>Media support</Label>
+                    <Label>{isMyanmar ? 'မီဒီယာ ပံ့ပိုးမှု' : 'Media support'}</Label>
                     <Select
                       value={crmDirectMessageMediaKind}
                       onValueChange={(value) =>
@@ -2073,14 +2298,14 @@ export default function UserLedgerPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NONE">Text only</SelectItem>
-                        <SelectItem value="IMAGE">Image / banner</SelectItem>
-                        <SelectItem value="FILE">File attachment</SelectItem>
+                        <SelectItem value="NONE">{isMyanmar ? 'စာသားသာ' : 'Text only'}</SelectItem>
+                        <SelectItem value="IMAGE">{isMyanmar ? 'ပုံ / ခေါင်းစီးပုံ' : 'Image / banner'}</SelectItem>
+                        <SelectItem value="FILE">{isMyanmar ? 'ဖိုင် ပူးတွဲချက်' : 'File attachment'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>{crmDirectMessageMediaKind === 'FILE' ? 'File URL' : 'Image URL'}</Label>
+                    <Label>{crmDirectMessageMediaKind === 'FILE' ? (isMyanmar ? 'ဖိုင် လင့်ခ်' : 'File URL') : (isMyanmar ? 'ပုံ လင့်ခ်' : 'Image URL')}</Label>
                     <Input
                       value={crmDirectMessageMediaUrl}
                       onChange={(event) => setCrmDirectMessageMediaUrl(event.target.value)}
@@ -2092,13 +2317,15 @@ export default function UserLedgerPage() {
                       disabled={!crmPermissions.canMessageCustomer || crmDirectMessageMediaKind === 'NONE'}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Reuses the Telegram announcement card styling for one-user messages.
+                      {isMyanmar
+                        ? 'ဖောက်သည်တစ်ဦးချင်းစီထံ ပို့သော စာများတွင် Telegram ကြေညာချက်ကတ်၏ ပုံစံကို ပြန်လည်အသုံးပြုပါသည်။'
+                        : 'Reuses the Telegram announcement card styling for one-user messages.'}
                     </p>
                   </div>
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
                   <div className="space-y-2">
-                    <Label>Template apply mode</Label>
+                    <Label>{isMyanmar ? 'တမ်းပလိတ် ထည့်သွင်းနည်း' : 'Template apply mode'}</Label>
                     <Select
                       value={crmTemplateMode}
                       onValueChange={(value) => setCrmTemplateMode(value as 'replace' | 'append')}
@@ -2107,15 +2334,15 @@ export default function UserLedgerPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="replace">Replace message</SelectItem>
-                        <SelectItem value="append">Append to message</SelectItem>
+                        <SelectItem value="replace">{isMyanmar ? 'စာကို အစားထိုးမည်' : 'Replace message'}</SelectItem>
+                        <SelectItem value="append">{isMyanmar ? 'စာ၏အဆုံးတွင် ထပ်ထည့်မည်' : 'Append to message'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="rounded-xl border border-border/50 p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Direct-send templates</p>
+                    <p className="text-xs font-medium text-muted-foreground">{isMyanmar ? 'တိုက်ရိုက်ပို့ တမ်းပလိတ်များ' : 'Direct-send templates'}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                  {CRM_DIRECT_MESSAGE_TEMPLATES.map((template) => (
+                      {CRM_DIRECT_MESSAGE_TEMPLATES.map((template) => (
                     <Button
                       key={`${template.category}-${template.label}`}
                       type="button"
@@ -2125,12 +2352,12 @@ export default function UserLedgerPage() {
                       onClick={() =>
                         setCrmDirectMessage((prev) =>
                           crmTemplateMode === 'append' && prev.trim().length > 0
-                            ? `${prev.trim()}\n\n${template.body}`
-                            : template.body,
+                            ? `${prev.trim()}\n\n${getCrmTemplateBody(template.label, template.body, isMyanmar)}`
+                            : getCrmTemplateBody(template.label, template.body, isMyanmar),
                         )
                       }
                     >
-                      {template.category} · {template.label}
+                      {getCrmTemplateCategoryLabel(template.category, isMyanmar)} · {getCrmTemplateLabel(template.label, isMyanmar)}
                     </Button>
                   ))}
                     </div>
@@ -2164,18 +2391,18 @@ export default function UserLedgerPage() {
                   ) : (
                     <Send className="mr-2 h-4 w-4" />
                   )}
-                  Send direct message
+                  {isMyanmar ? 'တိုက်ရိုက်စာ ပို့မည်' : 'Send direct message'}
                 </Button>
               </div>
 
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
-                <p className="text-sm font-medium">Delivery actions</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'ပို့ဆောင်မှု လုပ်ဆောင်ချက်များ' : 'Delivery actions'}</p>
                 <div className="mt-3 space-y-3">
                   <div className="space-y-2">
-                    <Label>Resend receipt</Label>
+                    <Label>{isMyanmar ? 'ပြေစာကို ထပ်ပို့မည်' : 'Resend receipt'}</Label>
                     <Select value={crmReceiptOrderId} onValueChange={setCrmReceiptOrderId}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a fulfilled order" />
+                        <SelectValue placeholder={isMyanmar ? 'ပြီးစီးထားသော အော်ဒါကို ရွေးပါ' : 'Choose a fulfilled order'} />
                       </SelectTrigger>
                       <SelectContent>
                         {telegramOrders.filter((order) => order.status === 'FULFILLED').map((order) => (
@@ -2196,25 +2423,25 @@ export default function UserLedgerPage() {
                       ) : (
                         <RefreshCw className="mr-2 h-4 w-4" />
                       )}
-                      Resend receipt in Telegram
+                      {isMyanmar ? 'Telegram တွင် ပြေစာကို ထပ်ပို့မည်' : 'Resend receipt in Telegram'}
                     </Button>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Resend share page</Label>
+                    <Label>{isMyanmar ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့မည်' : 'Resend share page'}</Label>
                     <Select value={crmShareTarget} onValueChange={setCrmShareTarget}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a key" />
+                        <SelectValue placeholder={isMyanmar ? 'သော့တစ်ခုကို ရွေးပါ' : 'Choose a key'} />
                       </SelectTrigger>
                       <SelectContent>
                         {accessKeys.map((key: AccessKeyItem) => (
                           <SelectItem key={`ACCESS_KEY:${key.id}`} value={`ACCESS_KEY:${key.id}`}>
-                            Standard • {key.name}
+                            {isMyanmar ? 'ပုံမှန် •' : 'Standard •'} {key.name}
                           </SelectItem>
                         ))}
                         {dynamicKeys.map((key: DynamicKeyItem) => (
                           <SelectItem key={`DYNAMIC_KEY:${key.id}`} value={`DYNAMIC_KEY:${key.id}`}>
-                            Premium • {key.name}
+                            {isMyanmar ? 'ပရီမီယံ •' : 'Premium •'} {key.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -2239,15 +2466,15 @@ export default function UserLedgerPage() {
                       ) : (
                         <ExternalLink className="mr-2 h-4 w-4" />
                       )}
-                      Resend share page
+                      {isMyanmar ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့မည်' : 'Resend share page'}
                     </Button>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Resend announcement to this user</Label>
+                    <Label>{isMyanmar ? 'ဤအသုံးပြုသူထံ ကြေညာချက်ကို ထပ်ပို့မည်' : 'Resend announcement to this user'}</Label>
                     <Select value={crmAnnouncementId} onValueChange={setCrmAnnouncementId}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a recent announcement" />
+                        <SelectValue placeholder={isMyanmar ? 'မကြာသေးမီ ကြေညာချက်ကို ရွေးပါ' : 'Choose a recent announcement'} />
                       </SelectTrigger>
                       <SelectContent>
                         {announcementDeliveries.map((delivery) => (
@@ -2277,31 +2504,31 @@ export default function UserLedgerPage() {
                       ) : (
                         <Bell className="mr-2 h-4 w-4" />
                       )}
-                      Resend announcement
+                      {isMyanmar ? 'ကြေညာချက်ကို ထပ်ပို့မည်' : 'Resend announcement'}
                     </Button>
                   </div>
                 </div>
               </div>
 
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
-                <p className="text-sm font-medium">Outage update</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'ပြတ်တောက်မှု အသိပေးချက်' : 'Outage update'}</p>
                 <div className="mt-3 space-y-3">
                   <div className="space-y-2">
-                    <Label>Server or service name</Label>
+                    <Label>{isMyanmar ? 'ဆာဗာ သို့မဟုတ် ဝန်ဆောင်မှု အမည်' : 'Server or service name'}</Label>
                     <Input
                       value={crmOutageServerName}
                       onChange={(event) => setCrmOutageServerName(event.target.value)}
-                      placeholder="SG, US, Premium pool, Service update…"
+                      placeholder={isMyanmar ? 'SG, US, ပရီမီယံအုပ်စု, ဝန်ဆောင်မှု အပ်ဒိတ်…' : 'SG, US, Premium pool, Service update…'}
                       disabled={!crmPermissions.canSendOutageUpdate}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Outage or maintenance message</Label>
+                    <Label>{isMyanmar ? 'ပြတ်တောက်မှု သို့မဟုတ် ထိန်းသိမ်းမှု စာ' : 'Outage or maintenance message'}</Label>
                     <Textarea
                       className="min-h-[100px]"
                       value={crmOutageMessage}
                       onChange={(event) => setCrmOutageMessage(event.target.value)}
-                      placeholder="We are checking a server issue for you. Please wait 2 to 3 hours while we complete recovery…"
+                      placeholder={isMyanmar ? 'ဆာဗာ ပြဿနာကို စစ်ဆေးနေပါသည်။ ပြန်လည်ပြုပြင်မှု ပြီးဆုံးသည်အထိ ၂ မှ ၃ နာရီခန့် စောင့်ပေးပါ…' : 'We are checking a server issue for you. Please wait 2 to 3 hours while we complete recovery…'}
                       disabled={!crmPermissions.canSendOutageUpdate}
                     />
                   </div>
@@ -2328,18 +2555,18 @@ export default function UserLedgerPage() {
                     ) : (
                       <AlertTriangle className="mr-2 h-4 w-4" />
                     )}
-                    Send outage update
+                    {isMyanmar ? 'ပြတ်တောက်မှု အသိပေးချက် ပို့မည်' : 'Send outage update'}
                   </Button>
                 </div>
               </div>
 
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
-                <p className="text-sm font-medium">Internal support note</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'အတွင်းသုံး အကူအညီ မှတ်စု' : 'Internal support note'}</p>
                 <Textarea
                   className="mt-3 min-h-[100px]"
                   value={crmSupportNote}
                   onChange={(event) => setCrmSupportNote(event.target.value)}
-                  placeholder="Write an internal note for future support context…"
+                  placeholder={isMyanmar ? 'နောက်ပိုင်း အကူအညီအတွက် အတွင်းသုံး မှတ်စုကို ရေးပါ…' : 'Write an internal note for future support context…'}
                   disabled={!crmPermissions.canAddSupportNote}
                 />
                 <Button
@@ -2358,7 +2585,7 @@ export default function UserLedgerPage() {
                   ) : (
                     <Save className="mr-2 h-4 w-4" />
                   )}
-                  Save support note
+                  {isMyanmar ? 'အကူအညီ မှတ်စုကို သိမ်းမည်' : 'Save support note'}
                 </Button>
                 {supportNotes.length > 0 ? (
                   <div className="mt-3 space-y-2">
@@ -2372,9 +2599,9 @@ export default function UserLedgerPage() {
                         {(note.telegramMessageTitle || note.telegramMediaKind || note.telegramMediaUrl) ? (
                           <p className="mt-1 text-[11px] text-muted-foreground">
                             {[
-                              note.telegramMessageTitle ? `Title ${note.telegramMessageTitle}` : null,
-                              note.telegramCardStyle ? `${note.telegramCardStyle.toLowerCase()} card` : null,
-                              note.telegramMediaKind ? `Media ${note.telegramMediaKind.toLowerCase()}` : null,
+                              note.telegramMessageTitle ? (isMyanmar ? `ခေါင်းစဉ် - ${note.telegramMessageTitle}` : `Title ${note.telegramMessageTitle}`) : null,
+                              note.telegramCardStyle ? (isMyanmar ? `ကတ်ပုံစံ - ${note.telegramCardStyle.toLowerCase()}` : `${note.telegramCardStyle.toLowerCase()} card`) : null,
+                              note.telegramMediaKind ? (isMyanmar ? `မီဒီယာ - ${note.telegramMediaKind.toLowerCase()}` : `Media ${note.telegramMediaKind.toLowerCase()}`) : null,
                             ]
                               .filter(Boolean)
                               .join(' • ')}
@@ -2387,14 +2614,14 @@ export default function UserLedgerPage() {
                                   rel="noreferrer"
                                   className="underline underline-offset-4"
                                 >
-                                  Open media
+                                  {isMyanmar ? 'မီဒီယာ ဖွင့်မည်' : 'Open media'}
                                 </a>
                               </>
                             ) : null}
                           </p>
                         ) : null}
                         {note.createdBy?.email ? (
-                          <p className="mt-1 text-[11px] text-muted-foreground">By {note.createdBy.email}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{isMyanmar ? 'ရေးသားသူ' : 'By'} {note.createdBy.email}</p>
                         ) : null}
                       </div>
                     ))}
@@ -2408,40 +2635,50 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />
-                Customer notifications
+                {isMyanmar ? 'ဖောက်သည်ထံ ပို့ထားသော အသိပေးချက်များ' : 'Customer notifications'}
               </CardTitle>
               <CardDescription>
-                Announcement deliveries, receipts, and recent key or outage-related notices for this customer.
+                {isMyanmar
+                  ? 'ဤဖောက်သည်အတွက် ကြေညာချက် ပို့ထားမှုများ၊ ပြေစာများနှင့် သော့/ပြတ်တောက်မှု ဆိုင်ရာ နောက်ဆုံးအသိပေးချက်များကို ပြထားသည်။'
+                  : 'Announcement deliveries, receipts, and recent key or outage-related notices for this customer.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Delivery analytics
+                    {isMyanmar ? 'ပို့ဆောင်မှု အချက်အလက်' : 'Delivery analytics'}
                   </p>
                   <p className="mt-2 text-2xl font-semibold">
                     {customerNotifications.summary.totalAnnouncements}
                   </p>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {customerNotifications.summary.readCount} read • {customerNotifications.summary.unreadCount} unread
+                    {isMyanmar
+                      ? `${customerNotifications.summary.readCount} ခု ဖတ်ပြီး • ${customerNotifications.summary.unreadCount} ခု မဖတ်ရသေး`
+                      : `${customerNotifications.summary.readCount} read • ${customerNotifications.summary.unreadCount} unread`}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {customerNotifications.summary.openCount} opens • {customerNotifications.summary.clickCount} clicks
+                    {isMyanmar
+                      ? `${customerNotifications.summary.openCount} ခု ဖွင့်ထား • ${customerNotifications.summary.clickCount} ခု နှိပ်ထား`
+                      : `${customerNotifications.summary.openCount} opens • ${customerNotifications.summary.clickCount} clicks`}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Engagement
+                    {isMyanmar ? 'ထိတွေ့မှု' : 'Engagement'}
                   </p>
                   <p className="mt-2 text-2xl font-semibold">
                     {Math.round(customerNotifications.summary.readRate * 100)}%
                   </p>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Read rate • {Math.round(customerNotifications.summary.clickRate * 100)}% click rate
+                    {isMyanmar
+                      ? `ဖတ်ရှုနှုန်း • ${Math.round(customerNotifications.summary.clickRate * 100)}% နှိပ်နှုန်း`
+                      : `Read rate • ${Math.round(customerNotifications.summary.clickRate * 100)}% click rate`}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {customerNotifications.summary.pinnedCount} pinned notices delivered
+                    {isMyanmar
+                      ? `ပင်ထားသော အသိပေးချက် ${customerNotifications.summary.pinnedCount} ခု ပို့ထားသည်`
+                      : `${customerNotifications.summary.pinnedCount} pinned notices delivered`}
                   </p>
                 </div>
               </div>
@@ -2449,20 +2686,28 @@ export default function UserLedgerPage() {
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">Customer promotion tags</p>
+                    <p className="text-sm font-medium">{isMyanmar ? 'ဖောက်သည် ပရိုမိုးရှင်း အမှတ်အသားများ' : 'Customer promotion tags'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Use comma-separated tags like <code>vip</code>, <code>warm_lead</code>, or <code>renewal_focus</code>. These tags appear in Telegram announcement targeting.
+                    {isMyanmar ? (
+                      <>
+                          ကော်မာဖြင့် ခွဲထားသော <code>vip</code>, <code>warm_lead</code>, <code>renewal_focus</code> ကဲ့သို့သော အမှတ်အသားများကို အသုံးပြုပါ။ ဤအမှတ်အသားများကို Telegram ကြေညာချက် ပစ်မှတ်သတ်မှတ်မှုတွင် အသုံးပြုပါမည်။
+                      </>
+                      ) : (
+                        <>
+                          Use comma-separated tags like <code>vip</code>, <code>warm_lead</code>, or <code>renewal_focus</code>. These tags appear in Telegram announcement targeting.
+                        </>
+                      )}
                     </p>
                   </div>
                   {!crmPermissions.canManageCustomerTags ? (
-                    <Badge variant="outline">Owner/Admin only</Badge>
+                    <Badge variant="outline">{isMyanmar ? 'ပိုင်ရှင်/စီမံခန့်ခွဲသူသာ' : 'Owner/Admin only'}</Badge>
                   ) : null}
                 </div>
                 <div className="mt-4 flex flex-col gap-3 md:flex-row">
                   <Input
                     value={crmMarketingTags}
                     onChange={(event) => setCrmMarketingTags(event.target.value)}
-                    placeholder="vip, warm_lead, renewal_focus"
+                    placeholder={isMyanmar ? 'vip, warm_lead, renewal_focus' : 'vip, warm_lead, renewal_focus'}
                     disabled={!crmPermissions.canManageCustomerTags}
                   />
                   <Button
@@ -2485,7 +2730,7 @@ export default function UserLedgerPage() {
                     ) : (
                       <Save className="mr-2 h-4 w-4" />
                     )}
-                    Save tags
+                    {isMyanmar ? 'အမှတ်အသားများကို သိမ်းမည်' : 'Save tags'}
                   </Button>
                 </div>
               </div>
@@ -2493,39 +2738,41 @@ export default function UserLedgerPage() {
               <div className="rounded-[1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">Notification preferences</p>
+                    <p className="text-sm font-medium">{isMyanmar ? 'အသိပေးချက် စိတ်ကြိုက်သတ်မှတ်မှုများ' : 'Notification preferences'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Control what this customer receives in Telegram. Users can also change these via /notifications.
+                      {isMyanmar
+                        ? 'ဤဖောက်သည် Telegram တွင် ဘာများ လက်ခံမည်ကို စီမံပါ။ အသုံးပြုသူကလည်း /notifications မှ ပြောင်းနိုင်သည်။'
+                        : 'Control what this customer receives in Telegram. Users can also change these via /notifications.'}
                     </p>
                   </div>
                   {!telegramProfile ? (
-                    <Badge variant="outline">Telegram profile required</Badge>
+                    <Badge variant="outline">{isMyanmar ? 'တယ်လီဂရမ် ပရိုဖိုင် လိုအပ်သည်' : 'Telegram profile required'}</Badge>
                   ) : null}
                 </div>
                 <div className="mt-4 grid gap-3">
                   {[
                     {
                       key: 'allowPromoAnnouncements' as const,
-                      label: 'Promotions and discounts',
-                      description: 'Promo broadcasts and discounted-plan offers.',
+                      label: isMyanmar ? 'ပရိုမိုးရှင်းနှင့် လျှော့ဈေးများ' : 'Promotions and discounts',
+                      description: isMyanmar ? 'ပရိုမိုးရှင်း အများပြည်သူပို့စာများနှင့် လျှော့ဈေး အစီအစဉ် ကမ်းလှမ်းချက်များ။' : 'Promo broadcasts and discounted-plan offers.',
                       checked: telegramProfile?.allowPromoAnnouncements ?? true,
                     },
                     {
                       key: 'allowMaintenanceNotices' as const,
-                      label: 'Maintenance and server updates',
-                      description: 'Maintenance, downtime, and new-server notices.',
+                      label: isMyanmar ? 'ထိန်းသိမ်းမှုနှင့် ဆာဗာ အပ်ဒိတ်များ' : 'Maintenance and server updates',
+                      description: isMyanmar ? 'ထိန်းသိမ်းမှု၊ ပြတ်တောက်မှု နှင့် ဆာဗာအသစ် အသိပေးချက်များ။' : 'Maintenance, downtime, and new-server notices.',
                       checked: telegramProfile?.allowMaintenanceNotices ?? true,
                     },
                     {
                       key: 'allowReceiptNotifications' as const,
-                      label: 'Receipts and refund confirmations',
-                      description: 'Receipt, refund, and finance confirmation messages.',
+                      label: isMyanmar ? 'ပြေစာနှင့် ငွေပြန်အမ်း အတည်ပြုချက်များ' : 'Receipts and refund confirmations',
+                      description: isMyanmar ? 'ပြေစာ၊ ငွေပြန်အမ်းမှုနှင့် ငွေကြေးအတည်ပြုချက် စာများ။' : 'Receipt, refund, and finance confirmation messages.',
                       checked: telegramProfile?.allowReceiptNotifications ?? true,
                     },
                     {
                       key: 'allowSupportUpdates' as const,
-                      label: 'Support updates',
-                      description: 'Direct support follow-up and status notices.',
+                      label: isMyanmar ? 'အကူအညီ အပ်ဒိတ်များ' : 'Support updates',
+                      description: isMyanmar ? 'တိုက်ရိုက် အကူအညီ နောက်ဆက်တွဲများနှင့် အခြေအနေ အသိပေးချက်များ။' : 'Direct support follow-up and status notices.',
                       checked: telegramProfile?.allowSupportUpdates ?? true,
                     },
                   ].map((preference) => (
@@ -2569,9 +2816,9 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Telegram announcements</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'Telegram ကြေညာချက်များ' : 'Telegram announcements'}</p>
                 {announcementDeliveries.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No announcement deliveries recorded yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'ကြေညာချက် ပို့ထားမှု မှတ်တမ်း မရှိသေးပါ။' : 'No announcement deliveries recorded yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {announcementDeliveries.map((delivery) => (
@@ -2580,8 +2827,8 @@ export default function UserLedgerPage() {
                           <p className="font-medium">{delivery.announcement.title}</p>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{delivery.status}</Badge>
-                            {delivery.isPinned ? <Badge variant="secondary">Pinned</Badge> : null}
-                            {!delivery.readAt ? <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">Unread</Badge> : null}
+                            {delivery.isPinned ? <Badge variant="secondary">{isMyanmar ? 'ပင်ထားသည်' : 'Pinned'}</Badge> : null}
+                            {!delivery.readAt ? <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">{isMyanmar ? 'မဖတ်ရသေး' : 'Unread'}</Badge> : null}
                           </div>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -2589,19 +2836,20 @@ export default function UserLedgerPage() {
                         </p>
                         <p className="mt-2 text-sm text-muted-foreground">{delivery.announcement.message}</p>
                         <p className="mt-2 text-xs text-muted-foreground">
-                          Opens: {delivery.openCount || 0} • Clicks: {delivery.clickCount || 0}
-                          {delivery.readAt ? ` • Read ${formatRelativeTime(delivery.readAt)}` : ' • Not opened yet'}
+                          {isMyanmar
+                            ? `ဖွင့်ထားမှု: ${delivery.openCount || 0} • နှိပ်ထားမှု: ${delivery.clickCount || 0}${delivery.readAt ? ` • ${formatRelativeTime(delivery.readAt)} တွင် ဖတ်ထားသည်` : ' • မဖွင့်ရသေးပါ'}`
+                            : `Opens: ${delivery.openCount || 0} • Clicks: ${delivery.clickCount || 0}${delivery.readAt ? ` • Read ${formatRelativeTime(delivery.readAt)}` : ' • Not opened yet'}`}
                         </p>
                         {(delivery.announcement.targetTag || delivery.announcement.targetServerName || delivery.announcement.targetCountryCode) ? (
                           <div className="mt-2 flex flex-wrap gap-2">
                             {delivery.announcement.targetTag ? (
-                              <Badge variant="secondary">Tag: {delivery.announcement.targetTag}</Badge>
+                              <Badge variant="secondary">{isMyanmar ? 'အမှတ်အသား' : 'Tag'}: {delivery.announcement.targetTag}</Badge>
                             ) : null}
                             {delivery.announcement.targetServerName ? (
-                              <Badge variant="secondary">Server: {delivery.announcement.targetServerName}</Badge>
+                              <Badge variant="secondary">{isMyanmar ? 'ဆာဗာ' : 'Server'}: {delivery.announcement.targetServerName}</Badge>
                             ) : null}
                             {delivery.announcement.targetCountryCode ? (
-                              <Badge variant="secondary">Region: {delivery.announcement.targetCountryCode}</Badge>
+                              <Badge variant="secondary">{isMyanmar ? 'ဒေသ' : 'Region'}: {delivery.announcement.targetCountryCode}</Badge>
                             ) : null}
                           </div>
                         ) : null}
@@ -2612,9 +2860,9 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Premium routing lifecycle</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'ပရီမီယံ လမ်းကြောင်း ပြောင်းလဲမှု အချိန်လိုင်း' : 'Premium routing lifecycle'}</p>
                 {premiumRoutingAlerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No premium routing events recorded yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'ပရီမီယံ လမ်းကြောင်း ပြောင်းလဲမှု မှတ်တမ်း မရှိသေးပါ။' : 'No premium routing events recorded yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {premiumRoutingAlerts.map((alert: PremiumRoutingAlertItem) => {
@@ -2635,10 +2883,10 @@ export default function UserLedgerPage() {
                               {alert.dynamicAccessKeyName}
                               <span className="ml-2 text-xs text-muted-foreground">
                                 {alert.eventType === 'AUTO_FALLBACK_PIN_APPLIED'
-                                  ? 'Fallback'
+                                  ? (isMyanmar ? 'အစားထိုး လမ်းကြောင်း' : 'Fallback')
                                   : alert.eventType === 'PREFERRED_REGION_RECOVERED'
-                                    ? 'Recovered'
-                                    : 'Degraded'}
+                                    ? (isMyanmar ? 'ပြန်ကောင်းလာသည်' : 'Recovered')
+                                    : (isMyanmar ? 'အခြေအနေ ကျဆင်း' : 'Degraded')}
                               </span>
                             </p>
                             <Badge
@@ -2660,21 +2908,21 @@ export default function UserLedgerPage() {
                             <div className="mt-2 flex flex-wrap gap-2">
                               {fallbackRegions.map((regionCode) => (
                                 <Badge key={`${alert.id}:${regionCode}`} variant="secondary">
-                                  Fallback: {regionCode}
+                                  {isMyanmar ? 'အစားထိုး လမ်းကြောင်း' : 'Fallback'}: {regionCode}
                                 </Badge>
                               ))}
                             </div>
                           ) : null}
                           {fallbackRegionCode ? (
                             <div className="mt-2 flex flex-wrap gap-2">
-                              <Badge variant="secondary">Pinned fallback: {fallbackRegionCode}</Badge>
+                              <Badge variant="secondary">{isMyanmar ? 'ပင်ထားသော အစားထိုး လမ်းကြောင်း' : 'Pinned fallback'}: {fallbackRegionCode}</Badge>
                             </div>
                           ) : null}
                           {healthyPreferredRegions.length > 0 ? (
                             <div className="mt-2 flex flex-wrap gap-2">
                               {healthyPreferredRegions.map((regionCode) => (
                                 <Badge key={`${alert.id}:recovered:${regionCode}`} variant="secondary">
-                                  Recovered: {regionCode}
+                                  {isMyanmar ? 'ပြန်ကောင်းလာသည်' : 'Recovered'}: {regionCode}
                                 </Badge>
                               ))}
                             </div>
@@ -2682,7 +2930,7 @@ export default function UserLedgerPage() {
                           <Button asChild size="sm" variant="outline" className="mt-3">
                             <Link href={withBasePath(`/dashboard/dynamic-keys/${alert.dynamicAccessKeyId}`)}>
                               <ExternalLink className="mr-2 h-4 w-4" />
-                              Open premium key
+                              {isMyanmar ? 'ပရီမီယံ သော့ကို ဖွင့်မည်' : 'Open premium key'}
                             </Link>
                           </Button>
                         </div>
@@ -2693,9 +2941,9 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Key and outage notices</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'သော့နှင့် ပြတ်တောက်မှု အသိပေးချက်များ' : 'Key and outage notices'}</p>
                 {customerNotifications.keyNotices.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No key notification logs recorded yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'သော့ အသိပေးချက် မှတ်တမ်း မရှိသေးပါ။' : 'No key notification logs recorded yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {customerNotifications.keyNotices.map((log: KeyNoticeItem) => (
@@ -2705,7 +2953,7 @@ export default function UserLedgerPage() {
                           <Badge variant="outline">{log.status}</Badge>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {log.accessKeyName || 'Unlinked key'} • {formatRelativeTime(log.sentAt)}
+                          {log.accessKeyName || (isMyanmar ? 'မချိတ်ထားသော သော့' : 'Unlinked key')} • {formatRelativeTime(log.sentAt)}
                         </p>
                         <p className="mt-2 text-sm text-muted-foreground">{log.message}</p>
                       </div>
@@ -2720,16 +2968,18 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5 text-primary" />
-                Support timeline
+                {isMyanmar ? 'အကူအညီ အချိန်လိုင်း' : 'Support timeline'}
               </CardTitle>
               <CardDescription>
-                One chronological feed for support threads, notices, premium requests, outage-related contact, and server-change history.
+                {isMyanmar
+                  ? 'အကူအညီ စကားပြောခန်းများ၊ အသိပေးချက်များ၊ ပရီမီယံ တောင်းဆိုမှုများ၊ ပြတ်တောက်မှုဆိုင်ရာ ဆက်သွယ်မှုများနှင့် ဆာဗာပြောင်းလဲမှု မှတ်တမ်းများကို အချိန်လိုက် တစ်နေရာတည်းတွင် ပြထားသည်။'
+                  : 'One chronological feed for support threads, notices, premium requests, outage-related contact, and server-change history.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {supportTimeline.length === 0 ? (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                  No support events have been recorded for this customer yet.
+                  {isMyanmar ? 'ဤဖောက်သည်အတွက် အကူအညီ မှတ်တမ်း မရှိသေးပါ။' : 'No support events have been recorded for this customer yet.'}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -2756,7 +3006,7 @@ export default function UserLedgerPage() {
                               <Button asChild size="sm" variant="outline">
                                 <Link href={event.href}>
                                   <ExternalLink className="mr-2 h-4 w-4" />
-                                  Open
+                                  {isMyanmar ? 'ဖွင့်မည်' : 'Open'}
                                 </Link>
                               </Button>
                             ) : null}
@@ -2774,20 +3024,20 @@ export default function UserLedgerPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5 text-primary" />
-                Support activity
+                {isMyanmar ? 'အကူအညီ လှုပ်ရှားမှု' : 'Support activity'}
               </CardTitle>
-              <CardDescription>Recent Telegram support threads, server-change requests, and premium support requests linked to this customer.</CardDescription>
+              <CardDescription>{isMyanmar ? 'ဤဖောက်သည်နှင့် ဆက်စပ်သော Telegram အကူအညီ စကားပြောခန်းများ၊ ဆာဗာပြောင်းလဲမှု တောင်းဆိုမှုများနှင့် ပရီမီယံ အကူအညီ တောင်းဆိုမှုများ၏ နောက်ဆုံးလှုပ်ရှားမှု။' : 'Recent Telegram support threads, server-change requests, and premium support requests linked to this customer.'}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="mb-2 text-sm font-medium">Telegram support threads</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'Telegram အကူအညီ စကားပြောခန်းများ' : 'Telegram support threads'}</p>
                 {supportThreads.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No Telegram support threads yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'Telegram အကူအညီ စကားပြောခန်း မရှိသေးပါ။' : 'No Telegram support threads yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {supportThreads.map((thread: SupportThreadItem) => {
                       const latestReply = thread.replies[thread.replies.length - 1];
-                      const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn);
+                      const stateLabel = getSupportThreadStateLabel(thread.status, thread.waitingOn, isMyanmar);
 
                       return (
                         <div key={thread.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
@@ -2798,13 +3048,13 @@ export default function UserLedgerPage() {
                               <Button asChild size="sm" variant="outline">
                                 <Link href={withBasePath(`/dashboard/support/threads/${thread.id}`)}>
                                   <ExternalLink className="mr-2 h-4 w-4" />
-                                  Open
+                                  {isMyanmar ? 'ဖွင့်မည်' : 'Open'}
                                 </Link>
                               </Button>
                             </div>
                           </div>
                           <p className="mt-1 text-muted-foreground">
-                            {getSupportThreadCategoryLabel(thread.issueCategory)}
+                            {getSupportThreadCategoryLabel(thread.issueCategory, isMyanmar)}
                             {thread.assignedAdminName ? ` • ${thread.assignedAdminName}` : ''}
                           </p>
                           <p className="mt-2 text-xs text-muted-foreground">
@@ -2813,14 +3063,14 @@ export default function UserLedgerPage() {
                           </p>
                           {latestReply ? (
                             <p className="mt-2 text-sm text-muted-foreground">
-                              {latestReply.senderType === 'ADMIN' ? 'Admin' : 'Customer'}: {latestReply.message}
+                              {latestReply.senderType === 'ADMIN' ? (isMyanmar ? 'စီမံခန့်ခွဲသူ' : 'Admin') : isMyanmar ? 'ဖောက်သည်' : 'Customer'}: {latestReply.message}
                             </p>
                           ) : null}
                           {thread.relatedOrderCode || thread.relatedKeyName || thread.relatedServerName ? (
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {thread.relatedOrderCode ? <Badge variant="secondary">Order: {thread.relatedOrderCode}</Badge> : null}
-                              {thread.relatedKeyName ? <Badge variant="secondary">Key: {thread.relatedKeyName}</Badge> : null}
-                              {thread.relatedServerName ? <Badge variant="secondary">Server: {thread.relatedServerName}</Badge> : null}
+                              {thread.relatedOrderCode ? <Badge variant="secondary">{isMyanmar ? 'အော်ဒါ' : 'Order'}: {thread.relatedOrderCode}</Badge> : null}
+                              {thread.relatedKeyName ? <Badge variant="secondary">{isMyanmar ? 'သော့' : 'Key'}: {thread.relatedKeyName}</Badge> : null}
+                              {thread.relatedServerName ? <Badge variant="secondary">{isMyanmar ? 'ဆာဗာ' : 'Server'}: {thread.relatedServerName}</Badge> : null}
                             </div>
                           ) : null}
                         </div>
@@ -2831,16 +3081,16 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Server change requests</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'ဆာဗာ ပြောင်းလဲရန် တောင်းဆိုမှုများ' : 'Server change requests'}</p>
                 {serverChangeRequests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No server change requests yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'ဆာဗာ ပြောင်းလဲရန် တောင်းဆိုမှု မရှိသေးပါ။' : 'No server change requests yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {serverChangeRequests.map((request: ServerChangeRequestItem) => (
                       <div key={request.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{request.requestCode}</p>
-                          <Badge variant="outline">{request.status}</Badge>
+                          <Badge variant="outline">{getServerChangeRequestStatusLabel(request.status, isMyanmar)}</Badge>
                         </div>
                         <p className="mt-1 text-muted-foreground">
                           {request.currentServerName} → {request.requestedServerName}
@@ -2853,21 +3103,21 @@ export default function UserLedgerPage() {
               </div>
 
               <div>
-                <p className="mb-2 text-sm font-medium">Premium support requests</p>
+                <p className="mb-2 text-sm font-medium">{isMyanmar ? 'ပရီမီယံ အကူအညီ တောင်းဆိုမှုများ' : 'Premium support requests'}</p>
                 {premiumSupportRequests.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No premium support requests yet.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'ပရီမီယံ အကူအညီ တောင်းဆိုမှု မရှိသေးပါ။' : 'No premium support requests yet.'}</p>
                 ) : (
                   <div className="space-y-2">
                     {premiumSupportRequests.map((request: PremiumSupportRequestItem) => (
                       <div key={request.id} className="rounded-[1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-medium">{request.requestCode}</p>
-                          <Badge variant="outline">{request.status}</Badge>
+                          <Badge variant="outline">{getPremiumSupportRequestStatusLabel(request.status, isMyanmar)}</Badge>
                         </div>
-                        <p className="mt-1 text-muted-foreground">{request.requestType}</p>
+                        <p className="mt-1 text-muted-foreground">{getPremiumSupportRequestTypeLabel(request.requestType, isMyanmar)}</p>
                         <p className="mt-2 text-xs text-muted-foreground">
                           {formatRelativeTime(request.createdAt)}
-                          {request.followUpPending ? ' • waiting for customer follow-up' : ''}
+                          {request.followUpPending ? isMyanmar ? ' • ဖောက်သည်၏ ပြန်လည်တုံ့ပြန်မှုကို စောင့်နေသည်' : ' • waiting for customer follow-up' : ''}
                         </p>
                       </div>
                     ))}
@@ -2884,53 +3134,61 @@ export default function UserLedgerPage() {
           <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle>
               {financeDialog?.action === 'VERIFY'
-                ? 'Verify payment'
+                ? isMyanmar ? 'ငွေပေးချေမှု စစ်ဆေးမည်' : 'Verify payment'
                 : financeDialog?.action === 'REFUND'
-                  ? 'Refund order'
-                  : 'Apply credit'}
+                  ? isMyanmar ? 'ပြန်အမ်းငွေ လုပ်မည်' : 'Refund order'
+                  : isMyanmar ? 'ခရက်ဒစ် ထည့်မည်' : 'Apply credit'}
             </DialogTitle>
             <DialogDescription>
               {financeDialog
-                ? `Update the finance state for order ${financeDialog.orderCode}.`
-                : 'Update the finance state for this order.'}
+                ? isMyanmar
+                  ? `အော်ဒါ ${financeDialog.orderCode} အတွက် ငွေကြေးဆိုင်ရာ အခြေအနေကို အပ်ဒိတ်လုပ်ပါ။`
+                  : `Update the finance state for order ${financeDialog.orderCode}.`
+                : isMyanmar
+                  ? 'ဤအော်ဒါအတွက် ငွေကြေးဆိုင်ရာ အခြေအနေကို အပ်ဒိတ်လုပ်ပါ။'
+                  : 'Update the finance state for this order.'}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Finance adjustment</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'ငွေကြေး ပြင်ဆင်မှု' : 'Finance adjustment'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Record the amount and internal note that should follow this order into the finance timeline.
+                  {isMyanmar
+                    ? 'ဤအော်ဒါအတွက် ငွေပမာဏနှင့် အတွင်းမှတ်စုကို ငွေကြေး အချိန်လိုင်းတွင် မှတ်တမ်းတင်ပါ။'
+                    : 'Record the amount and internal note that should follow this order into the finance timeline.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="finance-amount">
-                    Amount {financeDialog?.currency ? `(${financeDialog.currency})` : ''}
+                    {isMyanmar ? 'ငွေပမာဏ' : 'Amount'} {financeDialog?.currency ? `(${financeDialog.currency})` : ''}
                   </Label>
                   <Input
                     id="finance-amount"
                     type="number"
                     min="0"
-                    placeholder={financeDialog?.defaultAmount?.toString() || 'Optional'}
+                    placeholder={financeDialog?.defaultAmount?.toString() || (isMyanmar ? 'မဖြည့်လည်း ရသည်' : 'Optional')}
                     value={financeAmount}
                     onChange={(event) => setFinanceAmount(event.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="finance-note">Note</Label>
+                  <Label htmlFor="finance-note">{isMyanmar ? 'မှတ်စု' : 'Note'}</Label>
                   <Textarea
                     id="finance-note"
                     rows={4}
-                    placeholder="Internal reconciliation note"
+                    placeholder={isMyanmar ? 'အတွင်းပိုင်း စာရင်းညှိနှိုင်းမှု မှတ်စု' : 'Internal reconciliation note'}
                     value={financeNote}
                     onChange={(event) => setFinanceNote(event.target.value)}
                   />
                 </div>
                 {financeDialog?.action === 'REFUND' ? (
                   <div className="ops-modal-note border-amber-500/20 bg-amber-500/10 text-amber-100">
-                    Refunds are only allowed after more than 3 paid purchases and while usage stays at or below 5 GB.
+                    {isMyanmar
+                      ? 'ငွေပြန်အမ်းမှုကို ငွေပေးချေပြီး ဝယ်ယူမှု ၃ ခုကျော်ပြီး အသုံးပြုမှု 5 GB အောက် သို့မဟုတ် တူညီနေချိန်မှသာ ခွင့်ပြုပါသည်။'
+                      : 'Refunds are only allowed after more than 3 paid purchases and while usage stays at or below 5 GB.'}
                   </div>
                 ) : null}
               </div>
@@ -2939,7 +3197,7 @@ export default function UserLedgerPage() {
 
           <DialogFooter className="ops-modal-sticky-footer">
             <Button variant="outline" onClick={() => setFinanceDialog(null)}>
-              Cancel
+              {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
             </Button>
             <Button
               variant={financeDialog?.action === 'REFUND' ? 'destructive' : 'default'}
@@ -2961,7 +3219,7 @@ export default function UserLedgerPage() {
               disabled={reconcileMutation.isPending || !financePermissions.canManage}
             >
               {reconcileMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save
+              {isMyanmar ? 'သိမ်းမည်' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>

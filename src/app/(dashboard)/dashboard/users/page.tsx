@@ -35,6 +35,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { ExternalLink, Key, Loader2, Plus, RefreshCw, Search, Send, Shield, Trash2, User, Users, Wallet } from 'lucide-react';
 
 type RoleFilter = 'ALL' | 'ADMIN' | 'CLIENT';
@@ -80,7 +81,9 @@ function UserStatCard({
 }
 
 export default function UsersPage() {
+  const { locale, t } = useLocale();
   const { toast } = useToast();
+  const isMyanmar = locale === 'my';
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -183,8 +186,8 @@ export default function UsersPage() {
   const createMutation = trpc.users.createClient.useMutation({
     onSuccess: () => {
       toast({
-        title: 'User created',
-        description: 'Client user has been successfully created.',
+        title: isMyanmar ? 'အသုံးပြုသူကို ဖန်တီးပြီးပါပြီ' : 'User created',
+        description: isMyanmar ? 'ကလိုင်းယင့် အသုံးပြုသူကို အောင်မြင်စွာ ဖန်တီးပြီးပါပြီ။' : 'Client user has been successfully created.',
       });
       setIsCreateOpen(false);
       setNewUserEmail('');
@@ -203,8 +206,8 @@ export default function UsersPage() {
   const deleteMutation = trpc.users.delete.useMutation({
     onSuccess: () => {
       toast({
-        title: 'User deleted',
-        description: 'User has been removed.',
+        title: isMyanmar ? 'အသုံးပြုသူကို ဖျက်ပြီးပါပြီ' : 'User deleted',
+        description: isMyanmar ? 'အသုံးပြုသူကို ဖယ်ရှားပြီးပါပြီ။' : 'User has been removed.',
       });
       setDeletingUserId(null);
       refetch();
@@ -223,14 +226,14 @@ export default function UsersPage() {
     onSuccess: async () => {
       await financeControlsQuery.refetch();
       toast({
-        title: 'Finance controls updated',
-        description: 'Finance permissions and digest settings were saved.',
+        title: isMyanmar ? 'ငွေကြေးဆက်တင်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Finance controls updated',
+        description: isMyanmar ? 'ငွေကြေးအခွင့်အရေးများနှင့် အနှစ်ချုပ်ဆက်တင်များကို သိမ်းပြီးပါပြီ။' : 'Finance permissions and digest settings were saved.',
       });
       setFinanceDialogOpen(false);
     },
     onError: (error) => {
       toast({
-        title: 'Finance controls failed',
+        title: isMyanmar ? 'ငွေကြေးဆက်တင်များ မအောင်မြင်ပါ' : 'Finance controls failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -240,15 +243,17 @@ export default function UsersPage() {
   const runFinanceDigestMutation = trpc.users.runFinanceDigestNow.useMutation({
     onSuccess: (result) => {
       toast({
-        title: result.skipped ? 'Finance digest skipped' : 'Finance digest sent',
+        title: result.skipped
+          ? (isMyanmar ? 'ငွေကြေးအနှစ်ချုပ်ကို ကျော်လွှားခဲ့သည်' : 'Finance digest skipped')
+          : (isMyanmar ? 'ငွေကြေးအနှစ်ချုပ်ကို ပို့ပြီးပါပြီ' : 'Finance digest sent'),
         description: result.skipped
-          ? `Reason: ${result.reason || 'n/a'}`
-          : `Delivered to ${result.adminChats ?? 0} admin chat(s).`,
+          ? (isMyanmar ? `အကြောင်းရင်း - ${result.reason || 'မရှိ'}` : `Reason: ${result.reason || 'n/a'}`)
+          : (isMyanmar ? `စီမံခန့်ခွဲသူ စကားပြောခန်း ${result.adminChats ?? 0} ခုသို့ ပို့ပြီးပါပြီ။` : `Delivered to ${result.adminChats ?? 0} admin chat(s).`),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Finance digest failed',
+        title: isMyanmar ? 'ငွေကြေးအနှစ်ချုပ် မပို့နိုင်ပါ' : 'Finance digest failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -259,8 +264,8 @@ export default function UsersPage() {
     onSuccess: async () => {
       await refundQueueQuery.refetch();
       toast({
-        title: 'Refund request updated',
-        description: 'The customer refund request status was updated.',
+        title: isMyanmar ? 'ပြန်အမ်းငွေ တောင်းဆိုမှုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Refund request updated',
+        description: isMyanmar ? 'ဖောက်သည်၏ ပြန်အမ်းငွေ တောင်းဆိုမှု အခြေအနေကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The customer refund request status was updated.',
       });
       setRefundReviewDialog(null);
       setRefundReasonPresetCode('');
@@ -269,7 +274,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Refund review failed',
+        title: isMyanmar ? 'Refund စစ်ဆေးမှု မအောင်မြင်ပါ' : 'Refund review failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -279,12 +284,14 @@ export default function UsersPage() {
     onSuccess: async (_result, variables) => {
       await refundQueueQuery.refetch();
       toast({
-        title: variables.claimed ? 'Refund request claimed' : 'Refund request released',
+        title: variables.claimed
+          ? (isMyanmar ? 'ပြန်အမ်းငွေ တောင်းဆိုမှုကို လက်ခံယူထားပါပြီ' : 'Refund request claimed')
+          : (isMyanmar ? 'ပြန်အမ်းငွေ တောင်းဆိုမှု လက်ခံယူထားမှုကို လွှတ်ပြီးပါပြီ' : 'Refund request released'),
       });
     },
     onError: (error) => {
       toast({
-        title: 'Refund assignment failed',
+        title: isMyanmar ? 'Refund တာဝန်ခွဲဝေမှု မအောင်မြင်ပါ' : 'Refund assignment failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -294,12 +301,12 @@ export default function UsersPage() {
     onSuccess: async () => {
       await refundQueueQuery.refetch();
       toast({
-        title: 'Refund reviewer updated',
+        title: isMyanmar ? 'ပြန်အမ်းငွေ သုံးသပ်သူကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Refund reviewer updated',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Refund reassignment failed',
+        title: isMyanmar ? 'Refund reviewer ပြန်လည်သတ်မှတ်မှု မအောင်မြင်ပါ' : 'Refund reassignment failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -309,14 +316,14 @@ export default function UsersPage() {
     onSuccess: async () => {
       await quickActionLedgerQuery.refetch();
       toast({
-        title: 'Telegram message sent',
-        description: 'The direct customer message was delivered.',
+        title: isMyanmar ? 'Telegram စာကို ပို့ပြီးပါပြီ' : 'Telegram message sent',
+        description: isMyanmar ? 'ဖောက်သည်ထံ တိုက်ရိုက်စာကို ပို့ပြီးပါပြီ။' : 'The direct customer message was delivered.',
       });
       setQuickActionMessage('');
     },
     onError: (error) => {
       toast({
-        title: 'Telegram message failed',
+        title: isMyanmar ? 'Telegram message မပို့နိုင်ပါ' : 'Telegram message failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -326,13 +333,13 @@ export default function UsersPage() {
     onSuccess: async () => {
       await quickActionLedgerQuery.refetch();
       toast({
-        title: 'Receipt resent',
-        description: 'The Telegram receipt was sent again.',
+        title: isMyanmar ? 'ပြေစာကို ပြန်ပို့ပြီးပါပြီ' : 'Receipt resent',
+        description: isMyanmar ? 'Telegram ပြေစာကို ထပ်မံ ပို့ပြီးပါပြီ။' : 'The Telegram receipt was sent again.',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Receipt resend failed',
+        title: isMyanmar ? 'Receipt ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Receipt resend failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -342,13 +349,13 @@ export default function UsersPage() {
     onSuccess: async () => {
       await quickActionLedgerQuery.refetch();
       toast({
-        title: 'Share page resent',
-        description: 'The customer received the share page again in Telegram.',
+        title: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပြန်ပို့ပြီးပါပြီ' : 'Share page resent',
+        description: isMyanmar ? 'ဖောက်သည်သည် Telegram ထဲတွင် share page ကို ထပ်မံ ရရှိပါပြီ။' : 'The customer received the share page again in Telegram.',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Share resend failed',
+        title: isMyanmar ? 'Share page ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Share resend failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -358,13 +365,13 @@ export default function UsersPage() {
     onSuccess: async () => {
       await quickActionLedgerQuery.refetch();
       toast({
-        title: 'Promo override saved',
-        description: 'Customer promo eligibility was updated.',
+        title: isMyanmar ? 'ပရိုမိုးရှင်း override ကို သိမ်းပြီးပါပြီ' : 'Promo override saved',
+        description: isMyanmar ? 'ဖောက်သည်၏ ပရိုမိုးရှင်း အကျုံးဝင်မှုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Customer promo eligibility was updated.',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Promo override failed',
+        title: isMyanmar ? 'Promo override မအောင်မြင်ပါ' : 'Promo override failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -374,13 +381,17 @@ export default function UsersPage() {
     onSuccess: async (result) => {
       await quickActionLedgerQuery.refetch();
       toast({
-        title: result.status === 'CANCELLED' ? 'Coupon revoked' : 'Coupon expired',
-        description: `${result.couponCode} is no longer available to this customer.`,
+        title: result.status === 'CANCELLED'
+          ? (isMyanmar ? 'Coupon ကို ရုပ်သိမ်းပြီးပါပြီ' : 'Coupon revoked')
+          : (isMyanmar ? 'Coupon သက်တမ်းကုန်ပြီးပါပြီ' : 'Coupon expired'),
+        description: isMyanmar
+          ? `${result.couponCode} ကို ဤဖောက်သည်အတွက် ထပ်မံ အသုံးမပြုနိုင်တော့ပါ။`
+          : `${result.couponCode} is no longer available to this customer.`,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Coupon update failed',
+        title: isMyanmar ? 'Coupon အပ်ဒိတ် မအောင်မြင်ပါ' : 'Coupon update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -391,13 +402,15 @@ export default function UsersPage() {
     onSuccess: async (updated) => {
       await refetch();
       toast({
-        title: 'Admin scope updated',
-        description: `${updated.email} is now ${getAdminScopeLabel(updated.adminScope)}.`,
+        title: isMyanmar ? 'Admin scope ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Admin scope updated',
+        description: isMyanmar
+          ? `${updated.email} သည် ယခု ${getAdminScopeLabel(updated.adminScope)} ဖြစ်ပါသည်။`
+          : `${updated.email} is now ${getAdminScopeLabel(updated.adminScope)}.`,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Admin scope update failed',
+        title: isMyanmar ? 'Admin scope အပ်ဒိတ် မအောင်မြင်ပါ' : 'Admin scope update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -495,38 +508,44 @@ export default function UsersPage() {
               className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
             >
               <Users className="mr-2 h-3.5 w-3.5" />
-              User Directory
+              {isMyanmar ? 'အသုံးပြုသူ လမ်းညွှန်' : 'User Directory'}
             </Badge>
 
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
-                User management
+                {isMyanmar ? 'အသုံးပြုသူ စီမံခန့်ခွဲမှု' : 'User management'}
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Manage administrative access, provision portal users, and keep client accounts aligned with active keys.
+                {isMyanmar
+                  ? 'စီမံသူဝင်ရောက်ခွင့်ကို စီမံခန့်ခွဲပါ၊ ပေါ်တယ် အသုံးပြုသူများကို ဖန်တီးပါ၊ ကလိုင်းယင့်အကောင့်များကို အသက်ဝင်သောသော့များနှင့် ကိုက်ညီအောင် ထိန်းထားပါ။'
+                  : 'Manage administrative access, provision portal users, and keep client accounts aligned with active keys.'}
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <UserStatCard
-                label="Total users"
+                label={isMyanmar ? 'အသုံးပြုသူ စုစုပေါင်း' : 'Total users'}
                 value={userList.length}
-                helper="Admin and client accounts in the panel."
+                helper={isMyanmar ? 'ထိန်းချုပ်ခန်းအတွင်းရှိ စီမံသူနှင့် ကလိုင်းယင့်အကောင့်များ။' : 'Admin and client accounts in the panel.'}
               />
               <UserStatCard
-                label="Admins"
+                label={isMyanmar ? 'Admin များ' : 'Admins'}
                 value={adminCount}
-                helper={`${ownerCount} owner-level admin${ownerCount === 1 ? '' : 's'} configured.`}
+                helper={
+                  isMyanmar
+                    ? `owner-level စီမံသူ ${ownerCount} ယောက် သတ်မှတ်ထားသည်။`
+                    : `${ownerCount} owner-level admin${ownerCount === 1 ? '' : 's'} configured.`
+                }
               />
               <UserStatCard
-                label="Clients"
+                label={isMyanmar ? 'ကလိုင်းယင့်များ' : 'Clients'}
                 value={clientCount}
-                helper="Portal-only accounts for end users."
+                helper={isMyanmar ? 'အသုံးပြုသူများအတွက် portal-only account များ။' : 'Portal-only accounts for end users.'}
               />
               <UserStatCard
-                label="Assigned keys"
+                label={isMyanmar ? 'ချိတ်ထားသော သော့များ' : 'Assigned keys'}
                 value={assignedKeyCount}
-                helper="Access keys currently mapped to users."
+                helper={isMyanmar ? 'လက်ရှိ အသုံးပြုသူများနှင့် ချိတ်ထားသော အသုံးပြုခွင့်သော့များ။' : 'Access keys currently mapped to users.'}
               />
             </div>
           </div>
@@ -534,10 +553,12 @@ export default function UsersPage() {
           <div className="ops-detail-rail">
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">User controls</p>
-                <h2 className="text-xl font-semibold">Command rail</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'အသုံးပြုသူ ထိန်းချုပ်မှုများ' : 'User controls'}</p>
+                <h2 className="text-xl font-semibold">{t('dashboard.command_rail')}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Add a new portal user, then jump into sessions or security settings without leaving the directory.
+                  {isMyanmar
+                    ? 'ပေါ်တယ် အသုံးပြုသူ အသစ်တစ်ယောက်ကို ထည့်ပြီးနောက် ဒီစာရင်းမှ မထွက်ဘဲ ချိတ်ဆက်မှုများ သို့မဟုတ် လုံခြုံရေးဆက်တင်များကို တိုက်ရိုက်ဖွင့်ပါ။'
+                    : 'Add a new portal user, then jump into sessions or security settings without leaving the directory.'}
                 </p>
               </div>
 
@@ -545,20 +566,22 @@ export default function UsersPage() {
                 <DialogTrigger asChild>
                   <Button className="h-11 w-full rounded-full">
                     <Plus className="mr-2 h-4 w-4" />
-                    Add user
+                    {isMyanmar ? 'အသုံးပြုသူ ထည့်မည်' : 'Add user'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Create client user</DialogTitle>
+                    <DialogTitle>{isMyanmar ? 'ကလိုင်းယင့် အသုံးပြုသူ ဖန်တီးမည်' : 'Create client user'}</DialogTitle>
                     <DialogDescription>
-                      Create a portal-only user for subscriptions, usage visibility, and key delivery.
+                      {isMyanmar
+                        ? 'စာရင်းသွင်းမှုများ၊ အသုံးပြုမှုမြင်ကွင်းနှင့် သော့ပို့ဆောင်မှုအတွက် ပေါ်တယ်သီးသန့် အသုံးပြုသူတစ်ယောက် ဖန်တီးပါ။'
+                        : 'Create a portal-only user for subscriptions, usage visibility, and key delivery.'}
                     </DialogDescription>
                   </DialogHeader>
 
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="new-user-email">Email</Label>
+                      <Label htmlFor="new-user-email">{isMyanmar ? 'အီးမေးလ်' : 'Email'}</Label>
                       <Input
                         id="new-user-email"
                         placeholder="user@example.com"
@@ -568,10 +591,10 @@ export default function UsersPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="new-user-password">Password</Label>
+                      <Label htmlFor="new-user-password">{isMyanmar ? 'စကားဝှက်' : 'Password'}</Label>
                       <Input
                         id="new-user-password"
-                        placeholder="Enter a temporary password"
+                        placeholder={isMyanmar ? 'ယာယီစကားဝှက်ကို ထည့်ပါ' : 'Enter a temporary password'}
                         type="password"
                         value={newUserPassword}
                         onChange={(event) => setNewUserPassword(event.target.value)}
@@ -581,14 +604,14 @@ export default function UsersPage() {
 
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                      Cancel
+                      {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
                     </Button>
                     <Button
                       onClick={handleCreate}
                       disabled={createMutation.isPending || !newUserEmail || !newUserPassword}
                     >
                       {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Create user
+                      {isMyanmar ? 'အသုံးပြုသူ ဖန်တီးမည်' : 'Create user'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -598,45 +621,49 @@ export default function UsersPage() {
                 <Link href="/dashboard/sessions" className="ops-action-tile">
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <User className="h-4 w-4 text-primary" />
-                    Review sessions
+                    {isMyanmar ? 'sessions များကို စစ်ဆေးမည်' : 'Review sessions'}
                   </span>
-                  <span className="text-xs text-muted-foreground">Open</span>
+                  <span className="text-xs text-muted-foreground">{t('dashboard.open')}</span>
                 </Link>
                 <Link href="/dashboard/security" className="ops-action-tile">
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <Shield className="h-4 w-4 text-primary" />
-                    Open security
+                    {isMyanmar ? 'လုံခြုံရေးကို ဖွင့်မည်' : 'Open security'}
                   </span>
-                  <span className="text-xs text-muted-foreground">Open</span>
+                  <span className="text-xs text-muted-foreground">{t('dashboard.open')}</span>
                 </Link>
                 <Link href="/dashboard/analytics" className="ops-action-tile">
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <Wallet className="h-4 w-4 text-primary" />
-                    Revenue overview
+                    {isMyanmar ? 'ဝင်ငွေ အကျဉ်းချုပ်' : 'Revenue overview'}
                   </span>
-                  <span className="text-xs text-muted-foreground">Open</span>
+                  <span className="text-xs text-muted-foreground">{t('dashboard.open')}</span>
                 </Link>
                 <Dialog open={financeDialogOpen} onOpenChange={setFinanceDialogOpen}>
                   <DialogTrigger asChild>
                     <button type="button" className="ops-action-tile text-left">
                       <span className="inline-flex items-center gap-2 text-sm font-medium">
                         <Wallet className="h-4 w-4 text-primary" />
-                        Finance controls
+                        {isMyanmar ? 'ငွေကြေး ထိန်းချုပ်မှုများ' : 'Finance controls'}
                       </span>
-                      <span className="text-xs text-muted-foreground">Manage</span>
+                      <span className="text-xs text-muted-foreground">{isMyanmar ? 'စီမံမည်' : 'Manage'}</span>
                     </button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Finance controls</DialogTitle>
+                      <DialogTitle>{isMyanmar ? 'ငွေကြေး ထိန်းချုပ်မှုများ' : 'Finance controls'}</DialogTitle>
                       <DialogDescription>
-                        Limit who can refund or credit Telegram orders, and control the daily finance digest.
+                        {isMyanmar
+                          ? 'Telegram order refund သို့မဟုတ် credit လုပ်နိုင်သူများကို ကန့်သတ်ပြီး နေ့စဉ် finance digest ကိုလည်း ထိန်းချုပ်ပါ။'
+                          : 'Limit who can refund or credit Telegram orders, and control the daily finance digest.'}
                       </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="finance-owner-emails">Legacy owner email allowlist</Label>
+                        <Label htmlFor="finance-owner-emails">
+                          {isMyanmar ? 'ယခင် owner email ခွင့်ပြုစာရင်း' : 'Legacy owner email allowlist'}
+                        </Label>
                         <Input
                           id="finance-owner-emails"
                           placeholder="owner@example.com, second-owner@example.com"
@@ -644,11 +671,17 @@ export default function UsersPage() {
                           onChange={(event) => setFinanceOwnerEmails(event.target.value)}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Prefer assigning the `Owner` admin scope below. Leave blank to avoid legacy email overrides.
+                          {isMyanmar
+                            ? 'အောက်တွင် `Owner` admin scope ကို သတ်မှတ်ရန် အကြံပြုသည်။ legacy email override မသုံးလိုပါက အလွတ်ထားပါ။'
+                            : 'Prefer assigning the `Owner` admin scope below. Leave blank to avoid legacy email overrides.'}
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="finance-operator-emails">Legacy finance operator allowlist</Label>
+                        <Label htmlFor="finance-operator-emails">
+                          {isMyanmar
+                            ? 'ယခင် finance operator email ခွင့်ပြုစာရင်း'
+                            : 'Legacy finance operator allowlist'}
+                        </Label>
                         <Input
                           id="finance-operator-emails"
                           placeholder="finance@example.com, reviewer@example.com"
@@ -656,14 +689,18 @@ export default function UsersPage() {
                           onChange={(event) => setFinanceOperatorEmails(event.target.value)}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Prefer assigning the `Finance` admin scope below. These emails remain as a compatibility fallback.
+                          {isMyanmar
+                            ? 'အောက်တွင် `Finance` admin scope ကို သတ်မှတ်ရန် အကြံပြုသည်။ ဤ email များကို compatibility fallback အဖြစ်သာ ဆက်ထားပါသည်။'
+                            : 'Prefer assigning the `Finance` admin scope below. These emails remain as a compatibility fallback.'}
                         </p>
                       </div>
                       <div className="flex items-center justify-between rounded-xl border border-border/50 p-3">
                         <div className="space-y-1">
-                          <p className="text-sm font-medium">Daily finance digest</p>
+                          <p className="text-sm font-medium">{isMyanmar ? 'နေ့စဉ် finance digest' : 'Daily finance digest'}</p>
                           <p className="text-xs text-muted-foreground">
-                            Send revenue, refund, credit, and pending refund-request summaries to admin chats.
+                            {isMyanmar
+                              ? 'ဝင်ငွေ၊ refund၊ credit နှင့် စောင့်ဆိုင်းနေသည့် refund request အကျဉ်းချုပ်ကို admin chat များသို့ ပို့ပါ။'
+                              : 'Send revenue, refund, credit, and pending refund-request summaries to admin chats.'}
                           </p>
                         </div>
                         <Select value={financeDigestEnabled ? 'enabled' : 'disabled'} onValueChange={(value) => setFinanceDigestEnabled(value === 'enabled')}>
@@ -671,14 +708,14 @@ export default function UsersPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="enabled">Enabled</SelectItem>
-                            <SelectItem value="disabled">Disabled</SelectItem>
+                            <SelectItem value="enabled">{isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled'}</SelectItem>
+                            <SelectItem value="disabled">{isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled'}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="finance-digest-hour">Digest hour</Label>
+                          <Label htmlFor="finance-digest-hour">{isMyanmar ? 'digest ပို့ချိန် (နာရီ)' : 'Digest hour'}</Label>
                           <Input
                             id="finance-digest-hour"
                             inputMode="numeric"
@@ -687,7 +724,7 @@ export default function UsersPage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="finance-digest-minute">Digest minute</Label>
+                          <Label htmlFor="finance-digest-minute">{isMyanmar ? 'digest ပို့ချိန် (မိနစ်)' : 'Digest minute'}</Label>
                           <Input
                             id="finance-digest-minute"
                             inputMode="numeric"
@@ -710,11 +747,11 @@ export default function UsersPage() {
                         ) : (
                           <Send className="mr-2 h-4 w-4" />
                         )}
-                        Send digest now
+                        {isMyanmar ? 'ယခုပင် digest ပို့မည်' : 'Send digest now'}
                       </Button>
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={() => setFinanceDialogOpen(false)}>
-                          Cancel
+                          {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
                         </Button>
                         <Button
                           onClick={() =>
@@ -737,7 +774,7 @@ export default function UsersPage() {
                           {updateFinanceControlsMutation.isPending ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           ) : null}
-                          Save finance controls
+                          {isMyanmar ? 'ငွေကြေး ထိန်းချုပ်မှုများကို သိမ်းမည်' : 'Save finance controls'}
                         </Button>
                       </div>
                     </DialogFooter>
@@ -748,21 +785,31 @@ export default function UsersPage() {
 
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Access note</p>
-                <h2 className="text-xl font-semibold">Account policy</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'ဝင်ရောက်ခွင့် မှတ်ချက်' : 'Access note'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'အကောင့် မူဝါဒ' : 'Account policy'}</h2>
               </div>
               <div className="ops-detail-card space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Admins can manage the full control center. Client users only access their subscription and key delivery portal.
+                  {isMyanmar
+                    ? 'Admin များသည် control center အပြည့်အဝကို စီမံနိုင်သည်။ Client အသုံးပြုသူများသည် subscription နှင့် key delivery portal ကိုသာ ဝင်ရောက်နိုင်သည်။'
+                    : 'Admins can manage the full control center. Client users only access their subscription and key delivery portal.'}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Role split</p>
-                    <p className="mt-2 text-sm font-medium">{adminCount} admin / {clientCount} client</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {isMyanmar ? 'အခန်းကဏ္ဍ ခွဲဝေမှု' : 'Role split'}
+                    </p>
+                    <p className="mt-2 text-sm font-medium">
+                      {isMyanmar ? `${adminCount} admin / ${clientCount} client` : `${adminCount} admin / ${clientCount} client`}
+                    </p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Key coverage</p>
-                    <p className="mt-2 text-sm font-medium">{assignedKeyCount} assigned access keys</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'သော့ လွှမ်းခြုံမှု' : 'Key coverage'}
+                    </p>
+                    <p className="mt-2 text-sm font-medium">
+                        {isMyanmar ? `ခွဲပေးထားသော အသုံးပြုခွင့်သော့ ${assignedKeyCount} ခု` : `${assignedKeyCount} assigned access keys`}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -777,23 +824,25 @@ export default function UsersPage() {
             <div>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Wallet className="h-5 w-5 text-primary" />
-                Refund review queue
+                {isMyanmar ? 'ပြန်အမ်းငွေ စစ်ဆေးရေး တန်းစီစာရင်း' : 'Refund review queue'}
               </CardTitle>
               <CardDescription>
-                Review pending refund requests, apply presets, and open the linked customer ledger when more context is needed.
+                {isMyanmar
+                  ? 'စောင့်ဆိုင်းနေသော ပြန်အမ်းငွေ တောင်းဆိုမှုများကို စစ်ဆေးပြီး ကြိုတင်သတ်မှတ်ချက်များကို သုံးကာ လိုအပ်လျှင် ချိတ်ထားသော ဖောက်သည် ledger ကို ဖွင့်ပါ။'
+                  : 'Review pending refund requests, apply presets, and open the linked customer ledger when more context is needed.'}
               </CardDescription>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pending</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending'}</p>
                 <p className="mt-2 text-lg font-semibold">{refundQueueSummary?.pending || 0}</p>
               </div>
               <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Approved</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အတည်ပြုပြီး' : 'Approved'}</p>
                 <p className="mt-2 text-lg font-semibold">{refundQueueSummary?.approved || 0}</p>
               </div>
               <div className="ops-mini-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rejected</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ငြင်းပယ်ပြီး' : 'Rejected'}</p>
                 <p className="mt-2 text-lg font-semibold">{refundQueueSummary?.rejected || 0}</p>
               </div>
             </div>
@@ -802,21 +851,21 @@ export default function UsersPage() {
         <CardContent className="space-y-4 px-0 pb-0">
           <div className="ops-filter-bar grid gap-3 md:grid-cols-[220px_220px_220px_minmax(220px,1fr)_auto] md:items-end">
             <div className="space-y-2">
-              <Label htmlFor="refund-status-filter">Refund status</Label>
+              <Label htmlFor="refund-status-filter">{isMyanmar ? 'ပြန်အမ်းငွေ အခြေအနေ' : 'Refund status'}</Label>
               <Select value={refundQueueStatus} onValueChange={(value) => setRefundQueueStatus(value as RefundQueueFilter)}>
                 <SelectTrigger id="refund-status-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PENDING">Pending review</SelectItem>
-                  <SelectItem value="APPROVED">Approved</SelectItem>
-                  <SelectItem value="REJECTED">Rejected</SelectItem>
-                  <SelectItem value="ALL">All refund requests</SelectItem>
+                  <SelectItem value="PENDING">{isMyanmar ? 'စစ်ဆေးရန် စောင့်ဆိုင်းနေသည်' : 'Pending review'}</SelectItem>
+                  <SelectItem value="APPROVED">{isMyanmar ? 'အတည်ပြုပြီး' : 'Approved'}</SelectItem>
+                  <SelectItem value="REJECTED">{isMyanmar ? 'ငြင်းပယ်ပြီး' : 'Rejected'}</SelectItem>
+                  <SelectItem value="ALL">{isMyanmar ? 'ပြန်အမ်းငွေ တောင်းဆိုမှု အားလုံး' : 'All refund requests'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refund-assignment-filter">Reviewer ownership</Label>
+              <Label htmlFor="refund-assignment-filter">{isMyanmar ? 'သုံးသပ်သူ တာဝန်ပိုင်ဆိုင်မှု' : 'Reviewer ownership'}</Label>
               <Select
                 value={refundQueueAssignment}
                 onValueChange={(value) => setRefundQueueAssignment(value as RefundQueueAssignmentFilter)}
@@ -825,47 +874,49 @@ export default function UsersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All assignments</SelectItem>
-                  <SelectItem value="UNCLAIMED">Unclaimed</SelectItem>
-                  <SelectItem value="MINE">Claimed by me</SelectItem>
-                  <SelectItem value="CLAIMED">Claimed by any reviewer</SelectItem>
+                  <SelectItem value="ALL">{isMyanmar ? 'တာဝန်ပေးထားမှု အားလုံး' : 'All assignments'}</SelectItem>
+                  <SelectItem value="UNCLAIMED">{isMyanmar ? 'မယူထားသေး' : 'Unclaimed'}</SelectItem>
+                  <SelectItem value="MINE">{isMyanmar ? 'ကျွန်ုပ် လက်ခံယူထားသည်' : 'Claimed by me'}</SelectItem>
+                  <SelectItem value="CLAIMED">{isMyanmar ? 'သုံးသပ်သူ တစ်ယောက်ယောက် လက်ခံယူထားသည်' : 'Claimed by any reviewer'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refund-sort-filter">Queue order</Label>
+              <Label htmlFor="refund-sort-filter">{isMyanmar ? 'တန်းစီစာရင်း အစီအစဉ်' : 'Queue order'}</Label>
               <Select value={refundQueueSort} onValueChange={(value) => setRefundQueueSort(value as RefundQueueSort)}>
                 <SelectTrigger id="refund-sort-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="REQUESTED_DESC">Newest first</SelectItem>
-                  <SelectItem value="REQUESTED_ASC">Oldest first</SelectItem>
-                  <SelectItem value="AMOUNT_DESC">Highest value first</SelectItem>
+                  <SelectItem value="REQUESTED_DESC">{isMyanmar ? 'အသစ်ဆုံးကို အရင်' : 'Newest first'}</SelectItem>
+                  <SelectItem value="REQUESTED_ASC">{isMyanmar ? 'အဟောင်းဆုံးကို အရင်' : 'Oldest first'}</SelectItem>
+                  <SelectItem value="AMOUNT_DESC">{isMyanmar ? 'ငွေပမာဏအမြင့်ဆုံးကို အရင်' : 'Highest value first'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refund-search-filter">Search</Label>
+              <Label htmlFor="refund-search-filter">{isMyanmar ? 'ရှာဖွေမည်' : 'Search'}</Label>
               <Input
                 id="refund-search-filter"
                 value={refundQueueSearch}
                 onChange={(event) => setRefundQueueSearch(event.target.value)}
-                placeholder="Order code, email, Telegram, plan..."
+                placeholder={isMyanmar ? 'Order code၊ email၊ Telegram၊ plan...' : 'Order code, email, Telegram, plan...'}
               />
             </div>
             <div className="ops-table-meta">
-              {refundQueue.length} refund request{refundQueue.length === 1 ? '' : 's'}
+              {isMyanmar
+                ? `ပြန်အမ်းငွေ တောင်းဆိုမှု ${refundQueue.length} ခု`
+                : `${refundQueue.length} refund request${refundQueue.length === 1 ? '' : 's'}`}
             </div>
           </div>
 
           {refundQueueQuery.isLoading ? (
             <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-              Loading refund queue...
+              {isMyanmar ? 'Refund queue ကို တင်နေသည်...' : 'Loading refund queue...'}
             </div>
           ) : refundQueue.length === 0 ? (
             <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-              No refund requests match the current filter.
+              {isMyanmar ? 'လက်ရှိ filter များနှင့် ကိုက်ညီသော ပြန်အမ်းငွေ တောင်းဆိုမှု မရှိပါ။' : 'No refund requests match the current filter.'}
             </div>
           ) : (
             <div className="space-y-3">
@@ -884,8 +935,10 @@ export default function UsersPage() {
                         {order.refundAssignedReviewerEmail ? (
                           <Badge variant={isRefundClaimedByCurrentUser(order) ? 'default' : 'outline'}>
                             {isRefundClaimedByCurrentUser(order)
-                              ? `Claimed by you`
-                              : `Claimed by ${order.refundAssignedReviewerEmail}`}
+                              ? (isMyanmar ? 'သင် ယူထားသည်' : 'Claimed by you')
+                              : isMyanmar
+                                ? `${order.refundAssignedReviewerEmail} ယူထားသည်`
+                                : `Claimed by ${order.refundAssignedReviewerEmail}`}
                           </Badge>
                         ) : null}
                         {order.refundReviewReasonCode ? (
@@ -898,41 +951,41 @@ export default function UsersPage() {
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-1 text-sm text-muted-foreground">
                           <p>
-                            <span className="font-medium text-foreground">Customer:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'ဖောက်သည်:' : 'Customer:'}</span>{' '}
                             {order.requestedEmail || order.telegramUsername || order.telegramUserId}
                           </p>
                           <p>
-                            <span className="font-medium text-foreground">Plan:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'အစီအစဉ်:' : 'Plan:'}</span>{' '}
                             {order.planName || order.planCode || '—'}
                           </p>
                           <p>
-                            <span className="font-medium text-foreground">Amount:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'ငွေပမာဏ:' : 'Amount:'}</span>{' '}
                             {formatMoney(order.priceAmount, order.priceCurrency)}
                           </p>
                           <p>
-                            <span className="font-medium text-foreground">Key usage:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'သော့ အသုံးပြုမှု:' : 'Key usage:'}</span>{' '}
                             {formatBytes(BigInt(order.usedBytes || '0'))}
                           </p>
                         </div>
                         <div className="space-y-1 text-sm text-muted-foreground">
                           <p>
-                            <span className="font-medium text-foreground">Requested:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'တောင်းဆိုချိန်:' : 'Requested:'}</span>{' '}
                             {order.refundRequestedAt ? formatDateTime(order.refundRequestedAt) : '—'}
                           </p>
                           <p>
-                            <span className="font-medium text-foreground">Paid purchases:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'ငွေပေးပြီး ဝယ်ယူမှုများ:' : 'Paid purchases:'}</span>{' '}
                             {order.fulfilledPaidPurchaseCount}
                           </p>
                           <p>
-                            <span className="font-medium text-foreground">Reviewed:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'စစ်ဆေးချိန်:' : 'Reviewed:'}</span>{' '}
                             {order.refundRequestReviewedAt ? formatDateTime(order.refundRequestReviewedAt) : '—'}
                           </p>
                           <p>
-                            <span className="font-medium text-foreground">Claimed:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'ယူထားချိန်:' : 'Claimed:'}</span>{' '}
                             {order.refundAssignedAt ? formatDateTime(order.refundAssignedAt) : '—'}
                           </p>
                           <p>
-                            <span className="font-medium text-foreground">Reviewer:</span>{' '}
+                            <span className="font-medium text-foreground">{isMyanmar ? 'စစ်ဆေးသူ:' : 'Reviewer:'}</span>{' '}
                             {order.refundRequestReviewerEmail || '—'}
                           </p>
                         </div>
@@ -940,13 +993,13 @@ export default function UsersPage() {
 
                       {order.refundBlockedReason ? (
                         <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                          <span className="font-medium">Policy note:</span> {order.refundBlockedReason}
+                          <span className="font-medium">{isMyanmar ? 'မူဝါဒ မှတ်ချက်:' : 'Policy note:'}</span> {order.refundBlockedReason}
                         </div>
                       ) : null}
 
                       {order.refundRequestCustomerMessage ? (
                         <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                          <span className="font-medium text-foreground">Customer-facing message:</span>{' '}
+                          <span className="font-medium text-foreground">{isMyanmar ? 'ဖောက်သည်ထံ ပြမည့် စာ:' : 'Customer-facing message:'}</span>{' '}
                           {order.refundRequestCustomerMessage}
                         </div>
                       ) : null}
@@ -957,7 +1010,7 @@ export default function UsersPage() {
                         <Button asChild variant="outline" size="sm">
                           <Link href={`/dashboard/users/${order.customerLedgerId}`}>
                             <ExternalLink className="mr-2 h-4 w-4" />
-                            Open CRM
+                            {isMyanmar ? 'ဖောက်သည်မှတ်တမ်း ဖွင့်ရန်' : 'Open CRM'}
                           </Link>
                         </Button>
                       ) : null}
@@ -968,7 +1021,7 @@ export default function UsersPage() {
                           rel="noreferrer"
                         >
                           <Send className="mr-2 h-4 w-4" />
-                          Receipt PDF
+                          {isMyanmar ? 'ငွေလက်ခံလွှာ PDF' : 'Receipt PDF'}
                         </a>
                       </Button>
                       {order.refundRequestStatus === 'APPROVED' || order.financeStatus === 'REFUNDED' ? (
@@ -979,7 +1032,7 @@ export default function UsersPage() {
                             rel="noreferrer"
                           >
                             <Send className="mr-2 h-4 w-4" />
-                            Refund PDF
+                            {isMyanmar ? 'ပြန်အမ်းငွေ PDF' : 'Refund PDF'}
                           </a>
                         </Button>
                       ) : null}
@@ -987,7 +1040,7 @@ export default function UsersPage() {
                         <>
                           <div className="grid gap-2">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                              Quick macros
+                              {isMyanmar ? 'အမြန် macros' : 'Quick macros'}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {quickRefundMacros.map((preset) => (
@@ -1015,7 +1068,7 @@ export default function UsersPage() {
                                 disabled={!canManageFinance || claimRefundRequestMutation.isPending}
                                 onClick={() => claimRefundRequestMutation.mutate({ orderId: order.id, claimed: true })}
                               >
-                                Claim refund
+                                {isMyanmar ? 'Refund ကို ယူမည်' : 'Claim refund'}
                               </Button>
                             ) : (
                               <Button
@@ -1028,7 +1081,7 @@ export default function UsersPage() {
                                 }
                                 onClick={() => claimRefundRequestMutation.mutate({ orderId: order.id, claimed: false })}
                               >
-                                Release claim
+                                {isMyanmar ? 'ယူထားမှု ဖြုတ်မည်' : 'Release claim'}
                               </Button>
                             )}
 
@@ -1043,10 +1096,10 @@ export default function UsersPage() {
                               disabled={!canManageFinance || assignRefundReviewerMutation.isPending}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="Assign reviewer" />
+                                <SelectValue placeholder={isMyanmar ? 'Reviewer သတ်မှတ်ပါ' : 'Assign reviewer'} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                <SelectItem value="unassigned">{isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned'}</SelectItem>
                                 {adminUsers.map((admin) => (
                                   <SelectItem key={admin.id} value={admin.id}>
                                     {admin.email}
@@ -1061,7 +1114,7 @@ export default function UsersPage() {
                             disabled={!canManageFinance || isRefundClaimedByOtherUser(order)}
                             onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'APPROVE')}
                           >
-                            Approve request
+                            {isMyanmar ? 'Request ကို အတည်ပြုမည်' : 'Approve request'}
                           </Button>
                           <Button
                             size="sm"
@@ -1069,17 +1122,21 @@ export default function UsersPage() {
                             disabled={!canManageFinance || isRefundClaimedByOtherUser(order)}
                             onClick={() => openRefundReviewDialog(order.id, order.orderCode, 'REJECT')}
                           >
-                            Decline request
+                            {isMyanmar ? 'Request ကို ငြင်းပယ်မည်' : 'Decline request'}
                           </Button>
                           {isRefundClaimedByOtherUser(order) ? (
                             <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground dark:bg-white/[0.03]">
-                              This refund request is currently owned by {order.refundAssignedReviewerEmail || 'another admin'}.
+                              {isMyanmar
+                                ? `ဤပြန်အမ်းငွေ တောင်းဆိုမှုကို ${order.refundAssignedReviewerEmail || 'အခြား admin'} က လက်ရှိယူထားသည်။`
+                                : `This refund request is currently owned by ${order.refundAssignedReviewerEmail || 'another admin'}.`}
                             </div>
                           ) : null}
                         </>
                       ) : (
                         <div className="rounded-[1rem] border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground dark:bg-white/[0.03]">
-                          Updated {order.refundRequestReviewedAt ? formatRelativeTime(order.refundRequestReviewedAt) : 'recently'}
+                          {isMyanmar
+                            ? `${order.refundRequestReviewedAt ? formatRelativeTime(order.refundRequestReviewedAt) : 'မကြာသေးမီက'} ပြင်ဆင်ပြီး`
+                            : `Updated ${order.refundRequestReviewedAt ? formatRelativeTime(order.refundRequestReviewedAt) : 'recently'}`}
                         </div>
                       )}
                     </div>
@@ -1095,43 +1152,45 @@ export default function UsersPage() {
         <CardHeader className="px-0 pt-0">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-5 w-5 text-primary" />
-            User inventory
+            {isMyanmar ? 'အသုံးပြုသူ စာရင်း' : 'User inventory'}
           </CardTitle>
           <CardDescription>
-            Search by email or focus on one role to manage access and assigned keys faster.
+            {isMyanmar
+              ? 'email ဖြင့် ရှာဖွေပါ သို့မဟုတ် အခန်းကဏ္ဍတစ်ခုကိုသာ ကြည့်ပြီး access နှင့် assigned key များကို ပိုမိုလွယ်ကူစွာ စီမံပါ။'
+              : 'Search by email or focus on one role to manage access and assigned keys faster.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 px-0 pb-0">
           <div className="ops-filter-bar grid gap-3 md:grid-cols-[minmax(0,1fr)_200px_auto] md:items-end">
             <div className="space-y-2">
-              <Label htmlFor="user-search">Search</Label>
+              <Label htmlFor="user-search">{isMyanmar ? 'ရှာဖွေမည်' : 'Search'}</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="user-search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search users by email"
+                  placeholder={isMyanmar ? 'email ဖြင့် အသုံးပြုသူများကို ရှာပါ' : 'Search users by email'}
                   className="pl-9"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="user-role-filter">Role</Label>
+              <Label htmlFor="user-role-filter">{isMyanmar ? 'အခန်းကဏ္ဍ' : 'Role'}</Label>
               <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as RoleFilter)}>
                 <SelectTrigger id="user-role-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All roles</SelectItem>
+                  <SelectItem value="ALL">{isMyanmar ? 'အခန်းကဏ္ဍအားလုံး' : 'All roles'}</SelectItem>
                   <SelectItem value="ADMIN">Admin</SelectItem>
                   <SelectItem value="CLIENT">Client</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="ops-table-meta">{filteredUsers.length} users</div>
+            <div className="ops-table-meta">{filteredUsers.length} {isMyanmar ? 'အသုံးပြုသူ' : 'users'}</div>
           </div>
 
           <div className="hidden md:block">
@@ -1139,25 +1198,27 @@ export default function UsersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Admin scope</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Assigned keys</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{isMyanmar ? 'အသုံးပြုသူ' : 'User'}</TableHead>
+                    <TableHead>{isMyanmar ? 'အခန်းကဏ္ဍ' : 'Role'}</TableHead>
+                    <TableHead>{isMyanmar ? 'စီမံသူ ခွင့်ပြုနယ်ပယ်' : 'Admin scope'}</TableHead>
+                    <TableHead>{isMyanmar ? 'ဖန်တီးသည့်ရက်' : 'Created'}</TableHead>
+                    <TableHead>{isMyanmar ? 'ခွဲပေးထားသော သော့များ' : 'Assigned keys'}</TableHead>
+                    <TableHead className="text-right">{isMyanmar ? 'လုပ်ဆောင်ချက်များ' : 'Actions'}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center">
-                        Loading users...
+                        {isMyanmar ? 'အသုံးပြုသူများကို တင်နေသည်...' : 'Loading users...'}
                       </TableCell>
                     </TableRow>
                   ) : filteredUsers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center">
-                        {userList.length === 0 ? 'No users found.' : 'No users match the current filters.'}
+                        {userList.length === 0
+                          ? (isMyanmar ? 'အသုံးပြုသူ မတွေ့ပါ။' : 'No users found.')
+                          : (isMyanmar ? 'လက်ရှိ filter များနှင့် ကိုက်ညီသော အသုံးပြုသူ မရှိပါ။' : 'No users match the current filters.')}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1173,7 +1234,9 @@ export default function UsersPage() {
                               <div>
                                 <p className="font-medium">{user.email}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {user.role === 'ADMIN' ? 'Dashboard access' : 'Portal-only access'}
+                                  {user.role === 'ADMIN'
+                                    ? (isMyanmar ? 'Dashboard ဝင်ခွင့်' : 'Dashboard access')
+                                    : (isMyanmar ? 'Portal only ဝင်ခွင့်' : 'Portal-only access')}
                                 </p>
                               </div>
                             </div>
@@ -1222,7 +1285,7 @@ export default function UsersPage() {
                               <Button asChild variant="outline" size="sm">
                                 <Link href={`/dashboard/users/${user.id}`}>
                                   <ExternalLink className="mr-2 h-4 w-4" />
-                                  Open CRM
+                                  {isMyanmar ? 'ဖောက်သည်မှတ်တမ်း ဖွင့်ရန်' : 'Open CRM'}
                                 </Link>
                               </Button>
                               <Button
@@ -1236,7 +1299,7 @@ export default function UsersPage() {
                                 }
                               >
                                 <Send className="mr-2 h-4 w-4" />
-                                Quick actions
+                                {isMyanmar ? 'အမြန်လုပ်ဆောင်ချက်များ' : 'Quick actions'}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -1244,7 +1307,9 @@ export default function UsersPage() {
                                 className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => handleDelete(user.id, user.email || 'Unknown')}
                                 disabled={user.role === 'ADMIN' || (deleteMutation.isPending && deletingUserId === user.id)}
-                                title={user.role === 'ADMIN' ? 'Cannot delete admin' : 'Delete user'}
+                                title={user.role === 'ADMIN'
+                                  ? (isMyanmar ? 'Admin ကို ဖျက်၍ မရပါ' : 'Cannot delete admin')
+                                  : (isMyanmar ? 'အသုံးပြုသူကို ဖျက်မည်' : 'Delete user')}
                               >
                                 {deleteMutation.isPending && deletingUserId === user.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1265,7 +1330,9 @@ export default function UsersPage() {
 
           <MobileCardView
             data={filteredUsers}
-            emptyMessage={userList.length === 0 ? 'No users found.' : 'No users match the current filters.'}
+            emptyMessage={userList.length === 0
+              ? (isMyanmar ? 'အသုံးပြုသူ မတွေ့ပါ။' : 'No users found.')
+              : (isMyanmar ? 'လက်ရှိ filter များနှင့် ကိုက်ညီသော အသုံးပြုသူ မရှိပါ။' : 'No users match the current filters.')}
             keyExtractor={(user) => user.id}
             renderCard={(user) => {
               const assignedKeys = (user as { _count?: { accessKeys?: number } })._count?.accessKeys || 0;
@@ -1282,7 +1349,9 @@ export default function UsersPage() {
                         <div>
                           <p className="font-medium">{user.email}</p>
                           <p className="text-xs text-muted-foreground">
-                            {user.role === 'ADMIN' ? 'Dashboard access' : 'Portal-only access'}
+                            {user.role === 'ADMIN'
+                              ? (isMyanmar ? 'Dashboard ဝင်ခွင့်' : 'Dashboard access')
+                              : (isMyanmar ? 'Portal only ဝင်ခွင့်' : 'Portal-only access')}
                           </p>
                         </div>
                       </div>
@@ -1304,11 +1373,11 @@ export default function UsersPage() {
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Created</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဖန်တီးသည့်ရက်' : 'Created'}</p>
                       <p className="mt-2 text-sm font-medium">{new Date(user.createdAt).toLocaleDateString()}</p>
                     </div>
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Assigned keys</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ခွဲပေးထားသော သော့များ' : 'Assigned keys'}</p>
                       <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium">
                         <Key className="h-3.5 w-3.5 text-muted-foreground" />
                         {assignedKeys}
@@ -1318,7 +1387,7 @@ export default function UsersPage() {
 
                   {user.role === 'ADMIN' ? (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Admin scope</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Admin scope' : 'Admin scope'}</p>
                       <Select
                         value={normalizeAdminScope(user.adminScope) || 'ADMIN'}
                         onValueChange={(value) =>
@@ -1347,7 +1416,7 @@ export default function UsersPage() {
                     <Button asChild variant="outline" className="w-full rounded-full">
                       <Link href={`/dashboard/users/${user.id}`}>
                         <ExternalLink className="mr-2 h-4 w-4" />
-                        Open CRM
+                        {isMyanmar ? 'ဖောက်သည်မှတ်တမ်း ဖွင့်ရန်' : 'Open CRM'}
                       </Link>
                     </Button>
                     <Button
@@ -1361,7 +1430,7 @@ export default function UsersPage() {
                       }
                     >
                       <Send className="mr-2 h-4 w-4" />
-                      Quick actions
+                      {isMyanmar ? 'အမြန်လုပ်ဆောင်ချက်များ' : 'Quick actions'}
                     </Button>
                   </div>
                 </div>
@@ -1384,41 +1453,59 @@ export default function UsersPage() {
       >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Customer quick actions</DialogTitle>
+            <DialogTitle>{isMyanmar ? 'Customer အမြန်လုပ်ဆောင်ချက်များ' : 'Customer quick actions'}</DialogTitle>
             <DialogDescription>
-              {quickActionsUser?.email || 'Selected customer'} without leaving the user list.
+              {isMyanmar
+                ? `${quickActionsUser?.email || 'ရွေးထားသော customer'} ကို user list မှ မထွက်ဘဲ စီမံပါ။`
+                : `${quickActionsUser?.email || 'Selected customer'} without leaving the user list.`}
             </DialogDescription>
           </DialogHeader>
           {quickActionLedgerQuery.isLoading ? (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading customer shortcuts…
+              {isMyanmar ? 'Customer shortcuts များကို တင်နေသည်…' : 'Loading customer shortcuts…'}
             </div>
           ) : quickActionLedger ? (
             <div className="space-y-5">
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl border border-border/60 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Telegram</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Telegram
+                  </p>
                   <p className="mt-2 text-lg font-semibold">
-                    {quickActionLedger.telegramProfile?.telegramChatId || quickActionLedger.user.telegramChatId || 'Not linked'}
+                    {quickActionLedger.telegramProfile?.telegramChatId ||
+                      quickActionLedger.user.telegramChatId ||
+                      (isMyanmar ? 'မချိတ်ထားသေး' : 'Not linked')}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {quickActionLedger.telegramProfile?.username ? `@${quickActionLedger.telegramProfile.username}` : 'No username'}
+                    {quickActionLedger.telegramProfile?.username
+                      ? `@${quickActionLedger.telegramProfile.username}`
+                      : isMyanmar
+                        ? 'username မရှိပါ'
+                        : 'No username'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-border/60 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fulfilled orders</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {isMyanmar ? 'အပြီးသတ်ထားသော အော်ဒါများ' : 'Fulfilled orders'}
+                  </p>
                   <p className="mt-2 text-lg font-semibold">
                     {quickActionTelegramOrders.filter((order) => order.status === 'FULFILLED').length}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">Ready for receipt resend</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isMyanmar ? 'Receipt ကို ထပ်ပို့ရန် အဆင်သင့်' : 'Ready for receipt resend'}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-border/60 p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active keys</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {isMyanmar ? 'အသက်ဝင်သော သော့များ' : 'Active keys'}
+                  </p>
                   <p className="mt-2 text-lg font-semibold">
                     {quickActionAccessKeys.length + quickActionDynamicKeys.length}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">Share page resend available</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isMyanmar ? 'Share page ကို ထပ်ပို့နိုင်သည်' : 'Share page resend available'}
+                  </p>
                 </div>
               </div>
 
@@ -1426,8 +1513,10 @@ export default function UsersPage() {
                 <div className="rounded-xl border border-border/60 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium">Direct Telegram message</p>
-                      <p className="text-xs text-muted-foreground">Send a short customer update from the directory.</p>
+                      <p className="text-sm font-medium">{isMyanmar ? 'Telegram စာကို တိုက်ရိုက်ပို့မည်' : 'Direct Telegram message'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {isMyanmar ? 'ဤစာရင်းမှတစ်ဆင့် customer သို့ အတိုချုံး update တစ်စောင် ပို့ပါ။' : 'Send a short customer update from the directory.'}
+                      </p>
                     </div>
                     <Switch
                       checked={quickActionIncludeSupportButton}
@@ -1438,7 +1527,7 @@ export default function UsersPage() {
                     className="mt-3 min-h-[120px]"
                     value={quickActionMessage}
                     onChange={(event) => setQuickActionMessage(event.target.value)}
-                    placeholder="Write a direct Telegram message…"
+                    placeholder={isMyanmar ? 'Telegram သို့ တိုက်ရိုက်ပို့မည့် စာကို ရေးပါ…' : 'Write a direct Telegram message…'}
                     disabled={!quickActionLedger.crmPermissions.canMessageCustomer}
                   />
                   <Button
@@ -1461,18 +1550,18 @@ export default function UsersPage() {
                     ) : (
                       <Send className="mr-2 h-4 w-4" />
                     )}
-                    Send message
+                    {isMyanmar ? 'စာပို့မည်' : 'Send message'}
                   </Button>
                 </div>
 
                 <div className="rounded-xl border border-border/60 p-4">
-                  <p className="text-sm font-medium">Delivery shortcuts</p>
+                  <p className="text-sm font-medium">{isMyanmar ? 'ပို့ဆောင်မှု shortcut များ' : 'Delivery shortcuts'}</p>
                   <div className="mt-3 space-y-3">
                     <div className="space-y-2">
-                      <Label>Resend receipt</Label>
+                      <Label>{isMyanmar ? 'Receipt ကို ထပ်ပို့မည်' : 'Resend receipt'}</Label>
                       <Select value={quickActionReceiptOrderId} onValueChange={setQuickActionReceiptOrderId}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Choose a fulfilled order" />
+                          <SelectValue placeholder={isMyanmar ? 'အပြီးသတ်ထားသော အော်ဒါကို ရွေးပါ' : 'Choose a fulfilled order'} />
                         </SelectTrigger>
                         <SelectContent>
                           {quickActionTelegramOrders
@@ -1503,24 +1592,24 @@ export default function UsersPage() {
                         ) : (
                           <RefreshCw className="mr-2 h-4 w-4" />
                         )}
-                        Resend receipt
+                        {isMyanmar ? 'ပြေစာကို ထပ်ပို့မည်' : 'Resend receipt'}
                       </Button>
                     </div>
                     <div className="space-y-2">
-                      <Label>Resend share page</Label>
+                      <Label>{isMyanmar ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့မည်' : 'Resend share page'}</Label>
                       <Select value={quickActionShareTarget} onValueChange={setQuickActionShareTarget}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Choose a key" />
+                          <SelectValue placeholder={isMyanmar ? 'သော့တစ်ခုကို ရွေးပါ' : 'Choose a key'} />
                         </SelectTrigger>
                         <SelectContent>
                           {quickActionAccessKeys.map((key) => (
                             <SelectItem key={`ACCESS_KEY:${key.id}`} value={`ACCESS_KEY:${key.id}`}>
-                              Standard • {key.name}
+                              {isMyanmar ? 'ရိုးရိုး •' : 'Standard •'} {key.name}
                             </SelectItem>
                           ))}
                           {quickActionDynamicKeys.map((key) => (
                             <SelectItem key={`DYNAMIC_KEY:${key.id}`} value={`DYNAMIC_KEY:${key.id}`}>
-                              Premium • {key.name}
+                              {isMyanmar ? 'ပရီမီယံ •' : 'Premium •'} {key.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1547,7 +1636,7 @@ export default function UsersPage() {
                         ) : (
                           <ExternalLink className="mr-2 h-4 w-4" />
                         )}
-                        Resend share page
+                        {isMyanmar ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့မည်' : 'Resend share page'}
                       </Button>
                     </div>
                   </div>
@@ -1555,7 +1644,7 @@ export default function UsersPage() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-medium">Promo overrides</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'ပရိုမိုးရှင်း override များ' : 'Promo overrides'}</p>
                 <div className="grid gap-3 md:grid-cols-2">
                   {quickActionCouponEligibility.map((campaign) => (
                     <div key={campaign.campaignType} className="rounded-xl border border-border/60 p-4">
@@ -1563,17 +1652,19 @@ export default function UsersPage() {
                         <div>
                           <p className="font-medium">{campaign.label}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Remaining {campaign.remainingUses}/{campaign.maxUsesPerUser}
+                            {isMyanmar
+                              ? `ကျန်ရှိသည့် အသုံးပြုခွင့် ${campaign.remainingUses}/${campaign.maxUsesPerUser}`
+                              : `Remaining ${campaign.remainingUses}/${campaign.maxUsesPerUser}`}
                           </p>
                         </div>
                         <Badge variant="outline">
                           {campaign.overrideMode === 'FORCE_ALLOW'
-                            ? 'Force allow'
+                            ? (isMyanmar ? 'အတင်းခွင့်ပြု' : 'Force allow')
                             : campaign.overrideMode === 'FORCE_BLOCK'
-                              ? 'Suppressed'
+                              ? (isMyanmar ? 'ပိတ်ထားသည်' : 'Suppressed')
                               : campaign.eligibleNow
-                                ? 'Eligible'
-                                : campaign.blockedReason || 'Blocked'}
+                                ? (isMyanmar ? 'အကျုံးဝင်' : 'Eligible')
+                                : campaign.blockedReason || (isMyanmar ? 'ပိတ်ထားသည်' : 'Blocked')}
                         </Badge>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1592,7 +1683,7 @@ export default function UsersPage() {
                             })
                           }
                         >
-                          Force allow
+                          {isMyanmar ? 'အတင်းခွင့်ပြု' : 'Force allow'}
                         </Button>
                         <Button
                           size="sm"
@@ -1609,7 +1700,7 @@ export default function UsersPage() {
                             })
                           }
                         >
-                          Suppress
+                          {isMyanmar ? 'ပိတ်မည်' : 'Suppress'}
                         </Button>
                         <Button
                           size="sm"
@@ -1627,7 +1718,7 @@ export default function UsersPage() {
                             })
                           }
                         >
-                          Use rules
+                          {isMyanmar ? 'စည်းမျဉ်းများကို သုံးမည်' : 'Use rules'}
                         </Button>
                       </div>
                     </div>
@@ -1637,7 +1728,7 @@ export default function UsersPage() {
 
               {quickActionCouponHistory.some((coupon) => coupon.status === 'ISSUED') ? (
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">Coupon actions</p>
+                  <p className="text-sm font-medium">{isMyanmar ? 'Coupon လုပ်ဆောင်ချက်များ' : 'Coupon actions'}</p>
                   <div className="grid gap-3 md:grid-cols-2">
                     {quickActionCouponHistory
                       .filter((coupon) => coupon.status === 'ISSUED')
@@ -1669,7 +1760,7 @@ export default function UsersPage() {
                                 })
                               }
                             >
-                              Expire
+                              {isMyanmar ? 'သက်တမ်းကုန်အဖြစ် သတ်မှတ်မည်' : 'Expire'}
                             </Button>
                             <Button
                               size="sm"
@@ -1686,7 +1777,7 @@ export default function UsersPage() {
                                 })
                               }
                             >
-                              Revoke
+                              {isMyanmar ? 'ရုပ်သိမ်းမည်' : 'Revoke'}
                             </Button>
                           </div>
                         </div>
@@ -1697,18 +1788,20 @@ export default function UsersPage() {
             </div>
           ) : (
             <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-              Customer quick actions are not available for this account yet.
+              {isMyanmar
+                ? 'ဤအကောင့်အတွက် ဖောက်သည် အမြန်လုပ်ဆောင်ချက်များကို မရရှိသေးပါ။'
+                : 'Customer quick actions are not available for this account yet.'}
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setQuickActionsUser(null)}>
-              Close
+              {isMyanmar ? 'ပိတ်မည်' : 'Close'}
             </Button>
             {quickActionsUser ? (
               <Button asChild>
                 <Link href={`/dashboard/users/${quickActionsUser.id}`}>
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Open CRM
+                  {isMyanmar ? 'ဖောက်သည်မှတ်တမ်းကို ဖွင့်ရန်' : 'Open CRM'}
                 </Link>
               </Button>
             ) : null}
@@ -1723,9 +1816,15 @@ export default function UsersPage() {
             setUserToDelete(null);
           }
         }}
-        title="Delete user"
-        description={userToDelete ? `Are you sure you want to delete user ${userToDelete.email}?` : ''}
-        confirmLabel="Delete user"
+        title={isMyanmar ? 'အသုံးပြုသူကို ဖျက်မည်' : 'Delete user'}
+        description={
+          userToDelete
+            ? isMyanmar
+              ? `${userToDelete.email} အသုံးပြုသူကို ဖျက်လိုသည်မှာ သေချာပါသလား?`
+              : `Are you sure you want to delete user ${userToDelete.email}?`
+            : ''
+        }
+        confirmLabel={isMyanmar ? 'အသုံးပြုသူကို ဖျက်မည်' : 'Delete user'}
         destructive
         loading={deleteMutation.isPending}
         onConfirm={() => {
@@ -1749,16 +1848,24 @@ export default function UsersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {refundReviewDialog?.action === 'APPROVE' ? 'Approve refund request' : 'Reject refund request'}
+              {refundReviewDialog?.action === 'APPROVE'
+                ? isMyanmar
+                  ? 'ပြန်အမ်းငွေ တောင်းဆိုမှုကို အတည်ပြုမည်'
+                  : 'Approve refund request'
+                : isMyanmar
+                  ? 'ပြန်အမ်းငွေ တောင်းဆိုမှုကို ငြင်းပယ်မည်'
+                  : 'Reject refund request'}
             </DialogTitle>
             <DialogDescription>
-              Review {refundReviewDialog?.orderCode || 'this order'} with a preset, then adjust the admin note or customer message before sending the decision.
+              {isMyanmar
+                ? `ကြိုတင်သတ်မှတ်ချက် တစ်ခုဖြင့် ${refundReviewDialog?.orderCode || 'ဤအော်ဒါ'} ကို စစ်ဆေးပြီး ဆုံးဖြတ်ချက်မပို့မီ admin မှတ်စု သို့မဟုတ် ဖောက်သည်ထံ ပို့မည့်စာကို ပြင်ဆင်ပါ။`
+                : `Review ${refundReviewDialog?.orderCode || 'this order'} with a preset, then adjust the admin note or customer message before sending the decision.`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Quick macros</Label>
+              <Label>{isMyanmar ? 'အမြန် macro များ' : 'Quick macros'}</Label>
               <div className="flex flex-wrap gap-2">
                 {refundReasonPresets.map((preset) => (
                   <Button
@@ -1774,10 +1881,10 @@ export default function UsersPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refund-reason-preset">Reason preset</Label>
+              <Label htmlFor="refund-reason-preset">{isMyanmar ? 'အကြောင်းပြချက် ကြိုတင်သတ်မှတ်ချက်' : 'Reason preset'}</Label>
               <Select value={refundReasonPresetCode} onValueChange={applyRefundPreset}>
                 <SelectTrigger id="refund-reason-preset">
-                  <SelectValue placeholder="Choose a preset" />
+                          <SelectValue placeholder={isMyanmar ? 'ကြိုတင်သတ်မှတ်ချက် တစ်ခုကို ရွေးပါ' : 'Choose a preset'} />
                 </SelectTrigger>
                 <SelectContent>
                   {refundReasonPresets.map((preset) => (
@@ -1789,22 +1896,22 @@ export default function UsersPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refund-review-note">Admin note</Label>
+              <Label htmlFor="refund-review-note">{isMyanmar ? 'စီမံခန့်ခွဲသူ မှတ်စု' : 'Admin note'}</Label>
               <Textarea
                 id="refund-review-note"
                 value={refundReviewNote}
                 onChange={(event) => setRefundReviewNote(event.target.value)}
-                placeholder="Internal finance note"
+                placeholder={isMyanmar ? 'ငွေကြေးစစ်ဆေးမှုအတွက် အတွင်းရေးမှတ်စု' : 'Internal finance note'}
                 rows={4}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="refund-customer-message">Customer message</Label>
+              <Label htmlFor="refund-customer-message">{isMyanmar ? 'ဖောက်သည်ထံ ပို့မည့် စာ' : 'Customer message'}</Label>
               <Textarea
                 id="refund-customer-message"
                 value={refundReviewCustomerMessage}
                 onChange={(event) => setRefundReviewCustomerMessage(event.target.value)}
-                placeholder="Message sent to the customer in Telegram"
+                placeholder={isMyanmar ? 'Telegram မှတဆင့် ဖောက်သည်ထံ ပို့မည့် စာ' : 'Message sent to the customer in Telegram'}
                 rows={4}
               />
             </div>
@@ -1812,7 +1919,7 @@ export default function UsersPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setRefundReviewDialog(null)}>
-              Cancel
+              {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
             </Button>
             <Button
               variant={refundReviewDialog?.action === 'APPROVE' ? 'default' : 'destructive'}
@@ -1831,7 +1938,9 @@ export default function UsersPage() {
               }}
             >
               {reviewRefundRequestMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {refundReviewDialog?.action === 'APPROVE' ? 'Approve refund' : 'Reject refund'}
+              {refundReviewDialog?.action === 'APPROVE'
+                ? (isMyanmar ? 'Refund ကို အတည်ပြုမည်' : 'Approve refund')
+                : (isMyanmar ? 'Refund ကို ငြင်းပယ်မည်' : 'Reject refund')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -421,6 +421,7 @@ function CreateKeyDialog({
     enabled: open,
   });
   const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const globalShareThemeName = themeList.find((theme) => theme.id === globalSubscriptionTheme)?.name || globalSubscriptionTheme;
   const selectedShareTheme = getTheme(
     formData.subscriptionTheme === 'default' ? globalSubscriptionTheme : formData.subscriptionTheme,
@@ -803,9 +804,11 @@ function CreateKeyDialog({
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Basics</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'အခြေခံအချက်အလက်' : 'Basics'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Start with the right template, choose assignment mode, and set the short links the customer will actually see.
+                  {locale === 'my'
+                    ? 'သင့်တော်သော တမ်းပလိတ်ကို ရွေးပါ၊ ခွဲဝေပေးမည့် ပုံစံကို သတ်မှတ်ပါ၊ ထို့နောက် ဖောက်သည် မြင်မည့် အတိုလင့်ခ်များကို ပြင်ဆင်ပါ။'
+                    : 'Start with the right template, choose assignment mode, and set the short links the customer will actually see.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
@@ -840,9 +843,11 @@ function CreateKeyDialog({
                     : 'border-border/60 bg-background/45 dark:bg-white/[0.03]',
                 )}
               >
-                <p className="font-medium text-foreground">Auto assignment</p>
+                <p className="font-medium text-foreground">{locale === 'my' ? 'အလိုအလျောက် ခွဲဝေခြင်း' : 'Auto assignment'}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Picks the healthiest active server automatically. Draining and maintenance servers are skipped.
+                  {locale === 'my'
+                    ? 'အသင့်အတင့် အလုပ်လုပ်နေသော ဆာဗာများထဲမှ ကျန်းမာရေးအကောင်းဆုံး ဆာဗာကို အလိုအလျောက် ရွေးပေးသည်။ Draining နှင့် maintenance ဆာဗာများကို ကျော်သွားမည်။'
+                    : 'Picks the healthiest active server automatically. Draining and maintenance servers are skipped.'}
                 </p>
               </div>
               <div
@@ -853,9 +858,11 @@ function CreateKeyDialog({
                     : 'border-border/60 bg-background/45 dark:bg-white/[0.03]',
                 )}
               >
-                <p className="font-medium text-foreground">Manual assignment</p>
+                <p className="font-medium text-foreground">{locale === 'my' ? 'ကိုယ်တိုင် ရွေးချယ်ခွဲဝေခြင်း' : 'Manual assignment'}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  You choose the exact server below. Draining is allowed when you select it manually; maintenance stays blocked.
+                  {locale === 'my'
+                    ? 'အောက်တွင် ဆာဗာကို ကိုယ်တိုင် တိတိကျကျ ရွေးချယ်နိုင်သည်။ ကိုယ်တိုင်ရွေးချယ်သည့်အခါ draining ဆာဗာကို အသုံးပြုနိုင်သော်လည်း maintenance ဆာဗာများကို ပိတ်ထားဆဲဖြစ်သည်။'
+                    : 'You choose the exact server below. Draining is allowed when you select it manually; maintenance stays blocked.'}
                 </p>
               </div>
             </div>
@@ -947,7 +954,7 @@ function CreateKeyDialog({
 
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="publicSlug">Short Link Slug</Label>
+              <Label htmlFor="publicSlug">{locale === 'my' ? 'အတိုလင့်ခ် အမည်' : 'Short Link Slug'}</Label>
               <Input
                 id="publicSlug"
                 placeholder="premium-access"
@@ -959,19 +966,23 @@ function CreateKeyDialog({
               />
               <p className="text-xs text-muted-foreground">
                 {slugTouched
-                  ? 'Used for the short client URL and short share page URL.'
-                  : 'Auto-generated from the name until you edit it.'}
+                  ? (locale === 'my'
+                    ? 'အတို ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်နှင့် အတို မျှဝေစာမျက်နှာ URL အတွက် အသုံးပြုသည်။'
+                    : 'Used for the short client URL and short share page URL.')
+                  : (locale === 'my'
+                    ? 'သင် မပြင်မချင်း အမည်မှ အလိုအလျောက် ဖန်တီးပေးမည်။'
+                    : 'Auto-generated from the name until you edit it.')}
               </p>
             </div>
 
             {previewSlug ? (
               <div className="rounded-xl border border-border/60 bg-muted/30 p-3 space-y-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-medium text-foreground">Slug status:</span>
+                  <span className="font-medium text-foreground">{locale === 'my' ? 'အတိုအမည် အခြေအနေ:' : 'Slug status:'}</span>
                   {slugAvailabilityQuery.isFetching ? (
                     <span className="inline-flex items-center gap-1 text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Checking availability
+                      {locale === 'my' ? 'အသုံးပြုနိုင်မှုကို စစ်ဆေးနေသည်' : 'Checking availability'}
                     </span>
                   ) : hasPreviewSlug && slugAvailabilityQuery.data?.available ? (
                     <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
@@ -982,8 +993,8 @@ function CreateKeyDialog({
                     <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                       <XCircle className="h-3.5 w-3.5" />
                       {hasPreviewSlug
-                        ? (slugAvailabilityQuery.data?.message || 'This short link is unavailable.')
-                        : 'Enter at least 3 characters.'}
+                        ? (slugAvailabilityQuery.data?.message || (locale === 'my' ? 'ဤအတိုလင့်ခ်ကို အသုံးမပြုနိုင်ပါ။' : 'This short link is unavailable.'))
+                        : (locale === 'my' ? 'အနည်းဆုံး စာလုံး ၃ လုံး ထည့်ပါ။' : 'Enter at least 3 characters.')}
                     </span>
                   )}
                 </div>
@@ -991,7 +1002,7 @@ function CreateKeyDialog({
                 {slugAvailabilityQuery.data?.suggestions?.length ? (
                   <div className="space-y-2">
                     <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                      {locale === 'my' ? 'အကြံပြု slug များ' : 'Suggested Slugs'}
+                      {locale === 'my' ? 'အကြံပြု အတိုအမည်များ' : 'Suggested Slugs'}
                     </Label>
                     <div className="flex flex-wrap gap-2">
                       {slugAvailabilityQuery.data.suggestions.map((suggestion) => (
@@ -1016,18 +1027,18 @@ function CreateKeyDialog({
                 <div className="grid gap-3">
                   <div className="space-y-1">
                     <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                      Short Client URL
+                      {locale === 'my' ? 'အတို ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်' : 'Short Client URL'}
                     </Label>
                     <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
-                      {previewClientUrl || 'Enter a valid slug to preview the client URL.'}
+                      {previewClientUrl || (locale === 'my' ? 'ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ် အကြိုကြည့်ရန် မှန်ကန်သော အတိုအမည်ကို ထည့်ပါ။' : 'Enter a valid slug to preview the client URL.')}
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                      Short Share Page
+                      {locale === 'my' ? 'အတို မျှဝေစာမျက်နှာ' : 'Short Share Page'}
                     </Label>
                     <div className="rounded-lg border border-border/60 bg-background/80 px-3 py-2 text-xs break-all">
-                      {previewShareUrl || 'Enter a valid slug to preview the share page.'}
+                      {previewShareUrl || (locale === 'my' ? 'မျှဝေစာမျက်နှာ အကြိုကြည့်ရန် မှန်ကန်သော အတိုအမည်ကို ထည့်ပါ။' : 'Enter a valid slug to preview the share page.')}
                     </div>
                   </div>
                 </div>
@@ -1039,9 +1050,11 @@ function CreateKeyDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Ownership and access</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'ပိုင်ဆိုင်မှုနှင့် အသုံးပြုခွင့်' : 'Ownership and access'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Assign the key, choose the connection method, and capture the contact context you will need later.
+                  {locale === 'my'
+                    ? 'သော့ကို ခွဲဝေပေးပါ၊ ချိတ်ဆက်နည်းကို ရွေးပါ၊ ထို့နောက် နောက်ပိုင်း အကူအညီပေးရာတွင် လိုအပ်မည့် ဆက်သွယ်ရန်အချက်အလက်များကို သိမ်းပါ။'
+                    : 'Assign the key, choose the connection method, and capture the contact context you will need later.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
@@ -1314,17 +1327,21 @@ function CreateKeyDialog({
 
           <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
             <div className="space-y-1">
-              <p className="text-sm font-semibold">Automation Policy</p>
+              <p className="text-sm font-semibold">{locale === 'my' ? 'အလိုအလျောက် လုပ်ဆောင်မှု မူဝါဒ' : 'Automation Policy'}</p>
               <p className="text-xs text-muted-foreground">
-                Control how the key behaves when it expires or crosses quota thresholds.
+                {locale === 'my'
+                  ? 'သက်တမ်းကုန်ချိန် သို့မဟုတ် quota ကန့်သတ်ချက်ကို ကျော်လွန်ချိန်တွင် ဤ key ကို မည်သို့ လုပ်ဆောင်မည်ကို သတ်မှတ်ပါ။'
+                  : 'Control how the key behaves when it expires or crosses quota thresholds.'}
               </p>
             </div>
 
             <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-background/70 px-4 py-3">
               <div className="space-y-1">
-                <p className="text-sm font-medium">Auto-disable when expired</p>
+                <p className="text-sm font-medium">{locale === 'my' ? 'သက်တမ်းကုန်လျှင် အလိုအလျောက် ပိတ်မည်' : 'Auto-disable when expired'}</p>
                 <p className="text-xs text-muted-foreground">
-                  Remove the key from Outline immediately after its expiry date passes.
+                  {locale === 'my'
+                    ? 'သတ်မှတ်သက်တမ်း ကျော်လွန်သည်နှင့် Outline မှ ချက်ချင်း ပိတ်ပင်မည်။'
+                    : 'Remove the key from Outline immediately after its expiry date passes.'}
                 </p>
               </div>
               <Switch
@@ -1334,7 +1351,7 @@ function CreateKeyDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="autoArchiveAfterDays">Auto-archive after (days)</Label>
+              <Label htmlFor="autoArchiveAfterDays">{locale === 'my' ? 'အလိုအလျောက် မှတ်တမ်းသို့ ရွှေ့မည့်ကာလ (ရက်)' : 'Auto-archive after (days)'}</Label>
               <Input
                 id="autoArchiveAfterDays"
                 type="number"
@@ -1344,12 +1361,14 @@ function CreateKeyDialog({
                 onChange={(e) => setFormData({ ...formData, autoArchiveAfterDays: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                Use 0 to archive immediately after the key becomes expired or depleted.
+                {locale === 'my'
+                  ? '0 ဟု သတ်မှတ်ပါက သော့သည် သက်တမ်းကုန် သို့မဟုတ် ကန့်သတ်ချက်ကုန်သည်နှင့် ချက်ချင်း မှတ်တမ်းသို့ ရွှေ့မည်။'
+                  : 'Use 0 to archive immediately after the key becomes expired or depleted.'}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label>Auto-renew policy</Label>
+              <Label>{locale === 'my' ? 'အလိုအလျောက် သက်တမ်းတိုး မူဝါဒ' : 'Auto-renew policy'}</Label>
               <Select
                 value={formData.autoRenewPolicy}
                 onValueChange={(value: 'NONE' | 'EXTEND_DURATION') =>
@@ -1360,15 +1379,15 @@ function CreateKeyDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NONE">Do not auto-renew</SelectItem>
-                  <SelectItem value="EXTEND_DURATION">Extend by a fixed number of days</SelectItem>
+                  <SelectItem value="NONE">{locale === 'my' ? 'အလိုအလျောက် မတိုးပါ' : 'Do not auto-renew'}</SelectItem>
+                  <SelectItem value="EXTEND_DURATION">{locale === 'my' ? 'သတ်မှတ်ထားသော ရက်အရေအတွက်ဖြင့် တိုးမည်' : 'Extend by a fixed number of days'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {formData.autoRenewPolicy === 'EXTEND_DURATION' && (
               <div className="space-y-2">
-                <Label htmlFor="autoRenewDurationDays">Auto-renew duration (days)</Label>
+                <Label htmlFor="autoRenewDurationDays">{locale === 'my' ? 'အလိုအလျောက် သက်တမ်းတိုးကာလ (ရက်)' : 'Auto-renew duration (days)'}</Label>
                 <Input
                   id="autoRenewDurationDays"
                   type="number"
@@ -1378,7 +1397,9 @@ function CreateKeyDialog({
                   onChange={(e) => setFormData({ ...formData, autoRenewDurationDays: e.target.value })}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Leave empty to reuse the same duration configured for this key.
+                  {locale === 'my'
+                    ? 'ဗလာထားပါက ဤ key အတွက် သတ်မှတ်ထားပြီးသော ကာလအတိုင်း ပြန်လည်အသုံးပြုမည်။'
+                    : 'Leave empty to reuse the same duration configured for this key.'}
                 </p>
               </div>
             )}
@@ -1399,9 +1420,11 @@ function CreateKeyDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Share page and delivery</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'မျှဝေစာမျက်နှာနှင့် ပို့ဆောင်မှု' : 'Share page and delivery'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Configure the customer-facing page, delivery options, and the actions that should happen the moment the key is created.
+                  {locale === 'my'
+                    ? 'ဤသော့ကို ဖန်တီးသည့်အချိန်တွင် အသုံးပြုသူဘက် မြင်ရမည့် စာမျက်နှာ၊ ပို့ဆောင်မှု ရွေးချယ်စရာများနှင့် ချက်ချင်း လုပ်ဆောင်ရမည့်အရာများကို သတ်မှတ်ပါ။'
+                    : 'Configure the customer-facing page, delivery options, and the actions that should happen the moment the key is created.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
@@ -1409,10 +1432,12 @@ function CreateKeyDialog({
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Share2 className="h-4 w-4 text-primary" />
-                Share Page
+                {locale === 'my' ? 'မျှဝေစာမျက်နှာ' : 'Share Page'}
               </div>
               <p className="text-xs text-muted-foreground">
-                These settings apply to the subscription page generated with this key right after creation.
+                {locale === 'my'
+                  ? 'ဤ setting များသည် key ဖန်တီးပြီးသည်နှင့် ထုတ်ပေးမည့် subscription စာမျက်နှာတွင် သက်ရောက်ပါမည်။'
+                  : 'These settings apply to the subscription page generated with this key right after creation.'}
               </p>
             </div>
 
@@ -1423,9 +1448,9 @@ function CreateKeyDialog({
                   onCheckedChange={(checked) => setFormData({ ...formData, sharePageEnabled: checked })}
                 />
                 <span className="space-y-1">
-                  <span className="block text-sm font-medium">Share page</span>
+                  <span className="block text-sm font-medium">{locale === 'my' ? 'မျှဝေစာမျက်နှာ' : 'Share page'}</span>
                   <span className="block text-xs text-muted-foreground">
-                    Public preview and short share URL.
+                    {locale === 'my' ? 'အများပြည်သူ ကြိုကြည့်နိုင်သော စာမျက်နှာနှင့် အတိုမျှဝေ URL ။' : 'Public preview and short share URL.'}
                   </span>
                 </span>
               </label>
@@ -1435,9 +1460,9 @@ function CreateKeyDialog({
                   onCheckedChange={(checked) => setFormData({ ...formData, clientLinkEnabled: checked })}
                 />
                 <span className="space-y-1">
-                  <span className="block text-sm font-medium">Client URL</span>
+                  <span className="block text-sm font-medium">{locale === 'my' ? 'ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်' : 'Client URL'}</span>
                   <span className="block text-xs text-muted-foreground">
-                    Allow compatible clients to fetch the config.
+                    {locale === 'my' ? 'သဟဇာတဖြစ်သော ကလိုင်းယင့်များက ဆက်တင်ကို ရယူနိုင်စေမည်။' : 'Allow compatible clients to fetch the config.'}
                   </span>
                 </span>
               </label>
@@ -1447,9 +1472,9 @@ function CreateKeyDialog({
                   onCheckedChange={(checked) => setFormData({ ...formData, telegramDeliveryEnabled: checked })}
                 />
                 <span className="space-y-1">
-                  <span className="block text-sm font-medium">Telegram delivery</span>
+                  <span className="block text-sm font-medium">{locale === 'my' ? 'Telegram ဖြင့် ပို့ဆောင်မှု' : 'Telegram delivery'}</span>
                   <span className="block text-xs text-muted-foreground">
-                    Permit send-via-Telegram and lifecycle pushes.
+                    {locale === 'my' ? 'Telegram ဖြင့် ပေးပို့ခြင်းနှင့် သက်တမ်းဆိုင်ရာ သတိပေးစာများကို ခွင့်ပြုမည်။' : 'Permit send-via-Telegram and lifecycle pushes.'}
                   </span>
                 </span>
               </label>
@@ -1458,17 +1483,17 @@ function CreateKeyDialog({
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Page Theme</Label>
+                  <Label>{locale === 'my' ? 'စာမျက်နှာ အပြင်အဆင်' : 'Page Theme'}</Label>
                   <Select
                     value={formData.subscriptionTheme}
                     onValueChange={(value) => setFormData({ ...formData, subscriptionTheme: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select theme" />
+                      <SelectValue placeholder={locale === 'my' ? 'အပြင်အဆင် ရွေးပါ' : 'Select theme'} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="default">
-                        Use global default ({globalShareThemeName})
+                        {locale === 'my' ? `Global မူရင်း theme ကို သုံးမည် (${globalShareThemeName})` : `Use global default (${globalShareThemeName})`}
                       </SelectItem>
                       {themeList.map((themeOption) => (
                         <SelectItem key={themeOption.id} value={themeOption.id}>
@@ -1486,7 +1511,7 @@ function CreateKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="shareBackground">Background Image (Optional)</Label>
+                  <Label htmlFor="shareBackground">{isMyanmar ? 'နောက်ခံ ပုံ (မထည့်လည်းရ)' : 'Background Image (Optional)'}</Label>
                   <Input
                     id="shareBackground"
                     placeholder="https://example.com/image.jpg"
@@ -1494,26 +1519,30 @@ function CreateKeyDialog({
                     onChange={(e) => setFormData({ ...formData, coverImageUrl: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    If set, the share page uses this full-page background image.
+                    {isMyanmar
+                      ? 'သတ်မှတ်ထားပါက share page တွင် ဤပုံကို စာမျက်နှာတစ်ခုလုံး နောက်ခံအဖြစ် အသုံးပြုမည်။'
+                      : 'If set, the share page uses this full-page background image.'}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="shareWelcomeMessage">Welcome Message (Optional)</Label>
+                  <Label htmlFor="shareWelcomeMessage">{isMyanmar ? 'ကြိုဆိုစာ (မထည့်လည်းရ)' : 'Welcome Message (Optional)'}</Label>
                   <Textarea
                     id="shareWelcomeMessage"
-                    placeholder="Add a short note or setup hint for this specific user."
+                    placeholder={isMyanmar ? 'ဤအသုံးပြုသူအတွက် အတိုချုံး မှတ်စု သို့မဟုတ် setup hint ထည့်ပါ။' : 'Add a short note or setup hint for this specific user.'}
                     value={formData.subscriptionWelcomeMessage}
                     onChange={(e) => setFormData({ ...formData, subscriptionWelcomeMessage: e.target.value })}
                     className="min-h-[96px]"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Overrides the global subscription page welcome message for this key only.
+                    {isMyanmar
+                      ? 'ဤ key အတွက်သာ global subscription page ကြိုဆိုစာကို override လုပ်မည်။'
+                      : 'Overrides the global subscription page welcome message for this key only.'}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Contact Links ({shareContacts.length}/3)</Label>
+                  <Label>{isMyanmar ? `ဆက်သွယ်ရန် လင့်ခ်များ (${shareContacts.length}/3)` : `Contact Links (${shareContacts.length}/3)`}</Label>
 
                   {shareContacts.length > 0 && (
                     <div className="space-y-2">
@@ -1579,9 +1608,13 @@ function CreateKeyDialog({
 
                 <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">After create</p>
+                    <p className="text-sm font-medium">
+                      {locale === 'my' ? 'ဖန်တီးပြီးနောက်' : 'After create'}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      The share page link is generated with the key. Choose what should happen as soon as creation finishes.
+                      {locale === 'my'
+                        ? 'သော့ကို ဖန်တီးပြီးသည့်နောက် မျှဝေစာမျက်နှာလင့်ခ်နှင့်အတူ ဘာလုပ်ဆောင်မည်ကို ရွေးပါ။'
+                        : 'The share page link is generated with the key. Choose what should happen as soon as creation finishes.'}
                     </p>
                   </div>
                   <div className="mt-4 space-y-3">
@@ -1593,9 +1626,11 @@ function CreateKeyDialog({
                         disabled={!formData.sharePageEnabled}
                       />
                       <span className="space-y-1">
-                        <span className="block text-sm font-medium">Open preview after create</span>
+                        <span className="block text-sm font-medium">{locale === 'my' ? 'ဖန်တီးပြီးနောက် အကြိုကြည့်ကို ဖွင့်မည်' : 'Open preview after create'}</span>
                         <span className="block text-xs text-muted-foreground">
-                          Opens the new share page in a separate tab right after the key is created.
+                          {locale === 'my'
+                            ? 'သော့ဖန်တီးပြီးသည်နှင့် share page အသစ်ကို tab အသစ်တစ်ခုတွင် ချက်ချင်းဖွင့်မည်။'
+                            : 'Opens the new share page in a separate tab right after the key is created.'}
                         </span>
                       </span>
                     </label>
@@ -1607,9 +1642,15 @@ function CreateKeyDialog({
                         disabled={!formData.sharePageEnabled}
                       />
                       <span className="space-y-1">
-                        <span className="block text-sm font-medium">Copy share page link after create</span>
+                        <span className="block text-sm font-medium">
+                          {locale === 'my'
+                            ? 'ဖန်တီးပြီးနောက် မျှဝေစာမျက်နှာလင့်ခ်ကို ကူးယူမည်'
+                            : 'Copy share page link after create'}
+                        </span>
                         <span className="block text-xs text-muted-foreground">
-                          Copies the generated share page link immediately instead of waiting for the result dialog.
+                          {locale === 'my'
+                            ? 'ရလဒ် dialog ကို မစောင့်ဘဲ ဖန်တီးပြီးသော share page လင့်ခ်ကို ချက်ချင်း ကူးယူမည်။'
+                            : 'Copies the generated share page link immediately instead of waiting for the result dialog.'}
                         </span>
                       </span>
                     </label>
@@ -1621,9 +1662,15 @@ function CreateKeyDialog({
                         disabled={!formData.telegramDeliveryEnabled}
                       />
                       <span className="space-y-1">
-                        <span className="block text-sm font-medium">Send share page via Telegram after create</span>
+                        <span className="block text-sm font-medium">
+                          {locale === 'my'
+                            ? 'ဖန်တီးပြီးနောက် မျှဝေစာမျက်နှာကို Telegram မှ ပို့မည်'
+                            : 'Send share page via Telegram after create'}
+                        </span>
                         <span className="block text-xs text-muted-foreground">
-                          Uses the key&apos;s Telegram ID or the assigned user&apos;s linked Telegram chat if one exists.
+                          {locale === 'my'
+                            ? 'သော့၏ Telegram ID သို့မဟုတ် ချိတ်ထားသော အသုံးပြုသူ Telegram chat ရှိပါက ၎င်းကို အသုံးပြုမည်။'
+                            : 'Uses the key&apos;s Telegram ID or the assigned user&apos;s linked Telegram chat if one exists.'}
                         </span>
                       </span>
                     </label>
@@ -1696,7 +1743,7 @@ function CreateKeyDialog({
                     <div className="space-y-1 text-xs" style={{ color: formData.coverImageUrl ? 'rgba(255,255,255,0.78)' : selectedShareTheme.textMuted }}>
                       <p>Contact shortcuts: {shareContacts.length}</p>
                       <p>{formData.sharePageEnabled ? 'Share page enabled' : 'Share page disabled'}</p>
-                      <p>{formData.clientLinkEnabled ? 'Client URL enabled' : 'Client URL disabled'}</p>
+                      <p>{formData.clientLinkEnabled ? (locale === 'my' ? 'ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်ကို ဖွင့်ထားသည်' : 'Client URL enabled') : (locale === 'my' ? 'ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်ကို ပိတ်ထားသည်' : 'Client URL disabled')}</p>
                       <p>{formData.telegramDeliveryEnabled ? 'Telegram delivery enabled' : 'Telegram delivery disabled'}</p>
                       <p>{formData.coverImageUrl ? 'Background image enabled' : 'Color theme only'}</p>
                       <p>{formData.subscriptionWelcomeMessage.trim() ? 'Custom welcome message enabled' : 'Using global welcome message'}</p>
@@ -1750,7 +1797,7 @@ function CreatedKeySummaryDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const subscriptionPageUrl = getKeySubscriptionPageUrl(createdKey?.subscriptionToken, createdKey?.publicSlug);
   const { data: qrData, isLoading } = trpc.keys.generateQRCode.useQuery(
@@ -1921,7 +1968,7 @@ function CreatedKeySummaryDialog({
                 disabled={!subscriptionPageUrl}
               >
                 <Eye className="mr-2 h-4 w-4" />
-                Open Share Page
+                {locale === 'my' ? 'မျှဝေစာမျက်နှာကို ဖွင့်မည်' : 'Open Share Page'}
               </Button>
               <Button
                 type="button"
@@ -1935,7 +1982,7 @@ function CreatedKeySummaryDialog({
                 ) : (
                   <LinkCopy className="mr-2 h-4 w-4" />
                 )}
-                Copy Telegram Connect Link
+                {locale === 'my' ? 'Telegram ချိတ်ဆက်လင့်ခ်ကို ကူးယူမည်' : 'Copy Telegram Connect Link'}
               </Button>
               <Button
                 type="button"
@@ -1949,7 +1996,7 @@ function CreatedKeySummaryDialog({
                 ) : (
                   <MessageSquare className="mr-2 h-4 w-4" />
                 )}
-                Send via Telegram
+                {locale === 'my' ? 'Telegram သို့ ပို့မည်' : 'Send via Telegram'}
               </Button>
             </div>
           </div>
@@ -1997,7 +2044,8 @@ function QRCodeDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
 
   // Fetch QR code
   const { data, isLoading } = trpc.keys.generateQRCode.useQuery(
@@ -2466,7 +2514,8 @@ function EditKeyDialog({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const [formData, setFormData] = useState({
     name: keyData.name,
     email: keyData.email || '',
@@ -2742,6 +2791,8 @@ function BulkCreateDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: (result: { success: number; failed: number; errors: string[] }) => void;
 }) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const { data: servers } = trpc.servers.list.useQuery(undefined, {
     enabled: open,
@@ -2757,11 +2808,15 @@ function BulkCreateDialog({
   const bulkCreateMutation = trpc.keys.bulkCreate.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Bulk creation finished',
+        title: isMyanmar ? 'အစုလိုက် ဖန်တီးမှု ပြီးဆုံးပါပြီ' : 'Bulk creation finished',
         description:
           result.failed > 0
-            ? `${result.success} keys created, ${result.failed} failed.`
-            : `${result.success} keys created successfully.`,
+            ? isMyanmar
+              ? `သော့ ${result.success} ခု ဖန်တီးပြီး၊ ${result.failed} ခု မအောင်မြင်ပါ။`
+              : `${result.success} keys created, ${result.failed} failed.`
+            : isMyanmar
+              ? `သော့ ${result.success} ခုကို အောင်မြင်စွာ ဖန်တီးပြီးပါပြီ။`
+              : `${result.success} keys created successfully.`,
         variant: result.failed > 0 ? 'destructive' : 'default',
       });
       onSuccess(result);
@@ -2769,7 +2824,7 @@ function BulkCreateDialog({
     },
     onError: (error) => {
       toast({
-        title: 'Bulk creation failed',
+        title: isMyanmar ? 'အစုလိုက် ဖန်တီးမှု မအောင်မြင်ပါ' : 'Bulk creation failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -2806,8 +2861,10 @@ function BulkCreateDialog({
 
     if (selectedServerIds.length === 0) {
       toast({
-        title: 'Select at least one server',
-        description: 'Bulk create needs one or more target servers.',
+        title: isMyanmar ? 'အနည်းဆုံး ဆာဗာတစ်ခု ရွေးပါ' : 'Select at least one server',
+        description: isMyanmar
+          ? 'အစုလိုက် ဖန်တီးရန် ဦးတည်ဆာဗာ တစ်ခု သို့မဟုတ် ထို့ထက်ပိုသော ဆာဗာများ လိုအပ်သည်။'
+          : 'Bulk create needs one or more target servers.',
         variant: 'destructive',
       });
       return;
@@ -2815,8 +2872,10 @@ function BulkCreateDialog({
 
     if (!namePrefix.trim()) {
       toast({
-        title: 'Name prefix required',
-        description: 'Enter a prefix for the generated key names.',
+        title: isMyanmar ? 'အမည် ရှေ့ဆက် စာသား လိုအပ်သည်' : 'Name prefix required',
+        description: isMyanmar
+          ? 'ဖန်တီးမည့် သော့အမည်များအတွက် ရှေ့ဆက် စာသားတစ်ခု ထည့်ပါ။'
+          : 'Enter a prefix for the generated key names.',
         variant: 'destructive',
       });
       return;
@@ -2824,8 +2883,10 @@ function BulkCreateDialog({
 
     if (needsDrainingConfirmation && !confirmDrainingServers) {
       toast({
-        title: 'Confirm draining servers',
-        description: 'Bulk create is explicit admin use, but you still need to confirm draining targets before continuing.',
+        title: isMyanmar ? 'လက်ခံမှုလျှော့ထားသော ဆာဗာများကို အတည်ပြုပါ' : 'Confirm draining servers',
+        description: isMyanmar
+          ? 'ဤအစုလိုက် ဖန်တီးမှုသည် စီမံခန့်ခွဲသူက တိုက်ရိုက်ရွေးထားသော လုပ်ဆောင်မှုဖြစ်သော်လည်း ဆက်မလုပ်မီ လက်ခံမှုလျှော့ထားသော ဆာဗာများကို အတည်ပြုရန် လိုအပ်ပါသည်။'
+          : 'Bulk create is explicit admin use, but you still need to confirm draining targets before continuing.',
         variant: 'destructive',
       });
       return;
@@ -2846,9 +2907,11 @@ function BulkCreateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(960px,calc(100vw-2rem))]">
         <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
-          <DialogTitle>Bulk create access keys</DialogTitle>
+          <DialogTitle>{isMyanmar ? 'အသုံးပြုခွင့် သော့များကို အစုလိုက် ဖန်တီးရန်' : 'Bulk create access keys'}</DialogTitle>
           <DialogDescription>
-            Generate repeatable batches across one or more servers. Draining targets are allowed here only because this is explicit admin placement.
+            {isMyanmar
+              ? 'ဆာဗာ တစ်ခု သို့မဟုတ် ထို့ထက်ပိုသော ဆာဗာများအတွက် ထပ်တူကျသော သော့အစုများကို ဖန်တီးပါ။ ဤနေရာတွင် draining ဆာဗာများကို ခွင့်ပြုထားခြင်းမှာ admin က တိုက်ရိုက်ရွေးထားခြင်းကြောင့်သာ ဖြစ်သည်။'
+              : 'Generate repeatable batches across one or more servers. Draining targets are allowed here only because this is explicit admin placement.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -2856,15 +2919,17 @@ function BulkCreateDialog({
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Naming and quantity</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'အမည်နှင့် အရေအတွက်' : 'Naming and quantity'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Set the shared prefix, the number of keys per target, and an optional quota for every new key in the batch.
+                  {isMyanmar
+                    ? 'အမည် ရှေ့ဆက်၊ ဦးတည်ဆာဗာတစ်ခုလျှင် သော့အရေအတွက်နှင့် သော့အသစ်တိုင်းအတွက် optional quota ကို သတ်မှတ်ပါ။'
+                    : 'Set the shared prefix, the number of keys per target, and an optional quota for every new key in the batch.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="bulk-name-prefix">Name prefix</Label>
+                  <Label htmlFor="bulk-name-prefix">{isMyanmar ? 'အမည် ရှေ့ဆက်' : 'Name prefix'}</Label>
                   <Input
                     id="bulk-name-prefix"
                     value={namePrefix}
@@ -2873,7 +2938,7 @@ function BulkCreateDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bulk-count">Keys per server</Label>
+                  <Label htmlFor="bulk-count">{isMyanmar ? 'ဆာဗာတစ်ခုလျှင် သော့အရေအတွက်' : 'Keys per server'}</Label>
                   <Input
                     id="bulk-count"
                     type="number"
@@ -2884,14 +2949,14 @@ function BulkCreateDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bulk-limit">Data limit (GB)</Label>
+                  <Label htmlFor="bulk-limit">{isMyanmar ? 'ဒေတာ ကန့်သတ်ချက် (GB)' : 'Data limit (GB)'}</Label>
                   <Input
                     id="bulk-limit"
                     type="number"
                     min={1}
                     value={dataLimitGB}
                     onChange={(event) => setDataLimitGB(event.target.value)}
-                    placeholder="Optional"
+                    placeholder={isMyanmar ? 'မထည့်လည်း ရသည်' : 'Optional'}
                   />
                 </div>
               </div>
@@ -2899,15 +2964,17 @@ function BulkCreateDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Placement and expiry</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'နေရာချထားမှုနှင့် သက်တမ်း' : 'Placement and expiry'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Choose the destination servers and the expiry model that should apply to the whole batch.
+                  {isMyanmar
+                    ? 'ဤအစုတစ်ခုလုံးအတွက် အသုံးပြုမည့် ဦးတည်ဆာဗာများနှင့် သက်တမ်းပုံစံကို ရွေးပါ။'
+                    : 'Choose the destination servers and the expiry model that should apply to the whole batch.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
                 <div className="space-y-2">
-                  <Label>Target servers</Label>
+                  <Label>{locale === 'my' ? 'ဦးတည်ဆာဗာများ' : 'Target servers'}</Label>
                   <div className="max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-border/60 bg-background/45 p-3 dark:bg-white/[0.03]">
                     {(servers ?? []).map((server) => {
                       const lifecycleMeta = getServerLifecycleMeta(server.lifecycleMode);
@@ -2947,22 +3014,22 @@ function BulkCreateDialog({
 
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label>Expiry mode</Label>
+                    <Label>{isMyanmar ? 'သက်တမ်းပုံစံ' : 'Expiry mode'}</Label>
                     <Select value={expirationType} onValueChange={(value) => setExpirationType(value as 'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE')}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NEVER">Never expire</SelectItem>
-                        <SelectItem value="DURATION_FROM_CREATION">Duration from creation</SelectItem>
-                        <SelectItem value="START_ON_FIRST_USE">Start on first use</SelectItem>
+                        <SelectItem value="NEVER">{isMyanmar ? 'မသက်တမ်းကုန်ပါ' : 'Never expire'}</SelectItem>
+                        <SelectItem value="DURATION_FROM_CREATION">{isMyanmar ? 'ဖန်တီးချိန်မှ ရက်တွက်မည်' : 'Duration from creation'}</SelectItem>
+                        <SelectItem value="START_ON_FIRST_USE">{isMyanmar ? 'ပထမအသုံးပြုချိန်တွင် စတင်မည်' : 'Start on first use'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {expirationType === 'DURATION_FROM_CREATION' ? (
                     <div className="space-y-2">
-                      <Label htmlFor="bulk-duration">Duration (days)</Label>
+                      <Label htmlFor="bulk-duration">{isMyanmar ? 'သက်တမ်း (ရက်)' : 'Duration (days)'}</Label>
                       <Input
                         id="bulk-duration"
                         type="number"
@@ -2974,8 +3041,12 @@ function BulkCreateDialog({
                   ) : null}
 
                   <div className="ops-modal-note text-xs">
-                    <p className="font-medium text-foreground">Assignment policy</p>
-                    <p className="mt-1">Maintenance targets stay blocked. Draining targets remain allowed only because you selected them intentionally.</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'သတ်မှတ်နေရာချထားမှု မူဝါဒ' : 'Assignment policy'}</p>
+                    <p className="mt-1">
+                      {isMyanmar
+                        ? 'Maintenance ဆာဗာများကို ဆက်လက်ပိတ်ထားမည်။ Draining ဆာဗာများကို သင်တိုက်ရိုက်ရွေးထားသောကြောင့်သာ ခွင့်ပြုထားသည်။'
+                        : 'Maintenance targets stay blocked. Draining targets remain allowed only because you selected them intentionally.'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -2989,9 +3060,11 @@ function BulkCreateDialog({
                     onCheckedChange={(checked) => setConfirmDrainingServers(Boolean(checked))}
                   />
                   <div className="space-y-1">
-                    <p className="font-medium text-foreground">Confirm draining targets</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'လက်ခံမှုလျှော့ထားသော ဆာဗာများကို အတည်ပြုပါ' : 'Confirm draining targets'}</p>
                     <p className="text-xs text-muted-foreground">
-                      {selectedDrainingServers.map((server) => server.name).join(', ')} {selectedDrainingServers.length === 1 ? 'is' : 'are'} draining. Auto-placement avoids them, but this batch will still create keys there because you selected them explicitly.
+                      {isMyanmar
+                        ? `${selectedDrainingServers.map((server) => server.name).join(', ')} သည် လက်ခံမှုလျှော့ထားသော အနေအထားတွင် ရှိနေသည်။ အလိုအလျောက်နေရာချထားမှုသည် ၎င်းတို့ကို ရှောင်လွှဲမည်ဖြစ်သော်လည်း သင်တိုက်ရိုက်ရွေးထားသောကြောင့် ဤအစုအတွက် ၎င်းတို့တွင်ပင် သော့များကို ဖန်တီးမည်။`
+                        : `${selectedDrainingServers.map((server) => server.name).join(', ')} ${selectedDrainingServers.length === 1 ? 'is' : 'are'} draining. Auto-placement avoids them, but this batch will still create keys there because you selected them explicitly.`}
                     </p>
                   </div>
                 </label>
@@ -3001,11 +3074,11 @@ function BulkCreateDialog({
 
           <DialogFooter className="ops-modal-sticky-footer">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
             </Button>
             <Button type="submit" disabled={bulkCreateMutation.isPending}>
               {bulkCreateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-              Create keys
+              {isMyanmar ? 'သော့များ ဖန်တီးမည်' : 'Create keys'}
             </Button>
           </DialogFooter>
         </form>
@@ -3417,7 +3490,7 @@ export default function KeysPage() {
     autoRenewDurationDays: number | null;
   } | null>(null);
   const autoRefreshRef = useRef<(() => void) | null>(null);
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const router = useRouter();
   const getItemLabel = useCallback(
     (count: number) => t(count === 1 ? 'keys.bulk.item_singular' : 'keys.bulk.item_plural'),
@@ -4149,11 +4222,13 @@ export default function KeysPage() {
                   <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.45rem]">{t('keys.title')}</h1>
                   <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
                     <Sparkles className="mr-1 h-3.5 w-3.5" />
-                    Frosted
+                    {locale === 'my' ? 'မြင်ကွင်းသစ်' : 'Frosted'}
                   </Badge>
                 </div>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  Watch key health, traffic, device limits, and renewal pressure without pushing the important controls below the fold.
+                  {locale === 'my'
+                    ? 'သော့ကျန်းမာရေး၊ ဒေတာအသုံးပြုမှု၊ စက်ကန့်သတ်ချက်နှင့် သက်တမ်းတိုးရန် လိုအပ်မှုကို အရေးကြီးသော control များ မပျောက်စေဘဲ တစ်ပြိုင်နက် စောင့်ကြည့်ပါ။'
+                    : 'Watch key health, traffic, device limits, and renewal pressure without pushing the important controls below the fold.'}
                 </p>
               </div>
             </div>
@@ -4165,7 +4240,7 @@ export default function KeysPage() {
                 data-testid="create-access-key"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Create key
+                {locale === 'my' ? 'သော့ ဖန်တီးရန်' : 'Create key'}
               </Button>
               <Button
                 variant="outline"
@@ -4173,7 +4248,7 @@ export default function KeysPage() {
                 onClick={() => setBulkCreateDialogOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Bulk create
+                {locale === 'my' ? 'အစုလိုက် ဖန်တီးရန်' : 'Bulk create'}
               </Button>
               <Button
                 variant="outline"
@@ -4182,7 +4257,7 @@ export default function KeysPage() {
               >
                 <Link href="/dashboard/templates">
                   <FileText className="mr-2 h-4 w-4" />
-                  Open templates
+                  {locale === 'my' ? 'တမ်းပလိတ်များကို ဖွင့်မည်' : 'Open templates'}
                 </Link>
               </Button>
               <Button
@@ -4192,7 +4267,7 @@ export default function KeysPage() {
               >
                 <Link href="/dashboard/archived">
                   <Archive className="mr-2 h-4 w-4" />
-                  View archive
+                  {locale === 'my' ? 'အဟောင်းမှတ်တမ်းကို ကြည့်မည်' : 'View archive'}
                 </Link>
               </Button>
             </div>
@@ -4200,9 +4275,11 @@ export default function KeysPage() {
             <div className="ops-support-card space-y-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-sm font-semibold">Current view</p>
+                  <p className="text-sm font-semibold">{locale === 'my' ? 'လက်ရှိမြင်ကွင်း' : 'Current view'}</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Keep the working set visible while you filter by traffic, device pressure, owner, or tag.
+                    {locale === 'my'
+                      ? 'ဒေတာအသုံးပြုမှု၊ စက်ဖိအား၊ ပိုင်ရှင် သို့မဟုတ် tag အလိုက် စစ်ထုတ်နေစဉ်လည်း လက်ရှိလုပ်ဆောင်နေသောစာရင်းကို မျက်နှာပြင်ပေါ်တွင် ထင်ရှားစွာ ထားရှိပါ။'
+                      : 'Keep the working set visible while you filter by traffic, device pressure, owner, or tag.'}
                   </p>
                 </div>
                 {hasAnyFilters ? (
@@ -4215,7 +4292,13 @@ export default function KeysPage() {
               <div className="flex flex-wrap gap-2">
                 <span className={cn('ops-pill', hasAnyFilters ? 'border-primary/25 bg-primary/10 text-primary dark:text-cyan-200' : '')}>
                   <Filter className="h-3.5 w-3.5" />
-                  {hasAnyFilters ? 'Filtered view' : 'Showing all keys'}
+                  {hasAnyFilters
+                    ? locale === 'my'
+                      ? 'စစ်ထုတ်ထားသော မြင်ကွင်း'
+                      : 'Filtered view'
+                    : locale === 'my'
+                      ? 'သော့အားလုံးကို ပြနေသည်'
+                      : 'Showing all keys'}
                 </span>
                 <span className="ops-pill">
                   <Activity className="h-3.5 w-3.5" />
@@ -4223,7 +4306,9 @@ export default function KeysPage() {
                 </span>
                 <span className="ops-pill">
                   <Smartphone className="h-3.5 w-3.5" />
-                  {stats?.deviceLimitWarned ?? 0} warnings sent
+                  {locale === 'my'
+                    ? `သတိပေးချက် ${stats?.deviceLimitWarned ?? 0} ခု ပို့ထားသည်`
+                    : `${stats?.deviceLimitWarned ?? 0} warnings sent`}
                 </span>
               </div>
             </div>
@@ -4231,42 +4316,54 @@ export default function KeysPage() {
 
           <div className="ops-hero-aside space-y-4">
             <div className="space-y-1">
-              <p className="ops-section-heading">Inventory overview</p>
-              <p className="text-sm font-semibold">Live access key state</p>
+              <p className="ops-section-heading">{locale === 'my' ? 'စာရင်းအကျဉ်းချုပ်' : 'Inventory overview'}</p>
+                          <p className="text-sm font-semibold">{locale === 'my' ? 'လက်ရှိ အသုံးပြုခွင့်သော့ အခြေအနေ' : 'Live access key state'}</p>
               <p className="text-sm text-muted-foreground">
-                The signals below tell you whether the list needs action right now.
+                {locale === 'my'
+                  ? 'အောက်ပါ အချက်ပြမှုများက ယခုစာရင်းအတွက် ချက်ချင်း လုပ်ဆောင်ရန် လိုအပ်မှု ရှိ/မရှိကို ပြသပေးသည်။'
+                  : 'The signals below tell you whether the list needs action right now.'}
               </p>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Active keys
+                  {locale === 'my' ? 'အသုံးပြုနိုင်သော သော့များ' : 'Active keys'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{stats?.total ?? 0} total keys</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === 'my' ? `စုစုပေါင်း သော့ ${stats?.total ?? 0} ခု` : `${stats?.total ?? 0} total keys`}
+                </p>
               </div>
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Recent traffic
+                  {locale === 'my' ? 'မကြာသေးမီ ဒေတာအသွားအလာ' : 'Recent traffic'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Keys with live activity</p>
+                <p className="mt-1 text-xs text-muted-foreground">{locale === 'my' ? 'လက်ရှိအသုံးပြုမှု ရှိသော သော့များ' : 'Keys with live activity'}</p>
               </div>
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Device caps
+                  {locale === 'my' ? 'စက်ကန့်သတ်ချက်' : 'Device caps'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold leading-none">{stats?.deviceLimitOverLimit ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Currently over the limit</p>
+                <p className="mt-1 text-xs text-muted-foreground">{locale === 'my' ? 'လက်ရှိ ကန့်သတ်ချက် ကျော်နေသည်' : 'Currently over the limit'}</p>
               </div>
               <div className="ops-kpi-tile p-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  List scope
+                  {locale === 'my' ? 'စာရင်း အကျယ်အဝန်း' : 'List scope'}
                 </p>
-                <p className="mt-2 text-2xl font-semibold leading-none">{hasAnyFilters ? 'Filtered' : 'Full'}</p>
+                <p className="mt-2 text-2xl font-semibold leading-none">
+                  {hasAnyFilters ? (locale === 'my' ? 'စစ်ထုတ်ထား' : 'Filtered') : locale === 'my' ? 'အပြည့်' : 'Full'}
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {hasAnyFilters ? 'Filters are narrowing the table' : 'You are seeing the complete inventory'}
+                  {hasAnyFilters
+                    ? locale === 'my'
+                      ? 'စစ်ထုတ်မှုများကြောင့် စာရင်းကို ကျဉ်းအောင် ပြထားသည်'
+                      : 'Filters are narrowing the table'
+                    : locale === 'my'
+                      ? 'စာရင်းအားလုံးကို အပြည့်အဝ မြင်နေရသည်'
+                      : 'You are seeing the complete inventory'}
                 </p>
               </div>
             </div>
@@ -4339,7 +4436,7 @@ export default function KeysPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-violet-500/20 bg-violet-500/10">
                   <Smartphone className="h-4 w-4 text-violet-300" />
                 </div>
-                <p className="text-xs font-medium text-violet-300">Over device limit</p>
+                <p className="text-xs font-medium text-violet-300">{locale === 'my' ? 'စက်ကန့်သတ်ချက် ကျော်လွန်' : 'Over device limit'}</p>
               </div>
               <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitOverLimit ?? 0}</p>
             </div>
@@ -4348,7 +4445,7 @@ export default function KeysPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-amber-500/20 bg-amber-500/10">
                   <AlertTriangle className="h-4 w-4 text-amber-300" />
                 </div>
-                <p className="text-xs font-medium text-amber-300">Warning sent</p>
+                <p className="text-xs font-medium text-amber-300">{locale === 'my' ? 'သတိပေးချက် ပို့ထား' : 'Warning sent'}</p>
               </div>
               <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitWarned ?? 0}</p>
             </div>
@@ -4600,7 +4697,7 @@ export default function KeysPage() {
           onClick={() => setQuickFilter('overDeviceLimit', !filters.quickFilters.overDeviceLimit)}
         >
           <Smartphone className="w-3 h-3 mr-1" />
-          Over device limit
+          {locale === 'my' ? 'စက်ကန့်သတ်ချက် ကျော်လွန်' : 'Over device limit'}
         </Button>
         <Button
           variant={filters.quickFilters.deviceLimitWarned ? 'default' : 'outline'}
@@ -4609,7 +4706,7 @@ export default function KeysPage() {
           onClick={() => setQuickFilter('deviceLimitWarned', !filters.quickFilters.deviceLimitWarned)}
         >
           <AlertTriangle className="w-3 h-3 mr-1" />
-          Warning sent
+          {locale === 'my' ? 'သတိပေးချက် ပို့ပြီး' : 'Warning sent'}
         </Button>
         
         {/* Tag filter */}
@@ -4919,7 +5016,7 @@ export default function KeysPage() {
                   onClick={() => setQuickFilter('overDeviceLimit', !filters.quickFilters.overDeviceLimit)}
                 >
                   <Smartphone className="w-3 h-3 mr-1" />
-                  Over device limit
+                  {locale === 'my' ? 'စက်ကန့်သတ်ချက် ကျော်လွန်' : 'Over device limit'}
                 </Button>
                 <Button
                   variant={filters.quickFilters.deviceLimitWarned ? 'default' : 'outline'}
@@ -4928,7 +5025,7 @@ export default function KeysPage() {
                   onClick={() => setQuickFilter('deviceLimitWarned', !filters.quickFilters.deviceLimitWarned)}
                 >
                   <AlertTriangle className="w-3 h-3 mr-1" />
-                  Warning sent
+                  {locale === 'my' ? 'သတိပေးချက် ပို့ပြီး' : 'Warning sent'}
                 </Button>
               </div>
             </div>
@@ -5492,9 +5589,11 @@ export default function KeysPage() {
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Target server</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'ဦးတည်ဆာဗာ' : 'Target server'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Pick the new destination for the selected keys. This keeps maintenance targets blocked while still allowing explicit draining moves.
+                  {locale === 'my'
+                    ? 'ရွေးထားသော key များအတွက် ဦးတည်မည့် ဆာဗာအသစ်ကို ရွေးပါ။ ထိန်းသိမ်းရေးဆာဗာများကို ပိတ်ထားစဉ် explicit draining move များကိုတော့ ခွင့်ပြုထားမည်။'
+                    : 'Pick the new destination for the selected keys. This keeps maintenance targets blocked while still allowing explicit draining moves.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
