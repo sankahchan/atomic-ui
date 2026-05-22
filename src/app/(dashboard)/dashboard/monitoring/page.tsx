@@ -89,24 +89,25 @@ function getStatusBadgeClass(status: string) {
   }
 }
 
-function getStatusLabel(status: string) {
+function getStatusLabel(status: string, isMyanmar: boolean) {
   switch (status) {
     case 'healthy':
-      return 'Healthy';
+      return isMyanmar ? 'ကောင်းမွန်' : 'Healthy';
     case 'error':
-      return 'Issue detected';
+      return isMyanmar ? 'ပြဿနာ တွေ့ရှိသည်' : 'Issue detected';
     case 'warning':
-      return 'Attention needed';
+      return isMyanmar ? 'ဂရုပြုရန် လိုအပ်' : 'Attention needed';
     case 'not_configured':
-      return 'Not configured';
+      return isMyanmar ? 'မပြင်ဆင်ရသေးပါ' : 'Not configured';
     default:
       return status;
   }
 }
 
 export default function MonitoringPage() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const { toast } = useToast();
+  const isMyanmar = locale === 'my';
 
   const settingsQuery = trpc.system.getMonitoringSettings.useQuery();
   const overviewQuery = trpc.system.getMonitoringOverview.useQuery(undefined, {
@@ -173,13 +174,15 @@ export default function MonitoringPage() {
     onSuccess: async () => {
       await Promise.all([settingsQuery.refetch(), overviewQuery.refetch()]);
       toast({
-        title: 'Monitoring settings saved',
-        description: 'The alert thresholds and cooldowns are now updated.',
+        title: isMyanmar ? 'စောင့်ကြည့်မှု သတ်မှတ်ချက်များကို သိမ်းပြီးပါပြီ' : 'Monitoring settings saved',
+        description: isMyanmar
+          ? 'သတိပေးချက် သတ်မှတ်ကန့်သတ်ချက်များနှင့် cooldown ကာလများကို ပြင်ဆင်ပြီးပါပြီ။'
+          : 'The alert thresholds and cooldowns are now updated.',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Monitoring settings failed',
+        title: isMyanmar ? 'စောင့်ကြည့်မှု သတ်မှတ်ချက်များကို မသိမ်းနိုင်ပါ' : 'Monitoring settings failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -190,13 +193,13 @@ export default function MonitoringPage() {
     onSuccess: async () => {
       await overviewQuery.refetch();
       toast({
-        title: 'Monitoring job finished',
-        description: 'The monitoring state has been refreshed.',
+        title: isMyanmar ? 'စောင့်ကြည့်မှု လုပ်ငန်းပြီးပါပြီ' : 'Monitoring job finished',
+        description: isMyanmar ? 'စောင့်ကြည့်မှု အခြေအနေကို ပြန်လည်သစ်စေပြီးပါပြီ။' : 'The monitoring state has been refreshed.',
       });
     },
     onError: (error) => {
       toast({
-        title: 'Monitoring job failed',
+        title: isMyanmar ? 'စောင့်ကြည့်မှု လုပ်ငန်း မအောင်မြင်ပါ' : 'Monitoring job failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -206,8 +209,10 @@ export default function MonitoringPage() {
   const handleSave = () => {
     if (!parsedForm) {
       toast({
-        title: 'Invalid thresholds',
-        description: 'Use whole numbers for each monitoring threshold and cooldown.',
+        title: isMyanmar ? 'သတ်မှတ်ကန့်သတ်ချက် မမှန်ပါ' : 'Invalid thresholds',
+        description: isMyanmar
+          ? 'စောင့်ကြည့်မှု သတ်မှတ်ကန့်သတ်ချက်နှင့် cooldown တစ်ခုချင်းစီအတွက် ကိန်းပြည့်ကိုသာ ထည့်ပါ။'
+          : 'Use whole numbers for each monitoring threshold and cooldown.',
         variant: 'destructive',
       });
       return;
@@ -242,17 +247,21 @@ export default function MonitoringPage() {
                 {t('nav.monitoring')}
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Watch live backup, webhook, and queue health from one place, then tune the thresholds that decide when operators get paged in Telegram.
+                {isMyanmar
+                  ? 'အရန်သိမ်းမှု၊ webhook နှင့် queue အခြေအနေများကို တစ်နေရာတည်းတွင် တိုက်ရိုက်ကြည့်ရှုပါ၊ ထို့နောက် Telegram ထဲတွင် လုပ်ဆောင်သူများထံ သတိပေးပို့မည့် သတ်မှတ်ကန့်သတ်ချက်များကို ညှိနှိုင်းပါ။'
+                  : 'Watch live backup, webhook, and queue health from one place, then tune the thresholds that decide when operators get paged in Telegram.'}
               </p>
             </div>
           </div>
 
           <div className="ops-panel space-y-3">
             <div className="space-y-1">
-              <p className="ops-section-heading">Operator Summary</p>
-              <h2 className="text-xl font-semibold">Current monitor state</h2>
+              <p className="ops-section-heading">{isMyanmar ? 'လုပ်ဆောင်သူ အကျဉ်းချုပ်' : 'Operator Summary'}</p>
+              <h2 className="text-xl font-semibold">{isMyanmar ? 'လက်ရှိ စောင့်ကြည့်မှု အခြေအနေ' : 'Current monitor state'}</h2>
               <p className="text-sm text-muted-foreground">
-                This page combines live health checks with the scheduler’s last-known run results.
+                {isMyanmar
+                  ? 'ဤစာမျက်နှာသည် တိုက်ရိုက် ကျန်းမာရေး စစ်ဆေးချက်များနှင့် အချိန်ဇယား စနစ်၏ နောက်ဆုံး လည်ပတ်မှုရလဒ်များကို ပေါင်းစည်းပြသပါသည်။'
+                  : 'This page combines live health checks with the scheduler’s last-known run results.'}
               </p>
             </div>
             <Button
@@ -267,11 +276,11 @@ export default function MonitoringPage() {
               ) : (
                 <RefreshCw className="mr-2 h-4 w-4" />
               )}
-              Refresh health
+              {isMyanmar ? 'ကျန်းမာရေး အခြေအနေကို ပြန်သစ်မည်' : 'Refresh health'}
             </Button>
             <Button asChild variant="outline" className="h-11 w-full rounded-full border-border/70 bg-background/70">
               <Link href="/dashboard/jobs">
-                Open scheduler jobs
+                {isMyanmar ? 'အချိန်ဇယား လုပ်ငန်းများကို ဖွင့်မည်' : 'Open scheduler jobs'}
                 <ExternalLink className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -283,7 +292,7 @@ export default function MonitoringPage() {
         <Card className="ops-panel">
           <CardContent className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading monitoring state…
+            {isMyanmar ? 'စောင့်ကြည့်မှု အခြေအနေကို ရယူနေသည်…' : 'Loading monitoring state…'}
           </CardContent>
         </Card>
       ) : null}
@@ -293,7 +302,7 @@ export default function MonitoringPage() {
           <CardContent className="flex items-start gap-3 p-6 text-sm text-rose-600 dark:text-rose-300">
             <AlertTriangle className="mt-0.5 h-4 w-4" />
             <div>
-              <p className="font-medium">Monitoring overview failed to load</p>
+              <p className="font-medium">{isMyanmar ? 'စောင့်ကြည့်မှု အကျဉ်းချုပ်ကို မရယူနိုင်ပါ' : 'Monitoring overview failed to load'}</p>
               <p className="mt-1 text-rose-500/80">{overviewQuery.error.message}</p>
             </div>
           </CardContent>
@@ -307,45 +316,45 @@ export default function MonitoringPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="ops-section-heading">Backup Verification</p>
-                    <CardTitle className="text-xl">Portable restore baseline</CardTitle>
+                    <p className="ops-section-heading">{isMyanmar ? 'အရန်သိမ်း အတည်ပြုမှု' : 'Backup Verification'}</p>
+                    <CardTitle className="text-xl">{isMyanmar ? 'ပြန်လည်ထည့်သွင်းစမ်းသပ်မှု အခြေခံစစ်ဆေးချက်' : 'Portable restore baseline'}</CardTitle>
                   </div>
                   <Badge className={cn('rounded-full border text-xs', getStatusBadgeClass(overview.backupVerification.status))}>
-                    {getStatusLabel(overview.backupVerification.status)}
+                    {getStatusLabel(overview.backupVerification.status, isMyanmar)}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
                   <div className="rounded-2xl border border-border/60 bg-background/65 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Latest verify</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{isMyanmar ? 'နောက်ဆုံး အတည်ပြုချက်' : 'Latest verify'}</p>
                     <p className="mt-2 text-lg font-semibold text-foreground">
                       {overview.backupVerification.latestVerifiedAt
                         ? formatRelativeTime(overview.backupVerification.latestVerifiedAt)
-                        : 'No records'}
+                        : (isMyanmar ? 'မှတ်တမ်း မရှိသေးပါ' : 'No records')}
                     </p>
                   </div>
                   <div className="rounded-2xl border border-border/60 bg-background/65 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Failed records</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{isMyanmar ? 'မအောင်မြင်သော မှတ်တမ်းများ' : 'Failed records'}</p>
                     <p className="mt-2 text-lg font-semibold text-foreground">{overview.backupVerification.failedCount}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/65 p-4 text-xs text-muted-foreground">
                   <p>
-                    Alert cooldown: <span className="font-medium text-foreground">{overview.settings.backupVerificationAlertCooldownHours}h</span>
+                    {isMyanmar ? 'သတိပေး အနားကာလ:' : 'Alert cooldown:'} <span className="font-medium text-foreground">{overview.settings.backupVerificationAlertCooldownHours}h</span>
                   </p>
                   <p>
-                    Last alert: <span className="font-medium text-foreground">{overview.backupVerification.lastAlertAt ? formatRelativeTime(overview.backupVerification.lastAlertAt) : 'None sent yet'}</span>
+                    {isMyanmar ? 'နောက်ဆုံး သတိပေးချက်:' : 'Last alert:'} <span className="font-medium text-foreground">{overview.backupVerification.lastAlertAt ? formatRelativeTime(overview.backupVerification.lastAlertAt) : (isMyanmar ? 'မပို့ရသေးပါ' : 'None sent yet')}</span>
                   </p>
                   <p>
-                    Last scheduler run: <span className="font-medium text-foreground">{overview.backupVerification.job?.lastFinishedAt ? formatRelativeTime(overview.backupVerification.job.lastFinishedAt) : 'No run yet'}</span>
+                    {isMyanmar ? 'နောက်ဆုံး အချိန်ဇယား လည်ပတ်မှု:' : 'Last scheduler run:'} <span className="font-medium text-foreground">{overview.backupVerification.job?.lastFinishedAt ? formatRelativeTime(overview.backupVerification.job.lastFinishedAt) : (isMyanmar ? 'မလည်ပတ်ရသေးပါ' : 'No run yet')}</span>
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   {overview.backupVerification.latestRecords.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No backup verification records yet.</p>
+                    <p className="text-sm text-muted-foreground">{isMyanmar ? 'အရန်သိမ်း အတည်ပြု မှတ်တမ်း မရှိသေးပါ။' : 'No backup verification records yet.'}</p>
                   ) : (
                     overview.backupVerification.latestRecords.map((record) => (
                       <div key={record.id} className="rounded-2xl border border-border/60 bg-background/70 p-3 text-sm">
@@ -356,7 +365,7 @@ export default function MonitoringPage() {
                           </Badge>
                         </div>
                         <p className="mt-2 text-xs text-muted-foreground">
-                          {record.error?.trim() || 'pg_restore integrity check passed'}
+                      {record.error?.trim() || (isMyanmar ? 'pg_restore အကြမ်းဖျဉ်း စစ်ဆေးချက် အောင်မြင်ပါသည်' : 'pg_restore integrity check passed')}
                         </p>
                       </div>
                     ))
@@ -371,10 +380,10 @@ export default function MonitoringPage() {
                     disabled={runJobMutation.isPending}
                   >
                     {runJobMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Run verify now
+                    {isMyanmar ? 'အတည်ပြု စစ်ဆေးချက်ကို ယခု လည်ပတ်မည်' : 'Run verify now'}
                   </Button>
                   <Button asChild variant="ghost">
-                    <Link href="/dashboard/settings">Open backup workspace</Link>
+                    <Link href="/dashboard/settings">{isMyanmar ? 'အရန်သိမ်း စာမျက်နှာကို ဖွင့်မည်' : 'Open backup workspace'}</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -384,61 +393,61 @@ export default function MonitoringPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="ops-section-heading">Telegram Webhook</p>
-                    <CardTitle className="text-xl">Delivery health</CardTitle>
+                    <p className="ops-section-heading">{isMyanmar ? 'တယ်လီဂရမ် ဝက်ဘ်ဟွတ်' : 'Telegram Webhook'}</p>
+                    <CardTitle className="text-xl">{isMyanmar ? 'ပေးပို့မှု ကျန်းမာရေး အခြေအနေ' : 'Delivery health'}</CardTitle>
                   </div>
                   <Badge className={cn('rounded-full border text-xs', getStatusBadgeClass(overview.telegramWebhook.status))}>
-                    {getStatusLabel(overview.telegramWebhook.status)}
+                    {getStatusLabel(overview.telegramWebhook.status, isMyanmar)}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
                   <div className="rounded-2xl border border-border/60 bg-background/65 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Pending updates</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{isMyanmar ? 'စောင့်ဆိုင်းနေသော အပ်ဒိတ်များ' : 'Pending updates'}</p>
                     <p className="mt-2 text-lg font-semibold text-foreground">{overview.telegramWebhook.pendingUpdateCount}</p>
                   </div>
                   <div className="rounded-2xl border border-border/60 bg-background/65 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Admin chats</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{isMyanmar ? 'စီမံခန့်ခွဲရေး ချတ်များ' : 'Admin chats'}</p>
                     <p className="mt-2 text-lg font-semibold text-foreground">{overview.telegramWebhook.adminChatCount}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/65 p-4 text-xs text-muted-foreground">
                   <p>
-                    Backlog threshold: <span className="font-medium text-foreground">{overview.telegramWebhook.backlogThreshold}</span>
+                    {isMyanmar ? 'စုပုံမှု ကန့်သတ်ချက်:' : 'Backlog threshold:'} <span className="font-medium text-foreground">{overview.telegramWebhook.backlogThreshold}</span>
                   </p>
                   <p>
-                    Alert cooldown: <span className="font-medium text-foreground">{overview.settings.telegramWebhookAlertCooldownMinutes}m</span>
+                    {isMyanmar ? 'သတိပေး အနားကာလ:' : 'Alert cooldown:'} <span className="font-medium text-foreground">{overview.settings.telegramWebhookAlertCooldownMinutes}m</span>
                   </p>
                   <p>
-                    Last alert: <span className="font-medium text-foreground">{overview.telegramWebhook.lastAlertAt ? formatRelativeTime(overview.telegramWebhook.lastAlertAt) : 'None sent yet'}</span>
+                    {isMyanmar ? 'နောက်ဆုံး သတိပေးချက်:' : 'Last alert:'} <span className="font-medium text-foreground">{overview.telegramWebhook.lastAlertAt ? formatRelativeTime(overview.telegramWebhook.lastAlertAt) : (isMyanmar ? 'မပို့ရသေးပါ' : 'None sent yet')}</span>
                   </p>
                 </div>
 
                 {!overview.telegramWebhook.configured ? (
                   <div className="rounded-2xl border border-border/60 bg-background/70 p-4 text-sm text-muted-foreground">
-                    Telegram bot settings are not configured yet.
+                    {isMyanmar ? 'တယ်လီဂရမ် ဘော့တ် ဆက်တင်များ မပြင်ဆင်ရသေးပါ။' : 'Telegram bot settings are not configured yet.'}
                   </div>
                 ) : (
                   <div className="space-y-2 rounded-2xl border border-border/60 bg-background/70 p-4 text-sm text-muted-foreground">
                     <p className="font-medium text-foreground">
-                      {overview.telegramWebhook.summary || 'Webhook and secret token look healthy.'}
+                      {overview.telegramWebhook.summary || (isMyanmar ? 'ဝဘ်ဟွတ်နှင့် လျှို့ဝှက်တိုကင် အခြေအနေ ကောင်းမွန်ပါသည်။' : 'Webhook and secret token look healthy.')}
                     </p>
                     <p className="break-all">
-                      Expected: <span className="font-medium text-foreground">{overview.telegramWebhook.expectedWebhookUrl || 'Not configured'}</span>
+                      {isMyanmar ? 'မျှော်လင့်ထားသော URL:' : 'Expected:'} <span className="font-medium text-foreground">{overview.telegramWebhook.expectedWebhookUrl || (isMyanmar ? 'မပြင်ဆင်ရသေးပါ' : 'Not configured')}</span>
                     </p>
                     <p className="break-all">
-                      Current: <span className="font-medium text-foreground">{overview.telegramWebhook.currentWebhookUrl || 'Not set'}</span>
+                      {isMyanmar ? 'လက်ရှိ URL:' : 'Current:'} <span className="font-medium text-foreground">{overview.telegramWebhook.currentWebhookUrl || (isMyanmar ? 'မသတ်မှတ်ရသေးပါ' : 'Not set')}</span>
                     </p>
                     {overview.telegramWebhook.lastErrorMessage ? (
                       <p>
-                        Last error: <span className="font-medium text-foreground">{overview.telegramWebhook.lastErrorMessage}</span>
+                        {isMyanmar ? 'နောက်ဆုံး အမှား:' : 'Last error:'} <span className="font-medium text-foreground">{overview.telegramWebhook.lastErrorMessage}</span>
                       </p>
                     ) : null}
                     {!overview.telegramWebhook.alertsConfigured ? (
                       <p className="text-amber-700 dark:text-amber-200">
-                        Telegram admin chats are not configured, so alerts cannot be delivered yet.
+                        {isMyanmar ? 'တယ်လီဂရမ် စီမံခန့်ခွဲရေး ချတ်များ မပြင်ဆင်ရသေးသောကြောင့် သတိပေးချက်များကို မပို့နိုင်သေးပါ။' : 'Telegram admin chats are not configured, so alerts cannot be delivered yet.'}
                       </p>
                     ) : null}
                   </div>
@@ -452,10 +461,10 @@ export default function MonitoringPage() {
                     disabled={runJobMutation.isPending}
                   >
                     {runJobMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Run webhook check
+                    {isMyanmar ? 'ဝက်ဘ်ဟွတ် စစ်ဆေးမှုကို လည်ပတ်မည်' : 'Run webhook check'}
                   </Button>
                   <Button asChild variant="ghost">
-                    <Link href="/dashboard/notifications">Open notifications</Link>
+                    <Link href="/dashboard/notifications">{isMyanmar ? 'အသိပေးချက်များကို ဖွင့်မည်' : 'Open notifications'}</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -465,51 +474,53 @@ export default function MonitoringPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="ops-section-heading">Admin Queue</p>
-                    <CardTitle className="text-xl">Backlog aging</CardTitle>
+                    <p className="ops-section-heading">{isMyanmar ? 'စီမံခန့်ခွဲရေး စောင့်ဆိုင်းစာရင်း' : 'Admin Queue'}</p>
+                    <CardTitle className="text-xl">{isMyanmar ? 'နောက်ကျကျန်ရှိမှု အိုမင်းမှု' : 'Backlog aging'}</CardTitle>
                   </div>
                   <Badge className={cn('rounded-full border text-xs', getStatusBadgeClass(overview.adminQueue.status))}>
-                    {getStatusLabel(overview.adminQueue.status)}
+                    {getStatusLabel(overview.adminQueue.status, isMyanmar)}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
                   <div className="rounded-2xl border border-border/60 bg-background/65 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Support overdue</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{isMyanmar ? 'နောက်ကျနေသော အကူအညီ' : 'Support overdue'}</p>
                     <p className="mt-2 text-lg font-semibold text-foreground">{overview.adminQueue.supportOverdueCount}</p>
-                    <p className="mt-1 text-xs">Oldest: {formatMinutes(overview.adminQueue.oldestSupportOverdueMinutes)}</p>
+                    <p className="mt-1 text-xs">{isMyanmar ? 'အကြာဆုံး:' : 'Oldest:'} {formatMinutes(overview.adminQueue.oldestSupportOverdueMinutes)}</p>
                   </div>
                   <div className="rounded-2xl border border-border/60 bg-background/65 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Review pending</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{isMyanmar ? 'စောင့်ဆိုင်းနေသော စစ်ဆေးမှု' : 'Review pending'}</p>
                     <p className="mt-2 text-lg font-semibold text-foreground">{overview.adminQueue.pendingReviewCount}</p>
                     <p className="mt-1 text-xs">
-                      Oldest: {formatMinutes(overview.adminQueue.oldestReviewAgeMinutes)} / threshold {overview.adminQueue.reviewThresholdHours}h
+                      {isMyanmar ? 'အကြာဆုံး:' : 'Oldest:'} {formatMinutes(overview.adminQueue.oldestReviewAgeMinutes)} / {isMyanmar ? 'သတ်မှတ်ကန့်သတ်ချက်' : 'threshold'} {overview.adminQueue.reviewThresholdHours}h
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/65 p-4 text-xs text-muted-foreground">
                   <p>
-                    Alert cooldown: <span className="font-medium text-foreground">{overview.settings.adminQueueAlertCooldownHours}h</span>
+                    {isMyanmar ? 'သတိပေး အနားကာလ:' : 'Alert cooldown:'} <span className="font-medium text-foreground">{overview.settings.adminQueueAlertCooldownHours}h</span>
                   </p>
                   <p>
-                    Unclaimed reviews: <span className="font-medium text-foreground">{overview.adminQueue.unclaimedReviewCount}</span>
+                    {isMyanmar ? 'မယူထားသေးသော စစ်ဆေးမှုများ:' : 'Unclaimed reviews:'} <span className="font-medium text-foreground">{overview.adminQueue.unclaimedReviewCount}</span>
                   </p>
                   <p>
-                    Last alert: <span className="font-medium text-foreground">{overview.adminQueue.lastAlertAt ? formatRelativeTime(overview.adminQueue.lastAlertAt) : 'None sent yet'}</span>
+                    {isMyanmar ? 'နောက်ဆုံး သတိပေးချက်:' : 'Last alert:'} <span className="font-medium text-foreground">{overview.adminQueue.lastAlertAt ? formatRelativeTime(overview.adminQueue.lastAlertAt) : (isMyanmar ? 'မပို့ရသေးပါ' : 'None sent yet')}</span>
                   </p>
                 </div>
 
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/70 p-4 text-sm text-muted-foreground">
                   <p>
-                    Support thread codes: <span className="font-medium text-foreground">{overview.adminQueue.supportThreadCodes.length > 0 ? overview.adminQueue.supportThreadCodes.join(', ') : 'No overdue threads'}</span>
+                    {isMyanmar ? 'အကူအညီ စကားဝိုင်းကုဒ်များ:' : 'Support thread codes:'} <span className="font-medium text-foreground">{overview.adminQueue.supportThreadCodes.length > 0 ? overview.adminQueue.supportThreadCodes.join(', ') : (isMyanmar ? 'နောက်ကျနေသော စကားဝိုင်း မရှိပါ' : 'No overdue threads')}</span>
                   </p>
                   <p>
-                    Review order codes: <span className="font-medium text-foreground">{overview.adminQueue.reviewOrderCodes.length > 0 ? overview.adminQueue.reviewOrderCodes.join(', ') : 'No aged reviews'}</span>
+                    {isMyanmar ? 'စစ်ဆေးရန် အော်ဒါကုဒ်များ:' : 'Review order codes:'} <span className="font-medium text-foreground">{overview.adminQueue.reviewOrderCodes.length > 0 ? overview.adminQueue.reviewOrderCodes.join(', ') : (isMyanmar ? 'နောက်ကျနေသော စစ်ဆေးမှု မရှိပါ' : 'No aged reviews')}</span>
                   </p>
                   <p>
-                    Support aging follows each thread’s first-response due time. This page only tunes the review backlog threshold and alert cooldown.
+                    {isMyanmar
+                        ? 'အကူအညီ စောင့်ဆိုင်းချိန်သည် စကားဝိုင်းတစ်ခုချင်းစီ၏ ပထမတုံ့ပြန်ချိန်အတိုင်း လိုက်နာပါသည်။ ဤစာမျက်နှာတွင် စစ်ဆေးမှု စုပုံမှု ကန့်သတ်ချက်နှင့် သတိပေး အနားကာလကိုသာ ညှိနှိုင်းပေးပါသည်။'
+                        : 'Support aging follows each thread’s first-response due time. This page only tunes the review backlog threshold and alert cooldown.'}
                   </p>
                 </div>
 
@@ -521,10 +532,10 @@ export default function MonitoringPage() {
                     disabled={runJobMutation.isPending}
                   >
                     {runJobMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Run queue check
+                    {isMyanmar ? 'စောင့်ဆိုင်းစာရင်း စစ်ဆေးမှုကို လည်ပတ်မည်' : 'Run queue check'}
                   </Button>
                   <Button asChild variant="ghost">
-                    <Link href="/dashboard/support">Open support queue</Link>
+                    <Link href="/dashboard/support">{isMyanmar ? 'အကူအညီ အလုပ်စောင့်စာရင်းကို ဖွင့်မည်' : 'Open support queue'}</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -535,18 +546,18 @@ export default function MonitoringPage() {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="ops-section-heading">Threshold Tuning</p>
-                  <CardTitle className="text-xl">Alert windows and cooldowns</CardTitle>
+                    <p className="ops-section-heading">{isMyanmar ? 'ကန့်သတ်ချက် ချိန်ညှိမှု' : 'Threshold Tuning'}</p>
+                  <CardTitle className="text-xl">{isMyanmar ? 'သတိပေးချက် အချိန်ကာလများနှင့် အအေးချိန်များ' : 'Alert windows and cooldowns'}</CardTitle>
                 </div>
                 <Badge variant="outline" className="rounded-full text-xs">
-                  {settingsDirty ? 'Unsaved changes' : 'Saved'}
+                  {settingsDirty ? (isMyanmar ? 'မသိမ်းရသေးသော ပြောင်းလဲမှုများ' : 'Unsaved changes') : isMyanmar ? 'သိမ်းပြီး' : 'Saved'}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                 <div className="space-y-2">
-                  <Label htmlFor="backupVerificationAlertCooldownHours">Backup cooldown (hours)</Label>
+                  <Label htmlFor="backupVerificationAlertCooldownHours">{isMyanmar ? 'အရန်သိမ်း အနားကာလ (နာရီ)' : 'Backup cooldown (hours)'}</Label>
                   <Input
                     id="backupVerificationAlertCooldownHours"
                     inputMode="numeric"
@@ -558,7 +569,7 @@ export default function MonitoringPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="telegramWebhookAlertCooldownMinutes">Webhook cooldown (minutes)</Label>
+                  <Label htmlFor="telegramWebhookAlertCooldownMinutes">{isMyanmar ? 'ဝက်ဘ်ဟွတ် အနားကာလ (မိနစ်)' : 'Webhook cooldown (minutes)'}</Label>
                   <Input
                     id="telegramWebhookAlertCooldownMinutes"
                     inputMode="numeric"
@@ -570,7 +581,7 @@ export default function MonitoringPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="telegramWebhookPendingUpdateThreshold">Webhook backlog threshold</Label>
+                  <Label htmlFor="telegramWebhookPendingUpdateThreshold">{isMyanmar ? 'ဝက်ဘ်ဟွတ် စုပုံမှု ကန့်သတ်ချက်' : 'Webhook backlog threshold'}</Label>
                   <Input
                     id="telegramWebhookPendingUpdateThreshold"
                     inputMode="numeric"
@@ -582,7 +593,7 @@ export default function MonitoringPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adminQueueAlertCooldownHours">Queue cooldown (hours)</Label>
+                  <Label htmlFor="adminQueueAlertCooldownHours">{isMyanmar ? 'စောင့်ဆိုင်းစာရင်း အနားကာလ (နာရီ)' : 'Queue cooldown (hours)'}</Label>
                   <Input
                     id="adminQueueAlertCooldownHours"
                     inputMode="numeric"
@@ -594,7 +605,7 @@ export default function MonitoringPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="reviewQueueAlertHours">Review age threshold (hours)</Label>
+                  <Label htmlFor="reviewQueueAlertHours">{isMyanmar ? 'စစ်ဆေးမှု သက်တမ်း ကန့်သတ်ချက် (နာရီ)' : 'Review age threshold (hours)'}</Label>
                   <Input
                     id="reviewQueueAlertHours"
                     inputMode="numeric"
@@ -611,9 +622,11 @@ export default function MonitoringPage() {
                 <div className="flex items-start gap-3">
                   <Clock3 className="mt-0.5 h-4 w-4 text-cyan-600 dark:text-cyan-200" />
                   <div className="space-y-1">
-                    <p className="font-medium text-foreground">How these thresholds are applied</p>
+                    <p className="font-medium text-foreground">{isMyanmar ? 'ဤသတ်မှတ်ချက်များ လုပ်ဆောင်ပုံ' : 'How these thresholds are applied'}</p>
                     <p>
-                      Backup failures are deduped by file fingerprint. Webhook alerts are deduped by the live issue fingerprint. Queue alerts are deduped by the current backlog fingerprint, so one unchanged stale queue does not spam admins every cycle.
+                      {isMyanmar
+                        ? 'အရန်သိမ်း မအောင်မြင်မှုများကို ဖိုင်လက်ဗွေအလိုက် တစ်ကြိမ်တည်းသာ သိမ်းဆည်းပါသည်။ ဝက်ဘ်ဟွတ် သတိပေးချက်များကို လက်ရှိပြဿနာ လက်ဗွေအလိုက် ပေါင်းစည်းထားပြီး စောင့်ဆိုင်းစာရင်း သတိပေးချက်များကို လက်ရှိ စုပုံမှု လက်ဗွေအလိုက် ပေါင်းစည်းထားသဖြင့် မပြောင်းလဲသော စောင့်ဆိုင်းစာရင်းတစ်ခုက လည်ပတ်တိုင်း စီမံခန့်ခွဲသူများကို ထပ်ခါထပ်ခါ မပို့ပါ။'
+                        : 'Backup failures are deduped by file fingerprint. Webhook alerts are deduped by the live issue fingerprint. Queue alerts are deduped by the current backlog fingerprint, so one unchanged stale queue does not spam admins every cycle.'}
                     </p>
                   </div>
                 </div>
@@ -626,7 +639,7 @@ export default function MonitoringPage() {
                   disabled={updateSettingsMutation.isPending || !settingsDirty || !parsedForm}
                 >
                   {updateSettingsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Save monitoring settings
+                  {isMyanmar ? 'စောင့်ကြည့်မှု ဆက်တင်များကို သိမ်းမည်' : 'Save monitoring settings'}
                 </Button>
                 <Button
                   type="button"
@@ -635,7 +648,7 @@ export default function MonitoringPage() {
                   disabled={updateSettingsMutation.isPending || !settingsDirty}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
-                  Reset changes
+                  {isMyanmar ? 'ပြောင်းလဲမှုများကို မူလအတိုင်း ပြန်ထားမည်' : 'Reset changes'}
                 </Button>
               </div>
             </CardContent>
@@ -647,19 +660,25 @@ export default function MonitoringPage() {
                 <CardContent className="space-y-2 p-5 text-sm text-muted-foreground">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">Scheduler</p>
-                      <p className="mt-1 font-semibold text-foreground">{job?.name || 'No scheduler state yet'}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">{isMyanmar ? 'အချိန်ဇယား လည်ပတ်မှု' : 'Scheduler'}</p>
+                      <p className="mt-1 font-semibold text-foreground">{job?.name || (isMyanmar ? 'အချိန်ဇယား အခြေအနေ မရှိသေးပါ' : 'No scheduler state yet')}</p>
                     </div>
                     {job ? (
                       <Badge className={cn('rounded-full border text-xs', getStatusBadgeClass(job.lastStatus === 'SUCCESS' ? 'healthy' : job.lastStatus === 'FAILED' ? 'error' : job.lastStatus === 'SKIPPED' ? 'warning' : 'not_configured'))}>
-                        {job.lastStatus}
+                        {job.lastStatus === 'SUCCESS'
+                          ? (isMyanmar ? 'အောင်မြင်' : 'SUCCESS')
+                          : job.lastStatus === 'FAILED'
+                            ? (isMyanmar ? 'မအောင်မြင်' : 'FAILED')
+                            : job.lastStatus === 'SKIPPED'
+                              ? (isMyanmar ? 'ကျော်ထား' : 'SKIPPED')
+                              : job.lastStatus}
                       </Badge>
                     ) : null}
                   </div>
-                  <p>Cadence: {job?.cadenceLabel || '—'}</p>
-                  <p>Last finished: {job?.lastFinishedAt ? formatDateTime(job.lastFinishedAt) : '—'}</p>
-                  <p>Next run: {job?.nextRunAt ? formatRelativeTime(job.nextRunAt) : '—'}</p>
-                  <p>{job?.lastSummary || 'No summary recorded yet.'}</p>
+                  <p>{isMyanmar ? 'ကြိမ်နှုန်း' : 'Cadence'}: {job?.cadenceLabel || '—'}</p>
+                  <p>{isMyanmar ? 'နောက်ဆုံး ပြီးဆုံးချိန်' : 'Last finished'}: {job?.lastFinishedAt ? formatDateTime(job.lastFinishedAt) : '—'}</p>
+                  <p>{isMyanmar ? 'နောက်ထပ် လည်ပတ်ချိန်' : 'Next run'}: {job?.nextRunAt ? formatRelativeTime(job.nextRunAt) : '—'}</p>
+                  <p>{job?.lastSummary || (isMyanmar ? 'အနှစ်ချုပ် မှတ်တမ်း မရှိသေးပါ။' : 'No summary recorded yet.')}</p>
                 </CardContent>
               </Card>
             ))}

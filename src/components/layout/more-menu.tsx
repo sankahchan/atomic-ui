@@ -34,13 +34,13 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
 
   const sections = [
     {
-      title: 'Operations',
-      description: 'Support, jobs, reports, audit, migration, and the rest of the operator tools.',
+      title: t('tools.more.operations_title'),
+      description: t('tools.more.operations_desc'),
       items: adminToolNavItems,
     },
     {
       title: t('nav.settings'),
-      description: 'Security, user management, and notification controls.',
+      description: t('tools.more.settings_desc'),
       items: settingsShortcutItems,
     },
   ] as const;
@@ -66,7 +66,7 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
           <div>
             <h2 className="text-lg font-semibold">{t('nav.tools')}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Secondary pages, settings shortcuts, and operator workflows.
+              {t('tools.more.sheet_desc')}
             </p>
           </div>
           <button
@@ -136,9 +136,9 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
               <Settings className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Need the full workspace hub?</p>
+              <p className="text-sm font-semibold">{t('tools.more.workspace_hub_title')}</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                Open the tools page for a broader overview, grouped cards, and the settings hub.
+                {t('tools.more.workspace_hub_desc')}
               </p>
             </div>
           </div>
@@ -147,7 +147,7 @@ export function MoreMenu({ open, onClose }: MoreMenuProps) {
             onClick={onClose}
             className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-border/70 bg-background/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:border-cyan-400/24 hover:bg-cyan-400/10 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-100"
           >
-            Open tools hub
+            {t('tools.more.workspace_hub_open')}
           </Link>
         </div>
       </div>

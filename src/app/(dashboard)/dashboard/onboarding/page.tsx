@@ -23,12 +23,19 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/hooks/use-locale';
 import { formatDateTime } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-function StepBadge({ status }: { status: 'complete' | 'attention' | 'warning' | 'pending' }) {
+function StepBadge({
+  status,
+  isMyanmar,
+}: {
+  status: 'complete' | 'attention' | 'warning' | 'pending';
+  isMyanmar: boolean;
+}) {
   const styles =
     status === 'complete'
       ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
@@ -38,9 +45,18 @@ function StepBadge({ status }: { status: 'complete' | 'attention' | 'warning' | 
           ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300'
           : 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300';
 
+  const label =
+    status === 'complete'
+      ? isMyanmar ? 'ပြီးမြောက်ပြီး' : 'complete'
+      : status === 'attention'
+        ? isMyanmar ? 'အရေးကြီး' : 'attention'
+        : status === 'warning'
+          ? isMyanmar ? 'သတိပေးချက်' : 'warning'
+          : isMyanmar ? 'စောင့်ဆိုင်းနေ' : 'pending';
+
   return (
     <Badge variant="outline" className={styles}>
-      {status}
+      {label}
     </Badge>
   );
 }
@@ -81,7 +97,9 @@ function WizardStatCard({
 }
 
 export default function OnboardingPage() {
+  const { locale, t } = useLocale();
   const { toast } = useToast();
+  const isMyanmar = locale === 'my';
   const utils = trpc.useUtils();
   const [serverForm, setServerForm] = useState({
     name: 'atomic-node-1',
@@ -111,15 +129,15 @@ export default function OnboardingPage() {
   const syncAllMutation = trpc.servers.syncAll.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Server sync started',
-        description: 'The latest server inventory has been synced.',
+        title: isMyanmar ? 'ဆာဗာညှိနှိုင်းမှု စတင်ပြီးပါပြီ' : 'Server sync started',
+        description: isMyanmar ? 'နောက်ဆုံး ဆာဗာစာရင်းကို ပြန်လည်ညှိနှိုင်းနေပါသည်။' : 'The latest server inventory has been synced.',
       });
       void statusQuery.refetch();
       void postInstallChecksQuery.refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Sync failed',
+        title: isMyanmar ? 'ဆာဗာညှိနှိုင်းမှု မအောင်မြင်ပါ' : 'Sync failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -129,8 +147,8 @@ export default function OnboardingPage() {
   const createFirstServerMutation = trpc.onboarding.createFirstServer.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: 'Server connected',
-        description: `${result.name} is now available in the panel.`,
+        title: isMyanmar ? 'ဆာဗာကို ချိတ်ဆက်ပြီးပါပြီ' : 'Server connected',
+        description: isMyanmar ? `${result.name} ကို panel ထဲတွင် အသုံးပြုနိုင်ပါပြီ။` : `${result.name} is now available in the panel.`,
       });
       setServerForm((current) => ({
         ...current,
@@ -146,7 +164,7 @@ export default function OnboardingPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Server connection failed',
+        title: isMyanmar ? 'ဆာဗာ ချိတ်ဆက်မှု မအောင်မြင်ပါ' : 'Server connection failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -159,7 +177,7 @@ export default function OnboardingPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Import preview failed',
+        title: isMyanmar ? 'တင်သွင်းမှု ကြိုကြည့်ခြင်း မအောင်မြင်ပါ' : 'Import preview failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -169,8 +187,10 @@ export default function OnboardingPage() {
   const applyImportMutation = trpc.onboarding.applyImport.useMutation({
     onSuccess: async (result) => {
       toast({
-        title: 'Import applied',
-        description: `${result.usersCreated} user(s) created and ${result.keysUpdated} key(s) updated.`,
+        title: isMyanmar ? 'တင်သွင်းမှုကို အတည်ပြုပြီးပါပြီ' : 'Import applied',
+        description: isMyanmar
+          ? `အသုံးပြုသူ ${result.usersCreated} ယောက်ကို ဖန်တီးပြီး သော့ ${result.keysUpdated} ခုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။`
+          : `${result.usersCreated} user(s) created and ${result.keysUpdated} key(s) updated.`,
       });
       await Promise.all([
         statusQuery.refetch(),
@@ -182,7 +202,7 @@ export default function OnboardingPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Import failed',
+        title: isMyanmar ? 'တင်သွင်းမှု မအောင်မြင်ပါ' : 'Import failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -211,27 +231,29 @@ export default function OnboardingPage() {
               className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
             >
               <Rocket className="mr-2 h-3.5 w-3.5" />
-              Onboarding & Migration Wizard
+              {isMyanmar ? 'စတင်တပ်ဆင်မှု နှင့် ရွှေ့ပြောင်းလမ်းညွှန်' : 'Onboarding & Migration Wizard'}
             </Badge>
 
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
-                Launch checklist
+                {isMyanmar ? 'စတင်လွှင့်တင်ရန် စစ်ဆေးစာရင်း' : 'Launch checklist'}
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Connect the first server, import existing users and keys, and run post-install checks before you allow production traffic through the panel.
+                {isMyanmar ? 'ပထမဆုံး ဆာဗာကို ချိတ်ဆက်ပါ၊ ရှိပြီးသား အသုံးပြုသူများနှင့် သော့များကို တင်သွင်းပါ၊ ထို့နောက် panel မှ ထုတ်လုပ်ရေး လမ်းကြောင်းကို ဖွင့်မီ တပ်ဆင်ပြီးနောက် စစ်ဆေးချက်များကို လုပ်ဆောင်ပါ။' : 'Connect the first server, import existing users and keys, and run post-install checks before you allow production traffic through the panel.'}
               </p>
             </div>
 
             <div className="ops-detail-card space-y-4">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="ops-section-heading">Readiness</p>
+                  <p className="ops-section-heading">{isMyanmar ? 'အဆင်သင့် အခြေအနေ' : 'Readiness'}</p>
                   <p className="mt-2 text-3xl font-semibold tracking-tight">
                     {statusQuery.data?.summary.completedSteps ?? 0}/{statusQuery.data?.summary.totalSteps ?? 0}
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Complete the guided steps below, then verify environment and backup readiness before cutover.
+                    {isMyanmar
+                      ? 'အောက်ပါ လမ်းညွှန်အဆင့်များကို ပြီးအောင်လုပ်ပြီးနောက် production သို့ မပြောင်းမီ ပတ်ဝန်းကျင်နှင့် backup အဆင်သင့်ဖြစ်မှုကို စစ်ဆေးပါ။'
+                      : 'Complete the guided steps below, then verify environment and backup readiness before cutover.'}
                   </p>
                 </div>
                 {statusQuery.data?.summary.readyForLaunch ? (
@@ -239,14 +261,14 @@ export default function OnboardingPage() {
                     variant="outline"
                     className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
                   >
-                    Ready for launch
+                    {isMyanmar ? 'စတင်လွှင့်တင်ရန် အဆင်သင့်' : 'Ready for launch'}
                   </Badge>
                 ) : (
                   <Badge
                     variant="outline"
                     className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300"
                   >
-                    Still in setup
+                    {isMyanmar ? 'တပ်ဆင်ဆဲ' : 'Still in setup'}
                   </Badge>
                 )}
               </div>
@@ -255,27 +277,27 @@ export default function OnboardingPage() {
 
             <div className="ops-metric-strip">
               <WizardStatCard
-                label="Active servers"
+                label={isMyanmar ? 'အသက်ဝင် ဆာဗာများ' : 'Active servers'}
                 value={statusQuery.data?.summary.activeServers ?? 0}
-                helper="Connected infrastructure nodes"
+                helper={isMyanmar ? 'ချိတ်ဆက်ထားသော အခြေခံဆာဗာ node များ' : 'Connected infrastructure nodes'}
                 tone="cyan"
               />
               <WizardStatCard
-                label="Healthy servers"
+                label={isMyanmar ? 'ကောင်းမွန်သော ဆာဗာများ' : 'Healthy servers'}
                 value={statusQuery.data?.summary.onlineServers ?? 0}
-                helper="Nodes currently reachable"
+                helper={isMyanmar ? 'လက်ရှိချိတ်ဆက်နိုင်သော ဆာဗာများ' : 'Nodes currently reachable'}
                 tone="emerald"
               />
               <WizardStatCard
-                label="Imported keys"
+                label={isMyanmar ? 'တင်သွင်းထားသော သော့များ' : 'Imported keys'}
                 value={statusQuery.data?.summary.accessKeyCount ?? 0}
-                helper="Keys discovered in inventory"
+                helper={isMyanmar ? 'စာရင်းအတွင်း တွေ့ရှိထားသော သော့များ' : 'Keys discovered in inventory'}
                 tone="violet"
               />
               <WizardStatCard
-                label="Users"
+                label={isMyanmar ? 'အသုံးပြုသူများ' : 'Users'}
                 value={statusQuery.data?.summary.userCount ?? 0}
-                helper="Accounts ready for migration"
+                helper={isMyanmar ? 'ရွှေ့ပြောင်းရန် အဆင်သင့်ဖြစ်သော အကောင့်များ' : 'Accounts ready for migration'}
                 tone="amber"
               />
             </div>
@@ -284,17 +306,17 @@ export default function OnboardingPage() {
           <div className="ops-detail-rail">
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Quick actions</p>
-                <h2 className="text-xl font-semibold">Launch controls</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'အမြန်လုပ်ဆောင်ချက်များ' : 'Quick actions'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'စတင်ထိန်းချုပ်မှုများ' : 'Launch controls'}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Finish common first-run tasks without leaving the wizard.
+                  {isMyanmar ? 'လမ်းညွှန်မှ မထွက်ဘဲ ပထမအကြိမ် လုပ်ဆောင်ရမည့် အလုပ်များကို ပြီးအောင်လုပ်ပါ။' : 'Finish common first-run tasks without leaving the wizard.'}
                 </p>
               </div>
 
               <Button className="h-12 w-full rounded-full" asChild>
                 <Link href="/dashboard/servers/deploy">
                   <Server className="mr-2 h-4 w-4" />
-                  Deploy first server
+                  {isMyanmar ? 'ပထမဆုံး ဆာဗာကို တပ်ဆင်မည်' : 'Deploy first server'}
                 </Link>
               </Button>
 
@@ -302,16 +324,16 @@ export default function OnboardingPage() {
                 <Link href="/dashboard/migration" className="ops-action-tile">
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <ArrowRightLeft className="h-4 w-4 text-primary" />
-                    Open migration tools
+                    {isMyanmar ? 'ရွှေ့ပြောင်းကိရိယာများကို ဖွင့်မည်' : 'Open migration tools'}
                   </span>
-                  <span className="text-xs text-muted-foreground">Open</span>
+                  <span className="text-xs text-muted-foreground">{isMyanmar ? 'ဖွင့်မည်' : t('dashboard.open')}</span>
                 </Link>
                 <Link href="/dashboard/incidents" className="ops-action-tile">
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <LifeBuoy className="h-4 w-4 text-primary" />
-                    Review incident center
+                    {isMyanmar ? 'အဖြစ်အပျက် စင်တာကို ပြန်လည်စစ်ဆေးမည်' : 'Review incident center'}
                   </span>
-                  <span className="text-xs text-muted-foreground">Open</span>
+                  <span className="text-xs text-muted-foreground">{isMyanmar ? 'ဖွင့်မည်' : t('dashboard.open')}</span>
                 </Link>
                 <button
                   type="button"
@@ -321,10 +343,10 @@ export default function OnboardingPage() {
                 >
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <RefreshCw className={`h-4 w-4 text-primary ${syncAllMutation.isPending ? 'animate-spin' : ''}`} />
-                    Sync all connected servers
+                    {isMyanmar ? 'ချိတ်ဆက်ထားသော ဆာဗာအားလုံးကို ပြန်လည်ညှိနှိုင်းမည်' : 'Sync all connected servers'}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {syncAllMutation.isPending ? 'Running...' : 'Run'}
+                    {syncAllMutation.isPending ? (isMyanmar ? 'လုပ်ဆောင်နေသည်...' : 'Running...') : (isMyanmar ? 'လုပ်ဆောင်မည်' : 'Run')}
                   </span>
                 </button>
               </div>
@@ -332,33 +354,33 @@ export default function OnboardingPage() {
 
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Launch gate</p>
-                <h2 className="text-xl font-semibold">Validation summary</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'စတင်မှု အတည်ပြုချက်' : 'Launch gate'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'စစ်ဆေးမှု အနှစ်ချုပ်' : 'Validation summary'}</h2>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
                 <div className="ops-detail-card space-y-1">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Blocking issues
+                    {isMyanmar ? 'တားဆီးနေသော ပြဿနာများ' : 'Blocking issues'}
                   </p>
                   <p className="text-2xl font-semibold tracking-tight">{validationErrors.length}</p>
-                  <p className="text-sm text-muted-foreground">Env or runtime issues that still prevent launch.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'စတင်မှုကို တားဆီးနေဆဲ ပတ်ဝန်းကျင် သို့မဟုတ် လုပ်ဆောင်ချိန် ပြဿနာများ။' : 'Env or runtime issues that still prevent launch.'}</p>
                 </div>
                 <div className="ops-detail-card space-y-1">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Warnings
+                    {isMyanmar ? 'သတိပေးချက်များ' : 'Warnings'}
                   </p>
                   <p className="text-2xl font-semibold tracking-tight">{validationWarnings.length}</p>
-                  <p className="text-sm text-muted-foreground">Non-blocking items that still need review.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'တားဆီးခြင်းမရှိသော်လည်း စစ်ဆေးရန် လိုသေးသော အချက်များ။' : 'Non-blocking items that still need review.'}</p>
                 </div>
                 <div className="ops-detail-card space-y-1">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Checks passed
+                    {isMyanmar ? 'အောင်မြင်သော စစ်ဆေးချက်များ' : 'Checks passed'}
                   </p>
                   <p className="text-2xl font-semibold tracking-tight">
                     {passedChecks}/{postInstallChecks.length || 0}
                   </p>
-                  <p className="text-sm text-muted-foreground">Post-install checks that are already green.</p>
+                  <p className="text-sm text-muted-foreground">{isMyanmar ? 'တပ်ဆင်ပြီးနောက် အောင်မြင်ပြီးသား စစ်ဆေးချက်များ။' : 'Post-install checks that are already green.'}</p>
                 </div>
               </div>
             </div>
@@ -369,45 +391,45 @@ export default function OnboardingPage() {
       <section className="ops-section-grid">
         <div className="ops-panel space-y-5">
           <div className="space-y-1">
-            <p className="ops-section-heading">First server</p>
-            <h2 className="text-2xl font-semibold tracking-tight">Connect the first server</h2>
+            <p className="ops-section-heading">{isMyanmar ? 'ပထမဆုံး ဆာဗာ' : 'First server'}</p>
+            <h2 className="text-2xl font-semibold tracking-tight">{isMyanmar ? 'ပထမဆုံး ဆာဗာကို ချိတ်ဆက်မည်' : 'Connect the first server'}</h2>
             <p className="text-sm text-muted-foreground">
-              Paste the full Outline Manager output or fall back to the API URL and certificate fingerprint manually.
+              {isMyanmar ? 'Outline Manager ၏ အထွက်အပြည့်ကို ကူးထည့်ပါ၊ သို့မဟုတ် API URL နှင့် လက်မှတ် လက်ဗွေကို လက်ဖြင့် ထည့်သွင်းပါ။' : 'Paste the full Outline Manager output or fall back to the API URL and certificate fingerprint manually.'}
             </p>
           </div>
 
           <div className="ops-detail-card space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Server name</Label>
+                <Label>{isMyanmar ? 'ဆာဗာ အမည်' : 'Server name'}</Label>
                 <Input
                   value={serverForm.name}
                   onChange={(event) => setServerForm((current) => ({ ...current, name: event.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Location</Label>
+                <Label>{isMyanmar ? 'တည်နေရာ' : 'Location'}</Label>
                 <Input
                   value={serverForm.location}
                   onChange={(event) => setServerForm((current) => ({ ...current, location: event.target.value }))}
-                  placeholder="Singapore"
+                  placeholder={isMyanmar ? 'စင်ကာပူ' : 'Singapore'}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Outline Manager config output</Label>
+              <Label>{isMyanmar ? 'Outline Manager သတ်မှတ်ချက် အထွက်ဖိုင်' : 'Outline Manager config output'}</Label>
               <Textarea
                 className="min-h-[170px]"
                 value={serverForm.configText}
                 onChange={(event) => setServerForm((current) => ({ ...current, configText: event.target.value }))}
-                placeholder='Paste the JSON block that contains "apiUrl" and "certSha256"...'
+                placeholder={isMyanmar ? '"apiUrl" နှင့် "certSha256" ပါဝင်သော JSON အချက်အလက်ကို ကူးထည့်ပါ…' : 'Paste the JSON block that contains "apiUrl" and "certSha256"...'}
               />
             </div>
 
             <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-2">
-                <Label>API URL (manual fallback)</Label>
+                <Label>{isMyanmar ? 'API URL (လက်ဖြင့် ထည့်သွင်းရန် အရန်နည်းလမ်း)' : 'API URL (manual fallback)'}</Label>
                 <Input
                   value={serverForm.apiUrl}
                   onChange={(event) => setServerForm((current) => ({ ...current, apiUrl: event.target.value }))}
@@ -415,7 +437,7 @@ export default function OnboardingPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Country code</Label>
+                <Label>{isMyanmar ? 'နိုင်ငံကုဒ်' : 'Country code'}</Label>
                 <Input
                   value={serverForm.countryCode}
                   onChange={(event) =>
@@ -430,13 +452,13 @@ export default function OnboardingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Certificate SHA-256 (manual fallback)</Label>
+              <Label>{isMyanmar ? 'Certificate SHA-256 (လက်ဖြင့် ထည့်သွင်းရန် အရန်နည်းလမ်း)' : 'Certificate SHA-256 (manual fallback)'}</Label>
               <Input
                 value={serverForm.apiCertSha256}
                 onChange={(event) =>
                   setServerForm((current) => ({ ...current, apiCertSha256: event.target.value }))
                 }
-                placeholder="64-character SHA-256 fingerprint"
+                placeholder={isMyanmar ? 'အက္ခရာ ၆၄ လုံးပါ SHA-256 လက်ဗွေရာ' : '64-character SHA-256 fingerprint'}
               />
             </div>
 
@@ -451,7 +473,7 @@ export default function OnboardingPage() {
                 ) : (
                   <Server className="mr-2 h-4 w-4" />
                 )}
-                Connect server
+                {isMyanmar ? 'ဆာဗာကို ချိတ်ဆက်မည်' : 'Connect server'}
               </Button>
             </div>
           </div>
@@ -459,30 +481,32 @@ export default function OnboardingPage() {
 
         <div className="ops-panel space-y-5">
           <div className="space-y-1">
-            <p className="ops-section-heading">Import preview</p>
-            <h2 className="text-2xl font-semibold tracking-tight">Import existing users and keys</h2>
+            <p className="ops-section-heading">{isMyanmar ? 'တင်သွင်းမှု အကြိုကြည့်ခြင်း' : 'Import preview'}</p>
+            <h2 className="text-2xl font-semibold tracking-tight">{isMyanmar ? 'ရှိပြီးသား အသုံးပြုသူများနှင့် သော့များကို တင်သွင်းမည်' : 'Import existing users and keys'}</h2>
             <p className="text-sm text-muted-foreground">
-              Paste JSON or CSV exported from another panel. Users are created, and keys are matched against current inventory before apply.
+              {isMyanmar
+                ? 'အခြား စီမံခန့်ခွဲမှု မျက်နှာပြင်မှ ထုတ်ထားသော JSON သို့မဟုတ် CSV ကို ကူးထည့်ပါ။ အတည်မပြုမီ အသုံးပြုသူများကို ဖန်တီးပြီး သော့များကို လက်ရှိ စာရင်းနှင့် ကိုက်ညီအောင် စစ်ဆေးမည်။'
+                : 'Paste JSON or CSV exported from another panel. Users are created, and keys are matched against current inventory before apply.'}
             </p>
           </div>
 
           <div className="ops-detail-card space-y-4">
             <div className="space-y-2">
-              <Label>Import content</Label>
+              <Label>{isMyanmar ? 'တင်သွင်းမည့် အကြောင်းအရာ' : 'Import content'}</Label>
               <Textarea
                 className="min-h-[230px]"
                 value={importContent}
                 onChange={(event) => setImportContent(event.target.value)}
-                placeholder='JSON example: {"users":[{"email":"client@example.com"}],"keys":[{"name":"Key 1","server":"Singapore"}]}'
+                placeholder={isMyanmar ? 'JSON ဥပမာ - {"users":[{"email":"client@example.com"}],"keys":[{"name":"Key 1","server":"Singapore"}]}' : 'JSON example: {"users":[{"email":"client@example.com"}],"keys":[{"name":"Key 1","server":"Singapore"}]}'}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Default password for imported users without one</Label>
+              <Label>{isMyanmar ? 'စကားဝှက် မပါသော တင်သွင်းအသုံးပြုသူများအတွက် မူလစကားဝှက်' : 'Default password for imported users without one'}</Label>
               <Input
                 value={defaultPassword}
                 onChange={(event) => setDefaultPassword(event.target.value)}
-                placeholder="Leave blank to auto-generate per user"
+                placeholder={isMyanmar ? 'အသုံးပြုသူ တစ်ဦးချင်းစီအလိုက် အလိုအလျောက် ဖန်တီးပေးရန် အလွတ်ထားပါ' : 'Leave blank to auto-generate per user'}
               />
             </div>
 
@@ -498,7 +522,7 @@ export default function OnboardingPage() {
                 ) : (
                   <Wand2 className="mr-2 h-4 w-4" />
                 )}
-                Preview import
+                {isMyanmar ? 'တင်သွင်းမှုကို ကြိုကြည့်မည်' : 'Preview import'}
               </Button>
               <Button
                 className="h-11 rounded-full sm:flex-1"
@@ -515,7 +539,7 @@ export default function OnboardingPage() {
                 ) : (
                   <Upload className="mr-2 h-4 w-4" />
                 )}
-                Apply import
+                {isMyanmar ? 'တင်သွင်းမှုကို အတည်ပြုမည်' : 'Apply import'}
               </Button>
             </div>
 
@@ -524,25 +548,25 @@ export default function OnboardingPage() {
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="ops-mini-tile">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Users to create
+                      {isMyanmar ? 'ဖန်တီးမည့် အသုံးပြုသူများ' : 'Users to create'}
                     </p>
                     <p className="mt-2 text-2xl font-semibold">{importPreview.summary.usersToCreate}</p>
                   </div>
                   <div className="ops-mini-tile">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Existing users
+                      {isMyanmar ? 'ရှိပြီးသား အသုံးပြုသူများ' : 'Existing users'}
                     </p>
                     <p className="mt-2 text-2xl font-semibold">{importPreview.summary.usersExisting}</p>
                   </div>
                   <div className="ops-mini-tile">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Keys matched
+                      {isMyanmar ? 'ကိုက်ညီသော သော့များ' : 'Keys matched'}
                     </p>
                     <p className="mt-2 text-2xl font-semibold">{importPreview.summary.keysMatched}</p>
                   </div>
                   <div className="ops-mini-tile">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Keys unmatched
+                      {isMyanmar ? 'မကိုက်ညီသော သော့များ' : 'Keys unmatched'}
                     </p>
                     <p className="mt-2 text-2xl font-semibold">{importPreview.summary.keysUnmatched}</p>
                   </div>
@@ -551,7 +575,7 @@ export default function OnboardingPage() {
                 {importPreview.warnings.length ? (
                   <Alert className="border-amber-500/30 bg-amber-500/10">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Preview warnings</AlertTitle>
+                    <AlertTitle>{isMyanmar ? 'အကြိုကြည့် သတိပေးချက်များ' : 'Preview warnings'}</AlertTitle>
                     <AlertDescription>
                       <ul className="mt-2 list-disc space-y-1 pl-5">
                         {importPreview.warnings.map((warning) => (
@@ -570,10 +594,12 @@ export default function OnboardingPage() {
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="ops-panel space-y-5">
           <div className="space-y-1">
-            <p className="ops-section-heading">Guided steps</p>
-            <h2 className="text-2xl font-semibold tracking-tight">Follow the launch order</h2>
+            <p className="ops-section-heading">{isMyanmar ? 'လမ်းညွှန် အဆင့်များ' : 'Guided steps'}</p>
+            <h2 className="text-2xl font-semibold tracking-tight">{isMyanmar ? 'စတင်လွှင့်တင်မည့် အစဉ်လိုက်ကို လိုက်နာပါ' : 'Follow the launch order'}</h2>
             <p className="text-sm text-muted-foreground">
-              Move through the setup path in sequence to reduce surprises during cutover.
+              {isMyanmar
+                ? 'ထုတ်လုပ်မှု စနစ်သို့ ပြောင်းချိန်တွင် အံ့အားသင့်စရာ မဖြစ်စေရန် စတင်ပြင်ဆင်မှု လမ်းကြောင်းကို အစဉ်လိုက် လိုက်လုပ်ပါ။'
+                : 'Move through the setup path in sequence to reduce surprises during cutover.'}
             </p>
           </div>
 
@@ -586,7 +612,7 @@ export default function OnboardingPage() {
                       <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/70 text-sm font-semibold dark:border-cyan-400/16 dark:bg-cyan-400/8">
                         {index + 1}
                       </div>
-                      <StepBadge status={step.status} />
+                      <StepBadge status={step.status} isMyanmar={isMyanmar} />
                     </div>
                     <div>
                       <p className="text-lg font-semibold">{step.title}</p>
@@ -607,28 +633,28 @@ export default function OnboardingPage() {
           <div className="ops-panel space-y-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
-                <p className="ops-section-heading">Post-install checks</p>
-                <h2 className="text-2xl font-semibold tracking-tight">Fresh VPS verification</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'တပ်ဆင်ပြီးနောက် စစ်ဆေးချက်များ' : 'Post-install checks'}</p>
+                <h2 className="text-2xl font-semibold tracking-tight">{isMyanmar ? 'VPS အသစ် စစ်ဆေးအတည်ပြုခြင်း' : 'Fresh VPS verification'}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Use these checks as the final release gate before public traffic is allowed.
+                  {isMyanmar ? 'အများသုံး အသုံးပြုမှုကို ခွင့်မပြုမီ နောက်ဆုံး ထုတ်လွှင့်ခွင့် စစ်ဆေးချက်အဖြစ် ဤစစ်ဆေးချက်များကို အသုံးပြုပါ။' : 'Use these checks as the final release gate before public traffic is allowed.'}
                 </p>
               </div>
               <Button variant="outline" size="sm" className="rounded-full" onClick={() => void postInstallChecksQuery.refetch()}>
-                Refresh
+                {isMyanmar ? 'ပြန်လည်စစ်မည်' : 'Refresh'}
               </Button>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="ops-detail-card space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pass</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အောင်မြင်' : 'Pass'}</p>
                 <p className="text-2xl font-semibold tracking-tight">{passedChecks}</p>
               </div>
               <div className="ops-detail-card space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Warn</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'သတိပြုရန်' : 'Warn'}</p>
                 <p className="text-2xl font-semibold tracking-tight">{warnedChecks}</p>
               </div>
               <div className="ops-detail-card space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fail</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'မအောင်မြင်' : 'Fail'}</p>
                 <p className="text-2xl font-semibold tracking-tight">{failedChecks}</p>
               </div>
             </div>
@@ -668,14 +694,14 @@ export default function OnboardingPage() {
 
           <div className="ops-panel space-y-4">
             <div className="space-y-1">
-              <p className="ops-section-heading">Environment validation</p>
-              <h2 className="text-2xl font-semibold tracking-tight">Production readiness</h2>
+              <p className="ops-section-heading">{isMyanmar ? 'ပတ်ဝန်းကျင် စစ်ဆေးမှု' : 'Environment validation'}</p>
+              <h2 className="text-2xl font-semibold tracking-tight">{isMyanmar ? 'ထုတ်လုပ်မှု အဆင်သင့်အခြေအနေ' : 'Production readiness'}</h2>
             </div>
 
             {validationErrors.length ? (
               <Alert variant="destructive" className="border-red-500/25 bg-red-500/10">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Blocking issues</AlertTitle>
+                <AlertTitle>{isMyanmar ? 'တားဆီးနေသော ပြဿနာများ' : 'Blocking issues'}</AlertTitle>
                 <AlertDescription>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     {validationErrors.map((error) => (
@@ -687,15 +713,15 @@ export default function OnboardingPage() {
             ) : (
               <Alert className="border-emerald-500/25 bg-emerald-500/10">
                 <CheckCircle2 className="h-4 w-4" />
-                <AlertTitle>Blocking checks passed</AlertTitle>
-                <AlertDescription>No blocking production environment issues were detected.</AlertDescription>
+                <AlertTitle>{isMyanmar ? 'တားဆီးချက် စစ်ဆေးမှုများ အောင်မြင်သည်' : 'Blocking checks passed'}</AlertTitle>
+                <AlertDescription>{isMyanmar ? 'ထုတ်လုပ်မှု ပတ်ဝန်းကျင်ကို တားဆီးမည့် ပြဿနာများ မတွေ့ရှိရပါ။' : 'No blocking production environment issues were detected.'}</AlertDescription>
               </Alert>
             )}
 
             {validationWarnings.length ? (
               <Alert className="border-amber-500/25 bg-amber-500/10">
                 <ShieldCheck className="h-4 w-4" />
-                <AlertTitle>Warnings to review</AlertTitle>
+                <AlertTitle>{isMyanmar ? 'ပြန်လည်စစ်ဆေးရန် သတိပေးချက်များ' : 'Warnings to review'}</AlertTitle>
                 <AlertDescription>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     {validationWarnings.map((warning) => (
@@ -709,10 +735,10 @@ export default function OnboardingPage() {
 
           <div className="ops-panel space-y-4">
             <div className="space-y-1">
-              <p className="ops-section-heading">Backup gate</p>
-              <h2 className="text-2xl font-semibold tracking-tight">Latest backup verification</h2>
+              <p className="ops-section-heading">{isMyanmar ? 'အရန်သိမ်း အတည်ပြု စစ်ဆေးချက်' : 'Backup gate'}</p>
+              <h2 className="text-2xl font-semibold tracking-tight">{isMyanmar ? 'နောက်ဆုံး အရန်သိမ်း အတည်ပြုချက်' : 'Latest backup verification'}</h2>
               <p className="text-sm text-muted-foreground">
-                Use this as a final cutover gate before you move live traffic.
+                {isMyanmar ? 'အများသုံး အသုံးပြုမှုသို့ မပြောင်းမီ နောက်ဆုံး အတည်ပြု အဆင့်အဖြစ် ဤအချက်ကို အသုံးပြုပါ။' : 'Use this as a final cutover gate before you move live traffic.'}
               </p>
             </div>
 
@@ -721,16 +747,17 @@ export default function OnboardingPage() {
                 <div>
                   <p className="font-medium">{statusQuery.data.latestBackupVerification.filename}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Verified {formatDateTime(statusQuery.data.latestBackupVerification.verifiedAt)}
+                    {isMyanmar ? 'အတည်ပြုပြီးချိန်' : 'Verified'} {formatDateTime(statusQuery.data.latestBackupVerification.verifiedAt)}
                   </p>
                 </div>
                 <StepBadge
                   status={statusQuery.data.latestBackupVerification.restoreReady ? 'complete' : 'warning'}
+                  isMyanmar={isMyanmar}
                 />
               </div>
             ) : (
               <div className="ops-row-card border-dashed text-sm text-muted-foreground">
-                No backup verification record was found yet.
+                {isMyanmar ? 'အရန်သိမ်း အတည်ပြု မှတ်တမ်း မတွေ့ရှိရသေးပါ။' : 'No backup verification record was found yet.'}
               </div>
             )}
           </div>

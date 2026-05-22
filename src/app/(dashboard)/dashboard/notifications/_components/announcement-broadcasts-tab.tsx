@@ -180,10 +180,10 @@ export function AnnouncementBroadcastsTab({
             <Select value={audience} onValueChange={onAudienceChange}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ACTIVE_USERS">{isMyanmar ? 'Active Telegram users' : 'Active Telegram users'}</SelectItem>
-                <SelectItem value="STANDARD_USERS">{isMyanmar ? 'Standard key users' : 'Standard key users'}</SelectItem>
-                <SelectItem value="PREMIUM_USERS">{isMyanmar ? 'Premium users' : 'Premium users'}</SelectItem>
-                <SelectItem value="TRIAL_USERS">{isMyanmar ? 'Trial users' : 'Trial users'}</SelectItem>
+                <SelectItem value="ACTIVE_USERS">{isMyanmar ? 'အသက်ဝင် Telegram အသုံးပြုသူများ' : 'Active Telegram users'}</SelectItem>
+                <SelectItem value="STANDARD_USERS">{isMyanmar ? 'Standard သော့ အသုံးပြုသူများ' : 'Standard key users'}</SelectItem>
+                <SelectItem value="PREMIUM_USERS">{isMyanmar ? 'Premium အသုံးပြုသူများ' : 'Premium users'}</SelectItem>
+                <SelectItem value="TRIAL_USERS">{isMyanmar ? 'Trial အသုံးပြုသူများ' : 'Trial users'}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
@@ -195,11 +195,11 @@ export function AnnouncementBroadcastsTab({
             <Select value={type} onValueChange={onTypeChange}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="INFO">{isMyanmar ? 'Information' : 'Information'}</SelectItem>
-                <SelectItem value="ANNOUNCEMENT">{isMyanmar ? 'Announcement' : 'Announcement'}</SelectItem>
-                <SelectItem value="PROMO">{isMyanmar ? 'Discount / Promo' : 'Discount / Promo'}</SelectItem>
-                <SelectItem value="NEW_SERVER">{isMyanmar ? 'New server' : 'New server'}</SelectItem>
-                <SelectItem value="MAINTENANCE">{isMyanmar ? 'Maintenance' : 'Maintenance'}</SelectItem>
+                <SelectItem value="INFO">{isMyanmar ? 'သတင်းအချက်အလက်' : 'Information'}</SelectItem>
+                <SelectItem value="ANNOUNCEMENT">{isMyanmar ? 'အသိပေးချက်' : 'Announcement'}</SelectItem>
+                <SelectItem value="PROMO">{isMyanmar ? 'လျှော့ဈေး / အထူးပရိုမိုးရှင်း' : 'Discount / Promo'}</SelectItem>
+                <SelectItem value="NEW_SERVER">{isMyanmar ? 'ဆာဗာအသစ်' : 'New server'}</SelectItem>
+                <SelectItem value="MAINTENANCE">{isMyanmar ? 'ထိန်းသိမ်းမှု' : 'Maintenance'}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -211,7 +211,7 @@ export function AnnouncementBroadcastsTab({
             id="telegram-announcement-title"
             value={title}
             onChange={(event) => onTitleChange(event.target.value)}
-            placeholder={isMyanmar ? 'ဥပမာ - New SG server is ready' : 'Example: New SG server is ready'}
+            placeholder={isMyanmar ? 'ဥပမာ - SG ဆာဗာအသစ် အသင့်ဖြစ်ပါပြီ' : 'Example: New SG server is ready'}
           />
         </div>
         <div className="mt-3 space-y-2">
@@ -232,14 +232,16 @@ export function AnnouncementBroadcastsTab({
         <Collapsible className="mt-4 rounded-2xl border border-border/60 bg-background/55 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium">Advanced targeting and presentation</p>
+              <p className="text-sm font-medium">{isMyanmar ? 'အဆင့်မြင့် ပစ်မှတ်သတ်မှတ်မှုနှင့် တင်ဆက်ပုံ' : 'Advanced targeting and presentation'}</p>
               <p className="text-xs text-muted-foreground">
-                Card style, targeting, scheduling, inbox pinning, and image presentation.
+                {isMyanmar
+                  ? 'ကတ်ပုံစံ၊ ပစ်မှတ်သတ်မှတ်မှု၊ အချိန်ဇယားသတ်မှတ်မှု၊ inbox pin လုပ်ခြင်းနှင့် ပုံရိပ်တင်ဆက်မှု။'
+                  : 'Card style, targeting, scheduling, inbox pinning, and image presentation.'}
               </p>
             </div>
             <CollapsibleTrigger asChild>
               <Button type="button" variant="outline" size="sm">
-                Show options
+                {isMyanmar ? 'ရွေးချယ်စရာများကို ပြမည်' : 'Show options'}
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </CollapsibleTrigger>
@@ -284,7 +286,7 @@ export function AnnouncementBroadcastsTab({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{isMyanmar ? 'Customer segment' : 'Customer segment'}</Label>
+                <Label>{isMyanmar ? 'Customer အုပ်စု' : 'Customer segment'}</Label>
                 <Select value={targetSegment} onValueChange={onTargetSegmentChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -352,7 +354,7 @@ export function AnnouncementBroadcastsTab({
                 <div>
                   <p className="text-sm font-medium">{ui.includeSupportButton}</p>
                   <p className="text-xs text-muted-foreground">
-                    Adds the configured support link as an inline button when available.
+                    {isMyanmar ? 'သတ်မှတ်ထားသော support link ကို ရနိုင်ပါက inline button အဖြစ် ထည့်ပေးမည်။' : 'Adds the configured support link as an inline button when available.'}
                   </p>
                 </div>
                 <Switch checked={includeSupportButton} onCheckedChange={onIncludeSupportButtonChange} />
@@ -377,22 +379,22 @@ export function AnnouncementBroadcastsTab({
             {heroImageUrl.trim() ? (
               <div className="mb-3 overflow-hidden rounded-xl border border-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={heroImageUrl.trim()} alt={title.trim() || 'Announcement preview'} className="h-36 w-full object-cover" />
+                <img src={heroImageUrl.trim()} alt={title.trim() || (isMyanmar ? 'အသိပေးချက် အကြိုမြင်ကွင်း' : 'Announcement preview')} className="h-36 w-full object-cover" />
               </div>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">{getAnnouncementCardStyleLabel(cardStyle, isMyanmar)}</Badge>
               <Badge variant="outline">{type}</Badge>
               <Badge variant="outline">{getAnnouncementRecurrenceLabel(recurrenceType, isMyanmar)}</Badge>
-              {pinToInbox ? <Badge variant="secondary">Pinned</Badge> : null}
+              {pinToInbox ? <Badge variant="secondary">{isMyanmar ? 'pin လုပ်ထား' : 'Pinned'}</Badge> : null}
             </div>
             <p className="mt-3 text-lg font-semibold">
-              {title.trim() || (isMyanmar ? 'Announcement title preview' : 'Announcement title preview')}
+              {title.trim() || (isMyanmar ? 'အသိပေးချက် ခေါင်းစဉ် အကြိုမြင်ကွင်း' : 'Announcement title preview')}
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
               {message.trim()
                 || (isMyanmar
-                  ? 'Telegram အသုံးပြုသူများထံ ပို့မည့် message preview ကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။'
+                  ? 'Telegram အသုံးပြုသူများထံ ပို့မည့် message အကြိုမြင်ကွင်းကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။'
                   : 'This is where the branded Telegram announcement preview appears.')}
             </p>
           </div>
@@ -400,7 +402,7 @@ export function AnnouncementBroadcastsTab({
 
         {!canManageAnnouncements ? (
           <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            Only Owner/Admin scoped accounts can send Telegram announcements from the panel.
+            {isMyanmar ? 'Owner/Admin scope ရှိသော account များသာ panel မှ Telegram အသိပေးချက်များကို ပို့နိုင်ပါသည်။' : 'Only Owner/Admin scoped accounts can send Telegram announcements from the panel.'}
           </div>
         ) : null}
 

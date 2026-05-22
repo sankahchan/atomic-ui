@@ -438,6 +438,8 @@ function TrafficOverviewPanel({
 }
 
 function SecurityAlertsSummaryCard() {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const {
     data: overview,
@@ -468,7 +470,7 @@ function SecurityAlertsSummaryCard() {
     return (
       <div className="ops-panel space-y-4">
         <div className="space-y-2">
-          <p className="ops-section-heading">Security alerts</p>
+          <p className="ops-section-heading">{isMyanmar ? 'လုံခြုံရေး အသိပေးချက်များ' : 'Security alerts'}</p>
           <div className="h-6 w-40 animate-pulse rounded-full bg-muted" />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -491,10 +493,12 @@ function SecurityAlertsSummaryCard() {
     <div className="ops-panel space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="ops-section-heading">Security alerts</p>
-          <h2 className="mt-2 text-xl font-semibold">Admin login protection</h2>
+          <p className="ops-section-heading">{isMyanmar ? 'လုံခြုံရေး အသိပေးချက်များ' : 'Security alerts'}</p>
+          <h2 className="mt-2 text-xl font-semibold">{isMyanmar ? 'စီမံခန့်ခွဲရေး ဝင်ရောက်မှု ကာကွယ်ရေး' : 'Admin login protection'}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Keep an eye on failed-login IPs, active bans, and one-click unban actions.
+            {isMyanmar
+              ? 'ဝင်ရောက်မှု မအောင်မြင်သော IP များ၊ အသက်ဝင်ပိတ်ပင်မှုများနှင့် one-click ဖြင့် ပိတ်ပင်ချက်ဖြုတ်ခြင်းကို စောင့်ကြည့်ပါ။'
+              : 'Keep an eye on failed-login IPs, active bans, and one-click unban actions.'}
           </p>
         </div>
         <Badge
@@ -507,32 +511,42 @@ function SecurityAlertsSummaryCard() {
           )}
         >
           <Shield className="mr-1 h-3.5 w-3.5" />
-          {activeBans.length > 0 ? `${activeBans.length} active bans` : 'Monitoring'}
+          {activeBans.length > 0
+            ? isMyanmar
+              ? `အသက်ဝင်ပိတ်ပင်မှု ${activeBans.length} ခု`
+              : `${activeBans.length} active bans`
+            : isMyanmar
+              ? 'စောင့်ကြည့်နေသည်'
+              : 'Monitoring'}
         </Badge>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="ops-mini-tile">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Failed last hour</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ၁ နာရီ' : 'Failed last hour'}</p>
           <p className="mt-2 text-2xl font-semibold">{overview.summary.failuresLastHour}</p>
-          <p className="mt-1 text-sm text-muted-foreground">Recent bad-password attempts against the admin panel.</p>
+          <p className="mt-1 text-sm text-muted-foreground">{isMyanmar ? 'Admin panel ကို စကားဝှက်မှားဖြင့် ဝင်ရန် ကြိုးစားမှုများ။' : 'Recent bad-password attempts against the admin panel.'}</p>
         </div>
         <div className="ops-mini-tile">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active restrictions</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အသက်ဝင်ကန့်သတ်မှုများ' : 'Active restrictions'}</p>
           <p className="mt-2 text-2xl font-semibold">{overview.summary.activeRestrictions}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{overview.summary.activeBans} bans · {overview.summary.activeRestrictions - overview.summary.activeBans} soft locks</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isMyanmar
+              ? `ပိတ်ပင်မှု ${overview.summary.activeBans} ခု · soft lock ${overview.summary.activeRestrictions - overview.summary.activeBans} ခု`
+              : `${overview.summary.activeBans} bans · ${overview.summary.activeRestrictions - overview.summary.activeBans} soft locks`}
+          </p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">Currently restricted IPs</p>
+            <p className="text-sm font-semibold">{isMyanmar ? 'လက်ရှိကန့်သတ်ထားသော IP များ' : 'Currently restricted IPs'}</p>
             <Badge variant="outline">{overview.activeRestrictions.length}</Badge>
           </div>
           <div className="mt-3 space-y-3">
             {displayedRestrictions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No active bans or locks.</p>
+              <p className="text-sm text-muted-foreground">{isMyanmar ? 'အသက်ဝင်ပိတ်ပင်မှု သို့မဟုတ် lock မရှိပါ။' : 'No active bans or locks.'}</p>
             ) : (
               displayedRestrictions.map((restriction) => (
                 <div key={restriction.id} className="rounded-[1rem] border border-border/50 bg-background/70 p-3 dark:bg-white/[0.02]">
@@ -545,7 +559,7 @@ function SecurityAlertsSummaryCard() {
                         </Badge>
                       </div>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {restriction.attemptedEmail || 'Unknown email'}
+                        {restriction.attemptedEmail || (isMyanmar ? 'မသိရသည့် email' : 'Unknown email')}
                       </p>
                     </div>
                     <Button
@@ -556,11 +570,13 @@ function SecurityAlertsSummaryCard() {
                       onClick={() => unbanMutation.mutate({ ip: restriction.ip })}
                     >
                       <Unlock className="mr-2 h-3.5 w-3.5" />
-                      Unban
+                      {isMyanmar ? 'ပြန်ဖွင့်မည်' : 'Unban'}
                     </Button>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {restriction.failureCount} failures · expires {formatRelativeTime(restriction.expiresAt)}
+                    {isMyanmar
+                      ? `မအောင်မြင်မှု ${restriction.failureCount} ခု · ${formatRelativeTime(restriction.expiresAt)} တွင် သက်တမ်းကုန်မည်`
+                      : `${restriction.failureCount} failures · expires ${formatRelativeTime(restriction.expiresAt)}`}
                   </p>
                 </div>
               ))
@@ -570,23 +586,23 @@ function SecurityAlertsSummaryCard() {
 
         <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">Recent failed IPs</p>
+            <p className="text-sm font-semibold">{isMyanmar ? 'မကြာသေးခင်က မအောင်မြင်သော IP များ' : 'Recent failed IPs'}</p>
             <Badge variant="outline">{overview.recentFailures.length}</Badge>
           </div>
           <div className="mt-3 space-y-3">
             {displayedFailures.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No failed admin logins in the last 24 hours.</p>
+              <p className="text-sm text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး ၂၄ နာရီအတွင်း မအောင်မြင်သော admin login မရှိပါ။' : 'No failed admin logins in the last 24 hours.'}</p>
             ) : (
               displayedFailures.map((failure) => (
                 <div key={failure.id} className="rounded-[1rem] border border-border/50 bg-background/70 p-3 dark:bg-white/[0.02]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-medium">{failure.ip || 'Unknown IP'}</span>
+                        <span className="truncate font-medium">{failure.ip || (isMyanmar ? 'မသိရသည့် IP' : 'Unknown IP')}</span>
                         {failure.countryCode ? <Badge variant="outline">{failure.countryCode}</Badge> : null}
                       </div>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {failure.email || 'Unknown email'}
+                        {failure.email || (isMyanmar ? 'မသိရသည့် email' : 'Unknown email')}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
@@ -603,22 +619,34 @@ function SecurityAlertsSummaryCard() {
       <div className="rounded-[1.2rem] border border-border/60 bg-background/55 px-4 py-3 text-xs text-muted-foreground dark:bg-white/[0.03]">
         {overview.fail2banStatus.available ? (
           <span>
-            Server jail <span className="font-medium text-foreground">{overview.fail2banStatus.jail}</span> is active with{' '}
-            <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyBanned}</span> banned IPs and{' '}
-            <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyFailed}</span> recent failed hits.
+            {isMyanmar ? (
+              <>
+                Server jail <span className="font-medium text-foreground">{overview.fail2banStatus.jail}</span> သည် အသက်ဝင်နေပြီး{' '}
+                <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyBanned}</span> IP ကို ပိတ်ထားကာ{' '}
+                <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyFailed}</span> recent failed hit များရှိပါသည်။
+              </>
+            ) : (
+              <>
+                Server jail <span className="font-medium text-foreground">{overview.fail2banStatus.jail}</span> is active with{' '}
+                <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyBanned}</span> banned IPs and{' '}
+                <span className="font-medium text-foreground">{overview.fail2banStatus.currentlyFailed}</span> recent failed hits.
+              </>
+            )}
           </span>
         ) : (
           <span>
-            Server jail status is unavailable right now{overview.fail2banStatus.error ? `: ${overview.fail2banStatus.error}` : '.'}
+            {isMyanmar
+              ? `Server jail အခြေအနေကို ယခု မရနိုင်ပါ${overview.fail2banStatus.error ? `: ${overview.fail2banStatus.error}` : '.'}`
+              : `Server jail status is unavailable right now${overview.fail2banStatus.error ? `: ${overview.fail2banStatus.error}` : '.'}`}
           </span>
         )}
       </div>
 
       <Link href="/dashboard/security" className="ops-action-tile">
         <div className="min-w-0">
-          <p className="text-sm font-semibold">Open security center</p>
+          <p className="text-sm font-semibold">{isMyanmar ? 'လုံခြုံရေးစင်တာ ဖွင့်မည်' : 'Open security center'}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Review full history, tune thresholds, and manage trusted IPs.
+            {isMyanmar ? 'မှတ်တမ်းအပြည့်အစုံကိုကြည့်ပြီး သတ်မှတ်ချက်များကိုညှိကာ ယုံကြည်ထားသော IP များကိုစီမံပါ။' : 'Review full history, tune thresholds, and manage trusted IPs.'}
           </p>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -914,7 +942,7 @@ function FinanceTrendCards({
 
   const cards = [
     {
-      title: isMyanmar ? 'Finance revenue' : 'Finance revenue',
+      title: isMyanmar ? 'ငွေကြေးဝင်ငွေ' : 'Finance revenue',
       value: loading ? '…' : totalRevenueLabel,
       helper: loading
         ? isMyanmar
@@ -940,9 +968,9 @@ function FinanceTrendCards({
         renewalDelta == null ? 'neutral' : renewalDelta >= 0 ? 'emerald' : 'amber',
     },
     {
-      title: isMyanmar ? 'Churn signals' : 'Churn signals',
+      title: isMyanmar ? 'အသုံးပြုမှုရပ်စဲမှု အချက်ပြမှုများ' : 'Churn signals',
       value: loading ? '…' : dashboard?.summary.totalChurnSignals || 0,
-      helper: isMyanmar ? 'Expired / depleted / disabled key signals' : 'Expired, depleted, or disabled key signals',
+      helper: isMyanmar ? 'သက်တမ်းကုန် / ကန့်သတ်ချက်ကုန် / ပိတ်ထားသော သော့အချက်ပြမှုများ' : 'Expired, depleted, or disabled key signals',
       delta:
         churnDelta == null
           ? null

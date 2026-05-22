@@ -26,22 +26,22 @@ export default function ToolsPage() {
                 {t('tools.title')}
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Secondary pages, monitoring tools, and workspace shortcuts live here so the main navigation can stay focused.
+                {t('tools.subtitle')}
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:max-w-3xl">
               <div className="ops-support-card">
-                <p className="text-sm font-semibold">Operations</p>
-                <p className="mt-1 text-xs text-muted-foreground">Support, reports, jobs, audits, and migration tools in one place.</p>
+                <p className="text-sm font-semibold">{t('tools.hero.operations_title')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('tools.hero.operations_desc')}</p>
               </div>
               <div className="ops-support-card">
-                <p className="text-sm font-semibold">Workspace</p>
-                <p className="mt-1 text-xs text-muted-foreground">Notifications, security, and user management shortcuts stay close without crowding the sidebar.</p>
+                <p className="text-sm font-semibold">{t('tools.hero.workspace_title')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('tools.hero.workspace_desc')}</p>
               </div>
               <div className="ops-support-card">
-                <p className="text-sm font-semibold">Faster shell</p>
-                <p className="mt-1 text-xs text-muted-foreground">The main navigation is trimmed to five core routes for a cleaner desktop and mobile experience.</p>
+                <p className="text-sm font-semibold">{t('tools.hero.faster_shell_title')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('tools.hero.faster_shell_desc')}</p>
               </div>
             </div>
           </div>
@@ -62,10 +62,10 @@ export default function ToolsPage() {
       <section className="space-y-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Operations
+            {t('tools.operations_title')}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Incidents, queues, reports, audit trails, sessions, migration, and onboarding.
+            {t('tools.operations_desc')}
           </p>
         </div>
         <div className="ops-card-grid">
@@ -106,10 +106,10 @@ export default function ToolsPage() {
       <section className="space-y-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Workspace shortcuts
+            {t('tools.shortcuts_title')}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Settings-adjacent pages that no longer need to live in the main navigation.
+            {t('tools.shortcuts_desc')}
           </p>
         </div>
         <div className="grid gap-4 xl:grid-cols-3">

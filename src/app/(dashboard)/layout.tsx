@@ -88,7 +88,7 @@ function Sidebar({
                 Atomic-UI
               </span>
               <span className="block text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                Control Center
+                {t('dashboard.control_center')}
               </span>
             </div>
           )}
@@ -191,7 +191,7 @@ function Header({
   onOpenTools: () => void;
 }) {
   const { theme, setTheme } = useTheme();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -220,7 +220,9 @@ function Header({
             <Atom className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">Operations dashboard</p>
+            <p className="truncate text-sm font-semibold text-foreground">
+              {t('dashboard.operations_dashboard')}
+            </p>
           </div>
         </div>
 
@@ -246,7 +248,13 @@ function Header({
                 variant="ghost"
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                title={
+                  locale === 'my'
+                    ? theme === 'dark'
+                      ? 'အလင်းမုဒ်သို့ ပြောင်းမည်'
+                      : 'အမှောင်မုဒ်သို့ ပြောင်းမည်'
+                    : `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`
+                }
                 className="h-9 w-9 rounded-full border border-border/70 bg-background/70 shadow-sm sm:h-10 sm:w-10 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
               >
                 {theme === 'dark' ? (
@@ -274,7 +282,7 @@ function Header({
             variant="ghost"
             size="icon"
             onClick={onLogout}
-            title="Logout"
+            title={locale === 'my' ? 'ထွက်မည်' : 'Logout'}
             className="h-9 w-9 rounded-full border border-border/70 bg-background/70 text-muted-foreground shadow-sm hover:text-foreground sm:h-10 sm:w-10 dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))] dark:text-slate-400 dark:hover:text-cyan-100"
           >
             <LogOut className="h-4 w-4" />
@@ -299,6 +307,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { locale } = useLocale();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -329,8 +338,11 @@ export default function DashboardLayout({
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Logged out',
-        description: 'You have been successfully logged out.',
+        title: locale === 'my' ? 'ထွက်ပြီးပါပြီ' : 'Logged out',
+        description:
+          locale === 'my'
+            ? 'အကောင့်မှ အောင်မြင်စွာ ထွက်ပြီးပါပြီ။'
+            : 'You have been successfully logged out.',
       });
       router.push('/login');
       router.refresh();
@@ -356,7 +368,7 @@ export default function DashboardLayout({
         <GradientMeshBackground />
         <div className="flex flex-col items-center gap-4 relative z-10">
           <Atom className="h-12 w-12 text-primary animate-spin" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{locale === 'my' ? 'တင်နေသည်…' : 'Loading...'}</p>
           <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-3000 fill-mode-forwards opacity-0" style={{ animationDelay: '3s' }}>
             <Button
               variant="ghost"
@@ -375,7 +387,7 @@ export default function DashboardLayout({
                 }
               }}
             >
-              Taking too long? Sign out
+              {locale === 'my' ? 'ကြာနေပါသလား? ထွက်မည်' : 'Taking too long? Sign out'}
             </Button>
           </div>
         </div>
@@ -390,15 +402,19 @@ export default function DashboardLayout({
         <GradientMeshBackground />
         <div className="flex flex-col items-center gap-4 text-center p-8 relative z-10">
           <Atom className="h-12 w-12 text-red-500" />
-          <h2 className="text-xl font-semibold text-foreground">Connection Error</h2>
+          <h2 className="text-xl font-semibold text-foreground">
+            {locale === 'my' ? 'ချိတ်ဆက်မှု အမှား' : 'Connection Error'}
+          </h2>
           <p className="text-muted-foreground max-w-md">
-            Unable to connect to the server. Please check your connection and try again.
+            {locale === 'my'
+              ? 'ဆာဗာသို့ မချိတ်ဆက်နိုင်ပါ။ သင်၏ ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်မံကြိုးစားပါ။'
+              : 'Unable to connect to the server. Please check your connection and try again.'}
           </p>
           <Button
             onClick={() => router.refresh()}
             className="mt-4"
           >
-            Retry
+            {locale === 'my' ? 'ထပ်မံကြိုးစားမည်' : 'Retry'}
           </Button>
         </div>
       </div>

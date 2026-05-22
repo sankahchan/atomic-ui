@@ -364,22 +364,22 @@ export function SubscriptionSettings() {
     }> = [
         {
             key: "showConnectionSummary",
-            label: isMyanmar ? "Connection Summary" : "Connection Summary",
+            label: isMyanmar ? "ချိတ်ဆက်မှု အကျဉ်းချုပ်" : "Connection Summary",
             description: isMyanmar ? "အသုံးပြုမှုနှင့် expiration ပါသော summary card ကို desktop/mobile တွင် ပြသမည်။" : "Show the right-side or mobile summary card with usage and expiry.",
         },
         {
             key: "showCompatibleApps",
-            label: isMyanmar ? "Compatible Apps" : "Compatible Apps",
+            label: isMyanmar ? "ကိုက်ညီသော App များ" : "Compatible Apps",
             description: isMyanmar ? "Hero area အောက်တွင် secondary app grid ကို ပြသမည်။" : "Show the secondary app grid below the hero area.",
         },
         {
             key: "showHelpContact",
-            label: isMyanmar ? "Help & Contact" : "Help & Contact",
+            label: isMyanmar ? "အကူအညီ နှင့် ဆက်သွယ်ရန်" : "Help & Contact",
             description: isMyanmar ? "Support shortcut နှင့် contact action များကို ပြသမည်။" : "Show support shortcuts and contact actions.",
         },
         {
             key: "showManualSetupButton",
-            label: isMyanmar ? "Manual Setup Button" : "Manual Setup Button",
+            label: isMyanmar ? "လက်ဖြင့် ပြင်ဆင်ရန် ခလုတ်" : "Manual Setup Button",
             description: isMyanmar ? "Hero action များထဲတွင် QR/manual setup trigger ကို ဆက်လက် ပြသမည်။" : "Keep the QR/manual setup trigger visible in the hero actions.",
         },
     ];

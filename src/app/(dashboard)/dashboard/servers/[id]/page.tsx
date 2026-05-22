@@ -103,7 +103,8 @@ function EditServerDialog({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const [name, setName] = useState(server.name);
   const [location, setLocation] = useState(server.location || '');
   const [countryCode, setCountryCode] = useState(server.countryCode || '');
@@ -158,9 +159,11 @@ function EditServerDialog({
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Server identity</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'ဆာဗာ အချက်အလက်' : 'Server identity'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Update the name, location, and display tags used across routing, health, and reporting views.
+                  {isMyanmar
+                    ? 'လမ်းကြောင်းညွှန်မှု၊ health စောင့်ကြည့်မှုနှင့် report မျက်နှာပြင်များတွင် အသုံးပြုသော အမည်၊ တည်နေရာနှင့် tag များကို ပြင်ဆင်ပါ။'
+                    : 'Update the name, location, and display tags used across routing, health, and reporting views.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
@@ -209,7 +212,9 @@ function EditServerDialog({
                 <DialogSectionHeader>
                   <DialogSectionTitle>{t('server_details.edit.tags')}</DialogSectionTitle>
                   <DialogSectionDescription>
-                    Highlight which routing or reporting groups this server should appear in.
+                    {isMyanmar
+                      ? 'ဤ server ကို routing သို့မဟုတ် reporting အဖွဲ့များထဲတွင် မည်သည့်နေရာတွင် ပြသမည်ကို သတ်မှတ်ပါ။'
+                      : 'Highlight which routing or reporting groups this server should appear in.'}
                   </DialogSectionDescription>
                 </DialogSectionHeader>
                 <div className="flex flex-wrap gap-2">
@@ -241,9 +246,11 @@ function EditServerDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Default routing behavior</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'မူလလမ်းကြောင်းညွှန်မှု အပြုအမူ' : 'Default routing behavior'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Mark this server as a default target when new items need a preferred home.
+                  {isMyanmar
+                    ? 'အသစ်ဖန်တီးမည့် item များအတွက် ဤ server ကို မူလ target အဖြစ် သတ်မှတ်ပါ။'
+                    : 'Mark this server as a default target when new items need a preferred home.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 dark:bg-white/[0.03]">
@@ -287,7 +294,8 @@ export default function ServerDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const serverId = params.id as string;
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -299,11 +307,15 @@ export default function ServerDetailPage() {
   const [outageGraceHours, setOutageGraceHours] = useState('3');
   const [outageNotifyUsers, setOutageNotifyUsers] = useState(true);
   const [outageFollowUpMessage, setOutageFollowUpMessage] = useState(
-    'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
+    locale === 'my'
+      ? 'အစားထိုးမှုကို ဆက်လက်လုပ်ဆောင်နေဆဲဖြစ်သည်။ server အသစ်ကို ပြင်ဆင်နေစဉ် ခဏလေး ထပ်မံစောင့်ပေးပါ။'
+      : 'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
   );
   const [manualNoticeType, setManualNoticeType] = useState<'ISSUE' | 'DOWNTIME' | 'MAINTENANCE'>('ISSUE');
   const [manualNoticeMessage, setManualNoticeMessage] = useState(
-    'We found an issue on this server. Please wait while we stabilize the route. We will update you again if a replacement is needed.',
+    locale === 'my'
+      ? 'ဤ server တွင် ပြဿနာတစ်ခု တွေ့ရှိထားသည်။ လမ်းကြောင်းကို တည်ငြိမ်အောင် ပြင်ဆင်နေစဉ် ခဏစောင့်ပေးပါ။ အစားထိုးရန် လိုအပ်ပါက ထပ်မံအသိပေးပါမည်။'
+      : 'We found an issue on this server. Please wait while we stabilize the route. We will update you again if a replacement is needed.',
   );
   const [latencyThresholdMs, setLatencyThresholdMs] = useState('500');
   const [slowAutoDrainEnabled, setSlowAutoDrainEnabled] = useState(true);
@@ -393,14 +405,16 @@ export default function ServerDetailPage() {
   const lifecycleMutation = trpc.servers.setLifecycleMode.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Server mode updated',
-        description: 'Assignment safeguards were updated for this server.',
+        title: isMyanmar ? 'ဆာဗာ mode ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Server mode updated',
+        description: isMyanmar
+          ? 'ဤဆာဗာအတွက် assignment safeguards များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။'
+          : 'Assignment safeguards were updated for this server.',
       });
       refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Failed to update server mode',
+        title: isMyanmar ? 'ဆာဗာ mode ကို အပ်ဒိတ်မလုပ်နိုင်ပါ' : 'Failed to update server mode',
         description: error.message,
         variant: 'destructive',
       });
@@ -409,18 +423,22 @@ export default function ServerDetailPage() {
   const outageReplaceMutation = trpc.servers.outageReplace.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Outage replacement completed',
+        title: isMyanmar ? 'Outage အစားထိုးမှု ပြီးဆုံးပါပြီ' : 'Outage replacement completed',
         description:
           result.failed > 0
-            ? `${result.migrated} keys moved, ${result.failed} still need attention.`
-            : `${result.migrated} keys moved to ${result.targetServer.name}.`,
+            ? isMyanmar
+              ? `Key ${result.migrated} ခုကို ရွှေ့ပြီးပါပြီ၊ ${result.failed} ခုကို ထပ်စစ်ဆေးရန် လိုအပ်နေသေးသည်။`
+              : `${result.migrated} keys moved, ${result.failed} still need attention.`
+            : isMyanmar
+              ? `Key ${result.migrated} ခုကို ${result.targetServer.name} သို့ ရွှေ့ပြီးပါပြီ။`
+              : `${result.migrated} keys moved to ${result.targetServer.name}.`,
       });
       refetch();
       outageHistoryQuery.refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Outage replacement failed',
+        title: isMyanmar ? 'Outage အစားထိုးမှု မအောင်မြင်ပါ' : 'Outage replacement failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -429,15 +447,19 @@ export default function ServerDetailPage() {
   const outageFollowUpMutation = trpc.servers.sendOutageFollowUp.useMutation({
     onSuccess: (result, variables) => {
       toast({
-        title: variables.markRecovered ? 'Recovery update sent' : 'Outage follow-up sent',
-        description: `Telegram update sent to ${result.sentToTelegramUsers} affected user(s).`,
+        title: variables.markRecovered
+          ? (isMyanmar ? 'ပြန်လည်ကောင်းမွန်မှု အသိပေးချက် ပို့ပြီးပါပြီ' : 'Recovery update sent')
+          : (isMyanmar ? 'Outage နောက်ဆက်တွဲ အသိပေးချက် ပို့ပြီးပါပြီ' : 'Outage follow-up sent'),
+        description: isMyanmar
+          ? `ထိခိုက်သော Telegram အသုံးပြုသူ ${result.sentToTelegramUsers} ဦးထံ အပ်ဒိတ်ပို့ပြီးပါပြီ။`
+          : `Telegram update sent to ${result.sentToTelegramUsers} affected user(s).`,
       });
       refetch();
       outageHistoryQuery.refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Failed to send outage update',
+        title: isMyanmar ? 'Outage အပ်ဒိတ် ပို့မရပါ' : 'Failed to send outage update',
         description: error.message,
         variant: 'destructive',
       });
@@ -446,13 +468,15 @@ export default function ServerDetailPage() {
   const manualNoticeMutation = trpc.servers.sendTelegramIssueNotice.useMutation({
     onSuccess: (result) => {
       toast({
-        title: 'Telegram issue notice sent',
-        description: `Sent the update to ${result.sentCount} user(s).`,
+        title: isMyanmar ? 'Telegram ပြဿနာအသိပေးချက် ပို့ပြီးပါပြီ' : 'Telegram issue notice sent',
+        description: isMyanmar
+          ? `အသုံးပြုသူ ${result.sentCount} ဦးထံ အပ်ဒိတ်ပို့ပြီးပါပြီ။`
+          : `Sent the update to ${result.sentCount} user(s).`,
       });
     },
     onError: (error) => {
       toast({
-        title: 'Failed to send Telegram notice',
+        title: isMyanmar ? 'Telegram အသိပေးချက် ပို့မရပါ' : 'Failed to send Telegram notice',
         description: error.message,
         variant: 'destructive',
       });
@@ -1003,68 +1027,86 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Gauge className="w-5 h-5 text-primary" />
-                Latency diagnostics
+                {isMyanmar ? 'ကြာချိန် စစ်ဆေးချက်များ' : 'Latency diagnostics'}
               </CardTitle>
               <CardDescription>
-                Compare live latency against the slow threshold, see repeated-slow behavior, and confirm whether auto-drain or Telegram user notices have triggered.
+                {isMyanmar
+                  ? 'လက်ရှိကြာချိန်ကို နှေးကွေးမှုသတ်မှတ်ချက်နှင့် နှိုင်းယှဉ်ပြီး ဆက်တိုက်နှေးကွေးနေမှု၊ အလိုအလျောက်လက်ခံမှုလျှော့ခြင်းနှင့် Telegram အသိပေးချက်များ တက်သွားမှုကို စစ်ဆေးပါ။'
+                  : 'Compare live latency against the slow threshold, see repeated-slow behavior, and confirm whether auto-drain or Telegram user notices have triggered.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {healthDiagnosticsQuery.isLoading ? (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                  Loading latency diagnostics…
+                  {isMyanmar ? 'ကြာချိန် စစ်ဆေးချက်များကို တင်နေသည်…' : 'Loading latency diagnostics…'}
                 </div>
               ) : healthDiagnostics ? (
                 <>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <div className="min-w-0 rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Current reason</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'လက်ရှိအကြောင်းရင်း' : 'Current reason'}</p>
                       <p className="mt-1 break-words text-sm font-medium leading-5">{healthDiagnostics.current.reason}</p>
                     </div>
                     <div className="min-w-0 rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Slow streak</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'နှေးကွေးမှု ဆက်တိုက်အရေအတွက်' : 'Slow streak'}</p>
                       <p className="mt-1 text-xl font-semibold">{healthDiagnostics.current.slowConsecutiveCount}</p>
                       <p className="text-xs leading-5 text-muted-foreground">
-                        Auto-drain at {healthDiagnostics.current.autoDrainThreshold} consecutive slow checks
+                        {isMyanmar
+                          ? `${healthDiagnostics.current.autoDrainThreshold} ကြိမ် ဆက်တိုက်နှေးကွေးပါက အလိုအလျောက် လက်ခံမှုလျှော့မည်`
+                          : `Auto-drain at ${healthDiagnostics.current.autoDrainThreshold} consecutive slow checks`}
                       </p>
                     </div>
                     <div className="min-w-0 rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Auto-drain</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အလိုအလျောက် လက်ခံမှုလျှော့ခြင်း' : 'Auto-drain'}</p>
                       <p className="mt-1 break-words text-sm font-medium leading-5">
                         {healthDiagnostics.current.autoDrainEnabled
                           ? healthDiagnostics.current.autoDrainActive
-                            ? 'Active now'
-                            : 'Armed'
-                          : 'Disabled'}
+                            ? (isMyanmar ? 'လက်ရှိ အသက်ဝင်နေသည်' : 'Active now')
+                            : (isMyanmar ? 'အသင့်အနေအထား' : 'Armed')
+                          : (isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled')}
                       </p>
                       <p className="text-xs leading-5 text-muted-foreground">
                         {healthDiagnostics.current.autoDrainEnabled
-                          ? `Threshold ${healthDiagnostics.current.autoDrainThreshold} slow checks`
-                          : 'No automatic drain'}
+                          ? isMyanmar
+                            ? `သတ်မှတ်ချက် ${healthDiagnostics.current.autoDrainThreshold} ကြိမ် နှေးကွေးမှု`
+                            : `Threshold ${healthDiagnostics.current.autoDrainThreshold} slow checks`
+                          : isMyanmar
+                            ? 'အလိုအလျောက် လက်ခံမှုလျှော့ခြင်း မရှိ'
+                            : 'No automatic drain'}
                       </p>
                     </div>
                     <div className="min-w-0 rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Auto-migrate</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အလိုအလျောက် ပြောင်းရွှေ့ခြင်း' : 'Auto-migrate'}</p>
                       <p className="mt-1 break-words text-sm font-medium leading-5">
                         {healthDiagnostics.current.autoMigrateEnabled
-                          ? `After ${healthDiagnostics.current.autoMigrateThreshold} slow checks`
-                          : 'Disabled'}
+                          ? isMyanmar
+                            ? `${healthDiagnostics.current.autoMigrateThreshold} ကြိမ် နှေးကွေးပြီးနောက်`
+                            : `After ${healthDiagnostics.current.autoMigrateThreshold} slow checks`
+                          : (isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled')}
                       </p>
                       <p className="text-xs leading-5 text-muted-foreground">
-                        Wait window {healthDiagnostics.current.autoMigrateGraceHours} hour(s)
+                        {isMyanmar
+                          ? `စောင့်ဆိုင်းချိန် ${healthDiagnostics.current.autoMigrateGraceHours} နာရီ`
+                          : `Wait window ${healthDiagnostics.current.autoMigrateGraceHours} hour(s)`}
                       </p>
                     </div>
                     <div className="min-w-0 rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">User notice</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အသုံးပြုသူ အသိပေးချက်' : 'User notice'}</p>
                       <p className="mt-1 break-words text-sm font-medium leading-5">
                         {healthDiagnostics.current.slowUserAlertSentAt
-                          ? `Sent ${formatRelativeTime(healthDiagnostics.current.slowUserAlertSentAt)}`
+                          ? isMyanmar
+                            ? `${formatRelativeTime(healthDiagnostics.current.slowUserAlertSentAt)} က ပို့ပြီး`
+                            : `Sent ${formatRelativeTime(healthDiagnostics.current.slowUserAlertSentAt)}`
                           : healthDiagnostics.current.userNotifyEnabled
-                            ? `After ${healthDiagnostics.current.userNotifyThreshold} slow checks`
-                            : 'Disabled'}
+                            ? isMyanmar
+                              ? `${healthDiagnostics.current.userNotifyThreshold} ကြိမ် နှေးကွေးပြီးနောက်`
+                              : `After ${healthDiagnostics.current.userNotifyThreshold} slow checks`
+                            : (isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled')}
                       </p>
                       <p className="text-xs leading-5 text-muted-foreground">
-                        Cooldown {healthDiagnostics.current.userNotifyCooldownMins} min
+                        {isMyanmar
+                          ? `အအေးချိန် ${healthDiagnostics.current.userNotifyCooldownMins} မိနစ်`
+                          : `Cooldown ${healthDiagnostics.current.userNotifyCooldownMins} min`}
                       </p>
                     </div>
                   </div>
@@ -1074,19 +1116,19 @@ export default function ServerDetailPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="font-medium text-foreground">
-                            Smart fallback: {healthDiagnostics.current.fallbackTarget.serverName}
+                            {isMyanmar ? 'အလိုအလျောက် အရန်ပစ်မှတ်' : 'Smart fallback'}: {healthDiagnostics.current.fallbackTarget.serverName}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {healthDiagnostics.current.fallbackTarget.healthStatus || 'UNKNOWN'} health
+                            {healthDiagnostics.current.fallbackTarget.healthStatus || (isMyanmar ? 'မသိရ' : 'UNKNOWN')} {isMyanmar ? 'အခြေအနေ' : 'health'}
                             {typeof healthDiagnostics.current.fallbackTarget.healthLatencyMs === 'number'
                               ? ` · ${healthDiagnostics.current.fallbackTarget.healthLatencyMs}ms`
                               : ''}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">load {healthDiagnostics.current.fallbackTarget.loadScore}</Badge>
+                          <Badge variant="outline">{isMyanmar ? 'ဖိအား' : 'load'} {healthDiagnostics.current.fallbackTarget.loadScore}</Badge>
                           {healthDiagnostics.current.fallbackTarget.sameCountry ? (
-                            <Badge variant="outline">same region</Badge>
+                            <Badge variant="outline">{isMyanmar ? 'တူညီသောဒေသ' : 'same region'}</Badge>
                           ) : null}
                         </div>
                       </div>
@@ -1095,7 +1137,7 @@ export default function ServerDetailPage() {
 
                   {healthDiagnostics.current.status === 'SLOW' ? (
                     <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                      <span className="font-medium">Slow-server reason:</span> {healthDiagnostics.current.reason}
+                      <span className="font-medium">{isMyanmar ? 'နှေးကွေးသော ဆာဗာ အကြောင်းရင်း:' : 'Slow-server reason:'}</span> {healthDiagnostics.current.reason}
                     </div>
                   ) : null}
 
@@ -1132,8 +1174,8 @@ export default function ServerDetailPage() {
                                 active && payload && payload.length ? (
                                   <div className="rounded-xl border border-cyan-400/18 bg-[rgba(5,12,26,0.94)] p-3 text-xs text-white shadow-[0_18px_36px_rgba(1,6,20,0.55)]">
                                     <p className="font-semibold text-cyan-100">{label}</p>
-                                    <p className="mt-2">Latency: {payload[0]?.value ? `${payload[0].value}ms` : 'n/a'}</p>
-                                    <p>Status: {payload[0]?.payload?.status || 'UNKNOWN'}</p>
+                                    <p className="mt-2">{isMyanmar ? 'ကြာချိန်' : 'Latency'}: {payload[0]?.value ? `${payload[0].value}ms` : 'n/a'}</p>
+                                    <p>{isMyanmar ? 'အခြေအနေ' : 'Status'}: {payload[0]?.payload?.status || (isMyanmar ? 'မသိရ' : 'UNKNOWN')}</p>
                                   </div>
                                 ) : null
                               }
@@ -1157,14 +1199,16 @@ export default function ServerDetailPage() {
                       </div>
                     ) : (
                       <div className="rounded-[1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                        No latency history yet. New health metrics will appear after a few scheduled checks.
+                        {isMyanmar
+                          ? 'ကြာချိန်မှတ်တမ်း မရှိသေးပါ။ နောက်ထပ် စီစဉ်ထားသော စစ်ဆေးမှုအနည်းငယ်ပြီးနောက် ကျန်းမာရေးတိုင်းတာချက် အသစ်များ ပေါ်လာပါမည်။'
+                          : 'No latency history yet. New health metrics will appear after a few scheduled checks.'}
                       </div>
                     )}
                   </div>
                 </>
               ) : (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-                  No health diagnostics available for this server yet.
+                  {isMyanmar ? 'ဤဆာဗာအတွက် ကျန်းမာရေးစစ်ဆေးချက် မရှိသေးပါ။' : 'No health diagnostics available for this server yet.'}
                 </div>
               )}
             </CardContent>
@@ -1177,48 +1221,50 @@ export default function ServerDetailPage() {
       <div className="space-y-6">
           <Card className="ops-detail-card">
             <CardHeader>
-              <CardTitle>Assignment Mode</CardTitle>
+              <CardTitle>{isMyanmar ? 'ခွဲဝေမှုမုဒ်' : 'Assignment Mode'}</CardTitle>
               <CardDescription>
-                Control whether this server accepts new keys and migrations.
+                {isMyanmar
+                  ? 'ဤဆာဗာက သော့အသစ်များနှင့် ပြောင်းရွှေ့မှုများကို လက်ခံမလက်ခံ စီမံပါ။'
+                  : 'Control whether this server accepts new keys and migrations.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Mode</Label>
+                <Label>{isMyanmar ? 'မုဒ်' : 'Mode'}</Label>
                 <Select value={lifecycleMode} onValueChange={setLifecycleMode}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ACTIVE">Active</SelectItem>
-                    <SelectItem value="DRAINING">Draining</SelectItem>
-                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="ACTIVE">{isMyanmar ? 'အသုံးပြုနိုင်' : 'Active'}</SelectItem>
+                    <SelectItem value="DRAINING">{isMyanmar ? 'ဖြည်းဖြည်းလျှော့ချနေသည်' : 'Draining'}</SelectItem>
+                    <SelectItem value="MAINTENANCE">{isMyanmar ? 'ထိန်းသိမ်းမှု' : 'Maintenance'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="lifecycleNote">Operator Note</Label>
+                <Label htmlFor="lifecycleNote">{isMyanmar ? 'စီမံခန့်ခွဲသူ မှတ်စု' : 'Operator Note'}</Label>
                 <Input
                   id="lifecycleNote"
-                  placeholder="Optional note shown to admins"
+                  placeholder={isMyanmar ? 'စီမံခန့်ခွဲသူများကို ပြသမည့် ရွေးချယ်နိုင်သော မှတ်စု' : 'Optional note shown to admins'}
                   value={lifecycleNote}
                   onChange={(e) => setLifecycleNote(e.target.value)}
                 />
               </div>
 
               <div className="rounded-[1.2rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                <p>`Active` accepts new keys and migrations.</p>
-                <p>`Draining` keeps existing keys, blocks auto-placement, and still allows explicit admin key creation.</p>
-                <p>`Maintenance` blocks all new assignments while the server is being worked on.</p>
+                <p>{isMyanmar ? '`Active` သည် သော့အသစ်များနှင့် ပြောင်းရွှေ့မှုများကို လက်ခံသည်။' : '`Active` accepts new keys and migrations.'}</p>
+                <p>{isMyanmar ? '`Draining` သည် ရှိပြီးသားသော့များကို ထိန်းသိမ်းထားပြီး အလိုအလျောက်နေရာချထားမှုကို ပိတ်ကာ စီမံခန့်ခွဲသူက ကိုယ်တိုင် သော့ဖန်တီးနိုင်သေးသည်။' : '`Draining` keeps existing keys, blocks auto-placement, and still allows explicit admin key creation.'}</p>
+                <p>{isMyanmar ? '`Maintenance` သည် ဆာဗာကို ပြုပြင်နေစဉ် ခွဲဝေမှုအသစ်အားလုံးကို ပိတ်ထားသည်။' : '`Maintenance` blocks all new assignments while the server is being worked on.'}</p>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {[
                   {
                     mode: 'ACTIVE',
-                    title: 'Active',
-                    desc: 'Normal placement and migrations allowed.',
+                    title: isMyanmar ? 'အသုံးပြုနိုင်' : 'Active',
+                    desc: isMyanmar ? 'ပုံမှန်နေရာချထားမှုနှင့် ပြောင်းရွှေ့မှုများကို ခွင့်ပြုထားသည်။' : 'Normal placement and migrations allowed.',
                     onSelect: () => {
                       setLifecycleMode('ACTIVE');
                       setAllowManualAssignmentsWhenDraining(false);
@@ -1226,8 +1272,8 @@ export default function ServerDetailPage() {
                   },
                   {
                     mode: 'DRAINING',
-                    title: 'Draining',
-                    desc: 'Auto-placement stops, but admins can still create keys manually.',
+                    title: isMyanmar ? 'ဖြည်းဖြည်းလျှော့ချနေသည်' : 'Draining',
+                    desc: isMyanmar ? 'အလိုအလျောက်နေရာချထားမှု ရပ်ပြီး စီမံခန့်ခွဲသူများက သော့များကို ကိုယ်တိုင် ဖန်တီးနိုင်သေးသည်။' : 'Auto-placement stops, but admins can still create keys manually.',
                     onSelect: () => {
                       setLifecycleMode('DRAINING');
                       setAllowManualAssignmentsWhenDraining(true);
@@ -1235,8 +1281,8 @@ export default function ServerDetailPage() {
                   },
                   {
                     mode: 'MAINTENANCE',
-                    title: 'Maintenance',
-                    desc: 'Stops assignments and enables planned-maintenance outage handling.',
+                    title: isMyanmar ? 'ထိန်းသိမ်းမှု' : 'Maintenance',
+                    desc: isMyanmar ? 'ခွဲဝေသတ်မှတ်မှုများကို ရပ်ပြီး စီစဉ်ထားသော ပြုပြင်ထိန်းသိမ်းမှု ပြတ်တောက်မှု ကိုင်တွယ်ခြင်းကို ဖွင့်သည်။' : 'Stops assignments and enables planned-maintenance outage handling.',
                     onSelect: () => {
                       setLifecycleMode('MAINTENANCE');
                       setAllowManualAssignmentsWhenDraining(false);
@@ -1265,31 +1311,35 @@ export default function ServerDetailPage() {
               </div>
 
               <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                <p className="font-medium text-foreground">Current new-key policy</p>
+                <p className="font-medium text-foreground">{isMyanmar ? 'လက်ရှိ သော့အသစ် ဖန်တီးမှု မူဝါဒ' : 'Current new-key policy'}</p>
                 {lifecycleMode === 'ACTIVE' ? (
-                  <p className="mt-1">Automatic and manual key creation are allowed.</p>
+                  <p className="mt-1">{isMyanmar ? 'အလိုအလျောက်နှင့် လက်ဖြင့် သော့ဖန်တီးခြင်း နှစ်မျိုးစလုံး ခွင့်ပြုထားသည်။' : 'Automatic and manual key creation are allowed.'}</p>
                 ) : lifecycleMode === 'DRAINING' ? (
-                  <p className="mt-1">Automatic placement is blocked. Manual admin-selected key creation is still allowed.</p>
+                  <p className="mt-1">
+                    {isMyanmar
+                      ? 'အလိုအလျောက်နေရာချထားမှုကို တားထားသည်။ စီမံခန့်ခွဲသူက ကိုယ်တိုင်ရွေးပြီး သော့ဖန်တီးခြင်းကို ဆက်လက်ခွင့်ပြုထားသည်။'
+                      : 'Automatic placement is blocked. Manual admin-selected key creation is still allowed.'}
+                  </p>
                 ) : (
-                  <p className="mt-1">All new-key creation is blocked during maintenance.</p>
+                  <p className="mt-1">{isMyanmar ? 'ထိန်းသိမ်းမှုအတွင်း သော့အသစ် ဖန်တီးခြင်းအားလုံးကို ပိတ်ထားသည်။' : 'All new-key creation is blocked during maintenance.'}</p>
                 )}
               </div>
 
               {server.lifecycleChangedAt ? (
                 <p className="text-xs text-muted-foreground">
-                  Last changed {formatRelativeTime(server.lifecycleChangedAt)}
+                  {isMyanmar ? `နောက်ဆုံး ပြောင်းလဲမှု ${formatRelativeTime(server.lifecycleChangedAt)}` : `Last changed ${formatRelativeTime(server.lifecycleChangedAt)}`}
                 </p>
               ) : null}
 
               {!canManageOutages ? (
                 <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                  Only Owner/Admin scoped accounts can change lifecycle and outage controls.
+                  {isMyanmar ? 'Owner/Admin အခွင့်အရေးရှိသော အကောင့်များသာ lifecycle နှင့် ပြတ်တောက်မှု ထိန်းချုပ်မှုများကို ပြောင်းလဲနိုင်ပါသည်။' : 'Only Owner/Admin scoped accounts can change lifecycle and outage controls.'}
                 </div>
               ) : null}
 
               <Button onClick={handleSaveLifecycle} disabled={!canManageOutages || lifecycleMutation.isPending}>
                 {lifecycleMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Save Mode
+                {isMyanmar ? 'မုဒ်ကို သိမ်းမည်' : 'Save Mode'}
               </Button>
             </CardContent>
           </Card>
@@ -1298,16 +1348,18 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Gauge className="w-5 h-5 text-amber-500" />
-                Slow health policy
+                {isMyanmar ? 'နှေးကွေးသော ကျန်းမာရေးမူဝါဒ' : 'Slow health policy'}
               </CardTitle>
               <CardDescription>
-                Set the per-server threshold for slow health, then decide when to drain, notify users, or auto-migrate keys to the best fallback target.
+                {isMyanmar
+                  ? 'ဆာဗာတစ်ခုချင်းအလိုက် ကျန်းမာရေးနှေးကွေးမှု သတ်မှတ်ချက်ကို သတ်မှတ်ပြီး လက်ခံမှုလျှော့မည့်အချိန်၊ အသုံးပြုသူများကို အသိပေးမည့်အချိန် သို့မဟုတ် သော့များကို အကောင်းဆုံး fallback ပစ်မှတ်သို့ အလိုအလျောက် ပြောင်းရွှေ့မည့်အချိန်ကို ဆုံးဖြတ်ပါ။'
+                  : 'Set the per-server threshold for slow health, then decide when to drain, notify users, or auto-migrate keys to the best fallback target.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="latencyThresholdMs">Latency threshold (ms)</Label>
+                  <Label htmlFor="latencyThresholdMs">{isMyanmar ? 'ကြာချိန် သတ်မှတ်ချက် (ms)' : 'Latency threshold (ms)'}</Label>
                   <Input
                     id="latencyThresholdMs"
                     type="number"
@@ -1318,11 +1370,15 @@ export default function ServerDetailPage() {
                   />
                 </div>
                 <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                  <p className="font-medium text-foreground">Current fallback</p>
+                  <p className="font-medium text-foreground">{isMyanmar ? 'လက်ရှိ အရန်ပစ်မှတ်' : 'Current fallback'}</p>
                   <p className="mt-1">
                     {recommendedFallbackTarget
-                      ? `${recommendedFallbackTarget.serverName} · load ${recommendedFallbackTarget.loadScore}`
-                      : 'No healthy fallback target is available right now.'}
+                      ? isMyanmar
+                        ? `${recommendedFallbackTarget.serverName} · ဖိအား ${recommendedFallbackTarget.loadScore}`
+                        : `${recommendedFallbackTarget.serverName} · load ${recommendedFallbackTarget.loadScore}`
+                      : isMyanmar
+                        ? 'လက်ရှိတွင် ကောင်းမွန်သော အရန်ပစ်မှတ် မရှိသေးပါ။'
+                        : 'No healthy fallback target is available right now.'}
                   </p>
                   {recommendedFallbackTarget?.reasons?.length ? (
                     <p className="mt-2 text-xs">
@@ -1342,9 +1398,9 @@ export default function ServerDetailPage() {
                       className="mt-1 rounded border-gray-300"
                     />
                     <div className="space-y-2">
-                      <p className="font-medium text-foreground">Auto-drain</p>
+                      <p className="font-medium text-foreground">{isMyanmar ? 'အလိုအလျောက် လက်ခံမှုလျှော့ခြင်း' : 'Auto-drain'}</p>
                       <p className="text-muted-foreground">
-                        Stop new assignments when this server stays slow.
+                        {isMyanmar ? 'ဤဆာဗာ ဆက်တိုက်နှေးကွေးနေလျှင် ခွဲဝေမှုအသစ်များကို ရပ်ပါ။' : 'Stop new assignments when this server stays slow.'}
                       </p>
                       <Input
                         type="number"
@@ -1353,7 +1409,7 @@ export default function ServerDetailPage() {
                         value={slowAutoDrainThreshold}
                         onChange={(event) => setSlowAutoDrainThreshold(event.target.value)}
                       />
-                      <p className="text-xs text-muted-foreground">Consecutive slow checks before drain.</p>
+                      <p className="text-xs text-muted-foreground">{isMyanmar ? 'လက်ခံမှုမလျှော့မီ ဆက်တိုက်နှေးကွေးသော စစ်ဆေးမှုအရေအတွက်။' : 'Consecutive slow checks before drain.'}</p>
                     </div>
                   </div>
                 </label>
@@ -1367,9 +1423,9 @@ export default function ServerDetailPage() {
                       className="mt-1 rounded border-gray-300"
                     />
                     <div className="space-y-2">
-                      <p className="font-medium text-foreground">Auto-migrate</p>
+                      <p className="font-medium text-foreground">{isMyanmar ? 'အလိုအလျောက် ပြောင်းရွှေ့ခြင်း' : 'Auto-migrate'}</p>
                       <p className="text-muted-foreground">
-                        Move affected keys to the smart fallback target after sustained slow health.
+                        {isMyanmar ? 'ဆက်တိုက် ကျန်းမာရေးနှေးကွေးမှု ဖြစ်နေပါက ထိခိုက်သော သော့များကို အရန်ပစ်မှတ်သို့ ရွှေ့ပါ။' : 'Move affected keys to the smart fallback target after sustained slow health.'}
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <Input
@@ -1387,7 +1443,7 @@ export default function ServerDetailPage() {
                           onChange={(event) => setSlowAutoMigrateGraceHours(event.target.value)}
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">Threshold checks, then user wait window in hours.</p>
+                      <p className="text-xs text-muted-foreground">{isMyanmar ? 'သတ်မှတ်ထားသော စစ်ဆေးမှုအရေအတွက် ပြည့်ပြီးနောက် အသုံးပြုသူ စောင့်ဆိုင်းချိန် (နာရီ) ကို သတ်မှတ်ပါ။' : 'Threshold checks, then user wait window in hours.'}</p>
                     </div>
                   </div>
                 </label>
@@ -1401,9 +1457,9 @@ export default function ServerDetailPage() {
                       className="mt-1 rounded border-gray-300"
                     />
                     <div className="space-y-2">
-                      <p className="font-medium text-foreground">User notice</p>
+                      <p className="font-medium text-foreground">{isMyanmar ? 'အသုံးပြုသူ အသိပေးချက်' : 'User notice'}</p>
                       <p className="text-muted-foreground">
-                        Tell affected Telegram users to wait while the route is stabilized.
+                        {isMyanmar ? 'လမ်းကြောင်းတည်ငြိမ်အောင် ပြင်နေစဉ် ထိခိုက်သော Telegram အသုံးပြုသူများကို စောင့်ပေးရန် အသိပေးပါ။' : 'Tell affected Telegram users to wait while the route is stabilized.'}
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <Input
@@ -1421,21 +1477,21 @@ export default function ServerDetailPage() {
                           onChange={(event) => setSlowUserNotifyCooldownMins(event.target.value)}
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">Threshold checks, then cooldown in minutes.</p>
+                      <p className="text-xs text-muted-foreground">{isMyanmar ? 'သတ်မှတ်ထားသော စစ်ဆေးမှုအရေအတွက် ပြည့်ပြီးနောက် အအေးချိန်ကို မိနစ်ဖြင့် သတ်မှတ်ပါ။' : 'Threshold checks, then cooldown in minutes.'}</p>
                     </div>
                   </div>
                 </label>
               </div>
 
               <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                <p>`Auto-drain` changes the server to `DRAINING` so new assignments stop.</p>
-                <p>`Auto-migrate` uses the smart fallback target and preserves user expiry and usage.</p>
-                <p>`User notice` sends a Telegram heads-up only after the configured slow streak.</p>
+                <p>{isMyanmar ? '`Auto-drain` သည် ဆာဗာကို `DRAINING` သို့ ပြောင်းကာ ခွဲဝေမှုအသစ်များကို ရပ်စေသည်။' : '`Auto-drain` changes the server to `DRAINING` so new assignments stop.'}</p>
+                <p>{isMyanmar ? '`Auto-migrate` သည် အရန်ပစ်မှတ်ကို အသုံးပြုပြီး အသုံးပြုသူ၏ သက်တမ်းကုန်ချိန်နှင့် အသုံးပြုမှုပမာဏကို ထိန်းသိမ်းပေးသည်။' : '`Auto-migrate` uses the smart fallback target and preserves user expiry and usage.'}</p>
+                <p>{isMyanmar ? '`အသုံးပြုသူ အသိပေးချက်` သည် သတ်မှတ်ထားသော နှေးကွေးမှုဆက်တိုက်အရေအတွက် ပြည့်မှသာ Telegram သတိပေးချက် ပို့သည်။' : '`User notice` sends a Telegram heads-up only after the configured slow streak.'}</p>
               </div>
 
               <Button onClick={handleSaveSlowPolicy} disabled={!canManageOutages || slowPolicyMutation.isPending}>
                 {slowPolicyMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Save Slow Policy
+                {isMyanmar ? 'နှေးကွေးသော ကျန်းမာရေးမူဝါဒကို သိမ်းမည်' : 'Save Slow Policy'}
               </Button>
             </CardContent>
           </Card>
@@ -1444,51 +1500,59 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Gauge className="w-5 h-5 text-emerald-500" />
-                Capacity-aware routing
+                {isMyanmar ? 'Capacity အလိုက် လမ်းကြောင်းညှိခြင်း' : 'Capacity-aware routing'}
               </CardTitle>
               <CardDescription>
-                Automatic key placement avoids draining, maintenance, and full servers. This shows the current preferred target.
+                {isMyanmar
+                  ? 'အလိုအလျောက် သော့နေရာချထားမှုသည် လက်ခံမှုလျှော့နေသော၊ ထိန်းသိမ်းမှုရှိသောနှင့် ပြည့်နေသော ဆာဗာများကို ရှောင်သည်။ ဤနေရာတွင် လက်ရှိ ဦးစားပေးပစ်မှတ်ကို ပြထားသည်။'
+                  : 'Automatic key placement avoids draining, maintenance, and full servers. This shows the current preferred target.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Current server pressure
+                  {isMyanmar ? 'လက်ရှိ ဆာဗာဖိအား' : 'Current server pressure'}
                 </p>
                 <p className="mt-1 text-lg font-semibold">
                   {currentServerLoad?.loadScore ?? '—'}
-                  {typeof currentServerLoad?.loadScore === 'number' ? ' load score' : ''}
+                  {typeof currentServerLoad?.loadScore === 'number' ? (isMyanmar ? ' ဖိအားရမှတ်' : ' load score') : ''}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {currentServerLoad
                     ? currentServerLoad.capacityPercent !== null
-                      ? `${currentServerLoad.capacityPercent}% capacity · ${currentServerLoad.activeKeyCount} active keys`
-                      : `${currentServerLoad.activeKeyCount} active keys · no max-key cap`
-                    : 'Load data unavailable'}
+                      ? isMyanmar
+                        ? `စွမ်းရည် ${currentServerLoad.capacityPercent}% · အသုံးပြုနေသော သော့ ${currentServerLoad.activeKeyCount} ခု`
+                        : `${currentServerLoad.capacityPercent}% capacity · ${currentServerLoad.activeKeyCount} active keys`
+                      : isMyanmar
+                        ? `အသုံးပြုနေသော သော့ ${currentServerLoad.activeKeyCount} ခု · အများဆုံးသော့ကန့်သတ်ချက် မရှိ`
+                        : `${currentServerLoad.activeKeyCount} active keys · no max-key cap`
+                    : isMyanmar
+                      ? 'ဖိအားအချက်အလက် မရရှိနိုင်ပါ'
+                      : 'Load data unavailable'}
                 </p>
               </div>
 
               <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Preferred new-key target
+                  {isMyanmar ? 'သော့အသစ်အတွက် ဦးစားပေးပစ်မှတ်' : 'Preferred new-key target'}
                 </p>
                 {recommendedAssignmentTarget ? (
                   <>
                     <p className="mt-1 text-lg font-semibold">{recommendedAssignmentTarget.serverName}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Badge variant="secondary">
-                        load {recommendedAssignmentTarget.loadScore}
+                        {isMyanmar ? 'ဖိအား' : 'load'} {recommendedAssignmentTarget.loadScore}
                       </Badge>
                       {recommendedAssignmentTarget.capacityPercent !== null ? (
                         <Badge variant="outline">
-                          {recommendedAssignmentTarget.capacityPercent}% capacity
+                          {recommendedAssignmentTarget.capacityPercent}% {isMyanmar ? 'စွမ်းရည်' : 'capacity'}
                         </Badge>
                       ) : (
-                        <Badge variant="outline">No max-key cap</Badge>
+                        <Badge variant="outline">{isMyanmar ? 'အများဆုံးသော့ကန့်သတ်ချက် မရှိ' : 'No max-key cap'}</Badge>
                       )}
                       {recommendedAssignmentTarget.availableSlots !== null ? (
                         <Badge variant="outline">
-                          {recommendedAssignmentTarget.availableSlots} slots free
+                          {recommendedAssignmentTarget.availableSlots} {isMyanmar ? 'နေရာလွတ်' : 'slots free'}
                         </Badge>
                       ) : null}
                     </div>
@@ -1500,7 +1564,7 @@ export default function ServerDetailPage() {
                   </>
                 ) : (
                   <p className="mt-1 text-sm text-muted-foreground">
-                    No assignable target is currently available.
+                    {isMyanmar ? 'လက်ရှိတွင် ခွဲဝေနိုင်သော ပစ်မှတ် မရှိသေးပါ။' : 'No assignable target is currently available.'}
                   </p>
                 )}
               </div>
@@ -1515,21 +1579,23 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
-                Outage replacement
+                {isMyanmar ? 'Outage အစားထိုးခြင်း' : 'Outage replacement'}
               </CardTitle>
               <CardDescription>
-                Quarantine this server and move all active or pending keys to a healthy replacement server.
+                {isMyanmar
+                  ? 'ဤဆာဗာကို သီးသန့်ထားပြီး အသုံးပြုဆဲ သို့မဟုတ် စောင့်ဆိုင်းနေသော သော့အားလုံးကို ကောင်းမွန်သော အစားထိုးဆာဗာသို့ ရွှေ့ပါ။'
+                  : 'Quarantine this server and move all active or pending keys to a healthy replacement server.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Replacement server</Label>
+                <Label>{isMyanmar ? 'အစားထိုး ဆာဗာ' : 'Replacement server'}</Label>
                 <Select value={outageTargetServerId} onValueChange={setOutageTargetServerId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a healthy target server" />
+                    <SelectValue placeholder={isMyanmar ? 'ကောင်းမွန်သော ပစ်မှတ်ဆာဗာကို ရွေးပါ' : 'Choose a healthy target server'} />
                   </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Select a server</SelectItem>
+                      <SelectItem value="none">{isMyanmar ? 'ဆာဗာကို ရွေးပါ' : 'Select a server'}</SelectItem>
                       {availableOutageTargets.map((candidate) => {
                         const candidateLoad = loadStatsByServerId.get(candidate.id);
                         return (
@@ -1546,12 +1612,18 @@ export default function ServerDetailPage() {
                 </Select>
                 {outageTargetServerId !== 'none' && loadStatsByServerId.get(outageTargetServerId) ? (
                   <p className="text-xs text-muted-foreground">
-                    Target load {loadStatsByServerId.get(outageTargetServerId)?.loadScore}
+                    {isMyanmar ? 'ပစ်မှတ်ဖိအား' : 'Target load'} {loadStatsByServerId.get(outageTargetServerId)?.loadScore}
                     {loadStatsByServerId.get(outageTargetServerId)?.capacityPercent != null
-                      ? ` · ${loadStatsByServerId.get(outageTargetServerId)?.capacityPercent}% capacity`
-                      : ' · no max-key cap'}
+                      ? isMyanmar
+                        ? ` · capacity ${loadStatsByServerId.get(outageTargetServerId)?.capacityPercent}%`
+                        : ` · ${loadStatsByServerId.get(outageTargetServerId)?.capacityPercent}% capacity`
+                      : isMyanmar
+                        ? ' · max-key cap မရှိ'
+                        : ' · no max-key cap'}
                     {loadStatsByServerId.get(outageTargetServerId)?.availableSlots != null
-                      ? ` · ${loadStatsByServerId.get(outageTargetServerId)?.availableSlots} free slots`
+                      ? isMyanmar
+                        ? ` · နေရာလွတ် ${loadStatsByServerId.get(outageTargetServerId)?.availableSlots} ခု`
+                        : ` · ${loadStatsByServerId.get(outageTargetServerId)?.availableSlots} free slots`
                       : ''}
                   </p>
                 ) : null}
@@ -1559,21 +1631,23 @@ export default function ServerDetailPage() {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>User wait notice</Label>
+                  <Label>{isMyanmar ? 'အသုံးပြုသူ စောင့်ဆိုင်းမှု အသိပေးချိန်' : 'User wait notice'}</Label>
                   <Select value={outageGraceHours} onValueChange={setOutageGraceHours}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="2">2 hours</SelectItem>
-                      <SelectItem value="3">3 hours</SelectItem>
+                      <SelectItem value="2">{isMyanmar ? '၂ နာရီ' : '2 hours'}</SelectItem>
+                      <SelectItem value="3">{isMyanmar ? '၃ နာရီ' : '3 hours'}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                  <p className="font-medium text-foreground">Policy</p>
+                  <p className="font-medium text-foreground">{isMyanmar ? 'မူဝါဒ' : 'Policy'}</p>
                   <p className="mt-1">
-                    Admin outage replacements preserve expiry and usage, and do not consume the user’s 3-change limit.
+                    {isMyanmar
+                      ? 'စီမံခန့်ခွဲရေး outage replacement များသည် expiry နှင့် usage ကို ထိန်းသိမ်းထားပြီး အသုံးပြုသူ၏ ၃ ကြိမ်ပြောင်းနိုင်ခွင့်ကို မစားသုံးပါ။'
+                      : 'Admin outage replacements preserve expiry and usage, and do not consume the user’s 3-change limit.'}
                   </p>
                 </div>
               </div>
@@ -1586,49 +1660,65 @@ export default function ServerDetailPage() {
                   className="mt-1 rounded border-gray-300"
                 />
                 <span className="text-muted-foreground">
-                  Send Telegram recovery messages after the migration completes. Delayed outage warnings will still go out if the server stays down during the grace window.
+                    {isMyanmar
+                      ? 'migration ပြီးဆုံးပြီးနောက် Telegram recovery message များ ပို့မည်။ grace window အတွင်း server မပြန်ကောင်းသေးပါက နှောင့်နှေးထားသော outage warning များကိုလည်း ဆက်ပို့မည်။'
+                      : 'Send Telegram recovery messages after the migration completes. Delayed outage warnings will still go out if the server stays down during the grace window.'}
                 </span>
               </label>
 
               <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 text-sm dark:bg-white/[0.03]">
-                <p className="font-medium text-foreground">Affected keys</p>
+                <p className="font-medium text-foreground">{isMyanmar ? 'ထိခိုက်သော သော့များ' : 'Affected keys'}</p>
                 <p className="mt-1 text-muted-foreground">
                   {outageTargetServerId === 'none'
-                    ? 'Choose a target server to preview how many keys will move.'
+                    ? isMyanmar
+                      ? 'ရွှေ့မည့် သော့အရေအတွက်ကို ကြည့်ရန် ပစ်မှတ်ဆာဗာကို ရွေးပါ။'
+                      : 'Choose a target server to preview how many keys will move.'
                     : outagePreviewQuery.isLoading
-                      ? 'Loading outage preview...'
+                      ? isMyanmar
+                        ? 'outage preview ကို တင်နေသည်...'
+                        : 'Loading outage preview...'
                       : outagePreviewQuery.data
-                        ? `${outagePreviewQuery.data.totalKeys} active or pending key(s) will move from ${outagePreviewQuery.data.sourceServer.name} to ${outagePreviewQuery.data.targetServer.name}.`
-                        : 'No preview available yet.'}
+                        ? isMyanmar
+                          ? `${outagePreviewQuery.data.totalKeys} အသုံးပြုဆဲ သို့မဟုတ် စောင့်ဆိုင်းနေသော သော့များကို ${outagePreviewQuery.data.sourceServer.name} မှ ${outagePreviewQuery.data.targetServer.name} သို့ ရွှေ့မည်။`
+                          : `${outagePreviewQuery.data.totalKeys} active or pending key(s) will move from ${outagePreviewQuery.data.sourceServer.name} to ${outagePreviewQuery.data.targetServer.name}.`
+                        : isMyanmar
+                          ? 'preview မရရှိသေးပါ။'
+                          : 'No preview available yet.'}
                 </p>
                 {outagePreviewQuery.data ? (
                   <div className="mt-3 grid gap-3 md:grid-cols-3">
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Telegram users
+                        {isMyanmar ? 'Telegram အသုံးပြုသူများ' : 'Telegram users'}
                       </p>
                       <p className="mt-1 text-xl font-semibold">{outagePreviewQuery.data.affectedTelegramUsers}</p>
                       <p className="text-xs text-muted-foreground">
-                        {outagePreviewQuery.data.telegramEligibleKeys} key(s) can receive outage updates.
+                        {isMyanmar
+                          ? `${outagePreviewQuery.data.telegramEligibleKeys} သော့များသည် ပြတ်တောက်မှုအပ်ဒိတ်ကို လက်ခံနိုင်သည်။`
+                          : `${outagePreviewQuery.data.telegramEligibleKeys} key(s) can receive outage updates.`}
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Sample keys
+                        {isMyanmar ? 'နမူနာ သော့များ' : 'Sample keys'}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {outagePreviewQuery.data.sampleKeyNames.length > 0
                           ? outagePreviewQuery.data.sampleKeyNames.join(', ')
-                          : 'No active keys on this server.'}
+                          : isMyanmar
+                            ? 'ဤဆာဗာပေါ်တွင် အသုံးပြုဆဲ သော့မရှိပါ။'
+                            : 'No active keys on this server.'}
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Linked premium requests
+                        {isMyanmar ? 'ချိတ်ဆက်ထားသော premium တောင်းဆိုမှုများ' : 'Linked premium requests'}
                       </p>
                       <p className="mt-1 text-xl font-semibold">{outagePreviewQuery.data.linkedPremiumRequestCount}</p>
                       <p className="text-xs text-muted-foreground">
-                        Premium route issues or region requests tied to this server.
+                        {isMyanmar
+                          ? 'ဤ server နှင့် ချိတ်ဆက်ထားသော premium route issue သို့မဟုတ် region request များ'
+                          : 'Premium route issues or region requests tied to this server.'}
                       </p>
                     </div>
                   </div>
@@ -1636,7 +1726,7 @@ export default function ServerDetailPage() {
                 {outagePreviewQuery.data?.linkedPremiumRequests?.length ? (
                   <div className="mt-3 rounded-xl border border-border/40 bg-background/35 p-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Premium requests that will be linked to this outage
+                      {isMyanmar ? 'ဤပြတ်တောက်မှုနှင့် ချိတ်ဆက်မည့် premium တောင်းဆိုမှုများ' : 'Premium requests that will be linked to this outage'}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {outagePreviewQuery.data.linkedPremiumRequests.map((request) => (
@@ -1671,7 +1761,7 @@ export default function ServerDetailPage() {
                 ) : (
                   <AlertTriangle className="w-4 h-4 mr-2" />
                 )}
-                Quarantine and replace all affected keys
+                {isMyanmar ? 'ထိခိုက်သော သော့အားလုံးကို သီးသန့်ထားပြီး အစားထိုးမည်' : 'Quarantine and replace all affected keys'}
               </Button>
             </CardContent>
           </Card>
@@ -1680,10 +1770,12 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ArrowRightLeft className="w-5 h-5 text-cyan-500" />
-                Migration progress
+                {isMyanmar ? 'Migration အခြေအနေ' : 'Migration progress'}
               </CardTitle>
               <CardDescription>
-                Track how many keys were affected, moved, and still need attention for the current outage.
+                {isMyanmar
+                  ? 'လက်ရှိ ပြတ်တောက်မှုအတွက် သော့မည်မျှ ထိခိုက်၊ ရွှေ့ပြီး၊ စောင့်ကြည့်ရန် ကျန်သေးသည်ကို စစ်ဆေးပါ။'
+                  : 'Track how many keys were affected, moved, and still need attention for the current outage.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1691,19 +1783,19 @@ export default function ServerDetailPage() {
                 <>
                   <div className="grid gap-3 md:grid-cols-4">
                     <div className="rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Affected</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ထိခိုက်' : 'Affected'}</p>
                       <p className="mt-1 text-xl font-semibold">{activeOutageTotal}</p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Migrated</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ရွှေ့ပြီး' : 'Migrated'}</p>
                       <p className="mt-1 text-xl font-semibold">{activeOutageMigrated}</p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Needs attention</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'အာရုံစိုက်ရန် လိုအပ်' : 'Needs attention'}</p>
                       <p className="mt-1 text-xl font-semibold">{activeOutageFailed}</p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recovery notifications</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'Recovery အသိပေးချက်များ' : 'Recovery notifications'}</p>
                       <p className="mt-1 text-xl font-semibold">
                         {activeOutageIncident.recoveryNotificationCount ?? currentOutageState.recoveryNotificationCount ?? 0}
                       </p>
@@ -1711,24 +1803,30 @@ export default function ServerDetailPage() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Migration completion</span>
+                      <span className="text-muted-foreground">{isMyanmar ? 'Migration ပြီးစီးမှု' : 'Migration completion'}</span>
                       <span>{activeOutageProgress}%</span>
                     </div>
                     <Progress value={activeOutageProgress} className="h-2" />
                   </div>
                   <div className="rounded-[1.1rem] border border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
                     <p>
-                      Target server:{' '}
+                      {isMyanmar ? 'ပစ်မှတ် ဆာဗာ:' : 'Target server:'}{' '}
                       <span className="font-medium text-foreground">
-                        {activeOutageIncident.migrationTargetServerName || currentOutageState.migrationTargetServerName || 'Not selected yet'}
+                        {activeOutageIncident.migrationTargetServerName || currentOutageState.migrationTargetServerName || (isMyanmar ? 'မရွေးထားသေးပါ' : 'Not selected yet')}
                       </span>
                     </p>
                     <p className="mt-1">
                       {currentOutageState.migrationTriggeredAt
-                        ? `Started ${formatRelativeTime(currentOutageState.migrationTriggeredAt)}`
-                        : 'Migration has not started yet.'}
+                        ? isMyanmar
+                          ? `${formatRelativeTime(currentOutageState.migrationTriggeredAt)} က စတင်ခဲ့သည်`
+                          : `Started ${formatRelativeTime(currentOutageState.migrationTriggeredAt)}`
+                        : isMyanmar
+                          ? 'Migration ကို မစတင်သေးပါ။'
+                          : 'Migration has not started yet.'}
                       {currentOutageState.migrationCompletedAt
-                        ? ` · completed ${formatRelativeTime(currentOutageState.migrationCompletedAt)}`
+                        ? isMyanmar
+                          ? ` · ${formatRelativeTime(currentOutageState.migrationCompletedAt)} က ပြီးဆုံးခဲ့သည်`
+                          : ` · completed ${formatRelativeTime(currentOutageState.migrationCompletedAt)}`
                         : ''}
                     </p>
                     {currentOutageState.lastError ? (
@@ -1738,7 +1836,7 @@ export default function ServerDetailPage() {
                 </>
               ) : (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                  No active migration is running for this server right now.
+                  {isMyanmar ? 'ဤဆာဗာအတွက် လက်ရှိ ပြောင်းရွှေ့မှု မလုပ်ဆောင်နေပါ။' : 'No active migration is running for this server right now.'}
                 </div>
               )}
             </CardContent>
@@ -1748,10 +1846,12 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-cyan-500" />
-                Outage updates
+                {isMyanmar ? 'Outage အပ်ဒိတ်များ' : 'Outage updates'}
               </CardTitle>
               <CardDescription>
-                Send a Telegram follow-up to affected users while the outage is active, or close the outage early if the server recovers.
+                {isMyanmar
+                  ? 'Outage အခြေအနေ ဆက်ရှိနေစဉ် ထိခိုက်သော အသုံးပြုသူများထံ Telegram နောက်ဆက်တွဲ အသိပေးချက် ပို့ပါ၊ သို့မဟုတ် server ပြန်ကောင်းလျှင် outage ကို စောစီးစွာ ပိတ်ပါ။'
+                  : 'Send a Telegram follow-up to affected users while the outage is active, or close the outage early if the server recovers.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1760,7 +1860,7 @@ export default function ServerDetailPage() {
                   <div className="grid gap-3 md:grid-cols-3">
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Started
+                        {isMyanmar ? 'စတင်ချိန်' : 'Started'}
                       </p>
                       <p className="mt-1 text-sm font-medium">
                         {formatRelativeTime(server.outageState.startedAt)}
@@ -1771,38 +1871,42 @@ export default function ServerDetailPage() {
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        User alert
+                        {isMyanmar ? 'အသုံးပြုသူ အသိပေးချက်' : 'User alert'}
                       </p>
                       <p className="mt-1 text-sm font-medium">
                         {server.outageState.userAlertSentAt
-                          ? `Sent ${formatRelativeTime(server.outageState.userAlertSentAt)}`
-                          : `Scheduled ${formatRelativeTime(server.outageState.userAlertScheduledFor)}`}
+                          ? isMyanmar
+                            ? `${formatRelativeTime(server.outageState.userAlertSentAt)} က ပို့ပြီး`
+                            : `Sent ${formatRelativeTime(server.outageState.userAlertSentAt)}`
+                          : isMyanmar
+                            ? `${formatRelativeTime(server.outageState.userAlertScheduledFor)} တွင် ပို့ရန် စီစဉ်ထားသည်`
+                            : `Scheduled ${formatRelativeTime(server.outageState.userAlertScheduledFor)}`}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Grace window: {server.outageState.gracePeriodHours} hour(s)
+                        {isMyanmar ? `စောင့်ဆိုင်းချိန်: ${server.outageState.gracePeriodHours} နာရီ` : `Grace window: ${server.outageState.gracePeriodHours} hour(s)`}
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Current incident
+                        {isMyanmar ? 'လက်ရှိ ဖြစ်ရပ်' : 'Current incident'}
                       </p>
                       <p className="mt-1 text-sm font-medium">
-                        {activeOutageIncident?.incidentCode || 'Open outage'}
+                        {activeOutageIncident?.incidentCode || (isMyanmar ? 'ဖွင့်ထားသော ပြတ်တောက်မှု' : 'Open outage')}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {activeOutageIncident?.premiumSupportRequests?.length || 0} linked premium request(s)
+                        {activeOutageIncident?.premiumSupportRequests?.length || 0} {isMyanmar ? 'ချိတ်ဆက်ထားသော premium တောင်းဆိုမှု' : 'linked premium request(s)'}
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="outageFollowUpMessage">Telegram follow-up</Label>
+                    <Label htmlFor="outageFollowUpMessage">{isMyanmar ? 'Telegram နောက်ဆက်တွဲ အသိပေးချက်' : 'Telegram follow-up'}</Label>
                     <Textarea
                       id="outageFollowUpMessage"
                       rows={4}
                       value={outageFollowUpMessage}
                       onChange={(event) => setOutageFollowUpMessage(event.target.value)}
-                      placeholder="We are still working on the replacement. Please wait a little longer."
+                      placeholder={isMyanmar ? 'အစားထိုးပြင်ဆင်မှုကို ဆက်လက်လုပ်ဆောင်နေဆဲဖြစ်သည်။ ခဏလောက် ထပ်စောင့်ပေးပါ။' : 'We are still working on the replacement. Please wait a little longer.'}
                     />
                   </div>
 
@@ -1814,11 +1918,13 @@ export default function ServerDetailPage() {
                       disabled={!canManageOutages}
                       onClick={() =>
                         setOutageFollowUpMessage(
-                          'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
+                          isMyanmar
+                            ? 'Server အသစ်ပြင်ဆင်နေဆဲဖြစ်သဖြင့် အစားထိုးပေးခြင်းကို ဆက်လက်လုပ်ဆောင်နေပါသည်။ ခဏလောက် ထပ်စောင့်ပေးပါ။'
+                            : 'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
                         )
                       }
                     >
-                      Still working
+                      {isMyanmar ? 'ဆက်လက်လုပ်ဆောင်နေဆဲ' : 'Still working'}
                     </Button>
                     <Button
                       type="button"
@@ -1827,11 +1933,13 @@ export default function ServerDetailPage() {
                       disabled={!canManageOutages}
                       onClick={() =>
                         setOutageFollowUpMessage(
-                          'The server recovered earlier than expected. Please try using your key again now.',
+                          isMyanmar
+                            ? 'ခန့်မှန်းထားသည်ထက် စောပြီး ဆာဗာ ပြန်လည်ကောင်းမွန်လာပါသည်။ သင့်သော့ကို ယခုပြန်စမ်းသုံးကြည့်ပါ။'
+                            : 'The server recovered earlier than expected. Please try using your key again now.',
                         )
                       }
                     >
-                      Resolved early
+                      {isMyanmar ? 'စောစီးစွာ ဖြေရှင်းပြီး' : 'Resolved early'}
                     </Button>
                   </div>
 
@@ -1851,7 +1959,7 @@ export default function ServerDetailPage() {
                       {outageFollowUpMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
-                      Send follow-up
+                      {isMyanmar ? 'နောက်ဆက်တွဲ အသိပေးချက် ပို့မည်' : 'Send follow-up'}
                     </Button>
                     <Button
                       type="button"
@@ -1870,13 +1978,13 @@ export default function ServerDetailPage() {
                       ) : (
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                       )}
-                      Send resolution update
+                      {isMyanmar ? 'ဖြေရှင်းပြီးကြောင်း update ပို့မည်' : 'Send resolution update'}
                     </Button>
                   </div>
                 </>
               ) : (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                  There is no active outage on this server right now.
+                  {isMyanmar ? 'ဤဆာဗာတွင် လက်ရှိ ပြတ်တောက်မှု မရှိပါ။' : 'There is no active outage on this server right now.'}
                 </div>
               )}
             </CardContent>
@@ -1886,15 +1994,17 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ExternalLink className="w-5 h-5 text-primary" />
-                Manual Telegram notice
+                {isMyanmar ? 'ကိုယ်တိုင် Telegram အသိပေးချက်' : 'Manual Telegram notice'}
               </CardTitle>
               <CardDescription>
-                Send a direct downtime or issue update to all Telegram-linked users on this server.
+                {isMyanmar
+                  ? 'ဤ server နှင့် ချိတ်ထားသော Telegram အသုံးပြုသူများအားလုံးထံ issue သို့မဟုတ် downtime update ကို တိုက်ရိုက်ပို့ပါ။'
+                  : 'Send a direct downtime or issue update to all Telegram-linked users on this server.'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Notice type</Label>
+                <Label>{isMyanmar ? 'အသိပေးချက် အမျိုးအစား' : 'Notice type'}</Label>
                 <Select
                   value={manualNoticeType}
                   onValueChange={(value) =>
@@ -1905,15 +2015,15 @@ export default function ServerDetailPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ISSUE">Issue</SelectItem>
-                    <SelectItem value="DOWNTIME">Downtime</SelectItem>
-                    <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+                    <SelectItem value="ISSUE">{isMyanmar ? 'ပြဿနာ' : 'Issue'}</SelectItem>
+                    <SelectItem value="DOWNTIME">{isMyanmar ? 'မရရှိနိုင်ချိန်' : 'Downtime'}</SelectItem>
+                    <SelectItem value="MAINTENANCE">{isMyanmar ? 'ပြုပြင်ထိန်းသိမ်းမှု' : 'Maintenance'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="manualNoticeMessage">Message</Label>
+                <Label htmlFor="manualNoticeMessage">{isMyanmar ? 'မက်ဆေ့ချ်' : 'Message'}</Label>
                 <Textarea
                   id="manualNoticeMessage"
                   rows={4}
@@ -1923,7 +2033,9 @@ export default function ServerDetailPage() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                The Telegram bot will include the configured support button automatically if a support link is available.
+                {isMyanmar
+                  ? 'Support link ရှိပါက Telegram bot သည် သတ်မှတ်ထားသော support button ကို အလိုအလျောက် ထည့်ပေးမည်။'
+                  : 'The Telegram bot will include the configured support button automatically if a support link is available.'}
               </p>
 
               <Button
@@ -1940,7 +2052,7 @@ export default function ServerDetailPage() {
                 {manualNoticeMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
-                Send Telegram notice
+                {isMyanmar ? 'Telegram အသိပေးချက် ပို့မည်' : 'Send Telegram notice'}
               </Button>
             </CardContent>
           </Card>
@@ -1951,20 +2063,22 @@ export default function ServerDetailPage() {
       <div className="space-y-6">
           <Card className="ops-detail-card">
             <CardHeader>
-              <CardTitle>Outage history</CardTitle>
+              <CardTitle>{isMyanmar ? 'Outage မှတ်တမ်း' : 'Outage history'}</CardTitle>
               <CardDescription>
-                Review past outages, replacement targets, follow-ups, and linked premium support requests for this server.
+                {isMyanmar
+                  ? 'ဤ server ၏ ယခင် outage များ၊ အစားထိုး target များ၊ နောက်ဆက်တွဲ update များနှင့် ချိတ်ဆက်ထားသော premium support request များကို ကြည့်ရှုပါ။'
+                  : 'Review past outages, replacement targets, follow-ups, and linked premium support requests for this server.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {outageHistoryQuery.isLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading outage history…
+                  {isMyanmar ? 'ပြတ်တောက်မှုမှတ်တမ်းကို တင်နေသည်…' : 'Loading outage history…'}
                 </div>
               ) : !outageHistoryQuery.data || outageHistoryQuery.data.length === 0 ? (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 bg-background/35 p-4 text-sm text-muted-foreground dark:bg-white/[0.03]">
-                  No outage history for this server yet.
+                  {isMyanmar ? 'ဤဆာဗာအတွက် ပြတ်တောက်မှုမှတ်တမ်း မရှိသေးပါ။' : 'No outage history for this server yet.'}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1973,49 +2087,57 @@ export default function ServerDetailPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold">{incident.incidentCode}</p>
                         <Badge variant="outline">{incident.status}</Badge>
-                        <Badge variant="secondary">{incident.cause === 'MANUAL_OUTAGE' ? 'Manual outage' : 'Health outage'}</Badge>
+                        <Badge variant="secondary">
+                          {incident.cause === 'MANUAL_OUTAGE'
+                            ? isMyanmar
+                              ? 'ကိုယ်တိုင် outage'
+                              : 'Manual outage'
+                            : isMyanmar
+                              ? 'ကျန်းမာရေးစစ်ဆေးမှု outage'
+                              : 'Health outage'}
+                        </Badge>
                         {incident.migrationTargetServerName ? (
-                          <Badge variant="outline">Target: {incident.migrationTargetServerName}</Badge>
+                          <Badge variant="outline">{isMyanmar ? 'ပစ်မှတ်' : 'Target'}: {incident.migrationTargetServerName}</Badge>
                         ) : null}
                       </div>
                       <div className="mt-3 grid gap-3 md:grid-cols-4">
                         <div className="rounded-xl border border-border/40 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Started</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'စတင်ချိန်' : 'Started'}</p>
                           <p className="mt-1 text-sm font-medium">{formatRelativeTime(incident.startedAt)}</p>
                         </div>
                         <div className="rounded-xl border border-border/40 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Affected keys</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ထိခိုက်သော သော့များ' : 'Affected keys'}</p>
                           <p className="mt-1 text-sm font-medium">{incident.initialAffectedKeyCount || incident.affectedKeyCount}</p>
                         </div>
                         <div className="rounded-xl border border-border/40 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Telegram users</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'Telegram အသုံးပြုသူများ' : 'Telegram users'}</p>
                           <p className="mt-1 text-sm font-medium">{incident.affectedTelegramUsers}</p>
                         </div>
                         <div className="rounded-xl border border-border/40 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recovered</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ပြန်လည်ကောင်းမွန်ချိန်' : 'Recovered'}</p>
                           <p className="mt-1 text-sm font-medium">
-                            {incident.recoveredAt ? formatRelativeTime(incident.recoveredAt) : 'Still open'}
+                            {incident.recoveredAt ? formatRelativeTime(incident.recoveredAt) : isMyanmar ? 'ဆက်လက်ဖွင့်ထားဆဲ' : 'Still open'}
                           </p>
                         </div>
                       </div>
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
                         <div className="rounded-xl border border-border/40 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Migrated</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ပြောင်းရွှေ့ပြီး' : 'Migrated'}</p>
                           <p className="mt-1 text-sm font-medium">{incident.migratedKeyCount || 0}</p>
                         </div>
                         <div className="rounded-xl border border-border/40 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Needs attention</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ဆက်လက်ကြည့်ရှုရန်' : 'Needs attention'}</p>
                           <p className="mt-1 text-sm font-medium">{incident.failedKeyCount || 0}</p>
                         </div>
                         <div className="rounded-xl border border-border/40 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Recovery notifications</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ပြန်လည်သတိပေးချက်များ' : 'Recovery notifications'}</p>
                           <p className="mt-1 text-sm font-medium">{incident.recoveryNotificationCount || 0}</p>
                         </div>
                       </div>
                       {(incident.initialAffectedKeyCount || incident.affectedKeyCount) > 0 ? (
                         <div className="mt-3 space-y-2">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Migration progress</span>
+                            <span>{isMyanmar ? 'Migration အခြေအနေ' : 'Migration progress'}</span>
                             <span>
                               {Math.round(((incident.migratedKeyCount || 0) / (incident.initialAffectedKeyCount || incident.affectedKeyCount || 1)) * 100)}%
                             </span>

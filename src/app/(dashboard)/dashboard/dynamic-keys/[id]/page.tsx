@@ -203,7 +203,8 @@ function EditDAKDialog({
   };
   onSuccess: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: dakData.name,
@@ -331,9 +332,9 @@ function EditDAKDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(820px,calc(100vw-2rem))]">
         <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
-          <DialogTitle>Edit Dynamic Key</DialogTitle>
+          <DialogTitle>{t('dynamic_keys.dialog.edit_title')}</DialogTitle>
           <DialogDescription>
-            Update the dynamic key configuration.
+            {t('dynamic_keys.dialog.edit_desc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -341,14 +342,16 @@ function EditDAKDialog({
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Identity and access window</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'အမှတ်အသားနှင့် အသုံးပြုခွင့် ပြတင်းပေါက်' : 'Identity and access window'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Keep the customer-facing details, quota, and expiry settings aligned for this routing profile.
+                  {isMyanmar
+                    ? 'ဤလမ်းကြောင်းသတ်မှတ်ချက်အတွက် ဖောက်သည်မြင်ရမည့် အချက်အလက်များ၊ ဒေတာကန့်သတ်ချက်နှင့် သက်တမ်းဆက်တင်များကို ကိုက်ညီအောင် ထိန်းထားပါ။'
+                    : 'Keep the customer-facing details, quota, and expiry settings aligned for this routing profile.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="editName">Name</Label>
+                  <Label htmlFor="editName">{isMyanmar ? 'အမည်' : 'Name'}</Label>
                   <Input
                     id="editName"
                     value={formData.name}
@@ -357,7 +360,7 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editEmail">Email</Label>
+                  <Label htmlFor="editEmail">{isMyanmar ? 'အီးမေးလ်' : 'Email'}</Label>
                   <Input
                     id="editEmail"
                     type="email"
@@ -367,7 +370,7 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editTelegram">Telegram ID</Label>
+                  <Label htmlFor="editTelegram">{isMyanmar ? 'Telegram အိုင်ဒီ' : 'Telegram ID'}</Label>
                   <Input
                     id="editTelegram"
                     value={formData.telegramId}
@@ -376,11 +379,11 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editDataLimit">Data limit (GB)</Label>
+                  <Label htmlFor="editDataLimit">{isMyanmar ? 'ဒေတာကန့်သတ်ချက် (GB)' : 'Data limit (GB)'}</Label>
                   <Input
                     id="editDataLimit"
                     type="number"
-                    placeholder="Leave empty for unlimited"
+                    placeholder={isMyanmar ? 'မကန့်သတ်လိုပါက ဗလာထားပါ' : 'Leave empty for unlimited'}
                     value={formData.dataLimitGB}
                     onChange={(e) => setFormData({ ...formData, dataLimitGB: e.target.value })}
                     min="0"
@@ -389,28 +392,32 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editMaxDevices">Managed device limit (estimated)</Label>
+                  <Label htmlFor="editMaxDevices">{isMyanmar ? 'စီမံထားသော စက်အရေအတွက် ကန့်သတ်ချက် (ခန့်မှန်း)' : 'Managed device limit (estimated)'}</Label>
                   <Input
                     id="editMaxDevices"
                     type="number"
                     min="1"
                     max="20"
-                    placeholder="Leave blank for no limit"
+                    placeholder={isMyanmar ? 'ကန့်သတ်ချက် မရှိစေရန် ဗလာထားပါ' : 'Leave blank for no limit'}
                     value={formData.maxDevices}
                     onChange={(e) => setFormData({ ...formData, maxDevices: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Recommended for stronger anti-sharing. Customers stay on the managed share page or Outline client URL instead of receiving one reusable raw ss:// secret.
+                    {isMyanmar
+                      ? 'ပိုမိုခိုင်မာသော မျှဝေမှုပိတ်ဆို့မှုအတွက် အကြံပြုပါသည်။ ဖောက်သည်များသည် ပြန်လည်အသုံးပြုနိုင်သော raw ss:// secret တစ်ခုကို မရဘဲ စီမံထားသော မျှဝေစာမျက်နှာ သို့မဟုတ် Outline client URL ပေါ်တွင်သာ ရှိနေမည်ဖြစ်သည်။'
+                      : 'Recommended for stronger anti-sharing. Customers stay on the managed share page or Outline client URL instead of receiving one reusable raw ss:// secret.'}
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/55 px-4 py-3 sm:col-span-2 dark:bg-white/[0.03]">
                   <div className="space-y-0.5">
                     <Label htmlFor="editBoundDeviceInstallsOnly" className="text-sm font-medium">
-                      Keep managed install flow only
+                      {isMyanmar ? 'စီမံထားသော ထည့်သွင်းလမ်းကြောင်းကိုသာ ထိန်းမည်' : 'Keep managed install flow only'}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Hide the reusable raw config from customer-facing install screens and keep installs tied to the share page or Outline client URL when a device limit is set.
+                      {isMyanmar
+                        ? 'စက်ကန့်သတ်ချက် သတ်မှတ်ထားသည့်အခါ ဖောက်သည်မြင်ရမည့် ထည့်သွင်းမျက်နှာပြင်များတွင် ပြန်သုံးနိုင်သော raw config ကို ဖျောက်ထားပြီး ထည့်သွင်းမှုများကို မျှဝေစာမျက်နှာ သို့မဟုတ် Outline client URL နှင့်သာ ချိတ်ဆက်ထားစေပါမည်။'
+                        : 'Hide the reusable raw config from customer-facing install screens and keep installs tied to the share page or Outline client URL when a device limit is set.'}
                     </p>
                   </div>
                   <Switch
@@ -424,22 +431,24 @@ function EditDAKDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editDuration">Duration (days)</Label>
+                  <Label htmlFor="editDuration">{locale === 'my' ? 'သက်တမ်း (ရက်)' : 'Duration (days)'}</Label>
                   <Input
                     id="editDuration"
                     type="number"
-                    placeholder="e.g., 30, 45, 60"
+                    placeholder={locale === 'my' ? 'ဥပမာ 30၊ 45၊ 60' : 'e.g., 30, 45, 60'}
                     value={formData.durationDays}
                     onChange={(e) => setFormData({ ...formData, durationDays: e.target.value })}
                     min="1"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Recalculates the expiration date from the duration you set here.
+                    {locale === 'my'
+                      ? 'ဤနေရာတွင် သတ်မှတ်ထားသော ရက်အရေအတွက်အတိုင်း သက်တမ်းကုန်ရက်ကို ပြန်တွက်မည်။'
+                      : 'Recalculates the expiration date from the duration you set here.'}
                   </p>
                 </div>
 
                 <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="editExpiration">Expiration date</Label>
+                  <Label htmlFor="editExpiration">{locale === 'my' ? 'သက်တမ်းကုန်ရက်' : 'Expiration date'}</Label>
                   <Input
                     id="editExpiration"
                     type="date"
@@ -452,42 +461,52 @@ function EditDAKDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Routing strategy</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'လမ်းကြောင်းဆိုင်ရာ မူဝါဒ' : 'Routing strategy'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Choose how traffic is distributed and which regions or servers should be preferred first.
+                  {locale === 'my'
+                    ? 'Traffic ကို ဘယ်လိုခွဲမည်၊ မည်သည့် region သို့မဟုတ် server များကို အရင်ဦးစားပေးမည်ကို သတ်မှတ်ပါ။'
+                    : 'Choose how traffic is distributed and which regions or servers should be preferred first.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Load balancer algorithm</Label>
+                  <Label>{locale === 'my' ? 'ဝန်ခွဲစနစ် အယ်လဂိုရီသမ်' : 'Load balancer algorithm'}</Label>
                   <Select
                     value={formData.loadBalancerAlgorithm}
                     onValueChange={(value) => setFormData({ ...formData, loadBalancerAlgorithm: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select algorithm" />
+                      <SelectValue placeholder={locale === 'my' ? 'အယ်လဂိုရီသမ်ကို ရွေးပါ' : 'Select algorithm'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="IP_HASH">IP Hash (consistent)</SelectItem>
-                      <SelectItem value="RANDOM">Random</SelectItem>
-                      <SelectItem value="ROUND_ROBIN">Round robin</SelectItem>
-                      <SelectItem value="LEAST_LOAD">Least load (smart)</SelectItem>
+                      <SelectItem value="IP_HASH">{locale === 'my' ? 'IP Hash (တည်ငြိမ်)' : 'IP Hash (consistent)'}</SelectItem>
+                      <SelectItem value="RANDOM">{locale === 'my' ? 'ကျပန်း' : 'Random'}</SelectItem>
+                      <SelectItem value="ROUND_ROBIN">{locale === 'my' ? 'အလှည့်ကျ' : 'Round robin'}</SelectItem>
+                      <SelectItem value="LEAST_LOAD">{locale === 'my' ? 'ဝန်အနည်းဆုံး (စမတ်)' : 'Least load (smart)'}</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     {formData.loadBalancerAlgorithm === 'LEAST_LOAD'
-                      ? 'Routes to the server with the lowest current load.'
+                      ? (locale === 'my'
+                        ? 'လက်ရှိ ဝန်အနည်းဆုံးရှိသော server သို့ ပို့ဆောင်မည်။'
+                        : 'Routes to the server with the lowest current load.')
                       : formData.loadBalancerAlgorithm === 'IP_HASH'
-                        ? 'Keeps the same client IP on the same backend when possible.'
+                        ? (locale === 'my'
+                          ? 'ဖြစ်နိုင်လျှင် client IP တစ်ခုကို backend တစ်ခုတည်းပေါ်တွင် တည်ငြိမ်စွာ ထားမည်။'
+                          : 'Keeps the same client IP on the same backend when possible.')
                         : formData.loadBalancerAlgorithm === 'ROUND_ROBIN'
-                          ? 'Cycles through backends in sequence.'
-                          : 'Chooses a backend randomly.'}
+                          ? (locale === 'my'
+                            ? 'backend များကို အစဉ်လိုက် အလှည့်ကျ အသုံးပြုမည်။'
+                            : 'Cycles through backends in sequence.')
+                          : (locale === 'my'
+                            ? 'backend တစ်ခုကို ကျပန်းရွေးချယ်မည်။'
+                            : 'Chooses a backend randomly.')}
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Preferred routing order</Label>
+                  <Label>{locale === 'my' ? 'ဦးစားပေး လမ်းကြောင်းအစီအစဉ်' : 'Preferred routing order'}</Label>
                   <DynamicRoutingPreferencesEditor
                     preferredRegionMode={formData.preferredRegionMode}
                     serverTagIds={formData.serverTagIds}
@@ -518,9 +537,11 @@ function EditDAKDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Rotation and auto recovery</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'လှည့်ပြောင်းမှုနှင့် အလိုအလျောက် ပြန်လည်သက်သာရေး' : 'Rotation and auto recovery'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Control when the profile should rotate away from a backend and how aggressively it should recover.
+                  {locale === 'my'
+                    ? 'backend တစ်ခုမှ ဘယ်အချိန် လှည့်ပြောင်းမည်နှင့် ပြန်လည်သက်သာရေးကို ဘယ်လောက်တက်ကြွစွာ လုပ်မည်ကို ထိန်းချုပ်ပါ။'
+                    : 'Control when the profile should rotate away from a backend and how aggressively it should recover.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
 
@@ -528,7 +549,7 @@ function EditDAKDialog({
                 <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Trigger mode</Label>
+                      <Label>{locale === 'my' ? 'အစပျိုးမုဒ်' : 'Trigger mode'}</Label>
                       <Select
                         value={formData.rotationTriggerMode}
                         onValueChange={(value: typeof formData.rotationTriggerMode) =>
@@ -539,17 +560,17 @@ function EditDAKDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="SCHEDULED">Schedule only</SelectItem>
-                          <SelectItem value="USAGE">Quota threshold</SelectItem>
-                          <SelectItem value="HEALTH">Health issue</SelectItem>
-                          <SelectItem value="COMBINED">Schedule + quota + health</SelectItem>
+                          <SelectItem value="SCHEDULED">{locale === 'my' ? 'အချိန်ဇယားအတိုင်းသာ' : 'Schedule only'}</SelectItem>
+                          <SelectItem value="USAGE">{locale === 'my' ? 'ကန့်သတ်ချက် အဆင့်' : 'Quota threshold'}</SelectItem>
+                          <SelectItem value="HEALTH">{locale === 'my' ? 'ကျန်းမာရေး ပြဿနာ' : 'Health issue'}</SelectItem>
+                          <SelectItem value="COMBINED">{locale === 'my' ? 'အချိန်ဇယား + ကန့်သတ်ချက် + ကျန်းမာရေး' : 'Schedule + quota + health'}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     {(formData.rotationTriggerMode === 'USAGE' || formData.rotationTriggerMode === 'COMBINED') && (
                       <div className="space-y-2">
-                        <Label>Usage threshold (%)</Label>
+                        <Label>{locale === 'my' ? 'အသုံးပြုမှု အဆင့် (%)' : 'Usage threshold (%)'}</Label>
                         <Input
                           type="number"
                           min="50"
@@ -569,11 +590,13 @@ function EditDAKDialog({
                   {(formData.rotationTriggerMode === 'HEALTH' || formData.rotationTriggerMode === 'COMBINED') && (
                     <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-3">
                       <div>
-                        <p className="text-sm font-medium">Rotate on health failure</p>
-                        <p className="text-xs text-muted-foreground">
-                          Force a fresh backend when a serving server is degraded or down.
-                        </p>
-                      </div>
+                              <p className="text-sm font-medium">{locale === 'my' ? 'ကျန်းမာရေး ချို့ယွင်းလျှင် လှည့်ပြောင်းမည်' : 'Rotate on health failure'}</p>
+                              <p className="text-xs text-muted-foreground">
+                          {locale === 'my'
+                            ? 'ဝန်ဆောင်မှုပေးနေသော ဆာဗာ ပျက်စီး သို့မဟုတ် ကျနေပါက နောက်ခံချိတ်ဆက်မှု အသစ်သို့ အတင်းလှည့်ပြောင်းမည်။'
+                            : 'Force a fresh backend when a serving server is degraded or down.'}
+                              </p>
+                            </div>
                       <Switch
                         checked={formData.rotateOnHealthFailure}
                         onCheckedChange={(checked) =>
@@ -630,13 +653,15 @@ function EditDAKDialog({
 
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Notes</DialogSectionTitle>
+                <DialogSectionTitle>{locale === 'my' ? 'မှတ်စုများ' : 'Notes'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Keep an internal note for support, migration, or routing decisions.
+                  {locale === 'my'
+                    ? 'support၊ migration သို့မဟုတ် routing ဆိုင်ရာ ဆုံးဖြတ်ချက်များအတွက် အတွင်းရေးမှတ်စုထားပါ။'
+                    : 'Keep an internal note for support, migration, or routing decisions.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="space-y-2">
-                <Label htmlFor="editNotes">Notes</Label>
+                <Label htmlFor="editNotes">{locale === 'my' ? 'မှတ်စု' : 'Notes'}</Label>
                 <Input
                   id="editNotes"
                   value={formData.notes}
@@ -695,71 +720,71 @@ function SubscriptionShareCard({
   const { toast } = useToast();
   const isMyanmar = locale === 'my';
   const shareUi = {
-    title: isMyanmar ? 'မျှဝေရန် စာမျက်နှာ' : 'Share Page',
-    description: isMyanmar ? 'အသုံးပြုသူထံသို့ လှပသော subscription စာမျက်နှာကို မျှဝေပါ' : 'Share a beautiful subscription page with your user',
-    enabled: isMyanmar ? 'Share Page ကို ဖွင့်ထားမည်' : 'Share Page Enabled',
-    enabledDesc: isMyanmar ? 'Dynamic key သို့မဟုတ် client URL မပိတ်ဘဲ public share page ကိုသာ ပိတ်နိုင်သည်။' : 'Disable the public share page without disabling the dynamic key or client URLs.',
-    theme: isMyanmar ? 'စာမျက်နှာ Theme' : 'Page Theme',
-    selectTheme: isMyanmar ? 'Theme ကို ရွေးပါ' : 'Select theme',
+    title: isMyanmar ? 'မျှဝေစာမျက်နှာ' : 'Share Page',
+    description: isMyanmar ? 'အသုံးပြုသူထံသို့ စာရင်းသွင်းမှု စာမျက်နှာကို လှပစွာ မျှဝေပါ။' : 'Share a beautiful subscription page with your user',
+    enabled: isMyanmar ? 'မျှဝေစာမျက်နှာကို ဖွင့်ထားမည်' : 'Share Page Enabled',
+    enabledDesc: isMyanmar ? 'ပြောင်းလဲနိုင်သောသော့ သို့မဟုတ် ကလိုင်းယင့်ချိတ်ဆက်လင့်ခ်ကို မပိတ်ဘဲ အများမြင် မျှဝေစာမျက်နှာကိုသာ ပိတ်နိုင်သည်။' : 'Disable the public share page without disabling the dynamic key or client URLs.',
+    theme: isMyanmar ? 'စာမျက်နှာ အပြင်အဆင်' : 'Page Theme',
+    selectTheme: isMyanmar ? 'အပြင်အဆင်ကို ရွေးပါ' : 'Select theme',
     backgroundImage: isMyanmar ? 'နောက်ခံပုံ (ရွေးချယ်နိုင်သည်)' : 'Background Image (Optional)',
-    backgroundImageHelp: isMyanmar ? 'ပုံထည့်ပါက အပြည့်စုံ နောက်ခံပုံစံအဖြစ် အသုံးပြုမည်။ Theme အရောင်ကို အစားထိုးနိုင်သည်။' : 'Use image as full-page background theme. Overrides color theme when set.',
-    contactLinks: isMyanmar ? 'ဆက်သွယ်ရန် Link များ' : 'Contact Links',
-    contactPlaceholder: isMyanmar ? 'Link သို့မဟုတ် ID ထည့်ပါ' : 'Enter link or ID',
-    welcomeOverride: isMyanmar ? 'ကြိုဆိုစာ Override' : 'Welcome Message Override',
-    welcomePlaceholder: isMyanmar ? 'ဤ dynamic key ၏ share page အပေါ်ဘက်တွင် ပြသမည့် စာသား။ မဖြည့်ပါက global message ကို အသုံးပြုမည်။' : "Shown near the top of this key's share page. Leave empty to use the global message.",
-    welcomeHelp: isMyanmar ? 'ဤ dynamic key အတွက်သာ global subscription page welcome message ကို အစားထိုးမည်။' : 'This overrides the global subscription page welcome message for this dynamic key only.',
-    preview: isMyanmar ? 'အကြိုကြည့်မည်' : 'Preview',
+    backgroundImageHelp: isMyanmar ? 'ပုံထည့်ပါက စာမျက်နှာအပြည့် နောက်ခံပုံအဖြစ် အသုံးပြုမည်။ သတ်မှတ်ထားသော အပြင်အဆင်အရောင်ကို အစားထိုးနိုင်သည်။' : 'Use image as full-page background theme. Overrides color theme when set.',
+    contactLinks: isMyanmar ? 'ဆက်သွယ်ရန် လင့်ခ်များ' : 'Contact Links',
+    contactPlaceholder: isMyanmar ? 'လင့်ခ် သို့မဟုတ် ID ကို ထည့်ပါ' : 'Enter link or ID',
+    welcomeOverride: isMyanmar ? 'ကြိုဆိုစာ အစားထိုးသတ်မှတ်ချက်' : 'Welcome Message Override',
+    welcomePlaceholder: isMyanmar ? 'ဤပြောင်းလဲသတ်မှတ်သော့၏ မျှဝေစာမျက်နှာ အပေါ်ဘက်တွင် ပြသမည့် စာသားဖြစ်သည်။ မဖြည့်ပါက မူလ ကြိုဆိုစာကို အသုံးပြုမည်။' : "Shown near the top of this key's share page. Leave empty to use the global message.",
+    welcomeHelp: isMyanmar ? 'ဤပြောင်းလဲသတ်မှတ်သော့အတွက်သာ မူလ စာရင်းသွင်းမှု စာမျက်နှာ ကြိုဆိုစာကို အစားထိုးမည်။' : 'This overrides the global subscription page welcome message for this dynamic key only.',
+    preview: isMyanmar ? 'အစမ်းကြည့်မည်' : 'Preview',
     previewImage: isMyanmar ? 'ပုံနောက်ခံကို ဖွင့်ထားသည်' : 'Image Background',
-    previewColorOnly: isMyanmar ? 'အရောင် Theme သာ' : 'Color theme only',
+    previewColorOnly: isMyanmar ? 'အရောင်အပြင်အဆင်သာ' : 'Color theme only',
     previewCustomWelcome: isMyanmar ? 'ကိုယ်ပိုင်ကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Custom welcome message enabled',
-    previewGlobalWelcome: isMyanmar ? 'Global ကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Using global welcome message',
-    previewContacts: isMyanmar ? 'ဆက်သွယ်ရန် shortcut များ' : 'Contact shortcuts',
+    previewGlobalWelcome: isMyanmar ? 'မူလကြိုဆိုစာကို အသုံးပြုနေသည်' : 'Using global welcome message',
+    previewContacts: isMyanmar ? 'ဆက်သွယ်ရန် အမြန်ခလုတ်များ' : 'Contact shortcuts',
     previewAddToOutline: isMyanmar ? 'Outline ထဲသို့ ထည့်မည်' : 'Add to Outline',
-    shortSlug: isMyanmar ? 'Short Link Slug' : 'Short Link Slug',
+    shortSlug: isMyanmar ? 'အတိုလင့်ခ် အမည်တို' : 'Short Link Slug',
     slugPlaceholder: isMyanmar ? 'my-dynamic-key' : 'my-dynamic-key',
-    slugHelp: isMyanmar ? 'Short share page URL နှင့် Outline client URL အတွက် အသုံးပြုသည်။' : 'Used for the short share page and short Outline client URL.',
-    regenerateShortSlug: isMyanmar ? 'Short slug ကို ပြန်ဖန်တီးမည်' : 'Regenerate short slug',
-    copyLink: isMyanmar ? 'Link ကို ကူးယူမည်' : 'Copy Link',
-    copyClientUrl: isMyanmar ? 'Client URL ကို ကူးယူမည်' : 'Copy Client URL',
-    connectTelegram: isMyanmar ? 'Telegram ချိတ်ဆက်မည်' : 'Connect Telegram',
+    slugHelp: isMyanmar ? 'အတို မျှဝေစာမျက်နှာ URL နှင့် Outline ကလိုင်းယင့် URL အတွက် အသုံးပြုသည်။' : 'Used for the short share page and short Outline client URL.',
+    regenerateShortSlug: isMyanmar ? 'အတိုလင့်ခ် အမည်တိုကို ပြန်ဖန်တီးမည်' : 'Regenerate short slug',
+    copyLink: isMyanmar ? 'လင့်ခ်ကို ကူးယူမည်' : 'Copy Link',
+    copyClientUrl: isMyanmar ? 'ကလိုင်းယင့် URL ကို ကူးယူမည်' : 'Copy Client URL',
+    connectTelegram: isMyanmar ? 'Telegram နှင့် ချိတ်ဆက်လင့်ခ် ဖန်တီးမည်' : 'Connect Telegram',
     sendTelegram: isMyanmar ? 'Telegram ဖြင့် ပို့မည်' : 'Send via Telegram',
-    regenerateLink: isMyanmar ? 'Link ကို ပြန်ဖန်တီးမည်' : 'Regenerate Link',
-    sharePageUrl: isMyanmar ? 'Share Page URL:' : 'Share Page URL:',
-    clientUrl: isMyanmar ? 'Client URL:' : 'Client URL:',
-    sharePageDisabled: isMyanmar ? 'Share page ကို ပိတ်ထားသည်' : 'Share page disabled',
-    regenerateLinkHint: isMyanmar ? 'Link ကို ပြန်ဖန်တီးပါက legacy token URL ကိုသာ လဲမည်။ Short slug link များသည် slug ကို မပြောင်းမချင်း သို့မဟုတ် share page ကို မပိတ်မချင်း ဆက်လက် အလုပ်လုပ်နေမည်။' : 'Regenerating the link rotates the legacy token URL only. Your short slug links stay active until you change the slug or disable the share page.',
+    regenerateLink: isMyanmar ? 'လင့်ခ်ကို ပြန်ဖန်တီးမည်' : 'Regenerate Link',
+    sharePageUrl: isMyanmar ? 'မျှဝေစာမျက်နှာ URL:' : 'Share Page URL:',
+    clientUrl: isMyanmar ? 'ကလိုင်းယင့် URL:' : 'Client URL:',
+    sharePageDisabled: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပိတ်ထားသည်' : 'Share page disabled',
+    regenerateLinkHint: isMyanmar ? 'လင့်ခ်ကို ပြန်ဖန်တီးပါက အဟောင်းတိုကင် URL ကိုသာ လဲမည်။ အတိုအမည်လင့်ခ်များသည် အမည်တိုကို မပြောင်းမချင်း သို့မဟုတ် မျှဝေစာမျက်နှာကို မပိတ်မချင်း ဆက်လက် အလုပ်လုပ်နေမည်။' : 'Regenerating the link rotates the legacy token URL only. Your short slug links stay active until you change the slug or disable the share page.',
     pageViews: isMyanmar ? 'စာမျက်နှာကြည့်ရှုမှု' : 'Page Views',
-    copyClicks: isMyanmar ? 'Copy အကြိမ်ရေ' : 'Copy Clicks',
-    telegramSends: isMyanmar ? 'Telegram ပို့ထားမှု' : 'Telegram Sends',
-    lastViewed: isMyanmar ? 'နောက်ဆုံးကြည့်ရှုချိန်' : 'Last Viewed',
+    copyClicks: isMyanmar ? 'ကူးယူခံရသော အကြိမ်ရေ' : 'Copy Clicks',
+    telegramSends: isMyanmar ? 'Telegram ပို့ထားမှုများ' : 'Telegram Sends',
+    lastViewed: isMyanmar ? 'နောက်ဆုံး ကြည့်ရှုချိန်' : 'Last Viewed',
     never: isMyanmar ? 'မရှိသေးပါ' : 'Never',
     save: isMyanmar ? 'သိမ်းမည်' : 'Save',
     updatedTitle: isMyanmar ? 'အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Updated',
     updateFailed: isMyanmar ? 'အပ်ဒိတ် မအောင်မြင်ပါ' : 'Update failed',
-    updatedDesc: isMyanmar ? 'Share page ဆက်တင်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Share page settings have been updated.',
-    shortRegeneratedTitle: isMyanmar ? 'Short link ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Short link regenerated',
-    shortRegeneratedDesc: isMyanmar ? 'Short URL အသစ်များကို မျှဝေရန် အသင့်ဖြစ်နေပါပြီ။' : 'The new short URLs are ready to share.',
+    updatedDesc: isMyanmar ? 'မျှဝေစာမျက်နှာ ဆက်တင်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Share page settings have been updated.',
+    shortRegeneratedTitle: isMyanmar ? 'အတိုလင့်ခ်ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Short link regenerated',
+    shortRegeneratedDesc: isMyanmar ? 'အတို URL အသစ်များကို မျှဝေရန် အသင့်ဖြစ်နေပါပြီ။' : 'The new short URLs are ready to share.',
     welcomeUpdatedTitle: isMyanmar ? 'ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Welcome message updated',
-    welcomeUpdatedDesc: isMyanmar ? 'Share page ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The share page welcome message has been updated.',
-    shareSentTitle: isMyanmar ? 'Share page ကို ပို့ပြီးပါပြီ' : 'Share page sent',
-    shareSentDesc: isMyanmar ? 'Dynamic key ကို Telegram မှတစ်ဆင့် ပို့ပြီးပါပြီ။' : 'The dynamic key has been sent through Telegram.',
+    welcomeUpdatedDesc: isMyanmar ? 'မျှဝေစာမျက်နှာ ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The share page welcome message has been updated.',
+    shareSentTitle: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပို့ပြီးပါပြီ' : 'Share page sent',
+    shareSentDesc: isMyanmar ? 'ပြောင်းလဲနိုင်သောသော့ကို Telegram မှတစ်ဆင့် ပို့ပြီးပါပြီ။' : 'The dynamic key has been sent through Telegram.',
     copied: isMyanmar ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
-    copiedConnectLink: isMyanmar ? 'Telegram connect link ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Telegram connect link copied to clipboard.',
-    copiedShareUrl: isMyanmar ? 'Subscription page URL ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Subscription page URL copied to clipboard.',
-    copiedClientUrl: isMyanmar ? 'Client URL ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'Client URL copied to clipboard.',
-    copiedLegacyShareUrl: isMyanmar ? 'Legacy share page link အသစ်ကို ကူးယူပြီးပါပြီ။ Short slug link များသည် မပြောင်းလဲပါ။' : 'New legacy share page link copied. Short slug links are unchanged.',
-    copiedNewShareUrl: isMyanmar ? 'Share page link အသစ်ကို clipboard သို့ ကူးယူပြီးပါပြီ။' : 'New share page link copied to clipboard.',
-    connectFailed: isMyanmar ? 'Connect link ဖန်တီးမှု မအောင်မြင်ပါ' : 'Connect link failed',
+    copiedConnectLink: isMyanmar ? 'Telegram ချိတ်ဆက်လင့်ခ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Telegram connect link copied to clipboard.',
+    copiedShareUrl: isMyanmar ? 'မျှဝေစာမျက်နှာ URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Subscription page URL copied to clipboard.',
+    copiedClientUrl: isMyanmar ? 'ကလိုင်းယင့် URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Client URL copied to clipboard.',
+    copiedLegacyShareUrl: isMyanmar ? 'အဟောင်း မျှဝေစာမျက်နှာလင့်ခ် အသစ်ကို ကူးယူပြီးပါပြီ။ အတိုအမည်လင့်ခ်များသည် မပြောင်းလဲပါ။' : 'New legacy share page link copied. Short slug links are unchanged.',
+    copiedNewShareUrl: isMyanmar ? 'မျှဝေစာမျက်နှာလင့်ခ် အသစ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'New share page link copied to clipboard.',
+    connectFailed: isMyanmar ? 'ချိတ်ဆက်လင့်ခ် ဖန်တီးမှု မအောင်မြင်ပါ' : 'Connect link failed',
     telegramFailed: isMyanmar ? 'Telegram ပို့မှု မအောင်မြင်ပါ' : 'Telegram send failed',
-    missingSlug: isMyanmar ? 'Slug မပြည့်စုံပါ' : 'Missing slug',
+    missingSlug: isMyanmar ? 'အမည်တို မပြည့်စုံပါ' : 'Missing slug',
     missingSlugDesc: isMyanmar ? 'သိမ်းမီ အနည်းဆုံး တရားဝင် စာလုံး ၃ လုံး ထည့်ပါ။' : 'Enter at least 3 valid characters before saving.',
     errorTitle: isMyanmar ? 'အမှား' : 'Error',
     contactRequired: isMyanmar ? 'ဆက်သွယ်ရန် တန်ဖိုးတစ်ခု ထည့်ပါ။' : 'Please enter a contact value.',
     limitReached: isMyanmar ? 'အများဆုံး အရေအတွက် ပြည့်သွားပါပြီ' : 'Limit reached',
     limitDesc: isMyanmar ? 'ဆက်သွယ်ရန် ၃ ခုအထိသာ ထည့်နိုင်ပါသည်။' : 'Maximum 3 contacts allowed.',
-    shareTokenRegeneratedTitle: isMyanmar ? 'Share token ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Share token regenerated',
-    shareTokenRegeneratedDescShort: isMyanmar ? 'Legacy token link ကို လဲပြီးပါပြီ။ Short slug link များသည် မပြောင်းလဲပါ။' : 'The legacy token link was rotated. Your short slug links stay the same.',
-    shareTokenRegeneratedDescLegacy: isMyanmar ? 'Dynamic share link ကို ပြန်ဖန်တီးပြီးပါပြီ။' : 'The dynamic share link has been rotated.',
+    shareTokenRegeneratedTitle: isMyanmar ? 'မျှဝေတိုကင်ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Share token regenerated',
+    shareTokenRegeneratedDescShort: isMyanmar ? 'အဟောင်းတိုကင်လင့်ခ်ကို လဲပြီးပါပြီ။ အတိုအမည်လင့်ခ်များသည် မပြောင်းလဲပါ။' : 'The legacy token link was rotated. Your short slug links stay the same.',
+    shareTokenRegeneratedDescLegacy: isMyanmar ? 'ပြောင်းလဲသတ်မှတ် မျှဝေလင့်ခ်ကို ပြန်ဖန်တီးပြီးပါပြီ။' : 'The dynamic share link has been rotated.',
   };
   const getContactTypeLabel = (type: ContactLink['type']) => t(`subscription.contact.${type}`);
   const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'glassPurple');
@@ -1524,6 +1549,8 @@ function KeyRotationCard({
   rotationCount: number;
   onUpdate: () => void;
 }) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [enabled, setEnabled] = useState(rotationEnabled);
   const [interval, setInterval] = useState(rotationInterval);
@@ -1534,16 +1561,20 @@ function KeyRotationCard({
   const updateMutation = trpc.dynamicKeys.updateRotation.useMutation({
     onSuccess: (data) => {
       toast({
-        title: 'Rotation settings updated',
+        title: isMyanmar ? 'လှည့်ပြောင်းမှု ဆက်တင်များကို ပြင်ပြီးပါပြီ' : 'Rotation settings updated',
         description: enabled
-          ? `Keys will rotate ${interval.toLowerCase()}. Next rotation: ${data.nextRotationAt ? formatRelativeTime(data.nextRotationAt) : 'N/A'}`
-          : 'Key rotation has been disabled.',
+          ? isMyanmar
+            ? `သော့များကို ${interval.toLowerCase()} အလိုက် အလိုအလျောက် လှည့်ပြောင်းပါမည်။ နောက်တစ်ကြိမ်: ${data.nextRotationAt ? formatRelativeTime(data.nextRotationAt) : 'မသတ်မှတ်ရသေးပါ'}`
+            : `Keys will rotate ${interval.toLowerCase()}. Next rotation: ${data.nextRotationAt ? formatRelativeTime(data.nextRotationAt) : 'N/A'}`
+          : isMyanmar
+            ? 'သော့ အလိုအလျောက် လှည့်ပြောင်းမှုကို ပိတ်ထားပါသည်။'
+            : 'Key rotation has been disabled.',
       });
       onUpdate();
     },
     onError: (error) => {
       toast({
-        title: 'Update failed',
+        title: isMyanmar ? 'မပြင်ဆင်နိုင်ပါ' : 'Update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -1553,14 +1584,14 @@ function KeyRotationCard({
   const rotateMutation = trpc.dynamicKeys.rotateNow.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Keys rotated',
-        description: 'All attached keys have been rotated successfully.',
+        title: isMyanmar ? 'သော့များကို လှည့်ပြောင်းပြီးပါပြီ' : 'Keys rotated',
+        description: isMyanmar ? 'ချိတ်ဆက်ထားသော သော့အားလုံးကို အောင်မြင်စွာ လှည့်ပြောင်းပြီးပါပြီ။' : 'All attached keys have been rotated successfully.',
       });
       onUpdate();
     },
     onError: (error) => {
       toast({
-        title: 'Rotation failed',
+        title: isMyanmar ? 'လှည့်ပြောင်းမရပါ' : 'Rotation failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -1583,16 +1614,16 @@ function KeyRotationCard({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
           <RotateCw className="w-4 h-4 text-primary" />
-          Key Auto-Rotation
+          {isMyanmar ? 'သော့ အလိုအလျောက် လှည့်ပြောင်းမှု' : 'Key Auto-Rotation'}
         </CardTitle>
         <CardDescription className="text-xs">
-          Periodically replace underlying keys while keeping the subscription URL stable.
+          {isMyanmar ? 'စာရင်းသွင်းမှု URL မပြောင်းဘဲ အောက်ခံသော့များကို အချိန်အလိုက် လဲလှယ်ပါ။' : 'Periodically replace underlying keys while keeping the subscription URL stable.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Enable/Disable Toggle */}
         <div className="flex items-center justify-between">
-          <Label className="text-sm">Enable Rotation</Label>
+          <Label className="text-sm">{isMyanmar ? 'အလိုအလျောက် လှည့်ပြောင်းမှုကို ဖွင့်မည်' : 'Enable Rotation'}</Label>
           <Switch
             checked={enabled}
             onCheckedChange={setEnabled}
@@ -1603,7 +1634,7 @@ function KeyRotationCard({
         {enabled && (
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Rotation Interval</Label>
+              <Label className="text-xs text-muted-foreground">{isMyanmar ? 'လှည့်ပြောင်းမှု အကြိမ်ကာလ' : 'Rotation Interval'}</Label>
               <Select
                 value={interval}
                 onValueChange={setInterval}
@@ -1612,16 +1643,16 @@ function KeyRotationCard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="DAILY">Daily</SelectItem>
-                  <SelectItem value="WEEKLY">Weekly</SelectItem>
-                  <SelectItem value="BIWEEKLY">Every 2 Weeks</SelectItem>
-                  <SelectItem value="MONTHLY">Monthly</SelectItem>
+                  <SelectItem value="DAILY">{isMyanmar ? 'နေ့စဉ်' : 'Daily'}</SelectItem>
+                  <SelectItem value="WEEKLY">{isMyanmar ? 'အပတ်စဉ်' : 'Weekly'}</SelectItem>
+                  <SelectItem value="BIWEEKLY">{isMyanmar ? '၂ ပတ်တစ်ကြိမ်' : 'Every 2 Weeks'}</SelectItem>
+                  <SelectItem value="MONTHLY">{isMyanmar ? 'လစဉ်' : 'Monthly'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Rotation Trigger</Label>
+              <Label className="text-xs text-muted-foreground">{isMyanmar ? 'လှည့်ပြောင်းမှု စတင်မည့်အခြေအနေ' : 'Rotation Trigger'}</Label>
               <Select
                 value={triggerMode}
                 onValueChange={(value) => setTriggerMode(value as typeof triggerMode)}
@@ -1630,17 +1661,17 @@ function KeyRotationCard({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SCHEDULED">Schedule only</SelectItem>
-                  <SelectItem value="USAGE">Quota threshold</SelectItem>
-                  <SelectItem value="HEALTH">Health issue</SelectItem>
-                  <SelectItem value="COMBINED">Schedule + quota + health</SelectItem>
+                  <SelectItem value="SCHEDULED">{isMyanmar ? 'အချိန်ဇယားသာ' : 'Schedule only'}</SelectItem>
+                  <SelectItem value="USAGE">{isMyanmar ? 'ဒေတာအသုံးပြုမှု ကန့်သတ်ချက်' : 'Quota threshold'}</SelectItem>
+                  <SelectItem value="HEALTH">{isMyanmar ? 'ကျန်းမာရေး ပြဿနာ' : 'Health issue'}</SelectItem>
+                  <SelectItem value="COMBINED">{isMyanmar ? 'ဇယား + ဒေတာကန့်သတ်ချက် + ကျန်းမာရေး' : 'Schedule + quota + health'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {(triggerMode === 'USAGE' || triggerMode === 'COMBINED') && (
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Usage Threshold (%)</Label>
+                <Label className="text-xs text-muted-foreground">{isMyanmar ? 'အသုံးပြုမှု သတ်မှတ်ကန့်သတ်ချက် (%)' : 'Usage Threshold (%)'}</Label>
                 <Input
                   type="number"
                   min={50}
@@ -1655,9 +1686,9 @@ function KeyRotationCard({
             {(triggerMode === 'HEALTH' || triggerMode === 'COMBINED') && (
               <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
                 <div>
-                  <p className="text-sm font-medium">Rotate on health failure</p>
+                  <p className="text-sm font-medium">{isMyanmar ? 'ကျန်းမာရေး ချို့ယွင်းလျှင် လှည့်ပြောင်းမည်' : 'Rotate on health failure'}</p>
                   <p className="text-xs text-muted-foreground">
-                    Trigger a new backend when the current server is slow or down.
+                    {isMyanmar ? 'လက်ရှိ ဆာဗာ နှေးကွေးခြင်း သို့မဟုတ် ကျနေသည့်အခါ နောက်ခံချိတ်ဆက်မှု အသစ်သို့ ပြောင်းပါ။' : 'Trigger a new backend when the current server is slow or down.'}
                   </p>
                 </div>
                 <Switch checked={rotateOnHealth} onCheckedChange={setRotateOnHealth} />
@@ -1681,25 +1712,25 @@ function KeyRotationCard({
             disabled={updateMutation.isPending}
           >
             {updateMutation.isPending && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-            Save Settings
+            {isMyanmar ? 'ဆက်တင်များကို သိမ်းမည်' : 'Save Settings'}
           </Button>
         )}
 
         {/* Stats */}
         <div className="space-y-2 pt-2 border-t">
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Total Rotations</span>
+            <span className="text-muted-foreground">{isMyanmar ? 'စုစုပေါင်း လှည့်ပြောင်းမှု' : 'Total Rotations'}</span>
             <span className="font-medium">{rotationCount}</span>
           </div>
           {lastRotatedAt && (
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Last Rotated</span>
+              <span className="text-muted-foreground">{isMyanmar ? 'နောက်ဆုံး လှည့်ပြောင်းခဲ့သည့် အချိန်' : 'Last Rotated'}</span>
               <span>{formatRelativeTime(lastRotatedAt)}</span>
             </div>
           )}
           {nextRotationAt && enabled && (
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">Next Rotation</span>
+              <span className="text-muted-foreground">{isMyanmar ? 'နောက်တစ်ကြိမ် လှည့်ပြောင်းမည့်အချိန်' : 'Next Rotation'}</span>
               <span>{formatRelativeTime(nextRotationAt)}</span>
             </div>
           )}
@@ -2025,7 +2056,8 @@ function DynamicRoutingDiagnosticsCard({
   onExportDiagnostics?: () => void;
   isExporting?: boolean;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const [timelineFilter, setTimelineFilter] = useState<RoutingTimelineFilter>('ALL');
   const [pinExpiryValue, setPinExpiryValue] = useState<string>('never');
   const [operatorNote, setOperatorNote] = useState<string>('');
@@ -2099,27 +2131,27 @@ function DynamicRoutingDiagnosticsCard({
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <div className="ops-inline-stat">
                   <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.clear_stale_pins')}</p>
-                  <p className="font-medium">{data.autoClearStalePins ? 'Enabled' : 'Disabled'}</p>
+                  <p className="font-medium">{data.autoClearStalePins ? (isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled') : (isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled')}</p>
                 </div>
                 <div className="ops-inline-stat">
                   <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.relax_only')}</p>
-                  <p className="font-medium">{data.autoFallbackToPrefer ? 'Enabled' : 'Disabled'}</p>
+                  <p className="font-medium">{data.autoFallbackToPrefer ? (isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled') : (isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled')}</p>
                 </div>
                 <div className="ops-inline-stat">
                   <p className="text-xs text-muted-foreground">{t('dynamic_keys.routing.auto_recovery.skip_unhealthy')}</p>
-                  <p className="font-medium">{data.autoSkipUnhealthy ? 'Enabled' : 'Disabled'}</p>
+                  <p className="font-medium">{data.autoSkipUnhealthy ? (isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled') : (isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled')}</p>
                 </div>
               </div>
             </div>
 
             <div className="rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Alert delivery rules
+                {isMyanmar ? 'သတိပေးချက် ပို့ဆောင်မှု စည်းမျဉ်းများ' : 'Alert delivery rules'}
               </p>
               <div className="mt-3 space-y-3">
                 <div className="ops-inline-stat">
-                  <p className="text-xs text-muted-foreground">Default cooldown</p>
-                  <p className="font-medium">{parsedAlertRules.defaultCooldownMinutes} min</p>
+                  <p className="text-xs text-muted-foreground">{isMyanmar ? 'မူလ စောင့်ဆိုင်းချိန်' : 'Default cooldown'}</p>
+                  <p className="font-medium">{parsedAlertRules.defaultCooldownMinutes} {isMyanmar ? 'မိနစ်' : 'min'}</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {DYNAMIC_ROUTING_ALERT_RULE_DEFINITIONS.map((definition) => {
@@ -2130,7 +2162,7 @@ function DynamicRoutingDiagnosticsCard({
                           .map((entry) => entry.trim())
                           .filter(Boolean)
                           .join(', ')
-                      : 'All channels';
+                      : isMyanmar ? 'ချန်နယ် အားလုံး' : 'All channels';
 
                     return (
                       <div
@@ -2143,12 +2175,12 @@ function DynamicRoutingDiagnosticsCard({
                             <p className="text-xs text-muted-foreground">{definition.description}</p>
                           </div>
                           <Badge variant={rule.enabled ? 'default' : 'secondary'}>
-                            {rule.enabled ? 'Enabled' : 'Muted'}
+                            {rule.enabled ? (isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled') : (isMyanmar ? 'အသံလျှော့ထားသည်' : 'Muted')}
                           </Badge>
                         </div>
                         <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                          <p>Cooldown: {rule.cooldownMinutes} min</p>
-                          <p>Channels: {channels}</p>
+                          <p>{isMyanmar ? 'စောင့်ဆိုင်းချိန်' : 'Cooldown'}: {rule.cooldownMinutes} {isMyanmar ? 'မိနစ်' : 'min'}</p>
+                          <p>{isMyanmar ? 'ချန်နယ်များ' : 'Channels'}: {channels}</p>
                         </div>
                       </div>
                     );
@@ -2164,10 +2196,12 @@ function DynamicRoutingDiagnosticsCard({
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Premium region lifecycle
+                  {isMyanmar ? 'ပရီမီယံ ဒေသ လုပ်ဆောင်မှု စက်ဝန်း' : 'Premium region lifecycle'}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Shows the degraded, fallback, and recovered state for premium routing, plus the current operator override path.
+                  {isMyanmar
+                    ? 'ပရီမီယံ လမ်းကြောင်းသတ်မှတ်မှုအတွက် အခြေအနေကျဆင်းမှု၊ အစားထိုး လမ်းကြောင်းနှင့် ပြန်ကောင်းလာမှု အခြေအနေများအပြင် လက်ရှိ operator override လမ်းကြောင်းကို ပြထားသည်။'
+                    : 'Shows the degraded, fallback, and recovered state for premium routing, plus the current operator override path.'}
                 </p>
               </div>
               <Badge
@@ -2184,56 +2218,58 @@ function DynamicRoutingDiagnosticsCard({
 
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
               <div className="ops-inline-stat">
-                <p className="text-xs text-muted-foreground">Preferred regions</p>
+                <p className="text-xs text-muted-foreground">{isMyanmar ? 'ဦးစားပေး ဒေသများ' : 'Preferred regions'}</p>
                 <p className="font-medium">
                   {data.premiumRegionAutomation.preferredRegions.length
                     ? data.premiumRegionAutomation.preferredRegions.join(', ')
-                    : 'Auto'}
+                    : isMyanmar ? 'အလိုအလျောက်' : 'Auto'}
                 </p>
               </div>
               <div className="ops-inline-stat">
-                <p className="text-xs text-muted-foreground">Current region</p>
+                <p className="text-xs text-muted-foreground">{isMyanmar ? 'လက်ရှိ ဒေသ' : 'Current region'}</p>
                 <p className="font-medium">
                   {data.premiumRegionAutomation.currentRegionCode
                     ? `${data.premiumRegionAutomation.currentRegionCode}${data.premiumRegionAutomation.currentRegionStatus ? ` • ${data.premiumRegionAutomation.currentRegionStatus}` : ''}`
-                    : 'Unknown'}
+                    : isMyanmar ? 'မသိရသေးပါ' : 'Unknown'}
                 </p>
               </div>
               <div className="ops-inline-stat">
-                <p className="text-xs text-muted-foreground">Healthy preferred</p>
+                <p className="text-xs text-muted-foreground">{isMyanmar ? 'ကျန်းမာသော ဦးစားပေး ဒေသများ' : 'Healthy preferred'}</p>
                 <p className="font-medium">
                   {data.premiumRegionAutomation.healthyPreferredRegions.length
                     ? data.premiumRegionAutomation.healthyPreferredRegions.join(', ')
-                    : 'None yet'}
+                    : isMyanmar ? 'မရှိသေးပါ' : 'None yet'}
                 </p>
               </div>
             </div>
 
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
               <div className="rounded-[1rem] border border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]">
-                <p className="text-xs font-medium">Degraded</p>
+                <p className="text-xs font-medium">{isMyanmar ? 'အခြေအနေ ကျဆင်း' : 'Degraded'}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {data.premiumRegionAutomation.latestDegradedAt
                     ? formatRelativeTime(new Date(data.premiumRegionAutomation.latestDegradedAt))
-                    : 'No recent degradation'}
+                    : isMyanmar ? 'မကြာသေးမီက အခြေအနေကျဆင်းမှု မရှိပါ' : 'No recent degradation'}
                 </p>
               </div>
               <div className="rounded-[1rem] border border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]">
-                <p className="text-xs font-medium">Fallback</p>
+                <p className="text-xs font-medium">{isMyanmar ? 'အစားထိုး လမ်းကြောင်း' : 'Fallback'}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {data.premiumRegionAutomation.activeAutoFallback
-                    ? `${data.premiumRegionAutomation.activeAutoFallback.fallbackRegionCode || 'Fallback'} • ${data.premiumRegionAutomation.activeAutoFallback.pinnedServerName || 'Pinned'}`
+                    ? `${data.premiumRegionAutomation.activeAutoFallback.fallbackRegionCode || (isMyanmar ? 'အစားထိုး လမ်းကြောင်း' : 'Fallback')} • ${data.premiumRegionAutomation.activeAutoFallback.pinnedServerName || (isMyanmar ? 'ပင်ထားသည်' : 'Pinned')}`
                     : data.premiumRegionAutomation.latestFallbackAt
-                      ? `Last applied ${formatRelativeTime(new Date(data.premiumRegionAutomation.latestFallbackAt))}`
-                      : 'No fallback pin'}
+                      ? isMyanmar
+                        ? `${formatRelativeTime(new Date(data.premiumRegionAutomation.latestFallbackAt))} တွင် နောက်ဆုံး အသုံးပြုခဲ့သည်`
+                        : `Last applied ${formatRelativeTime(new Date(data.premiumRegionAutomation.latestFallbackAt))}`
+                      : isMyanmar ? 'ပင်ထားသော အစားထိုး လမ်းကြောင်း မရှိပါ' : 'No fallback pin'}
                 </p>
               </div>
               <div className="rounded-[1rem] border border-border/60 bg-background/70 p-3 dark:bg-white/[0.02]">
-                <p className="text-xs font-medium">Recovered</p>
+                <p className="text-xs font-medium">{isMyanmar ? 'ပြန်ကောင်းလာသည်' : 'Recovered'}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {data.premiumRegionAutomation.latestRecoveredAt
                     ? `${formatRelativeTime(new Date(data.premiumRegionAutomation.latestRecoveredAt))}${data.premiumRegionAutomation.latestRecoveryMinutes ? ` • ${Math.round(data.premiumRegionAutomation.latestRecoveryMinutes)} min` : ''}`
-                    : 'No recovery yet'}
+                    : isMyanmar ? 'ပြန်ကောင်းလာမှု မရှိသေးပါ' : 'No recovery yet'}
                 </p>
               </div>
             </div>
@@ -2244,18 +2280,24 @@ function DynamicRoutingDiagnosticsCard({
                   {data.premiumRegionAutomation.activeAutoFallback ? (
                     <>
                       <p className="text-sm font-medium">
-                        Temporary fallback is active on {data.premiumRegionAutomation.activeAutoFallback.pinnedServerName || 'the pinned backend'}.
+                        {isMyanmar
+                          ? `${data.premiumRegionAutomation.activeAutoFallback.pinnedServerName || 'ပင်ထားသော backend'} တွင် ယာယီ အစားထိုး လမ်းကြောင်းကို အသုံးပြုနေသည်။`
+                          : `Temporary fallback is active on ${data.premiumRegionAutomation.activeAutoFallback.pinnedServerName || 'the pinned backend'}.`}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {data.premiumRegionAutomation.activeAutoFallback.pinExpiresAt
-                          ? `Auto fallback pin expires ${formatRelativeTime(new Date(data.premiumRegionAutomation.activeAutoFallback.pinExpiresAt))}.`
-                          : 'This premium key is currently pinned to a temporary fallback backend.'}
+                          ? isMyanmar
+                            ? `အလိုအလျောက် အစားထိုး pin သည် ${formatRelativeTime(new Date(data.premiumRegionAutomation.activeAutoFallback.pinExpiresAt))} တွင် သက်တမ်းကုန်မည်။`
+                            : `Auto fallback pin expires ${formatRelativeTime(new Date(data.premiumRegionAutomation.activeAutoFallback.pinExpiresAt))}.`
+                          : isMyanmar
+                            ? 'ဤပရီမီယံ key ကို ယာယီ အစားထိုး backend သို့ လက်ရှိ ပင်ထားသည်။'
+                            : 'This premium key is currently pinned to a temporary fallback backend.'}
                       </p>
                     </>
                   ) : data.premiumRegionAutomation.suggestedFallback ? (
                     <>
                       <p className="text-sm font-medium">
-                        Suggested fallback: {getCountryFlag(data.premiumRegionAutomation.suggestedFallback.serverCountryCode || '')} {data.premiumRegionAutomation.suggestedFallback.serverName}
+                        {isMyanmar ? 'အကြံပြုထားသော အစားထိုး လမ်းကြောင်း' : 'Suggested fallback'}: {getCountryFlag(data.premiumRegionAutomation.suggestedFallback.serverCountryCode || '')} {data.premiumRegionAutomation.suggestedFallback.serverName}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {data.premiumRegionAutomation.suggestedFallback.regionCode}
@@ -2272,13 +2314,13 @@ function DynamicRoutingDiagnosticsCard({
                   {data.premiumRegionAutomation.suggestedFallback && !data.premiumRegionAutomation.activeAutoFallback && onPinSuggestedFallback ? (
                     <Button variant="outline" onClick={onPinSuggestedFallback} disabled={isPinning}>
                       {isPinning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pin className="mr-2 h-4 w-4" />}
-                      Approve fallback
+                      {isMyanmar ? 'အစားထိုး လမ်းကြောင်းကို အတည်ပြုမည်' : 'Approve fallback'}
                     </Button>
                   ) : null}
                   {data.premiumRegionAutomation.activeAutoFallback ? (
                     <Button variant="outline" onClick={onClearPin} disabled={isClearingPin}>
                       {isClearingPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PinOff className="mr-2 h-4 w-4" />}
-                      Override / clear fallback
+                      {isMyanmar ? 'ယာယီ အစားထိုးလမ်းကြောင်းကို ဖယ်ရှားမည်' : 'Override / clear fallback'}
                     </Button>
                   ) : null}
                 </div>
@@ -2801,6 +2843,8 @@ function DynamicKeyTemplateCard({
   };
   onUpdate: () => void;
 }) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [selectedTemplateId, setSelectedTemplateId] = useState(dak.appliedTemplateId || '__none__');
   const [templateName, setTemplateName] = useState('');
@@ -2816,14 +2860,16 @@ function DynamicKeyTemplateCard({
   const applyTemplateMutation = trpc.dynamicKeys.applyTemplate.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Template applied',
-        description: 'The dynamic key was updated with the selected template.',
+        title: isMyanmar ? 'နမူနာပုံစံကို အသုံးချပြီးပါပြီ' : 'Template applied',
+        description: isMyanmar
+          ? 'ရွေးထားသော template ဖြင့် ပြောင်းလဲနိုင်သောသော့ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။'
+          : 'The dynamic key was updated with the selected template.',
       });
       onUpdate();
     },
     onError: (error) => {
       toast({
-        title: 'Template apply failed',
+        title: isMyanmar ? 'နမူနာပုံစံကို အသုံးချမရပါ' : 'Template apply failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -2833,8 +2879,10 @@ function DynamicKeyTemplateCard({
   const createTemplateMutation = trpc.dynamicKeys.createTemplate.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Template saved',
-        description: 'This dynamic key can now be reused as a routing template.',
+        title: isMyanmar ? 'နမူနာပုံစံကို သိမ်းပြီးပါပြီ' : 'Template saved',
+        description: isMyanmar
+          ? 'ဤပြောင်းလဲနိုင်သောသော့ကို ယခုအခါ routing template အဖြစ် ပြန်လည်အသုံးပြုနိုင်ပါပြီ။'
+          : 'This dynamic key can now be reused as a routing template.',
       });
       setTemplateName('');
       setTemplateDescription('');
@@ -2842,7 +2890,7 @@ function DynamicKeyTemplateCard({
     },
     onError: (error) => {
       toast({
-        title: 'Template save failed',
+        title: isMyanmar ? 'နမူနာပုံစံကို သိမ်းမရပါ' : 'Template save failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -2852,15 +2900,17 @@ function DynamicKeyTemplateCard({
   const deleteTemplateMutation = trpc.dynamicKeys.deleteTemplate.useMutation({
     onSuccess: async () => {
       toast({
-        title: 'Template deleted',
-        description: 'The saved template has been removed.',
+        title: isMyanmar ? 'နမူနာပုံစံကို ဖျက်ပြီးပါပြီ' : 'Template deleted',
+        description: isMyanmar
+          ? 'သိမ်းထားသော template ကို ဖယ်ရှားပြီးပါပြီ။'
+          : 'The saved template has been removed.',
       });
       setSelectedTemplateId('__none__');
       await templatesQuery.refetch();
     },
     onError: (error) => {
       toast({
-        title: 'Template delete failed',
+        title: isMyanmar ? 'နမူနာပုံစံကို ဖျက်မရပါ' : 'Template delete failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -2870,8 +2920,10 @@ function DynamicKeyTemplateCard({
   const saveCurrentTemplate = () => {
     if (!templateName.trim()) {
       toast({
-        title: 'Template name required',
-        description: 'Enter a template name before saving.',
+        title: isMyanmar ? 'နမူနာပုံစံ အမည် လိုအပ်သည်' : 'Template name required',
+        description: isMyanmar
+          ? 'သိမ်းမီ template အမည်ကို ထည့်ပါ။'
+          : 'Enter a template name before saving.',
         variant: 'destructive',
       });
       return;
@@ -2918,22 +2970,24 @@ function DynamicKeyTemplateCard({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Settings className="h-5 w-5 text-primary" />
-          Routing Templates
+          {isMyanmar ? 'လမ်းကြောင်း နမူနာပုံစံများ' : 'Routing Templates'}
         </CardTitle>
         <CardDescription>
-          Save this dynamic key as a reusable routing policy or apply an existing template.
+          {isMyanmar
+            ? 'ဤပြောင်းလဲနိုင်သောသော့ကို ထပ်သုံးနိုင်သော routing policy အဖြစ် သိမ်းဆည်းပါ သို့မဟုတ် ရှိပြီးသား template ကို အသုံးချပါ။'
+            : 'Save this dynamic key as a reusable routing policy or apply an existing template.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label>Apply existing template</Label>
+          <Label>{isMyanmar ? 'ရှိပြီးသား နမူနာပုံစံကို အသုံးချမည်' : 'Apply existing template'}</Label>
           <div className="flex gap-2">
             <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
               <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Select a template" />
+                <SelectValue placeholder={isMyanmar ? 'နမူနာပုံစံ တစ်ခုကို ရွေးပါ' : 'Select a template'} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">No template</SelectItem>
+                <SelectItem value="__none__">{isMyanmar ? 'နမူနာပုံစံ မရွေးပါ' : 'No template'}</SelectItem>
                 {(templatesQuery.data ?? []).map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.name}
@@ -2951,11 +3005,13 @@ function DynamicKeyTemplateCard({
               }
               disabled={applyTemplateMutation.isPending}
             >
-              {applyTemplateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+              {applyTemplateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (isMyanmar ? 'အသုံးချမည်' : 'Apply')}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Templates can replace routing preferences, rotation defaults, and share-page defaults in one click.
+            {isMyanmar
+              ? 'Template များသည် routing preferences၊ rotation defaults နှင့် share-page defaults များကို တစ်ချက်တည်းဖြင့် အစားထိုးနိုင်သည်။'
+              : 'Templates can replace routing preferences, rotation defaults, and share-page defaults in one click.'}
           </p>
         </div>
 
@@ -2965,35 +3021,37 @@ function DynamicKeyTemplateCard({
             className="w-full justify-start text-destructive"
             onClick={() => deleteTemplateMutation.mutate({ id: selectedTemplateId })}
             disabled={deleteTemplateMutation.isPending}
-          >
-            {deleteTemplateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Delete selected template
-          </Button>
-        ) : null}
+        >
+          {deleteTemplateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isMyanmar ? 'ရွေးထားသော နမူနာပုံစံကို ဖျက်မည်' : 'Delete selected template'}
+        </Button>
+      ) : null}
 
-        <div className="space-y-3 rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Save current configuration as template</p>
+      <div className="space-y-3 rounded-[1.2rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+        <div className="space-y-1">
+            <p className="text-sm font-medium">{isMyanmar ? 'လက်ရှိ သတ်မှတ်ချက်ကို နမူနာပုံစံအဖြစ် သိမ်းမည်' : 'Save current configuration as template'}</p>
             <p className="text-xs text-muted-foreground">
-              Capture the current routing weights, drain mode, and rotation policy for reuse when creating future dynamic keys.
+              {isMyanmar
+                ? 'နောင်တွင် ပြောင်းလဲနိုင်သောသော့အသစ်များ ဖန်တီးရာ၌ ပြန်လည်အသုံးပြုနိုင်ရန် လက်ရှိ routing weights၊ drain mode နှင့် rotation policy ကို သိမ်းဆည်းပါ။'
+                : 'Capture the current routing weights, drain mode, and rotation policy for reuse when creating future dynamic keys.'}
             </p>
           </div>
           <div className="space-y-2">
-            <Label>Template name</Label>
-            <Input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="Premium SG failover policy" />
+            <Label>{isMyanmar ? 'နမူနာပုံစံ အမည်' : 'Template name'}</Label>
+            <Input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder={isMyanmar ? 'ပရီမီယံ SG failover မူဝါဒ' : 'Premium SG failover policy'} />
           </div>
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>{isMyanmar ? 'ဖော်ပြချက်' : 'Description'}</Label>
             <Textarea
               value={templateDescription}
               onChange={(event) => setTemplateDescription(event.target.value)}
-              placeholder="Explain when to use this template."
+              placeholder={isMyanmar ? 'ဤနမူနာပုံစံကို ဘယ်အချိန် အသုံးပြုသင့်သည်ကို ရှင်းပြပါ။' : 'Explain when to use this template.'}
               rows={3}
             />
           </div>
           <Button className="w-full" onClick={saveCurrentTemplate} disabled={createTemplateMutation.isPending}>
             {createTemplateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Save as template
+            {isMyanmar ? 'နမူနာပုံစံအဖြစ် သိမ်းမည်' : 'Save as template'}
           </Button>
         </div>
       </CardContent>
@@ -3014,7 +3072,8 @@ function AccessDistributionCard({
   dakName: string;
   accessKeys: any[];
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { toast } = useToast();
   const [maxUses, setMaxUses] = useState<number | undefined>();
   const [expiresInHours, setExpiresInHours] = useState<number | undefined>();
@@ -3516,8 +3575,8 @@ export default function DynamicKeyDetailPage() {
   const handlePinSuggestedFallback = () => {
     if (!dak || !routingDiagnosticsQuery.data?.premiumRegionAutomation?.suggestedFallback) {
       toast({
-        title: 'Fallback unavailable',
-        description: 'No suggested premium fallback is available right now.',
+        title: locale === 'my' ? 'အစားထိုး လမ်းကြောင်း မရနိုင်ပါ' : 'Fallback unavailable',
+        description: locale === 'my' ? 'ယခုအချိန်တွင် အကြံပြုထားသော ပရီမီယံ အစားထိုး လမ်းကြောင်း မရှိသေးပါ။' : 'No suggested premium fallback is available right now.',
         variant: 'destructive',
       });
       return;
@@ -3628,7 +3687,9 @@ export default function DynamicKeyDetailPage() {
           <KeyRound className="w-16 h-16 text-muted-foreground/50 mb-4" />
           <h3 className="text-lg font-semibold mb-2">{t('dynamic_keys.detail.not_found')}</h3>
           <p className="text-muted-foreground mb-6">
-            The requested dynamic access key could not be found.
+            {locale === 'my'
+              ? 'တောင်းဆိုထားသော ပြောင်းလဲနိုင်သော အသုံးပြုခွင့်သော့ကို မတွေ့ပါ။'
+              : 'The requested dynamic access key could not be found.'}
           </p>
           <Button asChild>
             <Link href="/dashboard/dynamic-keys">
@@ -3656,14 +3717,28 @@ export default function DynamicKeyDetailPage() {
   const manualBandwidthLevel = quotaAlertState?.recommendedLevel ?? null;
   const bandwidthThresholdLabel = quotaAlertState?.thresholds.length
     ? quotaAlertState.thresholds.map((threshold) => `${threshold}%`).join(', ')
-    : 'None';
+    : locale === 'my'
+      ? 'မရှိပါ'
+      : 'None';
   const attachedActiveKeys = dak.accessKeys.filter((key) => key.status === 'ACTIVE').length;
   const serverCoverage = new Set(dak.accessKeys.map((key) => key.server?.id).filter(Boolean)).size;
   const detailTabCopy: Record<'overview' | 'routing' | 'delivery' | 'history', string> = {
-    overview: 'Subscription basics, quota, and attached access keys for this dynamic access key.',
-    routing: 'Health-aware routing, rotation policy, and backend diagnostics for premium delivery.',
-    delivery: 'Share pages, client delivery, templates, and access distribution settings for this subscription.',
-    history: 'Connection activity and billing history linked to this dynamic access key.',
+    overview:
+      locale === 'my'
+        ? 'ဤပြောင်းလဲနိုင်သော သော့အတွက် စာရင်းသွင်းမှု အခြေခံအချက်များ၊ quota နှင့် ချိတ်ထားသော access key များကို ကြည့်ရှုပါ။'
+        : 'Subscription basics, quota, and attached access keys for this dynamic access key.',
+    routing:
+      locale === 'my'
+        ? 'ပရီမီယံပို့ဆောင်မှုအတွက် server health၊ rotation မူဝါဒနှင့် backend diagnostics ကို စောင့်ကြည့်ပါ။'
+        : 'Health-aware routing, rotation policy, and backend diagnostics for premium delivery.',
+    delivery:
+      locale === 'my'
+        ? 'ဤစာရင်းသွင်းမှုအတွက် မျှဝေစာမျက်နှာ၊ ကလိုင်းယင့်ပို့ဆောင်မှု၊ template နှင့် access ဖြန့်ချီရေး setting များကို စီမံပါ။'
+        : 'Share pages, client delivery, templates, and access distribution settings for this subscription.',
+    history:
+      locale === 'my'
+        ? 'ဤပြောင်းလဲနိုင်သော သော့နှင့် ဆက်စပ်နေသော ချိတ်ဆက်မှု လှုပ်ရှားမှုနှင့် billing history ကို ပြန်လည်ကြည့်ရှုပါ။'
+        : 'Connection activity and billing history linked to this dynamic access key.',
   };
 
   return (
@@ -3681,7 +3756,7 @@ export default function DynamicKeyDetailPage() {
                   </Button>
                   <span className="ops-pill border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-200">
                     <KeyRound className="h-3.5 w-3.5" />
-                    Dynamic Key
+                    {locale === 'my' ? 'ပြောင်းလဲနိုင်သော သော့' : 'Dynamic Key'}
                   </span>
                   <Badge variant={dak.status === 'ACTIVE' ? 'default' : 'secondary'} className="rounded-full px-3 py-1">
                     {dak.status}
@@ -3702,7 +3777,7 @@ export default function DynamicKeyDetailPage() {
               <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
                 <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {locale === 'my' ? 'ပြင်ဆင်မည်' : 'Edit'}
                 </Button>
                 <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => refetch()}>
                   <RefreshCw className="mr-2 h-4 w-4" />
@@ -3728,56 +3803,60 @@ export default function DynamicKeyDetailPage() {
               <DetailKpiTile
                 label={t('dynamic_keys.detail.attached_keys')}
                 value={dak.accessKeys.length}
-                meta={`${attachedActiveKeys} active attached keys`}
+                meta={isMyanmar ? `အသုံးပြုနေသော ချိတ်ဆက်ထားသည့် သော့ ${attachedActiveKeys} ခု` : `${attachedActiveKeys} active attached keys`}
               />
               <DetailKpiTile
-                label="Server Coverage"
+                label={locale === 'my' ? 'ဆာဗာ လွှမ်းခြုံမှု' : 'Server Coverage'}
                 value={serverCoverage}
-                meta="Distinct servers serving this subscription"
+                meta={locale === 'my' ? 'ဤစာရင်းသွင်းမှုကို ဝန်ဆောင်မှုပေးနေသော မတူညီသော ဆာဗာများ' : 'Distinct servers serving this subscription'}
               />
               <DetailKpiTile
                 label={t('dynamic_keys.detail.traffic_usage')}
                 value={formatBytes(dak.usedBytes)}
-                meta={dak.dataLimitBytes ? `of ${formatBytes(dak.dataLimitBytes)}` : 'Unlimited quota'}
+                meta={dak.dataLimitBytes ? `${locale === 'my' ? 'စုစုပေါင်း' : 'of'} ${formatBytes(dak.dataLimitBytes)}` : (locale === 'my' ? 'ကန့်သတ်ချက် မရှိပါ' : 'Unlimited quota')}
               />
               <DetailKpiTile
-                label="Rotation"
-                value={dak.rotationEnabled ? dak.rotationInterval : 'Off'}
-                meta={dak.nextRotationAt ? `Next ${formatRelativeTime(dak.nextRotationAt)}` : 'No scheduled rotation'}
+                label={locale === 'my' ? 'လှည့်ပြောင်းမှု' : 'Rotation'}
+                value={dak.rotationEnabled ? dak.rotationInterval : (locale === 'my' ? 'ပိတ်ထားသည်' : 'Off')}
+                meta={dak.nextRotationAt ? (locale === 'my' ? `နောက်တစ်ကြိမ် ${formatRelativeTime(dak.nextRotationAt)}` : `Next ${formatRelativeTime(dak.nextRotationAt)}`) : (locale === 'my' ? 'အချိန်ဇယားထားသော လှည့်ပြောင်းမှု မရှိပါ' : 'No scheduled rotation')}
               />
             </DetailMetricGrid>
           </div>
 
           <DetailHeroAside
-            title="Subscription summary"
-            description="Keep route selection, delivery state, and share identity visible while editing routing or attached access keys."
+            title={locale === 'my' ? 'စာရင်းသွင်းမှု အကျဉ်းချုပ်' : 'Subscription summary'}
+            description={
+              locale === 'my'
+                ? 'လမ်းကြောင်းခွဲမှု သို့မဟုတ် ချိတ်ထားသော အသုံးပြုခွင့်သော့များကို ပြင်နေစဉ် လမ်းကြောင်းရွေးချယ်မှု၊ ပို့ဆောင်မှုအခြေအနေနှင့် မျှဝေမှုအမှတ်အသားကို မြင်သာစွာ ထားပါ။'
+                : 'Keep route selection, delivery state, and share identity visible while editing routing or attached access keys.'
+            }
           >
             <DetailMiniTileGrid>
               <DetailMiniTile
-                label="Current route"
-                value={routingDiagnosticsQuery.data?.currentSelection?.serverName || 'Resolving automatically'}
-                meta={routingDiagnosticsQuery.data?.currentSelection?.keyName || 'No pinned backend'}
+                label={t('dashboard.current_route')}
+                value={routingDiagnosticsQuery.data?.currentSelection?.serverName || (locale === 'my' ? 'အလိုအလျောက် ရွေးချယ်နေသည်' : 'Resolving automatically')}
+                meta={routingDiagnosticsQuery.data?.currentSelection?.keyName || (locale === 'my' ? 'ချိတ်ထားသော နောက်ခံချိတ်ဆက်မှု မရှိပါ' : 'No pinned backend')}
               />
               <DetailMiniTile
-                label="Share identity"
-                value={dak.publicSlug || dak.dynamicUrl || 'Not generated'}
+                label={locale === 'my' ? 'မျှဝေမှု အမှတ်အသား' : 'Share identity'}
+                value={dak.publicSlug || dak.dynamicUrl || (locale === 'my' ? 'မဖန်တီးရသေးပါ' : 'Not generated')}
                 valueClassName="break-all"
               />
               <DetailMiniTile
-                label="Delivery state"
-                value={dak.sharePageEnabled === false ? 'Share page off' : 'Share page on'}
-                meta={dak.dynamicUrl ? 'Client URL ready' : 'Client URL unavailable'}
+                label={locale === 'my' ? 'ပို့ဆောင်မှု အခြေအနေ' : 'Delivery state'}
+                value={dak.sharePageEnabled === false ? (locale === 'my' ? 'မျှဝေစာမျက်နှာ ပိတ်ထားသည်' : 'Share page off') : (locale === 'my' ? 'မျှဝေစာမျက်နှာ ဖွင့်ထားသည်' : 'Share page on')}
+                meta={dak.dynamicUrl ? (locale === 'my' ? 'ကလိုင်းယင့် URL အသင့်ဖြစ်နေသည်' : 'Client URL ready') : (locale === 'my' ? 'ကလိုင်းယင့် URL မရရှိနိုင်ပါ' : 'Client URL unavailable')}
               />
               <DetailMiniTile
-                label="Quota watch"
-                value={dak.dataLimitBytes ? `${usagePercent.toFixed(0)}% used` : 'Unlimited quota'}
-                meta={dak.dataLimitBytes ? `Alerts ${bandwidthThresholdLabel}` : 'No quota alerts applied'}
+                label={locale === 'my' ? 'ကန့်သတ်ချက် စောင့်ကြည့်မှု' : 'Quota watch'}
+                value={dak.dataLimitBytes ? `${usagePercent.toFixed(0)}% ${locale === 'my' ? 'အသုံးပြုပြီး' : 'used'}` : (locale === 'my' ? 'ကန့်သတ်ချက် မရှိပါ' : 'Unlimited quota')}
+                meta={dak.dataLimitBytes ? `${locale === 'my' ? 'သတိပေးချက်' : 'Alerts'} ${bandwidthThresholdLabel}` : (locale === 'my' ? 'ကန့်သတ်ချက် သတိပေးချက် မသတ်မှတ်ရသေးပါ' : 'No quota alerts applied')}
               />
             </DetailMiniTileGrid>
 
             {dak.notes ? (
               <DetailNoteBlock>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Notes</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{locale === 'my' ? 'မှတ်စု' : 'Notes'}</p>
                 <p className="mt-3 line-clamp-4 text-sm leading-6 text-foreground">{dak.notes}</p>
               </DetailNoteBlock>
             ) : null}
@@ -3788,14 +3867,14 @@ export default function DynamicKeyDetailPage() {
       <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'routing' | 'delivery' | 'history')} className="space-y-4">
         <div className="ops-panel space-y-3 p-3 sm:p-4">
           <div className="space-y-1">
-            <p className="ops-section-heading">Dynamic key workspace</p>
+            <p className="ops-section-heading">{locale === 'my' ? 'ပြောင်းလဲနိုင်သောသော့ အလုပ်ခွင်' : 'Dynamic key workspace'}</p>
             <p className="text-sm text-muted-foreground">{detailTabCopy[detailTab]}</p>
           </div>
           <TabsList className="grid h-auto grid-cols-2 gap-2 rounded-[1.2rem] border border-border/60 bg-background/45 p-1 lg:grid-cols-4 dark:bg-white/[0.03]">
-            <TabsTrigger value="overview" className="rounded-[0.95rem] px-3 py-2 text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="routing" className="rounded-[0.95rem] px-3 py-2 text-sm">Routing</TabsTrigger>
-            <TabsTrigger value="delivery" className="rounded-[0.95rem] px-3 py-2 text-sm">Delivery</TabsTrigger>
-            <TabsTrigger value="history" className="rounded-[0.95rem] px-3 py-2 text-sm">History</TabsTrigger>
+            <TabsTrigger value="overview" className="rounded-[0.95rem] px-3 py-2 text-sm">{locale === 'my' ? 'အနှစ်ချုပ်' : 'Overview'}</TabsTrigger>
+            <TabsTrigger value="routing" className="rounded-[0.95rem] px-3 py-2 text-sm">{locale === 'my' ? 'လမ်းကြောင်း' : 'Routing'}</TabsTrigger>
+            <TabsTrigger value="delivery" className="rounded-[0.95rem] px-3 py-2 text-sm">{locale === 'my' ? 'ပို့ဆောင်မှု' : 'Delivery'}</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-[0.95rem] px-3 py-2 text-sm">{locale === 'my' ? 'မှတ်တမ်း' : 'History'}</TabsTrigger>
           </TabsList>
         </div>
 
@@ -3814,7 +3893,7 @@ export default function DynamicKeyDetailPage() {
                   {dak.dynamicUrl ? (
                     <>
                       <div className="space-y-2">
-                        <Label className="text-sm text-muted-foreground">Outline Client URL (ssconf://)</Label>
+                        <Label className="text-sm text-muted-foreground">{locale === 'my' ? 'Outline ကလိုင်းယင့် URL (ssconf://)' : 'Outline Client URL (ssconf://)'}</Label>
                         <div className="flex items-center gap-2">
                           <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
                             {ssconfUrl}
@@ -3824,12 +3903,14 @@ export default function DynamicKeyDetailPage() {
                           </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Copy this URL and paste it in Outline client to connect. The client will automatically fetch the latest server configuration.
+                          {locale === 'my'
+                            ? 'ဤ URL ကို ကူးယူပြီး Outline client ထဲသို့ paste လုပ်ကာ ချိတ်ဆက်ပါ။ client သည် နောက်ဆုံး server configuration ကို အလိုအလျောက် ရယူမည်။'
+                            : 'Copy this URL and paste it in Outline client to connect. The client will automatically fetch the latest server configuration.'}
                         </p>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-sm text-muted-foreground">API Endpoint</Label>
+                        <Label className="text-sm text-muted-foreground">{locale === 'my' ? 'API ချိတ်ဆက်လမ်းကြောင်း' : 'API Endpoint'}</Label>
                         <div className="flex items-center gap-2">
                           <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-xs break-all dark:bg-white/[0.03]">
                             {subscriptionApiUrl}
@@ -3844,19 +3925,19 @@ export default function DynamicKeyDetailPage() {
 
                   <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
                     <div className="ops-inline-stat">
-                      <p className="text-sm text-muted-foreground">Status</p>
+                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'အခြေအနေ' : 'Status'}</p>
                       <p className="font-medium">{dak.status}</p>
                     </div>
                     <div className="ops-inline-stat">
-                      <p className="text-sm text-muted-foreground">Load balancer</p>
+                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'ဝန်ခွဲစနစ်' : 'Load balancer'}</p>
                       <p className="font-medium">{dak.loadBalancerAlgorithm.replace(/_/g, ' ')}</p>
                     </div>
                     <div className="ops-inline-stat">
-                      <p className="text-sm text-muted-foreground">Preferred mode</p>
+                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'ဦးစားပေး မုဒ်' : 'Preferred mode'}</p>
                       <p className="font-medium">{dak.preferredRegionMode.replace(/_/g, ' ')}</p>
                     </div>
                     <div className="ops-inline-stat">
-                      <p className="text-sm text-muted-foreground">Rotation trigger</p>
+                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'လှည့်ပြောင်းမှု အစပျိုးမှု' : 'Rotation trigger'}</p>
                       <p className="font-medium">{dak.rotationTriggerMode.replace(/_/g, ' ')}</p>
                     </div>
                   </div>
@@ -3876,7 +3957,7 @@ export default function DynamicKeyDetailPage() {
                       <div className="ops-inline-stat">
                         <p className="text-3xl font-bold">{formatBytes(dak.usedBytes)}</p>
                         <p className="text-sm text-muted-foreground">
-                          of {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : 'unlimited'}
+                          {locale === 'my' ? 'စုစုပေါင်း' : 'of'} {dak.dataLimitBytes ? formatBytes(dak.dataLimitBytes) : (locale === 'my' ? 'အကန့်အသတ်မရှိ' : 'unlimited')}
                         </p>
                       </div>
                       {dak.dataLimitBytes ? (
@@ -3902,40 +3983,50 @@ export default function DynamicKeyDetailPage() {
                         <div className="flex flex-wrap items-center gap-2">
                           {dak.autoDisableOnLimit ? (
                             <Badge variant="outline" className="text-xs">
-                              Auto-disable on limit
+                              {locale === 'my' ? 'ကန့်သတ်ချက်ပြည့်လျှင် အလိုအလျောက်ပိတ်မည်' : 'Auto-disable on limit'}
                             </Badge>
                           ) : null}
                           <Badge variant="outline" className="text-xs">
-                            Manual alerts · {bandwidthThresholdLabel}
+                            {locale === 'my' ? 'လက်ဖြင့်ပို့မည့် သတိပေးချက်များ' : 'Manual alerts'} · {bandwidthThresholdLabel}
                           </Badge>
                           {dak.bandwidthAlertAt80 ? (
                             <Badge variant="outline" className="border-yellow-500 text-xs text-yellow-600">
-                              80% alert sent
+                              {locale === 'my' ? '80% သတိပေးချက် ပို့ပြီး' : '80% alert sent'}
                             </Badge>
                           ) : null}
                           {dak.bandwidthAlertAt90 ? (
                             <Badge variant="outline" className="border-red-500 text-xs text-red-600">
-                              90% alert sent
+                              {locale === 'my' ? '90% သတိပေးချက် ပို့ပြီး' : '90% alert sent'}
                             </Badge>
                           ) : null}
                         </div>
                         <div className="rounded-[1rem] border border-border/60 bg-background/45 p-3 text-sm dark:bg-white/[0.03]">
                           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                             <div className="space-y-1">
-                              <p className="font-medium text-foreground">Bandwidth alerts are manual-only</p>
+                              <p className="font-medium text-foreground">{isMyanmar ? 'ဒေတာအသုံးပြုမှု သတိပေးချက်များကို လက်ဖြင့်သာ ပို့မည်' : 'Bandwidth alerts are manual-only'}</p>
                               <p className="text-muted-foreground">
-                                Threshold notices are no longer auto-sent. Trigger the Telegram alert only when you want it sent.
+                                {isMyanmar ? 'သတ်မှတ်ကန့်သတ်ချက် သတိပေးချက်များကို အလိုအလျောက် မပို့တော့ပါ။ ပို့ချင်သည့်အခါမှ Telegram သတိပေးချက်ကို ကိုယ်တိုင်ပို့ပါ။' : 'Threshold notices are no longer auto-sent. Trigger the Telegram alert only when you want it sent.'}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {manualBandwidthLevel === 'DISABLED'
-                                  ? 'This dynamic key is at or above 100%. You can send a limit-reached notice manually.'
+                                  ? isMyanmar
+                                    ? 'ဤပြောင်းလဲသတ်မှတ်သော့သည် 100% သို့မဟုတ် ထို့ထက်ကျော်လွန်နေပါသည်။ ကန့်သတ်ချက်ပြည့် သတိပေးချက်ကို ကိုယ်တိုင်ပို့နိုင်ပါသည်။'
+                                    : 'This dynamic key is at or above 100%. You can send a limit-reached notice manually.'
                                   : manualBandwidthLevel
                                     ? quotaAlertState?.pendingThresholds.length
-                                      ? `Ready to send the ${manualBandwidthLevel}% alert now.`
-                                      : `The ${manualBandwidthLevel}% alert was already sent. You can resend it manually.`
+                                      ? isMyanmar
+                                        ? `${manualBandwidthLevel}% သတိပေးချက်ကို ယခုပို့ရန် အဆင်သင့်ဖြစ်ပါသည်။`
+                                        : `Ready to send the ${manualBandwidthLevel}% alert now.`
+                                      : isMyanmar
+                                        ? `${manualBandwidthLevel}% သတိပေးချက်ကို ပို့ပြီးဖြစ်သည်။ လိုအပ်ပါက ကိုယ်တိုင် ပြန်ပို့နိုင်ပါသည်။`
+                                        : `The ${manualBandwidthLevel}% alert was already sent. You can resend it manually.`
                                     : quotaAlertState?.nextThreshold
-                                      ? `Next threshold: ${quotaAlertState.nextThreshold}%`
-                                      : 'No threshold reached yet.'}
+                                      ? isMyanmar
+                                        ? `နောက်ထပ် သတ်မှတ်ကန့်သတ်ချက်: ${quotaAlertState.nextThreshold}%`
+                                        : `Next threshold: ${quotaAlertState.nextThreshold}%`
+                                      : isMyanmar
+                                        ? 'Threshold မရောက်သေးပါ။'
+                                        : 'No threshold reached yet.'}
                               </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -3946,10 +4037,10 @@ export default function DynamicKeyDetailPage() {
                               >
                                 {sendBandwidthAlertMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                 {manualBandwidthLevel === 'DISABLED'
-                                  ? 'Send limit notice'
+                                  ? isMyanmar ? 'ကန့်သတ်ချက်ပြည့် သတိပေးချက် ပို့မည်' : 'Send limit notice'
                                   : manualBandwidthLevel
-                                    ? `Send ${manualBandwidthLevel}% alert`
-                                    : 'Threshold not reached'}
+                                    ? isMyanmar ? `${manualBandwidthLevel}% သတိပေးချက်ကို ပို့မည်` : `Send ${manualBandwidthLevel}% alert`
+                                    : isMyanmar ? 'သတ်မှတ်ကန့်သတ်ချက် မရောက်သေးပါ' : 'Threshold not reached'}
                               </Button>
                               <Button
                                 variant="ghost"
@@ -3960,7 +4051,7 @@ export default function DynamicKeyDetailPage() {
                                 }
                               >
                                 {resetBandwidthAlertStateMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Reset alert history
+                                {locale === 'my' ? 'သတိပေးချက် မှတ်တမ်းကို ပြန်ရှင်းမည်' : 'Reset alert history'}
                               </Button>
                             </div>
                           </div>
@@ -3970,7 +4061,7 @@ export default function DynamicKeyDetailPage() {
                   </div>
 
                   <div className="border-t border-border/50 pt-4">
-                    <p className="mb-2 text-sm font-medium">Live Activity</p>
+                    <p className="mb-2 text-sm font-medium">{locale === 'my' ? 'တိုက်ရိုက် လှုပ်ရှားမှု' : 'Live Activity'}</p>
                     <AggregatedTrafficGraph accessKeys={dak.accessKeys} />
                   </div>
 
@@ -3991,7 +4082,7 @@ export default function DynamicKeyDetailPage() {
                     </CardTitle>
                     <Button size="sm" onClick={() => setAttachDialogOpen(true)}>
                       <Plus className="mr-2 h-4 w-4" />
-                      Attach Key
+                      {locale === 'my' ? 'သော့ကို ချိတ်မည်' : 'Attach Key'}
                     </Button>
                   </div>
                 </CardHeader>
@@ -4006,7 +4097,7 @@ export default function DynamicKeyDetailPage() {
                             </div>
                             <div>
                               <p className="text-sm font-medium">{key.name}</p>
-                              <p className="text-xs text-muted-foreground">{key.server?.name || 'Unknown Server'}</p>
+                              <p className="text-xs text-muted-foreground">{key.server?.name || (locale === 'my' ? 'မသိသော ဆာဗာ' : 'Unknown Server')}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
@@ -4027,7 +4118,7 @@ export default function DynamicKeyDetailPage() {
                                 onClick={() => handleDetachKey(key.id)}
                                 disabled={detachKeyMutation.isPending}
                               >
-                                Detach
+                                {locale === 'my' ? 'ဖြုတ်မည်' : 'Detach'}
                               </Button>
                             ) : null}
                           </div>
@@ -4088,17 +4179,19 @@ export default function DynamicKeyDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Download className="h-5 w-5 text-primary" />
-                    Backend Access
+                    {locale === 'my' ? 'Backend ချိတ်ဆက်အသုံးပြုမှု' : 'Backend Access'}
                   </CardTitle>
                   <CardDescription>
-                    Export the currently selected backend config while reviewing routing and failover behavior.
+                    {locale === 'my'
+                      ? 'routing နှင့် failover အပြုအမူကို စစ်ဆေးနေစဉ် လက်ရှိရွေးထားသော backend config ကို ထုတ်ယူပါ။'
+                      : 'Export the currently selected backend config while reviewing routing and failover behavior.'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="ops-inline-stat">
-                    <p className="text-sm text-muted-foreground">Current backend</p>
+                    <p className="text-sm text-muted-foreground">{locale === 'my' ? 'လက်ရှိ backend' : 'Current backend'}</p>
                     <p className="font-medium">
-                      {routingDiagnosticsQuery.data?.currentSelection?.serverName || 'No active backend selected'}
+                      {routingDiagnosticsQuery.data?.currentSelection?.serverName || (locale === 'my' ? 'အသုံးပြုနေသော backend မရွေးရသေးပါ' : 'No active backend selected')}
                     </p>
                   </div>
                   <Button variant="outline" className="w-full" onClick={handleDownloadCurrentBackendConfig}>
@@ -4113,8 +4206,12 @@ export default function DynamicKeyDetailPage() {
               <ClientEndpointTestCard
                 endpointUrl={subscriptionApiUrl}
                 probeUrl={subscriptionProbeUrl}
-                title="Client URL Test"
-                description="Probe the live Outline client endpoint and verify the current dynamic subscription payload."
+                title={locale === 'my' ? 'ကလိုင်းယင့် URL စမ်းသပ်ခြင်း' : 'Client URL Test'}
+                description={
+                  locale === 'my'
+                    ? 'live Outline client endpoint ကို စမ်းသပ်ပြီး လက်ရှိ dynamic subscription payload ကို စစ်ဆေးပါ။'
+                    : 'Probe the live Outline client endpoint and verify the current dynamic subscription payload.'
+                }
               />
 
               <AccessDistributionCard dakId={dak.id} dakName={dak.name} accessKeys={dak.accessKeys} />
@@ -4173,7 +4270,7 @@ export default function DynamicKeyDetailPage() {
                 title={isMyanmar ? 'ငွေပေးချေမှု မှတ်တမ်း' : 'Billing History'}
                 description={
                   isMyanmar
-                    ? 'ဤ premium dynamic key နှင့် သက်ဆိုင်သော Telegram order, renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
+                    ? 'ဤ premium dynamic key နှင့် သက်ဆိုင်သော Telegram order၊ renewal နှင့် billing history ကို ကြည့်ရှုပါ။'
                     : 'Review Telegram orders, renewals, and billing events related to this premium dynamic key.'
                 }
                 orders={(dak as any).billingHistory ?? []}
@@ -4214,15 +4311,15 @@ export default function DynamicKeyDetailPage() {
                 <div className="ops-mobile-action-bar mt-4 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
                   <Button variant="outline" className="w-full" onClick={handleCopyUrl}>
                     <Copy className="mr-2 h-4 w-4" />
-                    Copy URL
+                    {locale === 'my' ? 'URL ကို ကူးမည်' : 'Copy URL'}
                   </Button>
                   <Button variant="outline" className="w-full" onClick={handleDownloadQr}>
                     <QrCode className="mr-2 h-4 w-4" />
-                    Download QR
+                    {locale === 'my' ? 'QR ကို ဒေါင်းလုဒ်လုပ်မည်' : 'Download QR'}
                   </Button>
                   <Button variant="outline" className="w-full sm:col-span-2" onClick={handleDownloadConfig}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download Config
+                    {locale === 'my' ? 'ဆက်တင်ကို ဒေါင်းလုဒ်လုပ်မည်' : 'Download Config'}
                   </Button>
                 </div>
               </CardContent>
@@ -4230,9 +4327,11 @@ export default function DynamicKeyDetailPage() {
 
             <Card className="ops-detail-card">
               <CardHeader>
-                <CardTitle>Snapshot</CardTitle>
+                <CardTitle>{locale === 'my' ? 'အမြန်ကြည့်ရှုမှု' : 'Snapshot'}</CardTitle>
                 <CardDescription>
-                  Keep subscription status, load balancing, and route context visible while you edit delivery or routing settings.
+                  {locale === 'my'
+                    ? 'ပို့ဆောင်မှု သို့မဟုတ် လမ်းကြောင်းဆိုင်ရာ setting များ ပြင်ဆင်နေစဉ် စာရင်းသွင်းမှု အခြေအနေ၊ ဝန်ချိန်ညှိမှုနှင့် လက်ရှိ route ကို အမြဲ မြင်နိုင်စေရန် ပြထားသည်။'
+                    : 'Keep subscription status, load balancing, and route context visible while you edit delivery or routing settings.'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
@@ -4249,25 +4348,25 @@ export default function DynamicKeyDetailPage() {
                   <p className="mt-2 text-sm font-medium">{dak.accessKeys.length}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Load Balancer</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{locale === 'my' ? 'ဝန်ခွဲစနစ်' : 'Load Balancer'}</p>
                   <div className="mt-2">
                     <Badge variant={dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? 'default' : 'secondary'} className="text-xs">
                       {dak.loadBalancerAlgorithm === 'IP_HASH'
-                        ? 'IP Hash'
+                        ? locale === 'my' ? 'IP အလိုက်' : 'IP Hash'
                         : dak.loadBalancerAlgorithm === 'ROUND_ROBIN'
-                          ? 'Round Robin'
+                          ? locale === 'my' ? 'အလှည့်ကျ' : 'Round Robin'
                           : dak.loadBalancerAlgorithm === 'LEAST_LOAD'
-                            ? 'Least Load'
+                            ? locale === 'my' ? 'ဝန်အနည်းဆုံး' : 'Least Load'
                             : dak.loadBalancerAlgorithm === 'RANDOM'
-                              ? 'Random'
+                              ? locale === 'my' ? 'ကျပန်း' : 'Random'
                               : dak.loadBalancerAlgorithm}
                     </Badge>
                   </div>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Current route</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('dashboard.current_route')}</p>
                   <p className="mt-2 text-sm font-medium">
-                    {routingDiagnosticsQuery.data?.currentSelection?.serverName || 'Resolving automatically'}
+                    {routingDiagnosticsQuery.data?.currentSelection?.serverName || (locale === 'my' ? 'အလိုအလျောက် ရွေးချယ်နေသည်' : 'Resolving automatically')}
                   </p>
                 </div>
                 <div className="ops-mini-tile">
@@ -4290,29 +4389,33 @@ export default function DynamicKeyDetailPage() {
           <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
             <DialogTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-primary" />
-              Attach Access Key
+              {isMyanmar ? 'အသုံးပြုခွင့်သော့ကို ချိတ်မည်' : 'Attach Access Key'}
             </DialogTitle>
             <DialogDescription>
-              Select an access key to attach to this dynamic key. Only active keys that are not already attached to another dynamic key are shown.
+              {isMyanmar
+                ? 'ဤ dynamic key နှင့် ချိတ်ရန် access key ကို ရွေးပါ။ အခြား dynamic key တစ်ခုနှင့် မချိတ်ထားသေးသော active key များကိုသာ ပြပါမည်။'
+                : 'Select an access key to attach to this dynamic key. Only active keys that are not already attached to another dynamic key are shown.'}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody>
             <DialogSection>
               <DialogSectionHeader>
-                <DialogSectionTitle>Choose an access key</DialogSectionTitle>
+                <DialogSectionTitle>{isMyanmar ? 'ချိတ်မည့် အသုံးပြုခွင့်သော့ကို ရွေးပါ' : 'Choose an access key'}</DialogSectionTitle>
                 <DialogSectionDescription>
-                  Only active keys that are not already attached to another dynamic key can be selected here.
+                  {isMyanmar
+                    ? 'အခြား dynamic key တစ်ခုနှင့် မချိတ်ထားသေးသော active key များကိုသာ ဤနေရာတွင် ရွေးနိုင်ပါသည်။'
+                    : 'Only active keys that are not already attached to another dynamic key can be selected here.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
               <div className="space-y-2">
-                <Label>Select access key</Label>
+                <Label>{isMyanmar ? 'အသုံးပြုခွင့်သော့ကို ရွေးပါ' : 'Select access key'}</Label>
                 <Select
                   value={selectedKeyId}
                   onValueChange={setSelectedKeyId}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a key to attach..." />
+                    <SelectValue placeholder={isMyanmar ? 'ချိတ်မည့် သော့ကို ရွေးပါ...' : 'Choose a key to attach...'} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableKeys?.items && availableKeys.items.length > 0 ? (
@@ -4322,21 +4425,23 @@ export default function DynamicKeyDetailPage() {
                             <Key className="w-4 h-4" />
                             <span>{key.name}</span>
                             <span className="text-muted-foreground text-xs">
-                              ({key.server?.name || 'Unknown Server'})
+                              ({key.server?.name || (isMyanmar ? 'မသိသော ဆာဗာ' : 'Unknown Server')})
                             </span>
                           </div>
                         </SelectItem>
                       ))
                     ) : (
                       <SelectItem value="none" disabled>
-                        No available keys
+                        {isMyanmar ? 'အသုံးပြုနိုင်သော သော့ မရှိပါ' : 'No available keys'}
                       </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 {(!availableKeys?.items || availableKeys.items.length === 0) && (
                   <div className="ops-modal-note">
-                    No unattached access keys are available. Create one first or detach a key from another dynamic profile.
+                    {isMyanmar
+                      ? 'မချိတ်ထားသော access key မရှိပါ။ အရင် key တစ်ခု ဖန်တီးပါ သို့မဟုတ် အခြား dynamic profile မှ key တစ်ခုကို ဖြုတ်ပါ။'
+                      : 'No unattached access keys are available. Create one first or detach a key from another dynamic profile.'}
                   </div>
                 )}
               </div>
@@ -4351,7 +4456,7 @@ export default function DynamicKeyDetailPage() {
                 setSelectedKeyId('');
               }}
             >
-              Cancel
+              {isMyanmar ? 'မလုပ်တော့ပါ' : 'Cancel'}
             </Button>
             <Button
               onClick={handleAttachKey}
@@ -4523,7 +4628,8 @@ function AggregatedTrafficGraph({
  * Displays aggregated device count and recent connection sessions from all attached keys
  */
 function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const { data, isLoading } = trpc.dynamicKeys.getConnectionSessions.useQuery(
     { dakId, limit: 10 },
     { refetchInterval: 30000 } // Refresh every 30 seconds
@@ -4577,30 +4683,32 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
               )}
               <span className="text-2xl font-bold">{data?.estimatedDevices || 0}</span>
             </div>
-            <p className="text-xs text-muted-foreground">Active Devices</p>
+            <p className="text-xs text-muted-foreground">{isMyanmar ? 'လက်ရှိ စက်များ' : 'Active Devices'}</p>
           </div>
           <div className="ops-inline-stat text-center">
             <div className="text-2xl font-bold">{data?.peakDevices || 0}</div>
-            <p className="text-xs text-muted-foreground">Peak Devices</p>
+            <p className="text-xs text-muted-foreground">{isMyanmar ? 'အများဆုံး စက်များ' : 'Peak Devices'}</p>
           </div>
           {data?.maxDevices ? (
             <div className="ops-inline-stat text-center">
               <div className="text-2xl font-bold">{data.maxDevices}</div>
-              <p className="text-xs text-muted-foreground">Configured Limit</p>
+              <p className="text-xs text-muted-foreground">{isMyanmar ? 'သတ်မှတ်ထားသော ကန့်သတ်ချက်' : 'Configured Limit'}</p>
             </div>
           ) : null}
         </div>
 
         {data?.maxDevices ? (
           <div className="rounded-xl border border-border/60 bg-background/45 px-4 py-3 text-sm dark:bg-white/[0.03]">
-            <p className="font-medium">Managed install flow</p>
+            <p className="font-medium">{isMyanmar ? 'စီမံထားသော တပ်ဆင်ရေး လမ်းကြောင်း' : 'Managed install flow'}</p>
             <p className="text-xs text-muted-foreground">
               {data.boundDeviceInstallsOnly
-                ? 'Protected installs only. Customers must install from the share page or Outline client URL.'
-                : 'Raw config is still allowed, so customers can manually copy reusable connection secrets.'}
+                ? (isMyanmar ? 'ကာကွယ်ထားသော တပ်ဆင်မှုများသာ ခွင့်ပြုထားသည်။ ဖောက်သည်များသည် မျှဝေစာမျက်နှာ သို့မဟုတ် Outline ကလိုင်းယင့် URL မှသာ တပ်ဆင်ရမည်။' : 'Protected installs only. Customers must install from the share page or Outline client URL.')
+                : (isMyanmar ? 'Raw ဆက်တင်ကို ခွင့်ပြုထားသေးသောကြောင့် ဖောက်သည်များသည် ပြန်လည်အသုံးပြုနိုင်သော ချိတ်ဆက်မှု လျှို့ဝှက်ချက်ကို ကိုယ်တိုင်ကူးယူနိုင်သည်။' : 'Raw config is still allowed, so customers can manually copy reusable connection secrets.')}
             </p>
             <p className="text-xs text-muted-foreground">
-              This is the recommended delivery path when you need stronger anti-sharing than a reusable standard key can provide.
+              {isMyanmar
+                ? 'ပြန်လည်အသုံးပြုနိုင်သော ပုံမှန်သော့ထက် ပိုမိုခိုင်မာသည့် အခြားသူထံ မျှဝေခြင်းကာကွယ်မှု လိုအပ်သည့်အခါ ဤပို့ဆောင်မှု လမ်းကြောင်းကို အကြံပြုပါသည်။'
+                : 'This is the recommended delivery path when you need stronger anti-sharing than a reusable standard key can provide.'}
             </p>
           </div>
         ) : null}
@@ -4608,7 +4716,7 @@ function DAKConnectionSessionsCard({ dakId }: { dakId: string }) {
         {/* Recent Sessions */}
         {data?.sessions && data.sessions.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Recent Sessions</p>
+            <p className="text-sm font-medium">{isMyanmar ? 'နောက်ဆုံး ချိတ်ဆက်ဝင်ရောက်မှုများ' : 'Recent Sessions'}</p>
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {data.sessions.slice(0, 5).map((session) => (
                 <div

@@ -30,6 +30,7 @@ import {
   TerminalSquare,
   RefreshCw,
 } from 'lucide-react';
+import { useLocale } from '@/hooks/use-locale';
 
 type DeployStep = 1 | 2 | 3 | 4;
 type RegionOption = {
@@ -114,7 +115,9 @@ function getProvisioningStepLabel(step: ProvisioningRun['currentStep']) {
 }
 
 export default function DeployServerPage() {
+  const { locale, t } = useLocale();
   const { toast } = useToast();
+  const isMyanmar = locale === 'my';
   const [step, setStep] = useState<DeployStep>(1);
   const [token, setToken] = useState('');
 
@@ -239,13 +242,19 @@ export default function DeployServerPage() {
       setActiveRunId(run.id);
       await runsQuery.refetch();
       toast({
-        title: 'Provisioning resumed',
-        description: 'The saved server setup flow is running again from the failed step.',
+        title: isMyanmar ? 'Provisioning ကို ပြန်စတင်လိုက်ပါပြီ' : 'Provisioning resumed',
+        description: isMyanmar
+          ? 'သိမ်းထားသော server setup flow ကို မအောင်မြင်ခဲ့သော အဆင့်မှ ပြန်လည်ဆက်လက် လုပ်ဆောင်နေပါသည်။'
+          : 'The saved server setup flow is running again from the failed step.',
       });
     },
     onError: async (err) => {
       await Promise.all([runsQuery.refetch(), activeRunQuery.refetch()]);
-      toast({ title: 'Retry failed', description: err.message, variant: 'destructive' });
+      toast({
+        title: isMyanmar ? 'ပြန်လည်ကြိုးစားမှု မအောင်မြင်ပါ' : 'Retry failed',
+        description: err.message,
+        variant: 'destructive',
+      });
     },
   });
   const completeRunMutation = trpc.provision.completeRun.useMutation({
@@ -253,12 +262,18 @@ export default function DeployServerPage() {
       setActiveRunId(run.id);
       await runsQuery.refetch();
       toast({
-        title: 'Provisioning handoff completed',
-        description: 'This run is now recorded as finished.',
+        title: isMyanmar ? 'Provisioning handoff ပြီးဆုံးပါပြီ' : 'Provisioning handoff completed',
+        description: isMyanmar
+          ? 'ဤ run ကို ပြီးဆုံးပြီးဖြစ်ကြောင်း မှတ်တမ်းတင်လိုက်ပါပြီ။'
+          : 'This run is now recorded as finished.',
       });
     },
     onError: (err) => {
-      toast({ title: 'Could not complete run', description: err.message, variant: 'destructive' });
+      toast({
+        title: isMyanmar ? 'Run ကို မပြီးဆုံးနိုင်ပါ' : 'Could not complete run',
+        description: err.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -332,41 +347,41 @@ export default function DeployServerPage() {
                 className="ops-pill w-fit border-primary/25 bg-primary/10 text-primary dark:border-cyan-400/18 dark:bg-cyan-400/10 dark:text-cyan-200"
               >
                 <Rocket className="mr-2 h-3.5 w-3.5" />
-                Server provisioning
+                {isMyanmar ? 'ဆာဗာ တပ်ဆင်ရေး' : 'Server provisioning'}
               </Badge>
             </div>
 
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.7rem]">
-                Deploy a new server
+                {isMyanmar ? 'ဆာဗာအသစ် တပ်ဆင်မည်' : 'Deploy a new server'}
               </h1>
               <p className="max-w-3xl text-sm leading-7 text-muted-foreground sm:text-base">
-                Provision a new Outline node on DigitalOcean, prepare Docker automatically, and finish the Outline install from one guided flow.
+                  {isMyanmar ? 'DigitalOcean ပေါ်တွင် Outline ဆာဗာအသစ် တပ်ဆင်ပါ၊ Docker ကို အလိုအလျောက် ပြင်ဆင်ပါ၊ ထို့နောက် လမ်းညွှန် လုပ်ငန်းစဉ်တစ်ခုတည်းဖြင့် Outline တပ်ဆင်မှုကို အပြီးသတ်ပါ။' : 'Provision a new Outline node on DigitalOcean, prepare Docker automatically, and finish the Outline install from one guided flow.'}
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Provider</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဝန်ဆောင်မှုပေးသူ' : 'Provider'}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight">DO</p>
-                <p className="mt-2 text-sm text-muted-foreground">DigitalOcean automation endpoint.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{isMyanmar ? 'DigitalOcean အလိုအလျောက် လုပ်ဆောင်မှု ချိတ်ဆက်စနစ်။' : 'DigitalOcean automation endpoint.'}</p>
               </div>
               <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Step</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အဆင့်' : 'Step'}</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight">{step}/4</p>
-                <p className="mt-2 text-sm text-muted-foreground">Connect, configure, provision, and finish.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{isMyanmar ? 'ချိတ်ဆက်ပါ၊ ပြင်ဆင်ပါ၊ တပ်ဆင်ပါ၊ အပြီးသတ်ပါ။' : 'Connect, configure, provision, and finish.'}</p>
               </div>
               <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Region</p>
-                <p className="mt-3 text-xl font-semibold tracking-tight">{selectedRegion?.name ?? 'Pending'}</p>
-                <p className="mt-2 text-sm text-muted-foreground">Choose where the node should be created.</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'တည်နေရာဒေသ' : 'Region'}</p>
+                <p className="mt-3 text-xl font-semibold tracking-tight">{selectedRegion?.name ?? (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{isMyanmar ? 'ဆာဗာအသစ်ကို ဖန်တီးမည့် နေရာကို ရွေးပါ။' : 'Choose where the node should be created.'}</p>
               </div>
               <div className="ops-kpi-tile">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Size</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အရွယ်အစား' : 'Size'}</p>
                 <p className="mt-3 text-xl font-semibold tracking-tight">
-                  {selectedSize ? `$${selectedSize.priceMonthly}/mo` : 'Pending'}
+                  {selectedSize ? `$${selectedSize.priceMonthly}/mo` : (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">Single-vCPU droplets are recommended for small installs.</p>
+                <p className="mt-2 text-sm text-muted-foreground">{isMyanmar ? 'အသေးစား တပ်ဆင်မှုများအတွက် single-vCPU droplet များကို အကြံပြုသည်။' : 'Single-vCPU droplets are recommended for small installs.'}</p>
               </div>
             </div>
           </div>
@@ -374,45 +389,45 @@ export default function DeployServerPage() {
           <div className="ops-detail-rail">
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Command rail</p>
-                <h2 className="text-xl font-semibold">Provisioning status</h2>
+                <p className="ops-section-heading">{t('dashboard.command_rail')}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'တပ်ဆင်မှု အခြေအနေ' : 'Provisioning status'}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Track readiness, selected capacity, and final SSH access details without leaving this flow.
+                  {isMyanmar ? 'ဤလုပ်ငန်းစဉ်မှ မထွက်ဘဲ အဆင်သင့်ဖြစ်မှု၊ ရွေးထားသော စွမ်းဆောင်ရည် နှင့် နောက်ဆုံး SSH ချိတ်ဆက်မှု အချက်အလက်များကို စောင့်ကြည့်ပါ။' : 'Track readiness, selected capacity, and final SSH access details without leaving this flow.'}
                 </p>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">API token</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'API တိုကင်' : 'API token'}</p>
                   <p className="mt-2 text-sm font-medium">{tokenStatusLabel}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet state</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Droplet အခြေအနေ' : 'Droplet state'}</p>
                   <p className="mt-2 text-sm font-medium">
-                    {activeRun ? getProvisioningStatusLabel(activeRun.status) : step >= 2 ? 'Configuring' : 'Waiting'}
+                    {activeRun ? getProvisioningStatusLabel(activeRun.status) : step >= 2 ? (isMyanmar ? 'ပြင်ဆင်နေသည်' : 'Configuring') : (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Waiting')}
                   </p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Location</p>
-                  <p className="mt-2 text-sm font-medium">{activeRun?.region ?? selectedRegion?.slug ?? 'Unselected'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'တည်နေရာ' : 'Location'}</p>
+                  <p className="mt-2 text-sm font-medium">{activeRun?.region ?? selectedRegion?.slug ?? (isMyanmar ? 'မရွေးထားပါ' : 'Unselected')}</p>
                 </div>
                 <div className="ops-mini-tile">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Public IP</p>
-                  <p className="mt-2 text-sm font-medium">{dropletIp ?? 'Pending'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အများသုံး IP' : 'Public IP'}</p>
+                  <p className="mt-2 text-sm font-medium">{dropletIp ?? (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
                 </div>
               </div>
             </div>
 
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Recent runs</p>
-                <h2 className="text-xl font-semibold">Resume or inspect</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'နောက်ဆုံး လုပ်ဆောင်မှုများ' : 'Recent runs'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'ပြန်ဆက်လုပ် သို့မဟုတ် စစ်ဆေးမည်' : 'Resume or inspect'}</h2>
               </div>
 
               <div className="space-y-2">
                 {((runsQuery.data as ProvisioningRun[] | undefined) ?? []).length === 0 ? (
                   <div className="ops-mini-tile">
-                    <p className="text-sm text-muted-foreground">No provisioning runs recorded yet.</p>
+                    <p className="text-sm text-muted-foreground">{isMyanmar ? 'တပ်ဆင်မှု လုပ်ဆောင်ချက် မှတ်တမ်း မရှိသေးပါ။' : 'No provisioning runs recorded yet.'}</p>
                   </div>
                 ) : (
                   ((runsQuery.data as ProvisioningRun[] | undefined) ?? []).slice(0, 4).map((run) => (
@@ -442,16 +457,16 @@ export default function DeployServerPage() {
 
             <div className="ops-panel space-y-3">
               <div className="space-y-1">
-                <p className="ops-section-heading">Workflow guide</p>
-                <h2 className="text-xl font-semibold">Expected path</h2>
+                <p className="ops-section-heading">{isMyanmar ? 'လုပ်ငန်းစဉ် လမ်းညွှန်' : 'Workflow guide'}</p>
+                <h2 className="text-xl font-semibold">{isMyanmar ? 'မျှော်မှန်းထားသော အဆင့်လမ်းကြောင်း' : 'Expected path'}</h2>
               </div>
 
               <div className="ops-detail-card space-y-3">
                 {[
-                  { label: 'Connect provider', icon: KeyRound, active: step >= 1 },
-                  { label: 'Choose region + size', icon: Globe2, active: step >= 2 },
-                  { label: 'Provision droplet', icon: Server, active: step >= 3 },
-                  { label: 'Finish Outline install', icon: ShieldCheck, active: step >= 4 },
+                  { label: isMyanmar ? 'provider ကို ချိတ်ဆက်မည်' : 'Connect provider', icon: KeyRound, active: step >= 1 },
+                  { label: isMyanmar ? 'region နှင့် size ရွေးမည်' : 'Choose region + size', icon: Globe2, active: step >= 2 },
+                  { label: isMyanmar ? 'droplet ကို ပြင်ဆင်မည်' : 'Provision droplet', icon: Server, active: step >= 3 },
+                  { label: isMyanmar ? 'Outline တပ်ဆင်မှုကို ပြီးစီးစေမည်' : 'Finish Outline install', icon: ShieldCheck, active: step >= 4 },
                 ].map((item, index) => (
                   <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-background/50 px-3 py-3 dark:bg-[rgba(6,13,25,0.58)]">
                     <div className="flex items-center gap-3">
@@ -460,7 +475,7 @@ export default function DeployServerPage() {
                       </span>
                       <div>
                         <p className="text-sm font-medium">{item.label}</p>
-                        <p className="text-xs text-muted-foreground">Step {index + 1}</p>
+                        <p className="text-xs text-muted-foreground">{isMyanmar ? `အဆင့် ${index + 1}` : `Step ${index + 1}`}</p>
                       </div>
                     </div>
                     <span className={`h-2.5 w-2.5 rounded-full ${item.active ? 'bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.65)]' : 'bg-border'}`} />
@@ -487,7 +502,7 @@ export default function DeployServerPage() {
                 <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${step >= item ? 'bg-primary text-primary-foreground dark:bg-cyan-400 dark:text-slate-950' : 'bg-muted dark:bg-white/10'}`}>
                   {item}
                 </span>
-                <span>{item === 1 ? 'Connect' : item === 2 ? 'Configure' : item === 3 ? 'Provision' : 'Finish'}</span>
+                <span>{item === 1 ? (isMyanmar ? 'ချိတ်ဆက်' : 'Connect') : item === 2 ? (isMyanmar ? 'ပြင်ဆင်' : 'Configure') : item === 3 ? (isMyanmar ? 'တပ်ဆင်' : 'Provision') : (isMyanmar ? 'ပြီးစီး' : 'Finish')}</span>
               </div>
             ))}
           </div>
@@ -498,7 +513,7 @@ export default function DeployServerPage() {
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="ops-detail-card space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="do-token">DigitalOcean Personal Access Token</Label>
+                  <Label htmlFor="do-token">{isMyanmar ? 'DigitalOcean personal access token' : 'DigitalOcean Personal Access Token'}</Label>
                   <Input
                     id="do-token"
                     type="password"
@@ -507,11 +522,15 @@ export default function DeployServerPage() {
                     onChange={(e) => setToken(e.target.value)}
                   />
                   <p className="text-sm text-muted-foreground">
-                    Generate a token with read/write access from DigitalOcean API settings. It is encrypted before storage so future deploys can skip this step.
+                    {isMyanmar
+                      ? 'DigitalOcean API settings မှ read/write access ပါသော token တစ်ခု ဖန်တီးပါ။ နောက်ပိုင်း deploy များတွင် ဤအဆင့်ကို ကျော်နိုင်စေရန် သိမ်းဆည်းမီ encrypt လုပ်ပါမည်။'
+                      : 'Generate a token with read/write access from DigitalOcean API settings. It is encrypted before storage so future deploys can skip this step.'}
                   </p>
                   {configQuery.data?.needsTokenMigration ? (
                     <p className="text-sm font-medium text-amber-600 dark:text-amber-300">
-                      The saved token came from an older plaintext format. Re-enter it once to encrypt it at rest.
+                      {isMyanmar
+                        ? 'သိမ်းထားသော token သည် အဟောင်း plaintext format မှ ဖြစ်သည်။ သိမ်းထားစဉ် encrypt လုပ်နိုင်ရန် တစ်ကြိမ် ပြန်ထည့်ပါ။'
+                        : 'The saved token came from an older plaintext format. Re-enter it once to encrypt it at rest.'}
                     </p>
                   ) : null}
                   {configQuery.data?.tokenError ? (
@@ -524,25 +543,25 @@ export default function DeployServerPage() {
                   className="rounded-full"
                 >
                   {tokenMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-                  Save token and continue
+                    {isMyanmar ? 'တိုကင်ကို သိမ်းပြီး ဆက်လုပ်မည်' : 'Save token and continue'}
                 </Button>
               </div>
 
               <div className="ops-detail-card space-y-3">
-                <p className="ops-section-heading">Provider note</p>
-                <h3 className="text-lg font-semibold">Before you start</h3>
+                <p className="ops-section-heading">{isMyanmar ? 'ဝန်ဆောင်မှုပေးသူ မှတ်ချက်' : 'Provider note'}</p>
+                <h3 className="text-lg font-semibold">{isMyanmar ? 'မစတင်မီ သိထားရမည့်အချက်များ' : 'Before you start'}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p className="inline-flex items-center gap-2">
                     <Cloud className="h-4 w-4 text-primary" />
-                    Only DigitalOcean provisioning is automated in this flow.
+                    {isMyanmar ? 'ဤ flow တွင် DigitalOcean provisioning ကိုသာ အလိုအလျောက် လုပ်ဆောင်ပေးထားသည်။' : 'Only DigitalOcean provisioning is automated in this flow.'}
                   </p>
                   <p className="inline-flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-primary" />
-                    Docker is installed by cloud-init before Outline setup.
+                    {isMyanmar ? 'Outline setup မတိုင်မီ Docker ကို cloud-init ဖြင့် တပ်ဆင်ပေးသည်။' : 'Docker is installed by cloud-init before Outline setup.'}
                   </p>
                   <p className="inline-flex items-center gap-2">
                     <TerminalSquare className="h-4 w-4 text-primary" />
-                    You still finish Outline via SSH using the generated install command.
+                    {isMyanmar ? 'ဖန်တီးထားသော တပ်ဆင်အမိန့်ကို အသုံးပြုပြီး Outline ကို SSH မှတဆင့် ဆက်လက်ပြီးအောင်လုပ်ရမည်။' : 'You still finish Outline via SSH using the generated install command.'}
                   </p>
                 </div>
               </div>
@@ -558,14 +577,14 @@ export default function DeployServerPage() {
                   <div className="grid gap-5 md:grid-cols-2">
                     <div className="ops-detail-card space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="deploy-name">Server name</Label>
+                        <Label htmlFor="deploy-name">{isMyanmar ? 'ဆာဗာ အမည်' : 'Server name'}</Label>
                         <Input id="deploy-name" value={name} onChange={(e) => setName(e.target.value)} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="deploy-region">Region</Label>
+                        <Label htmlFor="deploy-region">{isMyanmar ? 'Region' : 'Region'}</Label>
                         <Select value={region} onValueChange={setRegion}>
                           <SelectTrigger id="deploy-region">
-                            <SelectValue placeholder="Select a region" />
+                            <SelectValue placeholder={isMyanmar ? 'region ကို ရွေးပါ' : 'Select a region'} />
                           </SelectTrigger>
                           <SelectContent>
                             {regionOptions.map((item) => (
@@ -580,10 +599,10 @@ export default function DeployServerPage() {
 
                     <div className="ops-detail-card space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="deploy-size">Droplet size</Label>
+                        <Label htmlFor="deploy-size">{isMyanmar ? 'Droplet အရွယ်အစား' : 'Droplet size'}</Label>
                         <Select value={size} onValueChange={setSize}>
                           <SelectTrigger id="deploy-size">
-                            <SelectValue placeholder="Select a size" />
+                            <SelectValue placeholder={isMyanmar ? 'အရွယ်အစားကို ရွေးပါ' : 'Select a size'} />
                           </SelectTrigger>
                           <SelectContent>
                             {sizeOptions.map((item) => (
@@ -601,7 +620,7 @@ export default function DeployServerPage() {
                           <p className="mt-2 text-sm font-medium">{selectedSize?.vcpus ?? '—'}</p>
                         </div>
                         <div className="ops-mini-tile">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Memory</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'မှတ်ဉာဏ်' : 'Memory'}</p>
                           <p className="mt-2 text-sm font-medium">{selectedSize ? `${selectedSize.memory}MB` : '—'}</p>
                         </div>
                       </div>
@@ -611,14 +630,14 @@ export default function DeployServerPage() {
 
                 <div className="ops-mobile-action-bar sm:grid-cols-[1fr_auto]">
                   <div className="text-sm text-muted-foreground">
-                    Recommended for small installs: 1 vCPU droplets with a region near your users.
+                    {isMyanmar ? 'အသုံးပြုသူနီးသော region ရှိ 1 vCPU droplet များကို အသေးစား တပ်ဆင်မှုအတွက် အကြံပြုပါသည်။' : 'Recommended for small installs: 1 vCPU droplets with a region near your users.'}
                   </div>
                   <Button
                     onClick={handleDeploy}
                     disabled={!name || !region || !size}
                     className="rounded-full"
                   >
-                    Deploy droplet
+                    {isMyanmar ? 'droplet ကို စတင်တပ်ဆင်မည်' : 'Deploy droplet'}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
@@ -626,23 +645,23 @@ export default function DeployServerPage() {
 
               <div className="ops-detail-card space-y-4">
                 <div className="space-y-1">
-                  <p className="ops-section-heading">Selection summary</p>
-                  <h3 className="text-lg font-semibold">Current config</h3>
+                  <p className="ops-section-heading">{isMyanmar ? 'ရွေးချယ်မှု အနှစ်ချုပ်' : 'Selection summary'}</p>
+                  <h3 className="text-lg font-semibold">{isMyanmar ? 'လက်ရှိ သတ်မှတ်ချက်' : 'Current config'}</h3>
                 </div>
                 <div className="grid gap-3">
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Hostname</p>
-                    <p className="mt-2 text-sm font-medium">{name || 'Pending'}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Hostname' : 'Hostname'}</p>
+                    <p className="mt-2 text-sm font-medium">{name || (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Region</p>
-                    <p className="mt-2 text-sm font-medium">{selectedRegion?.name ?? 'Pending'}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Region' : 'Region'}</p>
+                    <p className="mt-2 text-sm font-medium">{selectedRegion?.name ?? (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
                     {selectedRegion ? <p className="mt-1 text-xs text-muted-foreground">{selectedRegion.slug}</p> : null}
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet size</p>
-                    <p className="mt-2 text-sm font-medium">{selectedSize?.description ?? 'Pending'}</p>
-                    {selectedSize ? <p className="mt-1 text-xs text-muted-foreground">${selectedSize.priceMonthly}/month</p> : null}
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Droplet အရွယ်အစား' : 'Droplet size'}</p>
+                    <p className="mt-2 text-sm font-medium">{selectedSize?.description ?? (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
+                    {selectedSize ? <p className="mt-1 text-xs text-muted-foreground">${selectedSize.priceMonthly}/{isMyanmar ? 'လ' : 'month'}</p> : null}
                   </div>
                 </div>
               </div>
@@ -659,27 +678,27 @@ export default function DeployServerPage() {
                     </span>
                   </div>
                   <div className="space-y-2 text-center">
-                    <h3 className="text-2xl font-semibold">Provisioning needs attention</h3>
+                    <h3 className="text-2xl font-semibold">{isMyanmar ? 'Provisioning ကို စစ်ဆေးရန် လိုအပ်သည်' : 'Provisioning needs attention'}</h3>
                     <p className="mx-auto max-w-lg text-sm leading-7 text-muted-foreground">
                       {activeRun.summary}
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="ops-mini-tile text-center">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Failed step</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'မအောင်မြင်သော အဆင့်' : 'Failed step'}</p>
                       <p className="mt-2 text-sm font-medium">{getProvisioningStepLabel(activeRun.currentStep)}</p>
                     </div>
                     <div className="ops-mini-tile text-center">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Attempts</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ကြိုးစားမှု အကြိမ်ရေ' : 'Attempts'}</p>
                       <p className="mt-2 text-sm font-medium">{activeRun.attemptCount}</p>
                     </div>
                     <div className="ops-mini-tile text-center">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet</p>
-                      <p className="mt-2 text-sm font-medium">{activeRun.dropletId ? `#${activeRun.dropletId}` : 'Not created'}</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun.dropletId ? `#${activeRun.dropletId}` : (isMyanmar ? 'မဖန်တီးရသေးပါ' : 'Not created')}</p>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-700 dark:text-rose-200">
-                    {activeRun.lastError || 'The provider returned an unknown error.'}
+                    {activeRun.lastError || (isMyanmar ? 'provider မှ မသိသော အမှားတစ်ခု ပြန်ပေးခဲ့သည်။' : 'The provider returned an unknown error.')}
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <Button
@@ -688,10 +707,10 @@ export default function DeployServerPage() {
                       className="rounded-full"
                     >
                       {retryRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                      Retry last failed step
+                      {isMyanmar ? 'နောက်ဆုံး မအောင်မြင်သော အဆင့်ကို ထပ်လုပ်မည်' : 'Retry last failed step'}
                     </Button>
                     <Button variant="outline" onClick={handleStartNewRun} className="rounded-full">
-                      Start new run
+                      {isMyanmar ? 'run အသစ်ကို စတင်မည်' : 'Start new run'}
                     </Button>
                   </div>
                 </>
@@ -704,23 +723,23 @@ export default function DeployServerPage() {
                     </span>
                   </div>
                   <div className="space-y-2 text-center">
-                    <h3 className="text-2xl font-semibold">Provisioning droplet</h3>
+                    <h3 className="text-2xl font-semibold">{isMyanmar ? 'droplet ကို တပ်ဆင်နေသည်' : 'Provisioning droplet'}</h3>
                     <p className="mx-auto max-w-lg text-sm leading-7 text-muted-foreground">
-                      {activeRun?.summary || 'Allocating the server, assigning a public IP, and installing Docker. This usually finishes in 30 to 60 seconds.'}
+                      {activeRun?.summary || (isMyanmar ? 'ဆာဗာအရင်းအမြစ် ခွဲဝေပေးနေသည်၊ public IP သတ်မှတ်နေသည်၊ Docker ကို တပ်ဆင်နေသည်။ ပုံမှန်အားဖြင့် စက္ကန့် ၃၀ မှ ၆၀ အတွင်း ပြီးဆုံးတတ်သည်။' : 'Allocating the server, assigning a public IP, and installing Docker. This usually finishes in 30 to 60 seconds.')}
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="ops-mini-tile text-center">
                       <MapPin className="mx-auto h-4 w-4 text-primary" />
-                      <p className="mt-2 text-sm font-medium">{activeRun?.region ?? selectedRegion?.slug ?? 'Waiting'}</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun?.region ?? selectedRegion?.slug ?? (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Waiting')}</p>
                     </div>
                     <div className="ops-mini-tile text-center">
                       <Cpu className="mx-auto h-4 w-4 text-primary" />
-                      <p className="mt-2 text-sm font-medium">{activeRun?.size ?? selectedSize?.slug ?? 'Waiting'}</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun?.size ?? selectedSize?.slug ?? (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Waiting')}</p>
                     </div>
                     <div className="ops-mini-tile text-center">
                       <Server className="mx-auto h-4 w-4 text-primary" />
-                      <p className="mt-2 text-sm font-medium">{dropletId ? `#${dropletId}` : 'Requesting ID'}</p>
+                      <p className="mt-2 text-sm font-medium">{dropletId ? `#${dropletId}` : (isMyanmar ? 'ID တောင်းဆိုနေသည်' : 'Requesting ID')}</p>
                     </div>
                   </div>
                 </>
@@ -736,9 +755,9 @@ export default function DeployServerPage() {
                     <CheckCircle2 className="h-6 w-6" />
                   </span>
                   <div className="space-y-1">
-                    <h3 className="text-2xl font-semibold">Droplet is ready</h3>
+                    <h3 className="text-2xl font-semibold">{isMyanmar ? 'Droplet အဆင်သင့် ဖြစ်ပါပြီ' : 'Droplet is ready'}</h3>
                     <p className="text-sm leading-6 text-muted-foreground">
-                      Your server is provisioned at <span className="font-medium text-foreground">{dropletIp}</span>. The last step is to run the Outline installer over SSH.
+                      {isMyanmar ? <>သင့်ဆာဗာကို <span className="font-medium text-foreground">{dropletIp}</span> တွင် provision လုပ်ပြီးပါပြီ။ နောက်ဆုံးအဆင့်မှာ SSH မှတဆင့် Outline installer ကို လည်ပတ်ရန် ဖြစ်သည်။</> : <>Your server is provisioned at <span className="font-medium text-foreground">{dropletIp}</span>. The last step is to run the Outline installer over SSH.</>}
                     </p>
                   </div>
                 </div>
@@ -746,16 +765,16 @@ export default function DeployServerPage() {
                 {activeRun ? (
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Run status</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Run အခြေအနေ' : 'Run status'}</p>
                       <p className="mt-2 text-sm font-medium">{getProvisioningStatusLabel(activeRun.status)}</p>
                     </div>
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Attempts</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ကြိုးစားမှု အကြိမ်ရေ' : 'Attempts'}</p>
                       <p className="mt-2 text-sm font-medium">{activeRun.attemptCount}</p>
                     </div>
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Droplet ID</p>
-                      <p className="mt-2 text-sm font-medium">{activeRun.dropletId ? `#${activeRun.dropletId}` : 'Pending'}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Droplet ID' : 'Droplet ID'}</p>
+                      <p className="mt-2 text-sm font-medium">{activeRun.dropletId ? `#${activeRun.dropletId}` : (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
                     </div>
                   </div>
                 ) : null}
@@ -763,8 +782,8 @@ export default function DeployServerPage() {
                 <div className="ops-detail-card space-y-3 bg-background/55 dark:bg-[rgba(4,11,23,0.78)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <p className="ops-section-heading">Install command</p>
-                      <p className="text-sm text-muted-foreground">Run this on your machine to finish Outline setup.</p>
+                      <p className="ops-section-heading">{isMyanmar ? 'တပ်ဆင်အမိန့်' : 'Install command'}</p>
+                      <p className="text-sm text-muted-foreground">{isMyanmar ? 'Outline setup ကို ပြီးစီးစေရန် ဤအမိန့်ကို သင့်စက်ပေါ်တွင် လည်ပတ်ပါ။' : 'Run this on your machine to finish Outline setup.'}</p>
                     </div>
                     <Button
                       size="icon"
@@ -782,7 +801,7 @@ export default function DeployServerPage() {
 
                 <div className="ops-mobile-action-bar sm:grid-cols-[1fr_auto]">
                   <p className="text-sm text-muted-foreground">
-                    After installation, copy the generated <code>apiUrl</code> and add it from the servers page.
+                    {isMyanmar ? <>တပ်ဆင်ပြီးနောက် ဖန်တီးထားသော <code>apiUrl</code> ကို ကူးယူပြီး servers page မှ ထည့်သွင်းပါ။</> : <>After installation, copy the generated <code>apiUrl</code> and add it from the servers page.</>}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -791,7 +810,7 @@ export default function DeployServerPage() {
                       className="rounded-full"
                       onClick={handleStartNewRun}
                     >
-                      Start another run
+                      {isMyanmar ? 'နောက်ထပ် run တစ်ခုကို စတင်မည်' : 'Start another run'}
                     </Button>
                     {activeRun && activeRun.status !== 'completed' ? (
                       <Button
@@ -802,11 +821,11 @@ export default function DeployServerPage() {
                         disabled={completeRunMutation.isPending}
                       >
                         {completeRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        Mark handoff done
+                        {isMyanmar ? 'handoff ပြီးဆုံးကြောင်း မှတ်မည်' : 'Mark handoff done'}
                       </Button>
                     ) : null}
                     <Button asChild className="rounded-full">
-                      <Link href="/dashboard/servers">Return to servers</Link>
+                      <Link href="/dashboard/servers">{isMyanmar ? 'ဆာဗာစာရင်းသို့ ပြန်မည်' : 'Return to servers'}</Link>
                     </Button>
                   </div>
                 </div>
@@ -814,21 +833,21 @@ export default function DeployServerPage() {
 
               <div className="ops-detail-card space-y-4">
                 <div className="space-y-1">
-                  <p className="ops-section-heading">Finish checklist</p>
-                  <h3 className="text-lg font-semibold">After SSH install</h3>
+                  <p className="ops-section-heading">{isMyanmar ? 'ပြီးဆုံးရန် စစ်ဆေးစာရင်း' : 'Finish checklist'}</p>
+                  <h3 className="text-lg font-semibold">{isMyanmar ? 'SSH တပ်ဆင်မှုပြီးနောက်' : 'After SSH install'}</h3>
                 </div>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p className="inline-flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    Run the installer command above.
+                    {isMyanmar ? 'အပေါ်ရှိ တပ်ဆင်အမိန့်ကို လည်ပတ်ပါ။' : 'Run the installer command above.'}
                   </p>
                   <p className="inline-flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    Copy the generated access key management URL.
+                    {isMyanmar ? 'ဖန်တီးထားသော အသုံးပြုခွင့်သော့ စီမံခန့်ခွဲမှု URL ကို ကူးယူပါ။' : 'Copy the generated access key management URL.'}
                   </p>
                   <p className="inline-flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    Add the server from the inventory page.
+                    {isMyanmar ? 'inventory စာမျက်နှာမှ ဆာဗာကို ထည့်သွင်းပါ။' : 'Add the server from the inventory page.'}
                   </p>
                 </div>
               </div>
