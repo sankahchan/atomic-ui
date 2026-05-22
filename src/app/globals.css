@@ -179,9 +179,11 @@
     min-height: 100vh;
     min-height: 100dvh;
     overflow-x: hidden;
+    overflow-y: auto;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    touch-action: manipulation;
+    touch-action: pan-y pinch-zoom;
+    overscroll-behavior-x: none;
   }
 
   .dark body {
@@ -1859,11 +1861,81 @@
 
     body {
       background-attachment: scroll;
-      overscroll-behavior-y: none;
+      overscroll-behavior-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y pinch-zoom;
     }
 
     .ops-mobile-root {
       min-height: 100dvh;
+      touch-action: pan-y pinch-zoom;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: auto;
+    }
+
+    .ops-mobile-root main,
+    .ops-mobile-root .ops-page {
+      touch-action: pan-y pinch-zoom;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .ops-mobile-root .bg-mesh {
+      display: none;
+    }
+
+    .ops-mobile-root .glass,
+    .ops-mobile-root .glass-medium,
+    .ops-mobile-root .glass-light,
+    .ops-mobile-root .ops-panel,
+    .ops-mobile-root .ops-kpi-tile,
+    .ops-mobile-root .ops-showcase,
+    .ops-mobile-root .ops-support-card,
+    .ops-mobile-root .ops-detail-card,
+    .ops-mobile-root .ops-command-bar,
+    .ops-mobile-root .ops-table-toolbar,
+    .ops-mobile-root .ops-filter-bar,
+    .ops-mobile-root .ops-data-shell,
+    .ops-mobile-root .ops-mobile-card,
+    .ops-mobile-root .ops-chart-shell,
+    .ops-mobile-root .ops-empty-state,
+    .ops-mobile-root .ops-mobile-action-bar,
+    .ops-mobile-root .ops-inline-stat,
+    .ops-mobile-root .ops-row-card,
+    .ops-mobile-root .ops-mini-tile,
+    .ops-mobile-root .ops-action-tile,
+    .ops-mobile-root .ops-stat-pod,
+    .ops-mobile-root .ops-table-meta,
+    .ops-mobile-root .ops-chart-legend-chip,
+    .ops-mobile-root .ops-modal-shell,
+    .ops-mobile-root .ops-mobile-sheet,
+    .ops-mobile-root .ops-mobile-sheet-overlay,
+    .ops-mobile-root .ops-topbar,
+    .ops-mobile-root .glass-bottom-bar,
+    .ops-mobile-root .ops-mobile-dock,
+    .ops-mobile-root .ops-icon-button-shell,
+    .ops-mobile-root .ops-hero,
+    .ops-mobile-root .ops-toolbar-dock,
+    .ops-mobile-root .ops-segmented-control,
+    .ops-mobile-root .ops-filter-chip-row,
+    .ops-mobile-root .ops-workspace-tabs,
+    .ops-mobile-root .ops-screen-hero,
+    .ops-mobile-root .ops-screen-aside,
+    .ops-mobile-root .ops-screen-summary,
+    .ops-mobile-root [class*="backdrop-blur"] {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    .ops-mobile-sheet {
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y pinch-zoom;
+    }
+
+    .ops-mobile-root .ops-interactive-surface:hover,
+    .ops-mobile-root .ops-mobile-dock-item:hover,
+    .ops-mobile-root .ops-mobile-dock-item-active {
+      transform: none;
     }
 
     .ops-page,
@@ -2009,6 +2081,49 @@
       box-shadow:
         0 22px 50px rgba(0, 3, 12, 0.34),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    /*
+     * Portal-aware mobile perf: strip ALL backdrop-filter and -webkit-backdrop-filter
+     * from every descendant of ops-mobile-root, regardless of class name.
+     * The named-class list above catches custom components; this wildcard
+     * catches Tailwind utility classes like backdrop-blur-[14px] and the
+     * arbitrary-property variant [-webkit-backdrop-filter:blur(…)] which
+     * don't match the [class*="backdrop-blur"] selector.
+     */
+    .ops-mobile-root * {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+    }
+
+    /* Promote the main scroll container to its own GPU layer */
+    .ops-mobile-root > main {
+      will-change: scroll-position;
+      transform: translateZ(0);
+    }
+
+    /* Disable expensive hover transitions on touch — Android still fires
+       hover on tap which triggers layout/paint work during scroll */
+    .ops-mobile-root .transition-all {
+      transition-property: none !important;
+    }
+
+    .ops-mobile-root .hover\:shadow-lg:hover,
+    .ops-mobile-root .hover\:shadow-blue-500\/10:hover,
+    .ops-mobile-root .hover\:shadow-indigo-500\/10:hover,
+    .ops-mobile-root .hover\:border-blue-500\/50:hover,
+    .ops-mobile-root .hover\:border-indigo-500\/50:hover {
+      box-shadow: inherit !important;
+      border-color: inherit !important;
+    }
+
+    /* Simplify multi-layer box-shadows on cards to a single lightweight shadow */
+    .ops-mobile-root [class*="rounded-[1.9rem]"] {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    .dark .ops-mobile-root [class*="rounded-[1.9rem]"] {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.24) !important;
     }
   }
 
