@@ -167,7 +167,7 @@ export default function PortalLayout({
     if (!user) return null;
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-background">
+        <div className="ops-mobile-root relative min-h-screen min-h-[100dvh] overflow-x-hidden bg-background">
             <GradientMeshBackground />
             <PortalHeader user={user} onLogout={() => logoutMutation.mutate()} />
             <main className="relative z-10 px-4 pb-12 pt-6 md:px-6 lg:px-8">
