@@ -168,7 +168,7 @@ export default function PortalLayout({
         <div className="ops-mobile-root relative min-h-screen min-h-[100dvh] overflow-x-hidden bg-background">
             <GradientMeshBackground />
             <PortalHeader user={user} onLogout={() => logoutMutation.mutate()} />
-            <main className="relative z-10 px-4 pb-12 pt-6 md:px-6 lg:px-8">
+            <main className="ops-mobile-scroll-main relative z-10 px-4 pb-12 pt-6 md:px-6 lg:px-8">
                 <div className="ops-page">
                     {children}
                 </div>

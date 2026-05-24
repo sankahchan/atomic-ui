@@ -83,3 +83,64 @@ test('portal smoke login stays functional', async ({ page }) => {
   await expect(page).toHaveURL(/\/portal(?:\?.*)?$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: /My Access Keys/i })).toBeVisible();
 });
+
+test.describe('mobile dashboard layout', () => {
+  test.use({
+    hasTouch: true,
+    isMobile: true,
+    userAgent:
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36',
+    viewport: { width: 390, height: 844 },
+  });
+
+  test('preserves normal Android viewport scrolling', async ({ page }) => {
+    await login(page);
+    await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/, { timeout: 30_000 });
+    await page.goto('/dashboard/keys');
+    await expect(page.locator('.ops-mobile-root')).toBeVisible();
+    await expect(page.locator('main.ops-mobile-scroll-main')).toBeVisible();
+
+    const layout = await page.evaluate(() => {
+      const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+      const root = document.querySelector<HTMLElement>('.ops-mobile-root');
+      const shell = document.querySelector<HTMLElement>('.ops-mobile-scroll-shell');
+      const main = document.querySelector<HTMLElement>('main.ops-mobile-scroll-main');
+      const bodyStyle = getComputedStyle(document.body);
+      const rootStyle = root ? getComputedStyle(root) : null;
+      const shellStyle = shell ? getComputedStyle(shell) : null;
+      const mainStyle = main ? getComputedStyle(main) : null;
+
+      return {
+        bodyOverflowY: bodyStyle.overflowY,
+        bodyTouchAction: bodyStyle.touchAction,
+        innerHeight: window.innerHeight,
+        mainTransform: mainStyle?.transform ?? '',
+        mainTouchAction: mainStyle?.touchAction ?? '',
+        mainWillChange: mainStyle?.willChange ?? '',
+        rootOverflowY: rootStyle?.overflowY ?? '',
+        rootTouchAction: rootStyle?.touchAction ?? '',
+        scrollHeight: document.documentElement.scrollHeight,
+        shellTouchAction: shellStyle?.touchAction ?? '',
+        viewport: viewport?.content ?? '',
+      };
+    });
+
+    expect(layout.viewport).not.toContain('maximum-scale');
+    expect(layout.viewport).not.toContain('user-scalable=no');
+    expect(layout.scrollHeight).toBeGreaterThan(layout.innerHeight);
+    expect(layout.bodyOverflowY).toBe('auto');
+    expect(layout.rootOverflowY).toBe('visible');
+    expect(layout.bodyTouchAction).toContain('pan-y');
+    expect(layout.rootTouchAction).toContain('pan-y');
+    expect(layout.shellTouchAction).toContain('pan-y');
+    expect(layout.mainTouchAction).toContain('pan-y');
+    expect(layout.mainTransform).toBe('none');
+    expect(layout.mainWillChange).toBe('auto');
+
+    await page.evaluate(() => {
+      const maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
+      window.scrollTo(0, Math.min(600, maxScrollTop));
+    });
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  });
+});

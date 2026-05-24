@@ -441,7 +441,7 @@ export default function DashboardLayout({
 
       {/* Main content area */}
       <div className={cn(
-        'relative flex min-h-screen flex-col transition-all duration-300 lg:pb-4 lg:pr-4',
+        'ops-mobile-scroll-shell relative flex min-h-screen flex-col transition-all duration-300 lg:pb-4 lg:pr-4',
         'lg:ml-[20.5rem]',
         sidebarCollapsed && 'lg:ml-[8rem]'
       )}>
@@ -453,7 +453,7 @@ export default function DashboardLayout({
         />
 
         {/* Page content — extra bottom padding on mobile for tab bar */}
-        <main className="flex-1 px-3 pb-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+1.5rem)] pt-3 sm:px-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
+        <main className="ops-mobile-scroll-main flex-1 px-3 pb-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+1.5rem)] pt-3 sm:px-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
           <div className="ops-page">
             {children}
           </div>
