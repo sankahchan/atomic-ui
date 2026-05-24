@@ -45,13 +45,13 @@ function resolveTelegramOfferCampaignLabel(
   const isMyanmar = locale === 'my';
   switch (campaignType) {
     case 'TRIAL_TO_PAID':
-      return isMyanmar ? 'Trial to paid' : 'Trial to paid';
+      return isMyanmar ? 'Trial မှ paid order' : 'Trial to paid';
     case 'RENEWAL_SOON':
-      return isMyanmar ? 'Renewal coupon' : 'Renewal coupon';
+      return isMyanmar ? 'သက်တမ်းတိုး coupon' : 'Renewal coupon';
     case 'PREMIUM_UPSELL':
-      return isMyanmar ? 'Premium upgrade' : 'Premium upgrade';
+      return isMyanmar ? 'Premium upgrade offer' : 'Premium upgrade';
     case 'WINBACK':
-      return isMyanmar ? 'Welcome-back offer' : 'Welcome-back offer';
+      return isMyanmar ? 'ပြန်လည်ကြိုဆို offer' : 'Welcome-back offer';
     default:
       return campaignType;
   }
@@ -63,16 +63,16 @@ function resolveTelegramOfferStatusLabel(
 ) {
   const isMyanmar = locale === 'my';
   if (offer.status === 'ISSUED' && (!offer.expiresAt || offer.expiresAt.getTime() > Date.now())) {
-    return isMyanmar ? 'Active now' : 'Active now';
+    return isMyanmar ? 'လက်ရှိ အသုံးပြုနိုင်' : 'Active now';
   }
   if (offer.status === 'REDEEMED') {
-    return isMyanmar ? 'Used' : 'Used';
+    return isMyanmar ? 'အသုံးပြုပြီး' : 'Used';
   }
   if (offer.status === 'EXPIRED') {
-    return isMyanmar ? 'Expired' : 'Expired';
+    return isMyanmar ? 'သက်တမ်းကုန်' : 'Expired';
   }
   if (offer.status === 'CANCELLED') {
-    return isMyanmar ? 'Revoked' : 'Revoked';
+    return isMyanmar ? 'ပယ်ဖျက်ထား' : 'Revoked';
   }
   return offer.status;
 }
@@ -85,21 +85,23 @@ function resolveTelegramOfferUnavailableReason(
   if (offer.status === 'REDEEMED') {
     return offer.redeemedOrderCode
       ? isMyanmar
-        ? `Used on ${offer.redeemedOrderCode}`
+        ? `${offer.redeemedOrderCode} တွင် အသုံးပြုပြီး`
         : `Used on ${offer.redeemedOrderCode}`
       : isMyanmar
-        ? 'Already used on an order'
+        ? 'အော်ဒါတစ်ခုတွင် အသုံးပြုပြီးဖြစ်သည်'
         : 'Already used on an order';
   }
   if (offer.status === 'CANCELLED') {
-    return isMyanmar ? 'Revoked by admin or campaign rules' : 'Revoked by admin or campaign rules';
+    return isMyanmar
+      ? 'Admin သို့မဟုတ် campaign စည်းမျဉ်းကြောင့် ပယ်ဖျက်ထားသည်'
+      : 'Revoked by admin or campaign rules';
   }
   if (offer.expiresAt && offer.expiresAt.getTime() <= Date.now()) {
     return isMyanmar
-      ? `Expired at ${formatTelegramDateTime(offer.expiresAt, locale)}`
+      ? `${formatTelegramDateTime(offer.expiresAt, locale)} တွင် သက်တမ်းကုန်သွားသည်`
       : `Expired at ${formatTelegramDateTime(offer.expiresAt, locale)}`;
   }
-  return isMyanmar ? 'Not available for use right now' : 'Not available for use right now';
+  return isMyanmar ? 'ယခု လက်ရှိ အသုံးမပြုနိုင်ပါ' : 'Not available for use right now';
 }
 
 function resolveTelegramOfferActionLine(
@@ -111,19 +113,19 @@ function resolveTelegramOfferActionLine(
   if (offer.campaignType === 'RENEWAL_SOON') {
     return label
       ? isMyanmar
-        ? `Best use: /renew • ${label}`
+        ? `အသင့်တော်ဆုံး: /renew • ${label}`
         : `Best use: /renew • ${label}`
       : isMyanmar
-        ? 'Best use: /renew'
+        ? 'အသင့်တော်ဆုံး: /renew'
         : 'Best use: /renew';
   }
 
   return offer.couponCode
     ? isMyanmar
-      ? `Best use: /buy ${offer.couponCode}`
+      ? `အသင့်တော်ဆုံး: /buy ${offer.couponCode}`
       : `Best use: /buy ${offer.couponCode}`
     : isMyanmar
-      ? 'Best use: /buy'
+      ? 'အသင့်တော်ဆုံး: /buy'
       : 'Best use: /buy';
 }
 
@@ -134,10 +136,10 @@ function resolveTelegramOfferUseWithLabel(
   const isMyanmar = locale === 'my';
   return offer.campaignType === 'RENEWAL_SOON'
     ? isMyanmar
-      ? 'Use with: Renew'
+      ? 'အသုံးပြုရန်: Renew'
       : 'Use with: Renew'
     : isMyanmar
-      ? 'Use with: Buy key'
+      ? 'အသုံးပြုရန်: Buy key'
       : 'Use with: Buy key';
 }
 
@@ -148,15 +150,15 @@ function resolveTelegramOfferBestForLabel(
   const isMyanmar = locale === 'my';
   switch (offer.campaignType) {
     case 'TRIAL_TO_PAID':
-      return isMyanmar ? 'Best for: your first paid order' : 'Best for: your first paid order';
+      return isMyanmar ? 'အသင့်တော်ဆုံး: သင့်ပထမ paid order' : 'Best for: your first paid order';
     case 'RENEWAL_SOON':
-      return isMyanmar ? 'Best for: extending your current key' : 'Best for: extending your current key';
+      return isMyanmar ? 'အသင့်တော်ဆုံး: လက်ရှိ key ကို သက်တမ်းတိုးရန်' : 'Best for: extending your current key';
     case 'PREMIUM_UPSELL':
-      return isMyanmar ? 'Best for: upgrading to Premium' : 'Best for: upgrading to Premium';
+      return isMyanmar ? 'အသင့်တော်ဆုံး: Premium သို့ အဆင့်မြှင့်ရန်' : 'Best for: upgrading to Premium';
     case 'WINBACK':
-      return isMyanmar ? 'Best for: returning after inactivity' : 'Best for: returning after inactivity';
+      return isMyanmar ? 'အသင့်တော်ဆုံး: မသုံးဖြစ်ပြီးနောက် ပြန်လာရန်' : 'Best for: returning after inactivity';
     default:
-      return isMyanmar ? 'Best for: your next checkout' : 'Best for: your next checkout';
+      return isMyanmar ? 'အသင့်တော်ဆုံး: နောက်ထပ် checkout' : 'Best for: your next checkout';
   }
 }
 
@@ -168,23 +170,23 @@ function resolveTelegramOfferJourneyLabel(
   switch (offer.campaignType) {
     case 'TRIAL_TO_PAID':
       return isMyanmar
-        ? 'Journey: trial reminder → first paid order'
+        ? 'လမ်းကြောင်း: trial reminder → ပထမ paid order'
         : 'Journey: trial reminder -> first paid order';
     case 'RENEWAL_SOON':
       return isMyanmar
-        ? 'Journey: renewal reminder → extend current key'
+        ? 'လမ်းကြောင်း: renewal reminder → လက်ရှိ key သက်တမ်းတိုး'
         : 'Journey: renewal reminder -> extend current key';
     case 'PREMIUM_UPSELL':
       return isMyanmar
-        ? 'Journey: high usage → premium upgrade'
+        ? 'လမ်းကြောင်း: usage များခြင်း → premium upgrade'
         : 'Journey: high usage -> premium upgrade';
     case 'WINBACK':
       return isMyanmar
-        ? 'Journey: inactive user → welcome-back checkout'
+        ? 'လမ်းကြောင်း: မသုံးဖြစ်သော user → welcome-back checkout'
         : 'Journey: inactive user -> welcome-back checkout';
     default:
       return isMyanmar
-        ? 'Journey: offer → checkout'
+        ? 'လမ်းကြောင်း: offer → checkout'
         : 'Journey: offer -> checkout';
   }
 }
@@ -251,7 +253,7 @@ function buildTelegramOffersKeyboard(input: {
         {
           text:
             input.locale === 'my'
-              ? `🔄 Renew • ${targetLabel}`
+              ? `🔄 သက်တမ်းတိုးမည် • ${targetLabel}`
               : `🔄 Renew • ${targetLabel}`,
           callback_data: buildTelegramOrderActionCallbackData('ky', targetId, secondary),
         },
@@ -263,7 +265,7 @@ function buildTelegramOffersKeyboard(input: {
       {
         text:
           input.locale === 'my'
-            ? `🛒 Buy • ${offer.couponCode}`
+            ? `🛒 ဝယ်မည် • ${offer.couponCode}`
             : `🛒 Buy • ${offer.couponCode}`,
         callback_data: buildTelegramOrderActionCallbackData('by', offer.id, callbackSource),
       },
@@ -342,7 +344,7 @@ export async function handleOffersCommand(input: {
 
   if (offers.length === 0) {
     const emptyMessage = input.locale === 'my'
-      ? '🎟 <b>Offer wallet</b>\n\nActive promo မရှိသေးပါ။ Trial, renewal, or promo announcements ရရှိသည့်အခါ ဒီနေရာမှာ တစ်နေရာတည်းမှာ ပြသပေးပါမည်။'
+      ? '🎟 <b>Offer စာရင်း</b>\n\nလက်ရှိ promo မရှိသေးပါ။ Trial, renewal နှင့် promo coupon များ ရရှိသည့်အခါ ဒီနေရာမှာ တစ်နေရာတည်း ပြသပေးပါမည်။'
       : '🎟 <b>Offer wallet</b>\n\nThere are no active offers yet. Trial, renewal, and promo coupons will appear here in one place.';
     const sent = await sendTelegramMessage(input.botToken, input.chatId, emptyMessage, {
       replyMarkup: buildTelegramOffersKeyboard({
@@ -378,7 +380,7 @@ export async function handleOffersCommand(input: {
         ? `${input.locale === 'my' ? 'ယခုအသုံးပြုနိုင်' : 'Live now'}: <b>${escapeHtml(activeOffers[0].couponCode)}</b>`
         : '',
       input.locale === 'my'
-        ? 'Atomic-UI offer များ • ဝယ်ယူခြင်း၊ သက်တမ်းတိုးခြင်း၊ win-back၊ premium upgrade'
+        ? 'Atomic-UI ကမ်းလှမ်းချက်များ • ဝယ်ယူမှု၊ သက်တမ်းတိုးမှု၊ win-back၊ premium upgrade'
         : 'Atomic-UI offers • buy, renew, win-back, premium upgrade',
     ]
       .filter(Boolean)
@@ -437,7 +439,7 @@ export async function handleOffersCommand(input: {
   } else if (filter === 'ACTIVE') {
     lines.push(
       input.locale === 'my'
-        ? '📭 လက်ရှိ အသုံးပြုနိုင်သော offer မရှိသေးပါ။'
+        ? '📭 လက်ရှိ အသုံးပြုနိုင်သော ကမ်းလှမ်းချက် မရှိသေးပါ။'
         : '📭 There are no active offers right now.',
       '',
     );
@@ -461,7 +463,7 @@ export async function handleOffersCommand(input: {
   } else if (filter === 'USED') {
     lines.push(
       input.locale === 'my'
-        ? '📭 မကြာသေးမီက အသုံးပြုပြီးသော offer မရှိသေးပါ။'
+        ? '📭 မကြာသေးမီက အသုံးပြုပြီးသော ကမ်းလှမ်းချက် မရှိသေးပါ။'
         : '📭 There are no recently used offers yet.',
       '',
     );
@@ -483,7 +485,7 @@ export async function handleOffersCommand(input: {
   } else if (filter === 'UNAVAILABLE') {
     lines.push(
       input.locale === 'my'
-        ? '📭 လက်ရှိ unavailable offer မရှိသေးပါ။'
+        ? '📭 လက်ရှိ မရနိုင်သော ကမ်းလှမ်းချက် မရှိသေးပါ။'
         : '📭 There are no unavailable offers right now.',
       '',
     );
@@ -491,7 +493,7 @@ export async function handleOffersCommand(input: {
 
   lines.push(
     input.locale === 'my'
-      ? 'Tip: renewal offer များကို key တစ်ခုချင်းစီအတွက် ပေးထားပြီး promo/win-back offer များကို /buy COUPON-CODE ဖြင့် စတင်နိုင်ပါသည်။'
+      ? 'မှတ်ချက်: renewal offer များကို key တစ်ခုချင်းစီအတွက် ပေးထားပြီး promo/win-back offer များကို /buy COUPON-CODE ဖြင့် စတင်နိုင်ပါသည်။'
       : 'Tip: renewal offers are tied to a specific key, while promo and win-back offers can start with /buy COUPON-CODE.',
   );
 

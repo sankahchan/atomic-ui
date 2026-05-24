@@ -1309,12 +1309,14 @@ export default function SubscriptionPage() {
   );
   const effectiveWelcomeMessage = keyWelcomeMessage || localizedWelcomeMessage;
   const shouldShowWelcome = Boolean(keyWelcomeMessage || (branding.showWelcome && localizedWelcomeMessage));
-  const footerText = resolveLocalizedTemplate(
-    branding.localizedFooterTexts,
-    locale,
-    branding.footerText,
-  )?.trim()
-    || (branding.showPoweredBy !== false ? tr('subscription.ui.powered_by', { brand: branding.brandName || 'Atomic-UI' }) : '');
+  const localizedFooterText = resolveLocalizedTemplate(branding.localizedFooterTexts, locale)?.trim();
+  const rawFooterText = branding.footerText?.trim() || '';
+  const defaultFooterText = defaultBranding.footerText?.trim() || '';
+  const footerText = localizedFooterText
+    || (rawFooterText && rawFooterText !== defaultFooterText ? rawFooterText : '')
+    || (branding.showPoweredBy !== false
+      ? tr('subscription.ui.powered_by', { brand: branding.brandName || 'Atomic-UI' })
+      : '');
 
   const getCardStyle = () => {
     if (hasImageBackground) {
@@ -1359,7 +1361,9 @@ export default function SubscriptionPage() {
   const controlTextColor = hasImageBackground ? '#ffffff' : '#0f172a';
   const controlMutedColor = hasImageBackground ? 'rgba(255,255,255,0.72)' : '#64748b';
   const actionFieldText = rawConnectionUrl || installUrl;
-  const actionFieldLabel = rawConnectionUrl ? t('subscription.hero.connection_url') : 'Protected install link';
+  const actionFieldLabel = rawConnectionUrl
+    ? t('subscription.hero.connection_url')
+    : t('subscription.hero.protected_install_link');
   const qrDownloadFilename = buildDownloadFilename(keyData.name, 'qr', 'png');
   const configDownloadFilename = buildDownloadFilename(keyData.name, 'client-config', 'txt');
 

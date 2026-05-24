@@ -137,9 +137,15 @@ export function SubscriptionPageLivePreview({
       : mergedBranding.layout === "detailed"
         ? "text-[2.2rem] md:text-[2.35rem]"
         : "text-[2rem] md:text-[2.1rem]";
+  const localizedFooterText = resolveLocalizedTemplate(mergedBranding.localizedFooterTexts, locale)?.trim();
+  const rawFooterText = mergedBranding.footerText?.trim() || "";
+  const defaultFooterText = defaultBranding.footerText?.trim() || "";
   const footerText =
-    resolveLocalizedTemplate(mergedBranding.localizedFooterTexts, locale, mergedBranding.footerText)?.trim() ||
-    (mergedBranding.showPoweredBy === false ? "" : defaultBranding.footerText);
+    localizedFooterText ||
+    (rawFooterText && rawFooterText !== defaultFooterText ? rawFooterText : "") ||
+    (mergedBranding.showPoweredBy === false
+      ? ""
+      : tr("subscription.ui.powered_by", { brand: mergedBranding.brandName || "Atomic-UI" }));
   const localizedWelcomeMessage = resolveLocalizedTemplate(
     mergedBranding.localizedWelcomeMessages,
     locale,

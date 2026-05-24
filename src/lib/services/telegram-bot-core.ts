@@ -495,7 +495,7 @@ export function buildTelegramSalesPaymentPrompt(input: {
       ? `💳 <b>ငွေပေးချေမှု အဆင့် · ${escapeHtml(input.orderCode)}</b>`
       : `💳 <b>Payment step · ${escapeHtml(input.orderCode)}</b>`,
     '',
-    isMyanmar ? '<b>Order summary</b>' : '<b>Order summary</b>',
+    isMyanmar ? '<b>အော်ဒါ အနှစ်ချုပ်</b>' : '<b>Order summary</b>',
     `${ui.planLabel}: <b>${escapeHtml(input.planSummary)}</b>`,
   ];
 
@@ -2111,7 +2111,7 @@ export async function sendTelegramRenewalPlanSelection(input: {
   const lines = [
     ui.orderPlanPrompt(input.orderCode),
     '',
-    `<b>${isMyanmar ? 'Renewal target' : 'Renewal target'}</b>`,
+    `<b>${isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renewal target'}</b>`,
     `${ui.renewalTargetLabel}: <b>${escapeHtml(input.targetKey.name)}</b>`,
     `${ui.statusLineLabel}: <b>${escapeHtml(renewTargetTypeLabel)}</b>`,
     '',
@@ -2124,16 +2124,18 @@ export async function sendTelegramRenewalPlanSelection(input: {
       requestedCouponCode: resolvedCoupon?.requestedCouponCode || null,
     }),
     ...(resolvedCoupon?.coupon || resolvedCoupon?.unavailableReason ? [''] : []),
-    `<b>${isMyanmar ? 'What you keep' : 'What you keep'}</b>`,
+    `<b>${isMyanmar ? 'ဆက်လက်ရရှိမည့်အရာများ' : 'What you keep'}</b>`,
     input.targetKey.kind === 'dynamic' ? ui.renewalBenefitsPremium : ui.renewalBenefitsStandard,
     '',
-    `<b>${isMyanmar ? 'Choose renewal package' : 'Choose renewal package'}</b>`,
+    `<b>${isMyanmar ? 'သက်တမ်းတိုး အစီအစဉ်ကို ရွေးပါ' : 'Choose renewal package'}</b>`,
     ...(enabledPlans.length
       ? enabledPlans.map((plan, index) => {
           const label = resolveTelegramSalesPlanLabel(plan, input.locale);
           const price = resolveTelegramSalesPriceLabel(plan, input.locale);
           const quotaLabel = plan.unlimitedQuota
-            ? 'Unlimited'
+            ? isMyanmar
+              ? 'အကန့်အသတ်မရှိ'
+              : 'Unlimited'
             : typeof plan.dataLimitGB === 'number'
               ? `${plan.dataLimitGB} GB`
               : null;
