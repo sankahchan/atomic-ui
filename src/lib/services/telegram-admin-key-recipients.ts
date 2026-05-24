@@ -29,22 +29,22 @@ export function formatRecipientSummary(
   locale: SupportedLocale,
 ) {
   if (!recipient || recipient.mode === 'NONE') {
-    return locale === 'my' ? 'No recipient linked' : 'No recipient linked';
+    return locale === 'my' ? 'လက်ခံသူ ချိတ်ဆက်ထားခြင်း မရှိပါ' : 'No recipient linked';
   }
 
   const parts = [`<b>${escapeHtml(recipient.label)}</b>`];
   if ((recipient.mode === 'KNOWN' || recipient.mode === 'EXACT_REPLY') && recipient.chatId) {
-    parts.push(locale === 'my' ? 'linked chat • direct send ready' : 'linked chat • direct send ready');
+    parts.push(locale === 'my' ? 'chat ချိတ်ထား • တိုက်ရိုက်ပို့ရန် အဆင်သင့်' : 'linked chat • direct send ready');
   } else if (recipient.mode === 'AMBIGUOUS_USERNAME') {
-    parts.push(locale === 'my' ? 'username ambiguous • create only' : 'username ambiguous • create only');
+    parts.push(locale === 'my' ? 'username မရှင်းလင်း • ဖန်တီးရန်သာ' : 'username ambiguous • create only');
   } else if (recipient.mode === 'EMAIL_ONLY') {
-    parts.push(locale === 'my' ? 'email only • connect link fallback' : 'email only • connect link fallback');
+    parts.push(locale === 'my' ? 'email သာရှိ • connect link ဖြင့်ပေးမည်' : 'email only • connect link fallback');
   } else if (recipient.mode === 'USERNAME_ONLY') {
-    parts.push(locale === 'my' ? 'username hint only • create only' : 'username hint only • create only');
+    parts.push(locale === 'my' ? 'username အညွှန်းသာ • ဖန်တီးရန်သာ' : 'username hint only • create only');
   } else if (recipient.mode === 'CHAT_ID_ONLY' && recipient.chatId) {
-    parts.push(locale === 'my' ? 'manual chat id • create only' : 'manual chat id • create only');
+    parts.push(locale === 'my' ? 'manual chat id • ဖန်တီးရန်သာ' : 'manual chat id • create only');
   } else {
-    parts.push(locale === 'my' ? 'create only' : 'create only');
+    parts.push(locale === 'my' ? 'ဖန်တီးရန်သာ' : 'create only');
   }
   return parts.join(' • ');
 }
@@ -56,7 +56,7 @@ export function buildRecipientGuidanceLines(
   if (!recipient || recipient.mode === 'NONE') {
     return [
       locale === 'my'
-        ? 'No recipient linked yet. Create only will return a connect link.'
+        ? 'လက်ခံသူ မချိတ်ဆက်ရသေးပါ။ ဖန်တီးရန်သာ ရွေးလျှင် connect link ကို ပြန်ပေးပါမည်။'
         : 'No recipient linked yet. Create only will return a connect link.',
     ];
   }
@@ -64,7 +64,7 @@ export function buildRecipientGuidanceLines(
   if ((recipient.mode === 'KNOWN' || recipient.mode === 'EXACT_REPLY') && recipient.chatId) {
     return [
       locale === 'my'
-        ? 'This recipient has a linked Telegram chat. Create & send can deliver directly.'
+        ? 'ဤလက်ခံသူတွင် Telegram chat ချိတ်ထားပြီးဖြစ်သည်။ Create & send ဖြင့် တိုက်ရိုက်ပို့နိုင်ပါသည်။'
         : 'This recipient has a linked Telegram chat. Create & send can deliver directly.',
     ];
   }
@@ -72,7 +72,7 @@ export function buildRecipientGuidanceLines(
   if (recipient.mode === 'AMBIGUOUS_USERNAME') {
     return [
       locale === 'my'
-        ? 'This @username matches more than one Telegram profile. Use email, a linked chat, or reply to the user message for direct delivery.'
+        ? 'ဤ @username သည် Telegram profile တစ်ခုထက်ပိုကို ကိုက်ညီနေပါသည်။ တိုက်ရိုက်ပို့ရန် email, ချိတ်ထားသော chat, သို့မဟုတ် user message ကို reply လုပ်ပါ။'
         : 'This @username matches more than one Telegram profile. Use email, a linked chat, or reply to the user message for direct delivery.',
     ];
   }
@@ -80,7 +80,7 @@ export function buildRecipientGuidanceLines(
   if (recipient.mode === 'EMAIL_ONLY') {
     return [
       locale === 'my'
-        ? 'Only email ownership is known. Create only will return a connect link.'
+        ? 'email ပိုင်ဆိုင်မှုသာ သိရှိထားပါသည်။ ဖန်တီးရန်သာ ရွေးလျှင် connect link ကို ပြန်ပေးပါမည်။'
         : 'Only email ownership is known. Create only will return a connect link.',
     ];
   }
@@ -88,14 +88,14 @@ export function buildRecipientGuidanceLines(
   if (recipient.mode === 'USERNAME_ONLY') {
     return [
       locale === 'my'
-        ? 'Telegram username is stored as a hint only. The bot still needs a linked chat before direct delivery works.'
+        ? 'Telegram username ကို အညွှန်းအဖြစ်သာ သိမ်းထားပါသည်။ တိုက်ရိုက်ပို့နိုင်ရန် bot သည် ချိတ်ထားသော chat ကို လိုအပ်နေသေးသည်။'
         : 'Telegram username is stored as a hint only. The bot still needs a linked chat before direct delivery works.',
     ];
   }
 
   return [
     locale === 'my'
-      ? 'A manual Telegram chat ID was provided, but it is not treated as verified delivery identity. Create only will return a connect link.'
+      ? 'manual Telegram chat ID တစ်ခု ပေးထားသော်လည်း ၎င်းကို အတည်ပြုထားသော delivery identity အဖြစ် မယူပါ။ ဖန်တီးရန်သာ ရွေးလျှင် connect link ကို ပြန်ပေးပါမည်။'
       : 'A manual Telegram chat ID was provided, but it is not treated as verified delivery identity. Create only will return a connect link.',
   ];
 }

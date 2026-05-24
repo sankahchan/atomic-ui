@@ -3348,7 +3348,7 @@ export default function KeyDetailPage() {
                       </p>
                     </div>
                     <div className="ops-inline-stat">
-                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'Share page' : 'Share page'}</p>
+                      <p className="text-sm text-muted-foreground">{locale === 'my' ? 'မျှဝေစာမျက်နှာ' : 'Share page'}</p>
                       <p className="font-mono text-xs break-all">
                         {key.publicSlug
                           ? buildSharePageUrl(key.publicSlug, {

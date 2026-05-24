@@ -408,17 +408,17 @@ function buildAdminQueueHealthKeyboard(locale: SupportedLocale): MonitoringAlert
     inline_keyboard: [
       [
         {
-          text: locale === 'my' ? '📋 Review queue' : '📋 Review queue',
+          text: locale === 'my' ? '📋 စစ်ဆေးရန်စာရင်း' : '📋 Review queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
         },
         {
-          text: locale === 'my' ? '🛟 Support queue' : '🛟 Support queue',
+          text: locale === 'my' ? '🛟 Support စာရင်း' : '🛟 Support queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
         },
       ],
       [
         {
-          text: locale === 'my' ? '🧭 Admin home' : '🧭 Admin home',
+          text: locale === 'my' ? '🧭 Admin စင်တာ' : '🧭 Admin home',
           callback_data: buildTelegramMenuCallbackData('admin', 'home'),
         },
       ],

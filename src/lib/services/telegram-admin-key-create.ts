@@ -61,7 +61,7 @@ export async function handleAdminCreateAccessKeyCommand(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '➕ <b>Create normal key</b>' : '➕ <b>Create normal key</b>',
+      input.locale === 'my' ? '➕ <b>ပုံမှန်သော့ ဖန်တီးမည်</b>' : '➕ <b>Create normal key</b>',
       '',
       input.locale === 'my'
         ? 'Recipient အဖြစ် email, @username, Telegram user ID, သို့မဟုတ် chat ID ကို ပို့ပါ။ User မသတ်မှတ်ဘဲ ဆက်လိုပါက Skip ကိုနှိပ်ပါ။'
@@ -125,7 +125,7 @@ export async function handleAdminCreateDynamicKeyCommand(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '💎 <b>Create dynamic key</b>' : '💎 <b>Create dynamic key</b>',
+      input.locale === 'my' ? '💎 <b>Dynamic သော့ ဖန်တီးမည်</b>' : '💎 <b>Create dynamic key</b>',
       '',
       input.locale === 'my'
         ? 'Recipient အဖြစ် email, @username, Telegram user ID, သို့မဟုတ် chat ID ကို ပို့ပါ။ User မသတ်မှတ်ဘဲ ဆက်လိုပါက Skip ကိုနှိပ်ပါ။'

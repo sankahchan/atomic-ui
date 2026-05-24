@@ -296,7 +296,7 @@ function isTelegramTrialPlan(plan: TelegramSalesPlanOption) {
 
 function buildTelegramPlanTypeSummary(plan: TelegramSalesPlanOption, locale: SupportedLocale) {
   if (plan.deliveryType === 'DYNAMIC_KEY') {
-    return locale === 'my' ? 'Premium dynamic key' : 'Premium dynamic key';
+    return locale === 'my' ? 'Premium ပြောင်းလဲသတ်မှတ်သော့' : 'Premium dynamic key';
   }
 
   if (isTelegramTrialPlan(plan)) {
@@ -442,7 +442,7 @@ export function buildTelegramBuyCompareMessage(input: {
         ],
       ),
       buildTelegramCommerceCard(
-        input.locale === 'my' ? '💎 <b>Premium (Dynamic)</b>' : '💎 <b>Premium (Dynamic)</b>',
+        input.locale === 'my' ? '💎 <b>Premium (Dynamic) သော့</b>' : '💎 <b>Premium (Dynamic)</b>',
         [
           escapeHtml(
             input.locale === 'my'
@@ -1051,10 +1051,10 @@ function buildTelegramOrderReceiptMessage(input: {
       ? `${ui.requestedNameLabel}: <b>${escapeHtml(input.order.requestedName)}</b>`
       : '',
     input.order.orderMode === 'GIFT' && input.order.giftRecipientLabel
-      ? `${input.locale === 'my' ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
+      ? `${input.locale === 'my' ? 'လက်ဆောင်ပေးမည့်သူ' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
       : '',
     input.order.referralCode
-      ? `${input.locale === 'my' ? 'Referral' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
+      ? `${input.locale === 'my' ? 'Referral ကုဒ်' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
       : '',
     `${ui.deliveredKeyLabel}: <b>${escapeHtml(input.deliveredKeyName)}</b>`,
     '',
@@ -1107,10 +1107,10 @@ function buildTelegramOrderReceiptCaption(input: {
       : '',
     priceLabel ? `${ui.priceLabel}: <b>${escapeHtml(priceLabel)}</b>` : '',
     input.order.orderMode === 'GIFT' && input.order.giftRecipientLabel
-      ? `${input.locale === 'my' ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
+      ? `${input.locale === 'my' ? 'လက်ဆောင်ပေးမည့်သူ' : 'Gift for'}: <b>${escapeHtml(input.order.giftRecipientLabel)}</b>`
       : '',
     input.order.referralCode
-      ? `${input.locale === 'my' ? 'Referral' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
+      ? `${input.locale === 'my' ? 'Referral ကုဒ်' : 'Referral'}: <b>${escapeHtml(input.order.referralCode)}</b>`
       : '',
     serverLabel ? `${ui.preferredServerLabel}: <b>${escapeHtml(serverLabel)}</b>` : '',
     `${ui.deliveredKeyLabel}: <b>${escapeHtml(input.deliveredKeyName)}</b>`,

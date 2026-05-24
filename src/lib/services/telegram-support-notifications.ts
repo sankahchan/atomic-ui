@@ -50,13 +50,13 @@ export async function sendTelegramSupportThreadAlertToAdmins(input: {
   const supportLink = await getTelegramSupportLink();
   const message = [
     input.locale === 'my'
-      ? '🛟 <b>Customer support thread needs attention</b>'
+      ? '🛟 <b>Customer support thread ကို အရေးယူရန် လိုအပ်ပါသည်</b>'
       : '🛟 <b>Customer support thread needs attention</b>',
     '',
     `🧵 <b>${escapeHtml(thread.threadCode)}</b>`,
-    `${input.locale === 'my' ? 'Category' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(thread.issueCategory, input.locale))}</b>`,
-    `${input.locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
-    `${input.locale === 'my' ? 'User' : 'User'}: <b>${escapeHtml(thread.telegramUsername || thread.telegramUserId)}</b>`,
+    `${input.locale === 'my' ? 'အမျိုးအစား' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(thread.issueCategory, input.locale))}</b>`,
+    `${input.locale === 'my' ? 'အခြေအနေ' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
+    `${input.locale === 'my' ? 'အသုံးပြုသူ' : 'User'}: <b>${escapeHtml(thread.telegramUsername || thread.telegramUserId)}</b>`,
     ...buildTelegramLatestReplyPreviewLines({
       reply: latestReply,
       locale: input.locale,
@@ -76,22 +76,22 @@ export async function sendTelegramSupportThreadAlertToAdmins(input: {
         inline_keyboard: [
           [
             {
-              text: input.locale === 'my' ? '🛟 Support queue' : '🛟 Support queue',
+              text: input.locale === 'my' ? '🛟 Support စာရင်း' : '🛟 Support queue',
               callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
             },
             supportLink
               ? {
-                  text: input.locale === 'my' ? '🔗 Support link' : '🔗 Support link',
+                  text: input.locale === 'my' ? '🔗 အကူအညီ လင့်ခ်' : '🔗 Support link',
                   url: supportLink,
                 }
               : {
-                  text: input.locale === 'my' ? '📋 Review queue' : '📋 Review queue',
+                  text: input.locale === 'my' ? '📋 စစ်ဆေးရန်စာရင်း' : '📋 Review queue',
                   callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
                 },
           ],
           ...(latestReply?.mediaUrl
             ? [[{
-                text: input.locale === 'my' ? '🖼 Open attachment' : '🖼 Open attachment',
+                text: input.locale === 'my' ? '🖼 တွဲဖိုင်ဖွင့်မည်' : '🖼 Open attachment',
                 url: latestReply.mediaUrl,
               }]]
             : []),
@@ -166,16 +166,16 @@ export async function runTelegramSupportSlaAlertCycle() {
         : `${overdueMinutes}m`;
     const message = [
       locale === 'my'
-        ? '🚨 <b>Support SLA breach</b>'
+        ? '🚨 <b>Support SLA အချိန်ကျော်လွန်နေပါသည်</b>'
         : '🚨 <b>Support SLA breach</b>',
       '',
       `🧵 <b>${escapeHtml(thread.threadCode)}</b>`,
-      `${locale === 'my' ? 'Category' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(thread.issueCategory, locale))}</b>`,
-      `${locale === 'my' ? 'State' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
-      `${locale === 'my' ? 'Assigned' : 'Assigned'}: <b>${escapeHtml(thread.assignedAdminName || 'Unassigned')}</b>`,
-      `${locale === 'my' ? 'Due at' : 'Due at'}: <b>${escapeHtml(formatTelegramDateTime(thread.firstResponseDueAt || now, locale))}</b>`,
-      `${locale === 'my' ? 'Overdue by' : 'Overdue by'}: <b>${escapeHtml(overdueLabel)}</b>`,
-      `${locale === 'my' ? 'User' : 'User'}: <b>${escapeHtml(thread.telegramUsername || thread.telegramUserId)}</b>`,
+      `${locale === 'my' ? 'အမျိုးအစား' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(thread.issueCategory, locale))}</b>`,
+      `${locale === 'my' ? 'အခြေအနေ' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
+      `${locale === 'my' ? 'တာဝန်ယူသူ' : 'Assigned'}: <b>${escapeHtml(thread.assignedAdminName || 'Unassigned')}</b>`,
+      `${locale === 'my' ? 'ဖြေကြားရန် နောက်ဆုံးအချိန်' : 'Due at'}: <b>${escapeHtml(formatTelegramDateTime(thread.firstResponseDueAt || now, locale))}</b>`,
+      `${locale === 'my' ? 'ကျော်လွန်နေသည့် အချိန်' : 'Overdue by'}: <b>${escapeHtml(overdueLabel)}</b>`,
+      `${locale === 'my' ? 'အသုံးပြုသူ' : 'User'}: <b>${escapeHtml(thread.telegramUsername || thread.telegramUserId)}</b>`,
       ...buildTelegramLatestReplyPreviewLines({
         reply: latestReply,
         locale,
@@ -196,22 +196,22 @@ export async function runTelegramSupportSlaAlertCycle() {
             inline_keyboard: [
               [
                 {
-                  text: locale === 'my' ? '🛟 Support queue' : '🛟 Support queue',
+                  text: locale === 'my' ? '🛟 Support စာရင်း' : '🛟 Support queue',
                   callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
                 },
                 supportLink
                   ? {
-                      text: locale === 'my' ? '🔗 Support link' : '🔗 Support link',
+                      text: locale === 'my' ? '🔗 အကူအညီ လင့်ခ်' : '🔗 Support link',
                       url: supportLink,
                     }
                   : {
-                      text: locale === 'my' ? '📋 Review queue' : '📋 Review queue',
+                      text: locale === 'my' ? '📋 စစ်ဆေးရန်စာရင်း' : '📋 Review queue',
                       callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
                     },
               ],
               ...(latestReply?.mediaUrl
                 ? [[{
-                    text: locale === 'my' ? '🖼 Open attachment' : '🖼 Open attachment',
+                    text: locale === 'my' ? '🖼 တွဲဖိုင်ဖွင့်မည်' : '🖼 Open attachment',
                     url: latestReply.mediaUrl,
                   }]]
                 : []),

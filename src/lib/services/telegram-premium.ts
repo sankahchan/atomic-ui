@@ -274,12 +274,12 @@ function formatPremiumOverallStatusLine(
   );
 
   if (analysis.currentSummary?.status === 'DOWN') {
-    return locale === 'my' ? 'Overall: Current route is down' : 'Overall: Current route is down';
+    return locale === 'my' ? 'စုစုပေါင်း: လက်ရှိ route ပျက်နေသည်' : 'Overall: Current route is down';
   }
 
   if (analysis.currentSummary?.status === 'SLOW') {
     return locale === 'my'
-      ? 'Overall: Current route is slow'
+      ? 'စုစုပေါင်း: လက်ရှိ route နှေးနေသည်'
       : 'Overall: Current route is slow';
   }
 
@@ -289,23 +289,23 @@ function formatPremiumOverallStatusLine(
     preferredSummaries.every((entry) => entry.status !== 'UP')
   ) {
     return locale === 'my'
-      ? 'Overall: Preferred region is degraded'
+      ? 'စုစုပေါင်း: ဦးစားပေးဒေသ အားနည်းနေသည်'
       : 'Overall: Preferred region is degraded';
   }
 
   if (preferredSummaries.some((entry) => entry.status === 'SLOW')) {
     return locale === 'my'
-      ? 'Overall: Some preferred routes are slow'
+      ? 'စုစုပေါင်း: ဦးစားပေး route အချို့ နှေးနေသည်'
       : 'Overall: Some preferred routes are slow';
   }
 
   if (analysis.regionSummaries.length === 0) {
     return locale === 'my'
-      ? 'Overall: Region health is not ready yet'
+      ? 'စုစုပေါင်း: ဒေသကျန်းမာရေး အချက်အလက် မရသေးပါ'
       : 'Overall: Region health is not ready yet';
   }
 
-  return locale === 'my' ? 'Overall: Healthy' : 'Overall: Healthy';
+  return locale === 'my' ? 'စုစုပေါင်း: ကောင်းမွန်နေသည်' : 'Overall: Healthy';
 }
 
 function buildPremiumRecommendedNextStepText(
@@ -901,11 +901,11 @@ function buildTelegramPremiumHubKeyboard(input: {
   for (const item of pagination.pageItems) {
     rows.push([
       {
-        text: input.locale === 'my' ? '🌍 Region' : '🌍 Region',
+        text: input.locale === 'my' ? '🌍 ဒေသ' : '🌍 Region',
         callback_data: buildTelegramDynamicSupportActionCallbackData('rg', item.id),
       },
       {
-        text: input.locale === 'my' ? '🚨 Issue' : '🚨 Issue',
+        text: input.locale === 'my' ? '🚨 ပြဿနာ' : '🚨 Issue',
         callback_data: buildTelegramDynamicSupportActionCallbackData('is', item.id),
       },
     ]);
@@ -954,15 +954,15 @@ function buildTelegramPremiumDetailKeyboard(input: {
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
   if (input.item.sharePageUrl) {
-    rows.push([{ text: input.locale === 'my' ? '🔗 Share page' : '🔗 Share page', url: input.item.sharePageUrl }]);
+    rows.push([{ text: input.locale === 'my' ? '🔗 မျှဝေစာမျက်နှာ' : '🔗 Share page', url: input.item.sharePageUrl }]);
   }
   rows.push([
     {
-      text: input.locale === 'my' ? '🌍 Region' : '🌍 Region',
+      text: input.locale === 'my' ? '🌍 ဒေသ' : '🌍 Region',
       callback_data: buildTelegramDynamicSupportActionCallbackData('rg', input.item.id),
     },
     {
-      text: input.locale === 'my' ? '🚨 Issue' : '🚨 Issue',
+      text: input.locale === 'my' ? '🚨 ပြဿနာ' : '🚨 Issue',
       callback_data: buildTelegramDynamicSupportActionCallbackData('is', input.item.id),
     },
   ]);
@@ -1047,7 +1047,7 @@ function buildTelegramPremiumStatusDetailKeyboard(input: {
         ).inline_keyboard;
 
   requestKeyboard.push([{
-    text: input.locale === 'my' ? '← Back to requests' : '← Back to requests',
+    text: input.locale === 'my' ? '← တောင်းဆိုချက်များသို့ ပြန်မည်' : '← Back to requests',
     callback_data: buildTelegramCommerceViewCallbackData('supportstatus', 'home', String(input.page)),
   }]);
 
@@ -2542,21 +2542,21 @@ async function getLatestPremiumRoutingEventsByKeyIds(dynamicAccessKeyIds: string
 function formatTelegramPremiumRoutingEventTypeLabel(eventType: string, locale: SupportedLocale) {
   switch (eventType) {
     case DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_DEGRADED:
-      return locale === 'my' ? 'Preferred region degraded' : 'Preferred region degraded';
+      return locale === 'my' ? 'ဦးစားပေးဒေသ အားနည်းသွားသည်' : 'Preferred region degraded';
     case DYNAMIC_ROUTING_EVENT_TYPES.PREFERRED_REGION_RECOVERED:
-      return locale === 'my' ? 'Preferred region recovered' : 'Preferred region recovered';
+      return locale === 'my' ? 'ဦးစားပေးဒေသ ပြန်ကောင်းလာသည်' : 'Preferred region recovered';
     case DYNAMIC_ROUTING_EVENT_TYPES.AUTO_FALLBACK_PIN_APPLIED:
-      return locale === 'my' ? 'Auto fallback pinned' : 'Auto fallback pinned';
+      return locale === 'my' ? 'Auto fallback ကို ချိတ်ထားသည်' : 'Auto fallback pinned';
     case DYNAMIC_ROUTING_EVENT_TYPES.PIN_APPLIED:
-      return locale === 'my' ? 'Manual pin applied' : 'Manual pin applied';
+      return locale === 'my' ? 'Manual pin သတ်မှတ်ထားသည်' : 'Manual pin applied';
     case DYNAMIC_ROUTING_EVENT_TYPES.PIN_CLEARED:
-      return locale === 'my' ? 'Pin cleared' : 'Pin cleared';
+      return locale === 'my' ? 'Pin ကို ရှင်းလိုက်သည်' : 'Pin cleared';
     case DYNAMIC_ROUTING_EVENT_TYPES.BACKEND_SWITCH:
-      return locale === 'my' ? 'Route switched' : 'Route switched';
+      return locale === 'my' ? 'Route ပြောင်းလဲသွားသည်' : 'Route switched';
     case DYNAMIC_ROUTING_EVENT_TYPES.AUTO_RECOVERY:
-      return locale === 'my' ? 'Auto recovery' : 'Auto recovery';
+      return locale === 'my' ? 'အလိုအလျောက် ပြန်လည်ကောင်းမွန်မှု' : 'Auto recovery';
     default:
-      return locale === 'my' ? 'Routing update' : 'Routing update';
+      return locale === 'my' ? 'Routing အပ်ဒိတ်' : 'Routing update';
   }
 }
 
@@ -2565,7 +2565,7 @@ function formatTelegramPremiumRoutingEventSummary(
   locale: SupportedLocale,
 ) {
   if (!event) {
-    return locale === 'my' ? 'No recent routing event' : 'No recent routing event';
+    return locale === 'my' ? 'မကြာသေးမီ routing ဖြစ်ရပ် မရှိပါ' : 'No recent routing event';
   }
 
   const reason = event.reason.trim();

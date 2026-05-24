@@ -356,10 +356,10 @@ export async function handleOffersCommand(input: {
   }
 
   const lines = [
-    input.locale === 'my' ? '🎟 <b>Offer wallet</b>' : '🎟 <b>Offer wallet</b>',
+    input.locale === 'my' ? '🎟 <b>Offer စာရင်း</b>' : '🎟 <b>Offer wallet</b>',
     '',
     input.locale === 'my'
-      ? `${activeOffers.length} active • ${usedOffers.length} used • ${inactiveOffers.length} unavailable`
+      ? `${activeOffers.length} ခု အသုံးပြုနိုင် • ${usedOffers.length} ခု အသုံးပြုပြီး • ${inactiveOffers.length} ခု မရနိုင်`
       : `${activeOffers.length} active • ${usedOffers.length} used • ${inactiveOffers.length} unavailable`,
     '',
   ];
@@ -369,16 +369,16 @@ export async function handleOffersCommand(input: {
     input.chatId,
     getTelegramBrandMediaUrl('offersWallet'),
     [
-      input.locale === 'my' ? '🎟 <b>Offer wallet</b>' : '🎟 <b>Offer wallet</b>',
+      input.locale === 'my' ? '🎟 <b>Offer စာရင်း</b>' : '🎟 <b>Offer wallet</b>',
       '',
       input.locale === 'my'
-        ? `${activeOffers.length} active • ${usedOffers.length} used • ${inactiveOffers.length} unavailable`
+        ? `${activeOffers.length} ခု အသုံးပြုနိုင် • ${usedOffers.length} ခု အသုံးပြုပြီး • ${inactiveOffers.length} ခု မရနိုင်`
         : `${activeOffers.length} active • ${usedOffers.length} used • ${inactiveOffers.length} unavailable`,
       activeOffers[0]?.couponCode
-        ? `${input.locale === 'my' ? 'Live now' : 'Live now'}: <b>${escapeHtml(activeOffers[0].couponCode)}</b>`
+        ? `${input.locale === 'my' ? 'ယခုအသုံးပြုနိုင်' : 'Live now'}: <b>${escapeHtml(activeOffers[0].couponCode)}</b>`
         : '',
       input.locale === 'my'
-        ? 'Atomic-UI offers • buy, renew, win-back, premium upgrade'
+        ? 'Atomic-UI offer များ • ဝယ်ယူခြင်း၊ သက်တမ်းတိုးခြင်း၊ win-back၊ premium upgrade'
         : 'Atomic-UI offers • buy, renew, win-back, premium upgrade',
     ]
       .filter(Boolean)
@@ -386,7 +386,7 @@ export async function handleOffersCommand(input: {
   );
 
   if ((filter === 'ALL' || filter === 'ACTIVE') && activeOffers.length > 0) {
-    lines.push(input.locale === 'my' ? '<b>Active offers</b>' : '<b>Active offers</b>');
+    lines.push(input.locale === 'my' ? '<b>အသုံးပြုနိုင်သော offer များ</b>' : '<b>Active offers</b>');
     for (const offer of activeOffers) {
       const offerLabel =
         offer.couponDiscountLabel?.trim() ||
@@ -404,30 +404,30 @@ export async function handleOffersCommand(input: {
       const useNowLabel =
         offer.campaignType === 'RENEWAL_SOON'
           ? input.locale === 'my'
-            ? 'Tap the renew button below to use this offer.'
+            ? 'ဤ offer ကို သုံးရန် အောက်ပါ renew button ကို နှိပ်ပါ။'
             : 'Tap the renew button below to use this offer.'
           : offer.couponCode
             ? input.locale === 'my'
-              ? `Tap the buy button below or use /buy ${offer.couponCode}.`
+              ? `ဤ offer ကို သုံးရန် အောက်ပါ buy button ကို နှိပ်ပါ သို့မဟုတ် /buy ${offer.couponCode} ကို သုံးပါ။`
               : `Tap the buy button below or use /buy ${offer.couponCode}.`
             : input.locale === 'my'
-              ? 'Tap the action button below to continue with this offer.'
+              ? 'ဤ offer ဖြင့် ဆက်လုပ်ရန် အောက်ပါ action button ကို နှိပ်ပါ။'
               : 'Tap the action button below to continue with this offer.';
       lines.push(
         `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
-        `  ${input.locale === 'my' ? 'Campaign' : 'Campaign'}: <b>${escapeHtml(
+        `  ${input.locale === 'my' ? 'ကမ်ပိန်း' : 'Campaign'}: <b>${escapeHtml(
           resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale),
         )}</b>`,
-        offerLabel ? `  ${input.locale === 'my' ? 'Offer' : 'Offer'}: <b>${escapeHtml(offerLabel)}</b>` : '',
-        targetLabel ? `  ${input.locale === 'my' ? 'For' : 'For'}: <b>${escapeHtml(targetLabel)}</b>` : '',
+        offerLabel ? `  ${input.locale === 'my' ? 'ကမ်းလှမ်းချက်' : 'Offer'}: <b>${escapeHtml(offerLabel)}</b>` : '',
+        targetLabel ? `  ${input.locale === 'my' ? 'အတွက်' : 'For'}: <b>${escapeHtml(targetLabel)}</b>` : '',
         `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferJourneyLabel(offer, input.locale))}`,
-        `  ${input.locale === 'my' ? 'Availability' : 'Availability'}: <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
+        `  ${input.locale === 'my' ? 'အသုံးပြုနိုင်မှု' : 'Availability'}: <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
         `  ${escapeHtml(resolveTelegramOfferActionLine(offer, input.locale, targetLabel))}`,
         `  ${escapeHtml(useNowLabel)}`,
         offer.expiresAt
-          ? `  ${input.locale === 'my' ? 'Expires' : 'Expires'}: ${escapeHtml(
+          ? `  ${input.locale === 'my' ? 'သက်တမ်းကုန်ချိန်' : 'Expires'}: ${escapeHtml(
               formatTelegramDateTime(offer.expiresAt, input.locale),
             )}`
           : '',
@@ -444,12 +444,12 @@ export async function handleOffersCommand(input: {
   }
 
   if ((filter === 'ALL' || filter === 'USED') && usedOffers.length > 0) {
-    lines.push(input.locale === 'my' ? '<b>Used recently</b>' : '<b>Used recently</b>');
+    lines.push(input.locale === 'my' ? '<b>မကြာသေးမီက အသုံးပြုထားသော offer များ</b>' : '<b>Used recently</b>');
     for (const offer of usedOffers) {
       lines.push(
         `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
-        `  ${input.locale === 'my' ? 'Campaign' : 'Campaign'}: <b>${escapeHtml(resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale))}</b>`,
-        `  ${input.locale === 'my' ? 'Used on' : 'Used on'}: <b>${escapeHtml(
+        `  ${input.locale === 'my' ? 'ကမ်ပိန်း' : 'Campaign'}: <b>${escapeHtml(resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale))}</b>`,
+        `  ${input.locale === 'my' ? 'အသုံးပြုထားသော အော်ဒါ' : 'Used on'}: <b>${escapeHtml(
           offer.redeemedOrderCode || 'Order',
         )}</b>`,
         offer.redeemedAt
@@ -468,11 +468,11 @@ export async function handleOffersCommand(input: {
   }
 
   if ((filter === 'ALL' || filter === 'UNAVAILABLE') && inactiveOffers.length > 0) {
-    lines.push(input.locale === 'my' ? '<b>Unavailable now</b>' : '<b>Unavailable now</b>');
+    lines.push(input.locale === 'my' ? '<b>ယခု မရနိုင်သော offer များ</b>' : '<b>Unavailable now</b>');
     for (const offer of inactiveOffers.slice(0, 3)) {
       lines.push(
         `• 🎟 <b>${escapeHtml(offer.couponCode)}</b> • <b>${escapeHtml(resolveTelegramOfferStatusLabel(offer, input.locale))}</b>`,
-        `  ${input.locale === 'my' ? 'Campaign' : 'Campaign'}: <b>${escapeHtml(resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale))}</b>`,
+        `  ${input.locale === 'my' ? 'ကမ်ပိန်း' : 'Campaign'}: <b>${escapeHtml(resolveTelegramOfferCampaignLabel(offer.campaignType, input.locale))}</b>`,
         `  ${escapeHtml(resolveTelegramOfferUseWithLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferBestForLabel(offer, input.locale))}`,
         `  ${escapeHtml(resolveTelegramOfferJourneyLabel(offer, input.locale))}`,

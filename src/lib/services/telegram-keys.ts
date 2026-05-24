@@ -462,12 +462,12 @@ function buildTelegramKeysSummaryKeyboard(input: {
     const buttons: Array<{ text: string; callback_data?: string; url?: string }> = [];
     if (item.sharePageUrl) {
       buttons.push({
-        text: input.locale === 'my' ? 'Open' : 'Open',
+        text: input.locale === 'my' ? 'ဖွင့်မည်' : 'Open',
         url: item.sharePageUrl,
       });
     }
     buttons.push({
-      text: input.locale === 'my' ? 'Renew' : 'Renew',
+      text: input.locale === 'my' ? 'သက်တမ်းတိုးမည်' : 'Renew',
       callback_data: buildTelegramOrderActionCallbackData(
         'ky',
         item.id,
@@ -565,7 +565,7 @@ function buildTelegramKeyDetailKeyboard(input: {
   }
 
   rows.push([{
-    text: input.locale === 'my' ? '← Back to keys' : '← Back to keys',
+    text: input.locale === 'my' ? '← သော့များသို့ ပြန်မည်' : '← Back to keys',
     callback_data: buildTelegramCommerceViewCallbackData('keys', 'home', String(input.page)),
   }]);
 

@@ -256,12 +256,12 @@ export function resolveTelegramRejectionReasonLabel(
   }
 
   if (!code) {
-    return locale === 'my' ? 'Custom reason' : 'Custom reason';
+    return locale === 'my' ? 'စိတ်ကြိုက် အကြောင်းရင်း' : 'Custom reason';
   }
 
   const normalized = code.replaceAll('_', ' ').trim();
   if (!normalized) {
-    return locale === 'my' ? 'Custom reason' : 'Custom reason';
+    return locale === 'my' ? 'စိတ်ကြိုက် အကြောင်းရင်း' : 'Custom reason';
   }
 
   return normalized.replace(/\b\w/g, (char) => char.toUpperCase());

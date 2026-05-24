@@ -554,12 +554,12 @@ export async function sendTelegramRefundDecisionMessage(input: {
   ].filter(Boolean);
   const replyMarkup = {
     inline_keyboard: [
-      [{ text: locale === 'my' ? 'Printable refund' : 'Printable refund', url: buildTelegramFinanceDocumentUrl({
+      [{ text: locale === 'my' ? 'ပရင့်ထုတ်နိုင်သော refund' : 'Printable refund', url: buildTelegramFinanceDocumentUrl({
         orderCode: input.orderCode,
         type: 'refund',
         format: 'html',
       }) }],
-      [{ text: locale === 'my' ? 'Download PDF' : 'Download PDF', url: buildTelegramFinanceDocumentUrl({
+      [{ text: locale === 'my' ? 'PDF ဒေါင်းလုဒ်' : 'Download PDF', url: buildTelegramFinanceDocumentUrl({
         orderCode: input.orderCode,
         type: 'refund',
         format: 'pdf',

@@ -365,9 +365,9 @@ export default function SubscriptionPage() {
       : 'This key requires the protected install flow. Re-open the share page and install through the Outline app.',
   }), [locale]);
   const customerDeviceLimitCopy = useMemo(() => ({
-    title: locale === 'my' ? 'Device limit' : 'Device limit',
+    title: locale === 'my' ? 'စက်အရေအတွက် ကန့်သတ်ချက်' : 'Device limit',
     protectedUsage: locale === 'my' ? 'Protected install slot အသုံးပြုထားသည်' : 'Protected install slots used',
-    estimatedUsage: locale === 'my' ? 'Estimated devices max' : 'Estimated devices max',
+    estimatedUsage: locale === 'my' ? 'ခန့်မှန်း အများဆုံးစက်အရေအတွက်' : 'Estimated devices max',
     protectedNote: (limit: number, isDynamic: boolean) =>
       locale === 'my'
         ? `${isDynamic ? 'Managed delivery flow' : 'Official install flow'} တွင် ${limit} device အထိ ကာကွယ်ထားသည်။ Raw connection URL ကို copy လုပ်ပါက ဤ flow အပြင် enforcement လျော့နိုင်သည်။`
