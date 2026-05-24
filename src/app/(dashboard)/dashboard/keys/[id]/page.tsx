@@ -326,7 +326,7 @@ function EditKeyDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="editTelegram">{isMyanmar ? 'Telegram ID' : 'Telegram ID'}</Label>
+                  <Label htmlFor="editTelegram">{isMyanmar ? 'Telegram အိုင်ဒီ' : 'Telegram ID'}</Label>
                   <Input
                     id="editTelegram"
                     value={formData.telegramId}
@@ -2164,9 +2164,9 @@ function SupportWorkflowCard({
     reportPlaceholder: isMyanmar ? 'ဥပမာ - အသုံးပြုသူက subscription fetch မရကြောင်း အကြောင်းကြားထားသည်...' : 'For example: User reported that subscription fetch is failing...',
     reportRequired: isMyanmar ? 'ပြဿနာအကျဉ်းကို ရေးပါ။' : 'Enter a problem summary.',
     severity: isMyanmar ? 'အရေးကြီးမှု' : 'Severity',
-    severityInfo: isMyanmar ? 'Info' : 'Info',
-    severityWarning: isMyanmar ? 'Warning' : 'Warning',
-    severityCritical: isMyanmar ? 'Critical' : 'Critical',
+    severityInfo: isMyanmar ? 'အချက်အလက်' : 'Info',
+    severityWarning: isMyanmar ? 'သတိပေးချက်' : 'Warning',
+    severityCritical: isMyanmar ? 'ပြင်းထန်' : 'Critical',
     cancel: isMyanmar ? 'မလုပ်တော့' : 'Cancel',
     send: isMyanmar ? 'ပို့မည်' : 'Send',
     createIncident: isMyanmar ? 'Incident တစ်ခု ဖန်တီးမည်' : 'Create Incident',

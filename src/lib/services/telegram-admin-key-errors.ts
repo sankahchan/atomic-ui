@@ -23,8 +23,8 @@ export function buildTelegramAdminKeyErrorNotice(
 
   if (message.includes('certificate fingerprint mismatch')) {
     return {
-      callbackText: isMyanmar ? 'Server cert mismatch.' : 'Server cert mismatch.',
-      chatTitle: isMyanmar ? '❌ <b>Key action failed</b>' : '❌ <b>Key action failed</b>',
+      callbackText: isMyanmar ? 'ဆာဗာ cert မကိုက်ညီပါ။' : 'Server cert mismatch.',
+      chatTitle: isMyanmar ? '❌ <b>သော့ လုပ်ဆောင်ချက် မအောင်မြင်ပါ</b>' : '❌ <b>Key action failed</b>',
       chatText: isMyanmar
         ? 'Outline server certificate fingerprint မကိုက်ညီပါ။ Dashboard > Servers တွင် server config ကို စစ်ပြီး ပြန်သိမ်းပါ။'
         : 'The Outline server certificate fingerprint does not match the saved server config. Recheck and re-save the server in Dashboard > Servers, then try again.',
@@ -33,8 +33,8 @@ export function buildTelegramAdminKeyErrorNotice(
 
   if (message.includes('Failed to connect to Outline server') || message.includes('Connection timeout')) {
     return {
-      callbackText: isMyanmar ? 'Server connection failed.' : 'Server connection failed.',
-      chatTitle: isMyanmar ? '❌ <b>Key action failed</b>' : '❌ <b>Key action failed</b>',
+      callbackText: isMyanmar ? 'ဆာဗာချိတ်ဆက်မှု မအောင်မြင်ပါ။' : 'Server connection failed.',
+      chatTitle: isMyanmar ? '❌ <b>သော့ လုပ်ဆောင်ချက် မအောင်မြင်ပါ</b>' : '❌ <b>Key action failed</b>',
       chatText: isMyanmar
         ? 'Outline server ကို ချိတ်ဆက်မရပါ။ Server health, API URL နှင့် firewall ကို စစ်ပြီး ထပ်စမ်းပါ။'
         : 'The Outline server could not be reached. Check server health, API URL, and firewall access, then try again.',
@@ -42,8 +42,8 @@ export function buildTelegramAdminKeyErrorNotice(
   }
 
   return {
-    callbackText: isMyanmar ? 'Key action failed.' : 'Key action failed.',
-    chatTitle: isMyanmar ? '❌ <b>Key action failed</b>' : '❌ <b>Key action failed</b>',
+    callbackText: isMyanmar ? 'သော့ လုပ်ဆောင်ချက် မအောင်မြင်ပါ။' : 'Key action failed.',
+    chatTitle: isMyanmar ? '❌ <b>သော့ လုပ်ဆောင်ချက် မအောင်မြင်ပါ</b>' : '❌ <b>Key action failed</b>',
     chatText: message,
   };
 }

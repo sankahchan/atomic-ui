@@ -957,7 +957,7 @@ function FinanceTrendCards({
         revenueDelta == null ? 'neutral' : revenueDelta >= 0 ? 'cyan' : 'amber',
     },
     {
-      title: isMyanmar ? 'Renewals' : 'Renewals',
+      title: isMyanmar ? 'သက်တမ်းတိုးမှုများ' : 'Renewals',
       value: loading ? '…' : dashboard?.summary.totalRenewals || 0,
       helper: isMyanmar ? 'လစဉ် renewal လုပ်ထားသော order များ' : 'Renewed paid orders in the selected window',
       delta:

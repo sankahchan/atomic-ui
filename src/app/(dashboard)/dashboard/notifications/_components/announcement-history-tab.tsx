@@ -187,7 +187,7 @@ export function AnnouncementHistoryTab({
                   <div className="mt-2 space-y-2">
                     {announcement.deliveries.map((delivery) => (
                       <div key={delivery.id} className="rounded-xl border border-border/50 px-3 py-2 text-xs text-muted-foreground">
-                        <p>{isMyanmar ? 'Chat:' : 'Chat:'} {delivery.chatId}</p>
+                        <p>{isMyanmar ? 'ချတ်:' : 'Chat:'} {delivery.chatId}</p>
                         <p>{isMyanmar ? 'အမှား:' : 'Error:'} {delivery.error || 'send-failed'}</p>
                       </div>
                     ))}

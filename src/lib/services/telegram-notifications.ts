@@ -62,13 +62,13 @@ function buildTelegramInboxKeyboard(locale: SupportedLocale, mode: TelegramInbox
     inline_keyboard: [
       [
         option('ALL', isMyanmar ? 'အားလုံး' : 'All'),
-        option('ORDERS', isMyanmar ? 'Order' : 'Orders'),
-        option('SUPPORT', isMyanmar ? 'Support' : 'Support'),
+        option('ORDERS', isMyanmar ? 'အော်ဒါများ' : 'Orders'),
+        option('SUPPORT', isMyanmar ? 'အကူအညီ' : 'Support'),
       ],
       [
-        option('REFUNDS', isMyanmar ? 'Refund' : 'Refunds'),
-        option('ANNOUNCEMENTS', isMyanmar ? 'Notice' : 'Announcements'),
-        option('PREMIUM', isMyanmar ? 'Premium' : 'Premium'),
+        option('REFUNDS', isMyanmar ? 'ငွေပြန်' : 'Refunds'),
+        option('ANNOUNCEMENTS', isMyanmar ? 'အသိပေးချက်' : 'Announcements'),
+        option('PREMIUM', isMyanmar ? 'ပရီမီယမ်' : 'Premium'),
       ],
       [
         option('UNREAD', isMyanmar ? 'မဖတ်ရသေး' : 'Unread'),
@@ -85,11 +85,11 @@ function formatTelegramInboxRoutingEventLabel(
   const isMyanmar = locale === 'my';
   switch (eventType) {
     case 'PREFERRED_REGION_DEGRADED':
-      return isMyanmar ? 'Preferred region degraded' : 'Preferred region degraded';
+      return isMyanmar ? 'ဦးစားပေး region အားနည်းနေသည်' : 'Preferred region degraded';
     case 'AUTO_FALLBACK_PIN_APPLIED':
-      return isMyanmar ? 'Fallback pinned' : 'Fallback pinned';
+      return isMyanmar ? 'fallback pin သတ်မှတ်ထားသည်' : 'Fallback pinned';
     case 'PREFERRED_REGION_RECOVERED':
-      return isMyanmar ? 'Preferred region recovered' : 'Preferred region recovered';
+      return isMyanmar ? 'ဦးစားပေး region ပြန်လည်ကောင်းမွန်လာသည်' : 'Preferred region recovered';
     default:
       return eventType.replaceAll('_', ' ');
   }
@@ -121,15 +121,15 @@ function formatTelegramInboxAnnouncementTypeLabel(type: string, locale: Supporte
   const isMyanmar = locale === 'my';
   switch ((type || '').trim().toUpperCase()) {
     case 'PROMO':
-      return isMyanmar ? 'Promo' : 'Promo';
+      return isMyanmar ? 'ပရိုမိုးရှင်း' : 'Promo';
     case 'MAINTENANCE':
-      return isMyanmar ? 'Maintenance' : 'Maintenance';
+      return isMyanmar ? 'ပြုပြင်ထိန်းသိမ်းမှု' : 'Maintenance';
     case 'NEW_SERVER':
       return isMyanmar ? 'Server အသစ်' : 'New server';
     case 'ANNOUNCEMENT':
     case 'INFO':
     default:
-      return isMyanmar ? 'Notice' : 'Notice';
+      return isMyanmar ? 'အသိပေးချက်' : 'Notice';
   }
 }
 
@@ -171,7 +171,7 @@ export function buildTelegramNotificationPreferencesMessage(
 ) {
   const lines = [
     locale === 'my'
-      ? '🔔 <b>Notification settings</b>'
+      ? '🔔 <b>အသိပေးချက် ဆက်တင်များ</b>'
       : '🔔 <b>Notification settings</b>',
     '',
     `🏷 ${getTelegramNotificationPreferenceLabel('promo', locale)}: <b>${preferences.promo ? 'ON' : 'OFF'}</b>`,

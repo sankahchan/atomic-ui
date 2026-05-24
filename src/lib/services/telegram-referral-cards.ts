@@ -20,7 +20,7 @@ export function buildTelegramReferralMessage(input: {
 
   return buildTelegramCommerceMessage({
     title: isMyanmar ? '👥 <b>သင့် Referral အစီအစဉ်</b>' : '👥 <b>Your Referral Program</b>',
-    statsLine: `🎫 <b>${input.referralCode}</b> • ${isMyanmar ? 'အဆင့်အတန်း' : 'Status'}: <b>${isMyanmar ? 'Active' : 'Active'}</b>`,
+    statsLine: `🎫 <b>${input.referralCode}</b> • ${isMyanmar ? 'အခြေအနေ' : 'Status'}: <b>${isMyanmar ? 'အသုံးပြုနိုင်သည်' : 'Active'}</b>`,
     cards: [
       buildTelegramCommerceCard(
         isMyanmar ? '📊 <b>သင့်စွမ်းဆောင်ရည်</b>' : '📊 <b>Your Performance</b>',

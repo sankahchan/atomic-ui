@@ -99,7 +99,7 @@ function buildQuotaKeyboard(locale: SupportedLocale, action = 'quota') {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '♾ Unlimited' : '♾ Unlimited',
+          text: isMyanmar ? '♾ အကန့်အသတ်မရှိ' : '♾ Unlimited',
           callback_data: buildTelegramAdminKeyCallbackData(action, 'unlimited'),
         },
         {
@@ -117,7 +117,7 @@ function buildQuotaKeyboard(locale: SupportedLocale, action = 'quota') {
           callback_data: buildTelegramAdminKeyCallbackData(action, '50'),
         },
         {
-          text: isMyanmar ? '✍️ Custom' : '✍️ Custom',
+          text: isMyanmar ? '✍️ စိတ်ကြိုက်' : '✍️ Custom',
           callback_data: buildTelegramAdminKeyCallbackData(action, 'custom'),
         },
       ],
@@ -132,7 +132,7 @@ function buildDeviceLimitKeyboard(locale: SupportedLocale) {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '♾ No limit' : '♾ No limit',
+          text: isMyanmar ? '♾ မကန့်သတ်' : '♾ No limit',
           callback_data: buildTelegramAdminKeyCallbackData('devices', 'unlimited'),
         },
         {
@@ -154,7 +154,7 @@ function buildDeviceLimitKeyboard(locale: SupportedLocale) {
           callback_data: buildTelegramAdminKeyCallbackData('devices', '5'),
         },
         {
-          text: isMyanmar ? '✍️ Custom' : '✍️ Custom',
+          text: isMyanmar ? '✍️ စိတ်ကြိုက်' : '✍️ Custom',
           callback_data: buildTelegramAdminKeyCallbackData('devices', 'custom'),
         },
       ],
@@ -215,11 +215,11 @@ function buildCreateExpiryKeyboard(locale: SupportedLocale) {
           callback_data: buildTelegramAdminKeyCallbackData('expiry', '90'),
         },
         {
-          text: isMyanmar ? '📅 Fixed date' : '📅 Fixed date',
+          text: isMyanmar ? '📅 သတ်မှတ်ရက်' : '📅 Fixed date',
           callback_data: buildTelegramAdminKeyCallbackData('expiry', 'fixed'),
         },
         {
-          text: isMyanmar ? '▶️ First use +30d' : '▶️ First use +30d',
+          text: isMyanmar ? '▶️ ပထမအသုံးပြုချိန် +30 ရက်' : '▶️ First use +30d',
           callback_data: buildTelegramAdminKeyCallbackData('expiry', 'start30'),
         },
       ],
@@ -252,7 +252,7 @@ function buildManageExpiryKeyboard(locale: SupportedLocale) {
           callback_data: buildTelegramAdminKeyCallbackData('setexpiry', '90'),
         },
         {
-          text: isMyanmar ? '📅 Fixed date' : '📅 Fixed date',
+          text: isMyanmar ? '📅 သတ်မှတ်ရက်' : '📅 Fixed date',
           callback_data: buildTelegramAdminKeyCallbackData('setexpiry', 'fixed'),
         },
       ],
@@ -328,7 +328,7 @@ async function buildAccessServerKeyboard(locale: SupportedLocale) {
 
   const rows: Array<Array<{ text: string; callback_data: string }>> = [[
     {
-      text: isMyanmar ? '⚡ Auto best server' : '⚡ Auto best server',
+      text: isMyanmar ? '⚡ အကောင်းဆုံး ဆာဗာကို အလိုအလျောက်ရွေးမည်' : '⚡ Auto best server',
       callback_data: buildTelegramAdminKeyCallbackData('server', 'auto'),
     },
   ]];
@@ -451,14 +451,14 @@ function buildCreateConfirmKeyboard(locale: SupportedLocale, canSendDirect: bool
   const isMyanmar = locale === 'my';
   const rows: Array<Array<{ text: string; callback_data: string }>> = [[
     {
-      text: isMyanmar ? '✅ Create only' : '✅ Create only',
+      text: isMyanmar ? '✅ ဖန်တီးမည်' : '✅ Create only',
       callback_data: buildTelegramAdminKeyCallbackData('confirm', 'create'),
     },
   ]];
 
   if (canSendDirect) {
     rows[0].push({
-      text: isMyanmar ? '📨 Create & send' : '📨 Create & send',
+      text: isMyanmar ? '📨 ဖန်တီးပြီး ပို့မည်' : '📨 Create & send',
       callback_data: buildTelegramAdminKeyCallbackData('confirm', 'send'),
     });
   }
@@ -477,22 +477,22 @@ function buildDangerConfirmKeyboard(input: {
   const actionLabel =
     input.action === 'resetusage'
       ? isMyanmar
-        ? '🔄 Reset usage'
+        ? '🔄 အသုံးပြုမှု ပြန်သတ်မှတ်'
         : '🔄 Reset usage'
       : isMyanmar
-        ? '⛔ Disable key'
+        ? '⛔ သော့ကို ပိတ်မည်'
         : '⛔ Disable key';
   return {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? `✅ Confirm ${actionLabel}` : `✅ Confirm ${actionLabel}`,
+          text: isMyanmar ? `✅ ${actionLabel}` : `✅ Confirm ${actionLabel}`,
           callback_data: buildTelegramAdminKeyCallbackData('danger', input.action, 'confirm'),
         },
       ],
       [
         {
-          text: isMyanmar ? '↩️ Back' : '↩️ Back',
+          text: isMyanmar ? '↩️ နောက်သို့' : '↩️ Back',
           callback_data: buildTelegramAdminKeyCallbackData('danger', input.action, 'back'),
         },
       ],
@@ -532,45 +532,45 @@ function buildAccessManageKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '📦 Set quota' : '📦 Set quota',
+          text: isMyanmar ? '📦 quota သတ်မှတ်' : '📦 Set quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'quota'),
         },
         {
-          text: isMyanmar ? '➕ Add quota' : '➕ Add quota',
+          text: isMyanmar ? '➕ quota ထပ်တိုး' : '➕ Add quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'addquota'),
         },
       ],
       [
         {
-          text: isMyanmar ? '🔄 Reset usage' : '🔄 Reset usage',
+          text: isMyanmar ? '🔄 အသုံးပြုမှု ပြန်သတ်မှတ်' : '🔄 Reset usage',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'resetusage'),
         },
         {
-          text: isMyanmar ? '📅 Expiry' : '📅 Expiry',
+          text: isMyanmar ? '📅 သက်တမ်း' : '📅 Expiry',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'expiry'),
         },
       ],
       [
         {
           text: input.enabled
-            ? (isMyanmar ? '⛔ Disable' : '⛔ Disable')
-            : (isMyanmar ? '✅ Enable' : '✅ Enable'),
+            ? (isMyanmar ? '⛔ ပိတ်မည်' : '⛔ Disable')
+            : (isMyanmar ? '✅ ဖွင့်မည်' : '✅ Enable'),
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'toggle'),
         },
         {
-          text: isMyanmar ? '📨 Resend access' : '📨 Resend access',
+          text: isMyanmar ? '📨 access ပြန်ပို့မည်' : '📨 Resend access',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'resend'),
         },
       ],
       [
         ...(input.canMessageUser
           ? [{
-              text: isMyanmar ? '💬 Message user' : '💬 Message user',
+              text: isMyanmar ? '💬 အသုံးပြုသူသို့ စာပို့မည်' : '💬 Message user',
               callback_data: buildTelegramAdminKeyCallbackData('manage', 'message'),
             }]
           : []),
         {
-          text: isMyanmar ? 'Open panel' : 'Open panel',
+          text: isMyanmar ? 'Panel ဖွင့်မည်' : 'Open panel',
           url: input.panelUrl,
         },
       ],
@@ -609,53 +609,53 @@ function buildDynamicManageKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '📦 Set quota' : '📦 Set quota',
+          text: isMyanmar ? '📦 quota သတ်မှတ်' : '📦 Set quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'quota'),
         },
         {
-          text: isMyanmar ? '➕ Add quota' : '➕ Add quota',
+          text: isMyanmar ? '➕ quota ထပ်တိုး' : '➕ Add quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'addquota'),
         },
       ],
       [
         {
-          text: isMyanmar ? '🔄 Reset usage' : '🔄 Reset usage',
+          text: isMyanmar ? '🔄 အသုံးပြုမှု ပြန်သတ်မှတ်' : '🔄 Reset usage',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'resetusage'),
         },
         {
-          text: isMyanmar ? '📅 Expiry' : '📅 Expiry',
+          text: isMyanmar ? '📅 သက်တမ်း' : '📅 Expiry',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'expiry'),
         },
       ],
       [
         {
-          text: isMyanmar ? '🌍 Preferred region' : '🌍 Preferred region',
+          text: isMyanmar ? '🌍 ဦးစားပေး region' : '🌍 Preferred region',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'region'),
         },
         {
-          text: isMyanmar ? '🧭 Region mode' : '🧭 Region mode',
+          text: isMyanmar ? '🧭 region mode' : '🧭 Region mode',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'mode'),
         },
       ],
       [
         {
-          text: isMyanmar ? '📨 Resend access' : '📨 Resend access',
+          text: isMyanmar ? '📨 access ပြန်ပို့မည်' : '📨 Resend access',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'resend'),
         },
         {
-          text: isMyanmar ? '💎 Routing view' : '💎 Routing view',
+          text: isMyanmar ? '💎 routing view' : '💎 Routing view',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'routing'),
         },
       ],
       [
         ...(input.canMessageUser
           ? [{
-              text: isMyanmar ? '💬 Message user' : '💬 Message user',
+              text: isMyanmar ? '💬 အသုံးပြုသူသို့ စာပို့မည်' : '💬 Message user',
               callback_data: buildTelegramAdminKeyCallbackData('manage', 'message'),
             }]
           : []),
         {
-          text: isMyanmar ? 'Open panel' : 'Open panel',
+          text: isMyanmar ? 'Panel ဖွင့်မည်' : 'Open panel',
           url: input.panelUrl,
         },
       ],
@@ -677,7 +677,7 @@ function buildDynamicRegionKeyboard(input: {
   ]);
   rows.unshift([
     {
-      text: isMyanmar ? '⚡ Auto / clear preference' : '⚡ Auto / clear preference',
+      text: isMyanmar ? '⚡ အလိုအလျောက် / preference ရှင်းမည်' : '⚡ Auto / clear preference',
       callback_data: buildTelegramAdminKeyCallbackData('setregion', 'auto'),
     },
   ]);
@@ -715,9 +715,9 @@ export async function promptAccessCreateName(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '➕ <b>Create normal key</b>' : '➕ <b>Create normal key</b>',
+      isMyanmar ? '➕ <b>ပုံမှန် key ဖန်တီးမည်</b>' : '➕ <b>Create normal key</b>',
       '',
-      `${isMyanmar ? 'Recipient' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
+      `${isMyanmar ? 'လက်ခံသူ' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
       ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
       '',
       isMyanmar
@@ -742,9 +742,9 @@ export async function promptDynamicCreateName(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '💎 <b>Create dynamic key</b>' : '💎 <b>Create dynamic key</b>',
+      isMyanmar ? '💎 <b>dynamic key ဖန်တီးမည်</b>' : '💎 <b>Create dynamic key</b>',
       '',
-      `${isMyanmar ? 'Recipient' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
+      `${isMyanmar ? 'လက်ခံသူ' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
       ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
       '',
       isMyanmar
@@ -769,9 +769,9 @@ async function promptAccessServer(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '🖥 <b>Choose server</b>' : '🖥 <b>Choose server</b>',
+      isMyanmar ? '🖥 <b>ဆာဗာ ရွေးပါ</b>' : '🖥 <b>Choose server</b>',
       '',
-      `${isMyanmar ? 'Key' : 'Key'}: <b>${escapeHtml(input.draft.name || '-')}</b>`,
+      `${isMyanmar ? 'သော့' : 'Key'}: <b>${escapeHtml(input.draft.name || '-')}</b>`,
       isMyanmar
         ? 'Auto သည် draining/maintenance ကို ရှောင်ပါမည်။ Manual ရွေးချယ်မှုတွင် draining server ကိုလည်း ရွေးနိုင်ပါသည်။'
         : 'Auto skips draining and maintenance. Manual selection can still use draining servers.',
@@ -794,9 +794,9 @@ async function promptDynamicType(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '🧭 <b>Choose dynamic mode</b>' : '🧭 <b>Choose dynamic mode</b>',
+      isMyanmar ? '🧭 <b>dynamic mode ရွေးပါ</b>' : '🧭 <b>Choose dynamic mode</b>',
       '',
-      `${isMyanmar ? 'Key' : 'Key'}: <b>${escapeHtml(input.draft.name || '-')}</b>`,
+      `${isMyanmar ? 'သော့' : 'Key'}: <b>${escapeHtml(input.draft.name || '-')}</b>`,
       isMyanmar
         ? 'SELF_MANAGED သည် preferred routing/fallback အတွက် သင့်တော်ပါသည်။ MANUAL သည် admin controlled routing အတွက်ဖြစ်သည်။'
         : 'SELF_MANAGED is better for preferred routing and fallback. MANUAL keeps routing under admin control.',
@@ -856,8 +856,8 @@ async function promptDeviceLimit(input: {
   const isMyanmar = input.locale === 'my';
   const title =
     input.kind === 'create_dynamic'
-      ? (isMyanmar ? '📱 <b>Set dynamic device limit</b>' : '📱 <b>Set dynamic device limit</b>')
-      : (isMyanmar ? '📱 <b>Set device limit</b>' : '📱 <b>Set device limit</b>');
+      ? (isMyanmar ? '📱 <b>dynamic device limit သတ်မှတ်</b>' : '📱 <b>Set dynamic device limit</b>')
+      : (isMyanmar ? '📱 <b>device limit သတ်မှတ်</b>' : '📱 <b>Set device limit</b>');
 
   await input.deps.sendTelegramMessage(
     input.botToken,
@@ -885,7 +885,7 @@ async function promptAddQuota(input: {
   await input.deps.sendTelegramMessage(
     input.botToken,
     input.chatId,
-    isMyanmar ? '➕ <b>Add more quota</b>' : '➕ <b>Add more quota</b>',
+    isMyanmar ? '➕ <b>quota ထပ်တိုးမည်</b>' : '➕ <b>Add more quota</b>',
     {
       replyMarkup: buildAddQuotaKeyboard(input.locale),
     },
@@ -903,7 +903,7 @@ async function promptCreateExpiry(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '⏳ <b>Set expiration</b>' : '⏳ <b>Set expiration</b>',
+      isMyanmar ? '⏳ <b>သက်တမ်း သတ်မှတ်မည်</b>' : '⏳ <b>Set expiration</b>',
       '',
       isMyanmar
         ? 'Fixed date အတွက် YYYY-MM-DD (KST) ကို နောက် message အဖြစ် ပို့နိုင်ပါသည်။'
@@ -926,7 +926,7 @@ async function promptManageExpiry(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '⏳ <b>Update expiration</b>' : '⏳ <b>Update expiration</b>',
+      isMyanmar ? '⏳ <b>သက်တမ်း အပ်ဒိတ်လုပ်မည်</b>' : '⏳ <b>Update expiration</b>',
       '',
       isMyanmar
         ? 'Fixed date အတွက် YYYY-MM-DD (KST) ကို နောက် message အဖြစ် ပို့နိုင်ပါသည်။'
@@ -1390,8 +1390,8 @@ export async function promptManageMatches(input: {
     input.chatId,
     [
       input.type === 'access'
-        ? (isMyanmar ? '🔎 <b>Matching access keys</b>' : '🔎 <b>Matching access keys</b>')
-        : (isMyanmar ? '🔎 <b>Matching dynamic keys</b>' : '🔎 <b>Matching dynamic keys</b>'),
+        ? (isMyanmar ? '🔎 <b>ကိုက်ညီသော access key များ</b>' : '🔎 <b>Matching access keys</b>')
+        : (isMyanmar ? '🔎 <b>ကိုက်ညီသော dynamic key များ</b>' : '🔎 <b>Matching dynamic keys</b>'),
       '',
       ...input.matches.flatMap((match, index) => [
         `${index + 1}. <b>${escapeHtml(match.name)}</b> • ${escapeHtml(match.status)}`,

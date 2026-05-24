@@ -62,7 +62,7 @@ function buildTelegramOrdersCountsLine(input: {
       : null,
   ].filter(Boolean) as string[];
 
-  return segments.join(' • ') || (isMyanmar ? `${input.totalCount} ခု recent` : `${input.totalCount} recent`);
+  return segments.join(' • ') || (isMyanmar ? `${input.totalCount} ခု မကြာသေးမီက` : `${input.totalCount} recent`);
 }
 
 function buildTelegramCompactOrderStateLine(order: TelegramUserOrder, ui: ReturnType<typeof getTelegramUi>) {
@@ -159,18 +159,18 @@ function buildTelegramOrderListButtonLabel(input: {
   const isMyanmar = locale === 'my';
   const action =
     order.status === 'AWAITING_PAYMENT_METHOD'
-      ? isMyanmar ? 'Pay' : 'Pay'
+      ? isMyanmar ? 'ငွေပေးချေမည်' : 'Pay'
       : order.status === 'AWAITING_PAYMENT_PROOF'
-        ? isMyanmar ? 'Proof' : 'Proof'
+        ? isMyanmar ? 'အထောက်အထား' : 'Proof'
         : order.status === 'PENDING_REVIEW' || order.status === 'APPROVED'
-          ? isMyanmar ? 'Review' : 'Review'
+          ? isMyanmar ? 'စစ်ဆေးမည်' : 'Review'
           : order.status === 'FULFILLED'
-            ? isMyanmar ? 'Done' : 'Done'
+            ? isMyanmar ? 'ပြီးပါပြီ' : 'Done'
             : order.status === 'REJECTED'
-              ? isMyanmar ? 'Retry' : 'Retry'
+              ? isMyanmar ? 'ထပ်စမ်းမည်' : 'Retry'
               : order.status === 'CANCELLED'
-                ? isMyanmar ? 'Restart' : 'Restart'
-                : isMyanmar ? 'Open' : 'Open';
+                ? isMyanmar ? 'အသစ်စမည်' : 'Restart'
+                : isMyanmar ? 'ဖွင့်မည်' : 'Open';
 
   return `${formatTelegramOrderStatusIcon(order.status)} ${order.orderCode} • ${action}`;
 }
@@ -563,7 +563,7 @@ export async function buildTelegramOrderStatusMessage(input: {
     const serverLineSegments = [
       `${ui.preferredServerLabel}: <b>${escapeHtml(order.selectedServerName)}${flag}</b>`,
       order.referralCode
-        ? `${isMyanmar ? 'Referral' : 'Referral'}: <b>${escapeHtml(order.referralCode)}</b>`
+        ? `${isMyanmar ? 'ရည်ညွှန်းကုဒ်' : 'Referral'}: <b>${escapeHtml(order.referralCode)}</b>`
         : null,
     ].filter(Boolean) as string[];
     detailLines.push(serverLineSegments.join(' • '));
@@ -577,7 +577,7 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.orderMode === 'GIFT' && order.giftRecipientLabel) {
-    detailLines.push(`${isMyanmar ? 'Gift for' : 'Gift for'}: <b>${escapeHtml(order.giftRecipientLabel)}</b>`);
+    detailLines.push(`${isMyanmar ? 'လက်ဆောင် လက်ခံသူ' : 'Gift for'}: <b>${escapeHtml(order.giftRecipientLabel)}</b>`);
   }
 
   if (order.requestedEmail) {

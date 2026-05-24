@@ -127,10 +127,10 @@ function formatTelegramAnnouncementTargetSummary(input: {
 }) {
   const isMyanmar = input.locale === 'my';
   const parts = [
-    input.directUserLabel ? `${isMyanmar ? 'user' : 'user'}=${input.directUserLabel}` : null,
+    input.directUserLabel ? `${isMyanmar ? 'အသုံးပြုသူ' : 'user'}=${input.directUserLabel}` : null,
     input.tag ? `tag=${input.tag}` : null,
     input.segment ? `${isMyanmar ? 'segment' : 'segment'}=${input.segment}` : null,
-    input.serverName ? `${isMyanmar ? 'server' : 'server'}=${input.serverName}` : null,
+    input.serverName ? `${isMyanmar ? 'ဆာဗာ' : 'server'}=${input.serverName}` : null,
     input.countryCode ? `${isMyanmar ? 'region' : 'region'}=${input.countryCode}` : null,
   ].filter(Boolean);
   return parts.length ? parts.join(' • ') : isMyanmar ? 'ကိုက်ညီသော user အားလုံး' : 'all matching users';

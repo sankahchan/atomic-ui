@@ -2033,7 +2033,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="auditRuleEntities">{isMyanmar ? 'Entities' : 'Entities'}</Label>
+                  <Label htmlFor="auditRuleEntities">{isMyanmar ? 'Entity များ' : 'Entities'}</Label>
                   <Input
                     id="auditRuleEntities"
                     value={auditRuleForm.entities}

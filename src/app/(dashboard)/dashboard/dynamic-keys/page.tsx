@@ -1981,7 +1981,7 @@ function EditDAKDialog({
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>{isMyanmar ? 'Load balancer algorithm' : 'Load balancer algorithm'}</Label>
+                  <Label>{isMyanmar ? 'load balancer algorithm' : 'Load balancer algorithm'}</Label>
                   <Select
                     value={formData.loadBalancerAlgorithm}
                     onValueChange={(value) =>

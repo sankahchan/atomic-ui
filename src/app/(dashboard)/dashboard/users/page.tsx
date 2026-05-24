@@ -1387,7 +1387,7 @@ export default function UsersPage() {
 
                   {user.role === 'ADMIN' ? (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Admin scope' : 'Admin scope'}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Admin ခွင့်ပြုနယ်ပယ်' : 'Admin scope'}</p>
                       <Select
                         value={normalizeAdminScope(user.adminScope) || 'ADMIN'}
                         onValueChange={(value) =>
