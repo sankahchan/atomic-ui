@@ -4281,13 +4281,20 @@ export async function getAdminLoginAbuseOverview() {
   const activeRestrictionByIp = new Map(
     activeRestrictions.map((restriction) => [restriction.ip, restriction as AdminLoginRestrictionInfo]),
   );
-  const geoIpCache = new Map<string, ReturnType<typeof getGeoIpCountry>>();
-  const getCachedGeo = (ip: string) => {
-    if (!geoIpCache.has(ip)) {
-      geoIpCache.set(ip, getGeoIpCountry(ip));
+  const geoIpCache = new Map<string, { ip: string | null; countryCode: string | null }>();
+  const getCachedGeo = async (ip: string) => {
+    const cached = geoIpCache.get(ip);
+    if (cached) {
+      return cached;
     }
 
-    return geoIpCache.get(ip)!;
+    try {
+      const result = await getGeoIpCountry(ip);
+      geoIpCache.set(ip, result);
+      return result;
+    } catch {
+      return { ip: null, countryCode: null };
+    }
   };
   const rawSecurityIncidents = buildSecurityIncidents(incidentLogs, {
     activeRestrictionByIp,
