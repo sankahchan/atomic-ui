@@ -17,9 +17,9 @@ export function buildTelegramAdminSupportReplyPromptMessage(input: {
 }) {
   return [
     input.locale === 'my'
-      ? '💬 <b>Support reply</b>'
+      ? '💬 <b>အကူအညီ အကြောင်းပြန်</b>'
       : '💬 <b>Support reply</b>',
-    `${input.locale === 'my' ? 'To' : 'To'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
+    `${input.locale === 'my' ? 'သို့' : 'To'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
     input.locale === 'my'
       ? 'Text, photo, document ပို့နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။'
       : 'Send text, photo, or document. Use /cancel to stop.',
@@ -32,9 +32,9 @@ export function buildTelegramAdminDirectMessagePromptMessage(input: {
 }) {
   return [
     input.locale === 'my'
-      ? '💬 <b>Direct message</b>'
+      ? '💬 <b>တိုက်ရိုက် မက်ဆေ့ချ်</b>'
       : '💬 <b>Direct message</b>',
-    `${input.locale === 'my' ? 'To' : 'To'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
+    `${input.locale === 'my' ? 'သို့' : 'To'}: <b>${escapeHtml(input.recipientLabel)}</b>`,
     input.locale === 'my'
       ? 'Text, photo, document ပို့နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။'
       : 'Send text, photo, or document. Use /cancel to stop.',

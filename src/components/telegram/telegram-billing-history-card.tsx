@@ -78,16 +78,16 @@ export function TelegramBillingHistoryCard({
   const { locale } = useLocale();
   const isMyanmar = locale === 'my';
   const ui = {
-    order: isMyanmar ? 'Order' : 'Order',
+    order: isMyanmar ? 'အော်ဒါ' : 'Order',
     kind: isMyanmar ? 'အမျိုးအစား' : 'Kind',
     price: isMyanmar ? 'ငွေပေးချေမှု' : 'Price',
-    paymentMethod: isMyanmar ? 'Payment method' : 'Payment method',
-    retentionSource: isMyanmar ? 'Source' : 'Source',
+    paymentMethod: isMyanmar ? 'ငွေပေးချေမှုနည်းလမ်း' : 'Payment method',
+    retentionSource: isMyanmar ? 'ရင်းမြစ်' : 'Source',
     reviewedBy: isMyanmar ? 'စစ်ဆေးသူ' : 'Reviewed by',
     created: isMyanmar ? 'ဖန်တီးခဲ့ချိန်' : 'Created',
     updated: isMyanmar ? 'နောက်ဆုံးအခြေအနေ' : 'Latest status',
-    renew: isMyanmar ? 'Renewal' : 'Renewal',
-    newOrder: isMyanmar ? 'New order' : 'New order',
+    renew: isMyanmar ? 'သက်တမ်းတိုး' : 'Renewal',
+    newOrder: isMyanmar ? 'အော်ဒါအသစ်' : 'New order',
     openOrders: isMyanmar ? 'Orders တွင်ကြည့်မည်' : 'Open in Orders',
   };
 

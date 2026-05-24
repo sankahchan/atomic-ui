@@ -3110,21 +3110,21 @@ export function buildTelegramStoreSupportContactView(input: {
   const rows: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [
     [
       {
-        text: input.locale === 'my' ? '💳 Payment' : '💳 Payment',
+        text: input.locale === 'my' ? '💳 ငွေပေးချေမှု' : '💳 Payment',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'order'),
       },
       {
-        text: input.locale === 'my' ? '🔑 Key' : '🔑 Key',
+        text: input.locale === 'my' ? '🔑 သော့' : '🔑 Key',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'key'),
       },
     ],
     [
       {
-        text: input.locale === 'my' ? '🖥 Server' : '🖥 Server',
+        text: input.locale === 'my' ? '🖥 ဆာဗာ' : '🖥 Server',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'server'),
       },
       {
-        text: input.locale === 'my' ? '🧵 My Threads' : '🧵 My Threads',
+        text: input.locale === 'my' ? '🧵 ကျွန်ုပ်၏ thread များ' : '🧵 My Threads',
         callback_data: buildTelegramSupportThreadCallbackData('status', 'list'),
       },
     ],

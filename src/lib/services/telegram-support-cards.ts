@@ -635,7 +635,7 @@ export function buildTelegramSupportThreadStatusMessage(input: {
   const latestReply = input.thread.replies[input.thread.replies.length - 1] || null;
   const snapshotLines = [
     `${escapeHtml(resolveTelegramSupportIssueLabel(input.thread.issueCategory, input.locale))} • ${escapeHtml(state.label)}`,
-    `${input.locale === 'my' ? 'SLA' : 'SLA'} <b>${escapeHtml(
+    `SLA <b>${escapeHtml(
       getTelegramSupportThreadSlaLabel({ thread: input.thread, locale: input.locale }),
     )}</b> • ${input.locale === 'my' ? 'ကြာချိန်' : 'Age'} <b>${escapeHtml(
       formatTelegramSupportRelativeAge(input.thread.updatedAt || input.thread.createdAt, input.locale),
@@ -680,11 +680,11 @@ export function buildTelegramSupportThreadStatusMessage(input: {
   if (latestReply) {
     const latestReplyPreview = latestReply.message.trim();
     const latestReplyLines = [
-      `${latestReply.senderType === 'ADMIN' ? 'Admin' : input.locale === 'my' ? 'You' : 'You'} • ${escapeHtml(
+      `${latestReply.senderType === 'ADMIN' ? 'Admin' : input.locale === 'my' ? 'သင်' : 'You'} • ${escapeHtml(
         formatTelegramDateTime(latestReply.createdAt, input.locale),
       )}`,
       latestReply.mediaKind
-        ? `${input.locale === 'my' ? 'Attachment' : 'Attachment'}: <b>${escapeHtml(
+        ? `${input.locale === 'my' ? 'တွဲဖိုင်' : 'Attachment'}: <b>${escapeHtml(
             latestReply.mediaKind === 'IMAGE'
               ? input.locale === 'my'
                 ? 'ပုံ'
@@ -692,7 +692,7 @@ export function buildTelegramSupportThreadStatusMessage(input: {
               : latestReply.mediaKind === 'FILE'
                 ? latestReply.mediaFilename || (input.locale === 'my' ? 'ဖိုင်' : 'File')
                 : latestReply.mediaKind,
-          )}</b>${latestReply.mediaUrl ? ` • ${input.locale === 'my' ? 'button below' : 'button below'}` : ''}`
+          )}</b>${latestReply.mediaUrl ? ` • ${input.locale === 'my' ? 'အောက်ပါ button' : 'button below'}` : ''}`
         : null,
       latestReplyPreview
         ? escapeHtml(`${latestReplyPreview.slice(0, 100)}${latestReplyPreview.length > 100 ? '…' : ''}`)

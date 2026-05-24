@@ -182,7 +182,7 @@ function buildAddQuotaKeyboard(locale: SupportedLocale) {
       ],
       [
         {
-          text: locale === 'my' ? '✍️ Custom' : '✍️ Custom',
+          text: locale === 'my' ? '✍️ စိတ်ကြိုက်' : '✍️ Custom',
           callback_data: buildTelegramAdminKeyCallbackData('addquota', 'custom'),
         },
       ],
@@ -271,7 +271,7 @@ function parseDeviceLimitInput(text: string) {
 
 function formatDraftDeviceLimit(maxDevices: number | null, locale: SupportedLocale) {
   if (!maxDevices) {
-    return locale === 'my' ? 'No limit' : 'No limit';
+    return locale === 'my' ? 'အကန့်အသတ်မရှိ' : 'No limit';
   }
 
   return `${maxDevices} estimated device${maxDevices === 1 ? '' : 's'}`;
@@ -350,9 +350,9 @@ async function buildAccessServerKeyboard(locale: SupportedLocale) {
 
 function formatRegionModeLabel(mode: string | null | undefined, locale: SupportedLocale) {
   if ((mode || '').toUpperCase() === 'ONLY') {
-    return locale === 'my' ? 'Only preferred regions' : 'Only preferred regions';
+    return locale === 'my' ? 'ရွေးထားသော ဒေသများသာ' : 'Only preferred regions';
   }
-  return locale === 'my' ? 'Prefer preferred regions' : 'Prefer preferred regions';
+  return locale === 'my' ? 'ရွေးထားသော ဒေသများကို ဦးစားပေး' : 'Prefer preferred regions';
 }
 
 function formatPinnedRoutingLabel(input: {
@@ -396,12 +396,12 @@ function buildDynamicRoutingManageLines(input: {
 
   return [
     `🌍 ${routingSummary}`,
-    `${input.locale === 'my' ? '🧭 Region mode' : '🧭 Region mode'}: ${formatRegionModeLabel(
+    `${input.locale === 'my' ? '🧭 ဒေသမုဒ်' : '🧭 Region mode'}: ${formatRegionModeLabel(
       input.preferredRegionMode,
       input.locale,
     )}`,
     regionChoices.length > 0
-      ? `${input.locale === 'my' ? '📍 Region choices' : '📍 Region choices'}: ${regionChoices.join(', ')}`
+      ? `${input.locale === 'my' ? '📍 ရွေးထားသော ဒေသများ' : '📍 Region choices'}: ${regionChoices.join(', ')}`
       : null,
     pinnedLabel ? `📌 ${pinnedLabel}` : null,
   ].filter((value): value is string => Boolean(value));
@@ -958,7 +958,7 @@ async function promptAccessCreateConfirm(input: {
     : null;
   const serverLabel =
     input.draft.assignmentMode === 'AUTO'
-      ? (input.locale === 'my' ? 'Auto placement' : 'Auto placement')
+      ? (input.locale === 'my' ? 'အလိုအလျောက် နေရာချ' : 'Auto placement')
       : server
         ? renderServerChoiceLabel(server)
         : input.locale === 'my'
@@ -969,7 +969,7 @@ async function promptAccessCreateConfirm(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '✅ <b>Confirm normal key</b>' : '✅ <b>Confirm normal key</b>',
+      input.locale === 'my' ? '✅ <b>ပုံမှန်သော့ အတည်ပြုမည်</b>' : '✅ <b>Confirm normal key</b>',
       '',
       `🔑 <b>${escapeHtml(input.draft.name || '-')}</b>`,
       `👤 ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
@@ -1014,7 +1014,7 @@ async function promptDynamicCreateConfirm(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '✅ <b>Confirm dynamic key</b>' : '✅ <b>Confirm dynamic key</b>',
+      input.locale === 'my' ? '✅ <b>Dynamic သော့ အတည်ပြုမည်</b>' : '✅ <b>Confirm dynamic key</b>',
       '',
       `💎 <b>${escapeHtml(input.draft.name || '-')}</b>`,
       `👤 ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
@@ -1171,7 +1171,7 @@ function formatAccessManageSummary(key: {
   telegramId?: string | null;
 }, locale: SupportedLocale) {
   return [
-    locale === 'my' ? '🛠 <b>Manage normal key</b>' : '🛠 <b>Manage normal key</b>',
+    locale === 'my' ? '🛠 <b>ပုံမှန်သော့ စီမံမည်</b>' : '🛠 <b>Manage normal key</b>',
     '',
     `🔑 <b>${escapeHtml(key.name)}</b>`,
     `🆔 <code>${key.id}</code>`,
@@ -1180,7 +1180,7 @@ function formatAccessManageSummary(key: {
     `📦 ${escapeHtml(
       key.dataLimitBytes
         ? `${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
-        : (locale === 'my' ? 'Unlimited' : 'Unlimited'),
+        : (locale === 'my' ? 'အကန့်အသတ်မရှိ' : 'Unlimited'),
     )}`,
     key.maxDevices ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} estimated devices` : '',
     `⏳ ${escapeHtml(
@@ -1227,17 +1227,17 @@ function formatDynamicManageSummary(key: {
   }>;
 }, locale: SupportedLocale) {
   return [
-    locale === 'my' ? '🧭 <b>Manage dynamic key</b>' : '🧭 <b>Manage dynamic key</b>',
+    locale === 'my' ? '🧭 <b>Dynamic သော့ စီမံမည်</b>' : '🧭 <b>Manage dynamic key</b>',
     '',
     `💎 <b>${escapeHtml(key.name)}</b>`,
     `🆔 <code>${key.id}</code>`,
     `📈 ${escapeHtml(key.status)}`,
     `🧭 ${escapeHtml(key.type)}`,
-    `🖥 ${locale === 'my' ? 'Attached keys' : 'Attached keys'}: ${key.accessKeys.length}`,
+    `🖥 ${locale === 'my' ? 'ချိတ်ထားသော သော့များ' : 'Attached keys'}: ${key.accessKeys.length}`,
     `📦 ${escapeHtml(
       key.dataLimitBytes
         ? `${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
-        : (locale === 'my' ? 'Unlimited' : 'Unlimited'),
+        : (locale === 'my' ? 'အကန့်အသတ်မရှိ' : 'Unlimited'),
     )}`,
     key.maxDevices ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} estimated devices` : '',
     `⏳ ${escapeHtml(
@@ -2090,7 +2090,7 @@ async function finalizeAccessCreate(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '✅ <b>Normal key created</b>' : '✅ <b>Normal key created</b>',
+      input.locale === 'my' ? '✅ <b>ပုံမှန်သော့ ဖန်တီးပြီးပါပြီ</b>' : '✅ <b>Normal key created</b>',
       '',
       `🔑 <b>${escapeHtml(created.name)}</b>`,
       `🆔 <code>${created.id}</code>`,
@@ -2165,7 +2165,7 @@ async function finalizeDynamicCreate(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '✅ <b>Dynamic key created</b>' : '✅ <b>Dynamic key created</b>',
+      input.locale === 'my' ? '✅ <b>Dynamic သော့ ဖန်တီးပြီးပါပြီ</b>' : '✅ <b>Dynamic key created</b>',
       '',
       `💎 <b>${escapeHtml(created.name)}</b>`,
       `🆔 <code>${created.id}</code>`,
@@ -3169,7 +3169,7 @@ export async function handleTelegramAdminKeyCallback(input: {
   if (!flow) {
     if (input.action === 'cancel') {
       await clearPendingAdminFlow(input.telegramUserId, input.chatId);
-      return { handled: true, callbackText: input.locale === 'my' ? 'Wizard cancelled.' : 'Wizard cancelled.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဖန်တီးမှု လမ်းညွှန်ကို ပယ်ဖျက်လိုက်ပါပြီ။' : 'Wizard cancelled.' };
     }
     return { handled: false };
   }
@@ -3183,7 +3183,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         ? '🛑 Telegram admin key wizard ကို ပယ်ဖျက်ပြီးပါပြီ။'
         : '🛑 Cancelled the Telegram admin key wizard.',
     );
-    return { handled: true, callbackText: input.locale === 'my' ? 'Cancelled.' : 'Cancelled.' };
+    return { handled: true, callbackText: input.locale === 'my' ? 'ပယ်ဖျက်ပြီးပါပြီ။' : 'Cancelled.' };
   }
 
   if (flow.kind === 'create_access') {
@@ -3209,7 +3209,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Recipient skipped.' : 'Recipient skipped.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'လက်ခံသူကို ကျော်လိုက်ပါပြီ။' : 'Recipient skipped.' };
     }
 
     if (flow.step === 'server' && input.action === 'server') {
@@ -3226,7 +3226,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Server saved.' : 'Server saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဆာဗာကို သိမ်းလိုက်ပါပြီ။' : 'Server saved.' };
     }
 
     if (input.action === 'quota') {
@@ -3246,7 +3246,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting quota.' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
 
       const nextFlow: AccessCreateDraft = {
@@ -3261,7 +3261,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota saved.' : 'Quota saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို သိမ်းလိုက်ပါပြီ။' : 'Quota saved.' };
     }
 
     if (input.action === 'devices') {
@@ -3281,7 +3281,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting device limit.' : 'Awaiting device limit.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'စက်အရေအတွက် ကန့်သတ်ချက်ကို စောင့်နေပါသည်။' : 'Awaiting device limit.' };
       }
 
       const nextFlow: AccessCreateDraft = {
@@ -3295,7 +3295,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Device limit saved.' : 'Device limit saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'စက်အရေအတွက် ကန့်သတ်ချက်ကို သိမ်းလိုက်ပါပြီ။' : 'Device limit saved.' };
     }
 
     if (input.action === 'expiry') {
@@ -3315,7 +3315,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting date.' : 'Awaiting date.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ရက်စွဲကို စောင့်နေပါသည်။' : 'Awaiting date.' };
       }
 
       const nextFlow: AccessCreateDraft = {
@@ -3347,7 +3347,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Expiry saved.' : 'Expiry saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'သက်တမ်းကုန်ရက်ကို သိမ်းလိုက်ပါပြီ။' : 'Expiry saved.' };
     }
 
     if (flow.step === 'confirm' && input.action === 'confirm') {
@@ -3373,7 +3373,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: created.id,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Key created.' : 'Key created.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'သော့ကို ဖန်တီးပြီးပါပြီ။' : 'Key created.' };
     }
   }
 
@@ -3400,7 +3400,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Recipient skipped.' : 'Recipient skipped.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'လက်ခံသူကို ကျော်လိုက်ပါပြီ။' : 'Recipient skipped.' };
     }
 
     if (flow.step === 'type' && input.action === 'type') {
@@ -3416,7 +3416,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Mode saved.' : 'Mode saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'မုဒ်ကို သိမ်းလိုက်ပါပြီ။' : 'Mode saved.' };
     }
 
     if (input.action === 'quota') {
@@ -3436,7 +3436,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting quota.' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
 
       const nextFlow: DynamicCreateDraft = {
@@ -3451,7 +3451,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota saved.' : 'Quota saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို သိမ်းလိုက်ပါပြီ။' : 'Quota saved.' };
     }
 
     if (input.action === 'devices') {
@@ -3471,7 +3471,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting device limit.' : 'Awaiting device limit.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'စက်အရေအတွက် ကန့်သတ်ချက်ကို စောင့်နေပါသည်။' : 'Awaiting device limit.' };
       }
 
       const nextFlow: DynamicCreateDraft = {
@@ -3485,7 +3485,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Device limit saved.' : 'Device limit saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'စက်အရေအတွက် ကန့်သတ်ချက်ကို သိမ်းလိုက်ပါပြီ။' : 'Device limit saved.' };
     }
 
     if (input.action === 'expiry') {
@@ -3505,7 +3505,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting date.' : 'Awaiting date.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ရက်စွဲကို စောင့်နေပါသည်။' : 'Awaiting date.' };
       }
 
       const nextFlow: DynamicCreateDraft = {
@@ -3533,7 +3533,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Expiry saved.' : 'Expiry saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'သက်တမ်းကုန်ရက်ကို သိမ်းလိုက်ပါပြီ။' : 'Expiry saved.' };
     }
 
     if (flow.step === 'confirm' && input.action === 'confirm') {
@@ -3559,7 +3559,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: created.id,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Dynamic key created.' : 'Dynamic key created.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'Dynamic သော့ကို ဖန်တီးပြီးပါပြီ။' : 'Dynamic key created.' };
     }
   }
 
@@ -3578,7 +3578,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: input.primary,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Selected.' : 'Selected.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ရွေးထားပါပြီ။' : 'Selected.' };
     }
 
     if (flow.step === 'confirm_resetusage' && flow.keyId && input.action === 'danger' && input.primary === 'resetusage') {
@@ -3595,7 +3595,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           keyId: flow.keyId,
           deps: input.deps,
         });
-        return { handled: true, callbackText: input.locale === 'my' ? 'Back.' : 'Back.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'နောက်သို့' : 'Back.' };
       }
 
       if (input.secondary === 'confirm') {
@@ -3618,7 +3618,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           keyId: flow.keyId,
           deps: input.deps,
         });
-        return { handled: true, callbackText: input.locale === 'my' ? 'Usage reset.' : 'Usage reset.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'အသုံးပြုမှုကို ပြန်လည်သတ်မှတ်ပြီးပါပြီ။' : 'Usage reset.' };
       }
     }
 
@@ -3636,7 +3636,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           keyId: flow.keyId,
           deps: input.deps,
         });
-        return { handled: true, callbackText: input.locale === 'my' ? 'Back.' : 'Back.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'နောက်သို့' : 'Back.' };
       }
 
       if (input.secondary === 'confirm') {
@@ -3659,7 +3659,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           keyId: flow.keyId,
           deps: input.deps,
         });
-        return { handled: true, callbackText: input.locale === 'my' ? 'Key disabled.' : 'Key disabled.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'သော့ကို ပိတ်လိုက်ပါပြီ။' : 'Key disabled.' };
       }
     }
 
@@ -3742,7 +3742,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Choose quota.' : 'Choose quota.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ရွေးပါ။' : 'Choose quota.' };
         case 'addquota':
           await promptAddQuota({
             chatId: input.chatId,
@@ -3750,7 +3750,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Choose top-up.' : 'Choose top-up.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ထပ်တိုးပမာဏကို ရွေးပါ။' : 'Choose top-up.' };
         case 'resetusage':
           await savePendingAdminFlow(input.telegramUserId, input.chatId, {
             ...flow,
@@ -3769,7 +3769,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               }),
             },
           );
-          return { handled: true, callbackText: input.locale === 'my' ? 'Confirm reset.' : 'Confirm reset.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'Reset ကို အတည်ပြုပါ။' : 'Confirm reset.' };
         case 'expiry':
           await promptManageExpiry({
             chatId: input.chatId,
@@ -3777,7 +3777,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Choose expiry.' : 'Choose expiry.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'သက်တမ်းကုန်ရက်ကို ရွေးပါ။' : 'Choose expiry.' };
         case 'toggle': {
           const currentKey = await db.accessKey.findUnique({
             where: { id: flow.keyId },
@@ -3805,7 +3805,7 @@ export async function handleTelegramAdminKeyCallback(input: {
                 }),
               },
             );
-            return { handled: true, callbackText: input.locale === 'my' ? 'Confirm disable.' : 'Confirm disable.' };
+            return { handled: true, callbackText: input.locale === 'my' ? 'ပိတ်ခြင်းကို အတည်ပြုပါ။' : 'Confirm disable.' };
           }
 
           await setAccessKeyEnabledState(flow.keyId, true);
@@ -3822,7 +3822,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             keyId: flow.keyId,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Key enabled.' : 'Key enabled.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'သော့ကို ပြန်ဖွင့်လိုက်ပါပြီ။' : 'Key enabled.' };
         }
         case 'resend': {
           try {
@@ -3842,7 +3842,7 @@ export async function handleTelegramAdminKeyCallback(input: {
                 directDelivery: true,
               },
             });
-            return { handled: true, callbackText: input.locale === 'my' ? 'Access sent.' : 'Access sent.' };
+            return { handled: true, callbackText: input.locale === 'my' ? 'Access ကို ပို့လိုက်ပါပြီ။' : 'Access sent.' };
           } catch {
             const connectLink = await input.deps.createAccessKeyTelegramConnectLink({
               accessKeyId: flow.keyId,
@@ -3870,7 +3870,7 @@ export async function handleTelegramAdminKeyCallback(input: {
                 `Expires: ${formatDateTime(connectLink.expiresAt)}`,
               ].join('\n'),
             );
-            return { handled: true, callbackText: input.locale === 'my' ? 'Connect link ready.' : 'Connect link ready.' };
+            return { handled: true, callbackText: input.locale === 'my' ? 'ချိတ်ဆက်လင့်ခ် အဆင်သင့်ဖြစ်ပါပြီ။' : 'Connect link ready.' };
           }
         }
         case 'message': {
@@ -3889,7 +3889,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             accessKeyId: target.accessKeyId,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Send the message now.' : 'Send the message now.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ယခု မက်ဆေ့ချ်ပို့ပါ။' : 'Send the message now.' };
         }
         default:
           break;
@@ -3913,7 +3913,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting quota.' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
       await applyAccessKeyQuota({
         keyId: flow.keyId || '',
@@ -3935,7 +3935,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: flow.keyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota updated.' : 'Quota updated.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Quota updated.' };
     }
 
     if (input.action === 'addquota') {
@@ -3955,7 +3955,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting top-up.' : 'Awaiting top-up.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ထပ်တိုးပမာဏကို စောင့်နေပါသည်။' : 'Awaiting top-up.' };
       }
       const addGb = parseGbInput(input.primary || '');
       const key = await db.accessKey.findUnique({
@@ -3988,7 +3988,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: flow.keyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota added.' : 'Quota added.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ထပ်ထည့်လိုက်ပါပြီ။' : 'Quota added.' };
     }
 
     if (input.action === 'setexpiry') {
@@ -4008,7 +4008,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting date.' : 'Awaiting date.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ရက်စွဲကို စောင့်နေပါသည်။' : 'Awaiting date.' };
       }
       await updateAccessKeyExpiry({
         keyId: flow.keyId || '',
@@ -4030,7 +4030,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: flow.keyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Expiry updated.' : 'Expiry updated.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'သက်တမ်းကုန်ရက်ကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Expiry updated.' };
     }
   }
 
@@ -4049,7 +4049,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: input.primary,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Selected.' : 'Selected.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ရွေးထားပါပြီ။' : 'Selected.' };
     }
 
     if (flow.step === 'confirm_resetusage' && flow.dynamicKeyId && input.action === 'danger' && input.primary === 'resetusage') {
@@ -4066,7 +4066,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           dynamicKeyId: flow.dynamicKeyId,
           deps: input.deps,
         });
-        return { handled: true, callbackText: input.locale === 'my' ? 'Back.' : 'Back.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'နောက်သို့' : 'Back.' };
       }
 
       if (input.secondary === 'confirm') {
@@ -4089,7 +4089,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           dynamicKeyId: flow.dynamicKeyId,
           deps: input.deps,
         });
-        return { handled: true, callbackText: input.locale === 'my' ? 'Usage reset.' : 'Usage reset.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'အသုံးပြုမှုကို ပြန်လည်သတ်မှတ်ပြီးပါပြီ။' : 'Usage reset.' };
       }
     }
 
@@ -4128,7 +4128,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         callbackText:
           preferredCountryCodes.length > 0
             ? `Region set to ${preferredCountryCodes[0]}.`
-            : (input.locale === 'my' ? 'Region preference cleared.' : 'Region preference cleared.'),
+            : (input.locale === 'my' ? 'ဒေသဦးစားပေးမှုကို ရှင်းလိုက်ပါပြီ။' : 'Region preference cleared.'),
       };
     }
 
@@ -4213,7 +4213,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Choose quota.' : 'Choose quota.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ရွေးပါ။' : 'Choose quota.' };
         case 'addquota':
           await promptAddQuota({
             chatId: input.chatId,
@@ -4221,7 +4221,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Choose top-up.' : 'Choose top-up.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ထပ်တိုးပမာဏကို ရွေးပါ။' : 'Choose top-up.' };
         case 'resetusage':
           await savePendingAdminFlow(input.telegramUserId, input.chatId, {
             ...flow,
@@ -4240,7 +4240,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               }),
             },
           );
-          return { handled: true, callbackText: input.locale === 'my' ? 'Confirm reset.' : 'Confirm reset.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'Reset ကို အတည်ပြုပါ။' : 'Confirm reset.' };
         case 'expiry':
           await promptManageExpiry({
             chatId: input.chatId,
@@ -4248,7 +4248,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Choose expiry.' : 'Choose expiry.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'သက်တမ်းကုန်ရက်ကို ရွေးပါ။' : 'Choose expiry.' };
         case 'region': {
           const key = await db.dynamicAccessKey.findUnique({
             where: { id: flow.dynamicKeyId },
@@ -4292,7 +4292,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               }),
             },
           );
-          return { handled: true, callbackText: input.locale === 'my' ? 'Choose region.' : 'Choose region.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ဒေသကို ရွေးပါ။' : 'Choose region.' };
         }
         case 'mode': {
           const updated = await toggleDynamicPreferredRegionMode(flow.dynamicKeyId);
@@ -4359,7 +4359,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               }),
             ].join('\n'),
           );
-          return { handled: true, callbackText: input.locale === 'my' ? 'Routing view.' : 'Routing view.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'Routing အမြင်ကို ဖွင့်ထားပါသည်။' : 'Routing view.' };
         }
         case 'resend': {
           try {
@@ -4379,7 +4379,7 @@ export async function handleTelegramAdminKeyCallback(input: {
                 directDelivery: true,
               },
             });
-            return { handled: true, callbackText: input.locale === 'my' ? 'Access sent.' : 'Access sent.' };
+            return { handled: true, callbackText: input.locale === 'my' ? 'Access ကို ပို့လိုက်ပါပြီ။' : 'Access sent.' };
           } catch {
             const connectLink = await input.deps.createDynamicKeyTelegramConnectLink({
               dynamicAccessKeyId: flow.dynamicKeyId,
@@ -4407,7 +4407,7 @@ export async function handleTelegramAdminKeyCallback(input: {
                 `Expires: ${formatDateTime(connectLink.expiresAt)}`,
               ].join('\n'),
             );
-            return { handled: true, callbackText: input.locale === 'my' ? 'Connect link ready.' : 'Connect link ready.' };
+            return { handled: true, callbackText: input.locale === 'my' ? 'ချိတ်ဆက်လင့်ခ် အဆင်သင့်ဖြစ်ပါပြီ။' : 'Connect link ready.' };
           }
         }
         case 'message': {
@@ -4426,7 +4426,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             dynamicKeyId: target.dynamicKeyId,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Send the message now.' : 'Send the message now.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ယခု မက်ဆေ့ချ်ပို့ပါ။' : 'Send the message now.' };
         }
         default:
           break;
@@ -4450,7 +4450,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting quota.' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
       await applyDynamicQuota({
         dynamicKeyId: flow.dynamicKeyId || '',
@@ -4472,7 +4472,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: flow.dynamicKeyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota updated.' : 'Quota updated.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Quota updated.' };
     }
 
     if (input.action === 'addquota') {
@@ -4492,7 +4492,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting top-up.' : 'Awaiting top-up.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ထပ်တိုးပမာဏကို စောင့်နေပါသည်။' : 'Awaiting top-up.' };
       }
       const addGb = parseGbInput(input.primary || '');
       const dynamicKey = await db.dynamicAccessKey.findUnique({
@@ -4527,7 +4527,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: flow.dynamicKeyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota added.' : 'Quota added.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ထပ်ထည့်လိုက်ပါပြီ။' : 'Quota added.' };
     }
 
     if (input.action === 'setexpiry') {
@@ -4547,7 +4547,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Awaiting date.' : 'Awaiting date.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ရက်စွဲကို စောင့်နေပါသည်။' : 'Awaiting date.' };
       }
       await updateDynamicExpiry({
         dynamicKeyId: flow.dynamicKeyId || '',
@@ -4569,7 +4569,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: flow.dynamicKeyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Expiry updated.' : 'Expiry updated.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'သက်တမ်းကုန်ရက်ကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Expiry updated.' };
     }
   }
 

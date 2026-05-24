@@ -250,16 +250,16 @@ export function buildTelegramPremiumSupportQueueCardMessage(input: {
   }).map((line) => escapeHtml(line));
   const routeSummary = [
     input.request.requestedRegionCode
-      ? `${input.locale === 'my' ? 'Region' : 'Region'} ${escapeHtml(input.request.requestedRegionCode)}`
+      ? `${input.locale === 'my' ? 'ဒေသ' : 'Region'} ${escapeHtml(input.request.requestedRegionCode)}`
       : '',
     input.request.currentResolvedServerName
-      ? `${input.locale === 'my' ? 'Route' : 'Route'} ${escapeHtml(input.request.currentResolvedServerName)}`
+      ? `${input.locale === 'my' ? 'လမ်းကြောင်း' : 'Route'} ${escapeHtml(input.request.currentResolvedServerName)}`
       : '',
   ].filter(Boolean);
   const statusSnapshot = `🕒 <b>${escapeHtml(state.label)}</b> • ${escapeHtml(age)}${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`;
   return [
     input.locale === 'my'
-      ? '💎 <b>Premium support</b>'
+      ? '💎 <b>Premium အကူအညီ</b>'
       : '💎 <b>Premium support thread</b>',
     '',
     `<b>${escapeHtml(input.request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}`,
@@ -336,12 +336,12 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
               callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
             },
             {
-              text: isMyanmar ? '🧾 Panel' : '🧾 Panel',
+              text: isMyanmar ? '🧾 Panel ဖွင့်မည်' : '🧾 Panel',
               url: input.panelUrl,
             },
           ],
       ...(includeDetail
-        ? [[{ text: isMyanmar ? '🧾 Panel' : '🧾 Panel', url: input.panelUrl }]]
+        ? [[{ text: isMyanmar ? '🧾 Panel ဖွင့်မည်' : '🧾 Panel', url: input.panelUrl }]]
         : []),
     ],
   };
@@ -363,20 +363,20 @@ export function buildTelegramPremiumSupportQueueDetailMessage(input: {
   }).map((line) => escapeHtml(line));
   const routingParts = [
     input.request.requestedRegionCode
-      ? `${input.locale === 'my' ? 'Region' : 'Region'} ${escapeHtml(input.request.requestedRegionCode)}`
+      ? `${input.locale === 'my' ? 'ဒေသ' : 'Region'} ${escapeHtml(input.request.requestedRegionCode)}`
       : '',
     input.request.currentResolvedServerName
-      ? `${input.locale === 'my' ? 'Route' : 'Route'} ${escapeHtml(input.request.currentResolvedServerName)}`
+      ? `${input.locale === 'my' ? 'လမ်းကြောင်း' : 'Route'} ${escapeHtml(input.request.currentResolvedServerName)}`
       : '',
     input.request.appliedPinServerName
-      ? `${input.locale === 'my' ? 'Pin' : 'Pin'} ${escapeHtml(input.request.appliedPinServerName)}`
+      ? `${input.locale === 'my' ? 'ချိတ်ထားသောဆာဗာ' : 'Pin'} ${escapeHtml(input.request.appliedPinServerName)}`
       : '',
   ].filter(Boolean);
   const poolLabel = compactTelegramSupportQueueText(input.request.currentPoolSummary, 72);
   const contextParts = [
-    poolLabel ? `${input.locale === 'my' ? 'Pool' : 'Pool'} ${escapeHtml(poolLabel)}` : '',
+    poolLabel ? `${input.locale === 'my' ? 'လမ်းကြောင်းစု' : 'Pool'} ${escapeHtml(poolLabel)}` : '',
     input.request.linkedOutageServerName
-      ? `${input.locale === 'my' ? 'Incident' : 'Incident'} ${escapeHtml(input.request.linkedOutageServerName)}`
+      ? `${input.locale === 'my' ? 'ဖြစ်ရပ်' : 'Incident'} ${escapeHtml(input.request.linkedOutageServerName)}`
       : '',
   ].filter(Boolean);
   const note = compactTelegramSupportQueueText(

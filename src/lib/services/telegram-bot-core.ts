@@ -1338,7 +1338,7 @@ export function buildTelegramOrderActionKeyboard(input: {
   ) {
     rows.push([
       {
-        text: input.locale === 'my' ? '🧾 Orders' : '🧾 Orders',
+        text: input.locale === 'my' ? '🧾 အော်ဒါများ' : '🧾 Orders',
         callback_data: buildTelegramMenuCallbackData('orders', 'action'),
       },
       ...(input.order.status !== 'PENDING_REVIEW'
@@ -1516,21 +1516,21 @@ export async function buildTelegramOrderStatusReplyMarkup(input: {
   if (input.order.status === 'FULFILLED') {
     rows.push([
       {
-        text: input.locale === 'my' ? '🔁 Resend access' : '🔁 Resend access',
+        text: input.locale === 'my' ? '🔁 Access ကို ပြန်ပို့မည်' : '🔁 Resend access',
         callback_data: buildTelegramOrderActionCallbackData('sh', input.order.id),
       },
       {
-        text: input.locale === 'my' ? '🧾 Resend receipt' : '🧾 Resend receipt',
+        text: input.locale === 'my' ? '🧾 ပြေစာကို ပြန်ပို့မည်' : '🧾 Resend receipt',
         callback_data: buildTelegramOrderActionCallbackData('rc', input.order.id),
       },
     ]);
     rows.push([
       {
-        text: input.locale === 'my' ? '🧾 Orders' : '🧾 Orders',
+        text: input.locale === 'my' ? '🧾 အော်ဒါများ' : '🧾 Orders',
         callback_data: buildTelegramMenuCallbackData('orders', 'completed'),
       },
       {
-        text: input.locale === 'my' ? '🎟 Offers' : '🎟 Offers',
+        text: input.locale === 'my' ? '🎟 Offer များ' : '🎟 Offers',
         callback_data: buildTelegramMenuCallbackData('offers', 'active'),
       },
     ]);
@@ -7941,7 +7941,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Unsupported category' : 'Unsupported category',
+              locale === 'my' ? 'မထောက်ပံ့သော အမျိုးအစား' : 'Unsupported category',
             );
             return null;
           }
@@ -7974,7 +7974,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Support thread not found.' : 'Support thread not found.',
+              locale === 'my' ? 'Support thread ကို မတွေ့ပါ။' : 'Support thread not found.',
             );
             return null;
           }
@@ -8028,7 +8028,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Support thread not found.' : 'Support thread not found.',
+              locale === 'my' ? 'Support thread ကို မတွေ့ပါ။' : 'Support thread not found.',
             );
             return null;
           }
@@ -8063,7 +8063,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Support thread not found.' : 'Support thread not found.',
+              locale === 'my' ? 'Support thread ကို မတွေ့ပါ။' : 'Support thread not found.',
             );
             return null;
           }
@@ -8076,7 +8076,7 @@ export async function handleTelegramCallbackQuery(
             senderName: callbackQuery.from.username || callbackQuery.from.first_name || null,
             message:
               locale === 'my'
-                ? 'Customer requested escalation from Telegram.'
+                ? 'Customer က Telegram မှ escalate တောင်းဆိုထားသည်။'
                 : 'Customer requested escalation from Telegram.',
             waitingOn: 'ADMIN',
             escalate: true,
@@ -8164,7 +8164,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Support thread not found.' : 'Support thread not found.',
+              locale === 'my' ? 'Support thread ကို မတွေ့ပါ။' : 'Support thread not found.',
             );
             return null;
           }
@@ -8201,7 +8201,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Claimed the support thread.' : 'Claimed the support thread.',
+              locale === 'my' ? 'Support thread ကို ယူထားပါပြီ။' : 'Claimed the support thread.',
             );
             return null;
           }
@@ -8215,7 +8215,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Unclaimed the support thread.' : 'Unclaimed the support thread.',
+              locale === 'my' ? 'Support thread ကို ပြန်လွှတ်လိုက်ပါပြီ။' : 'Unclaimed the support thread.',
             );
             return null;
           }
@@ -8241,7 +8241,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Send the reply now.' : 'Send the reply now.',
+              locale === 'my' ? 'ယခု အကြောင်းပြန်ပို့ပါ။' : 'Send the reply now.',
             );
             return null;
           }
@@ -8257,7 +8257,7 @@ export async function handleTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
               locale === 'my'
-                ? 'Escalated the support thread.'
+                ? 'Support thread ကို escalate လုပ်လိုက်ပါပြီ။'
                 : 'Escalated the support thread.',
             );
             return null;
@@ -8276,7 +8276,7 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Handled the support thread.' : 'Handled the support thread.',
+              locale === 'my' ? 'Support thread ကို ဖြေရှင်းပြီးပါပြီ။' : 'Handled the support thread.',
             );
             return null;
           }
@@ -9665,7 +9665,9 @@ export async function handleTelegramCallbackQuery(
             await answerTelegramCallbackQuery(
               config.botToken,
               callbackQuery.id,
-              locale === 'my' ? 'Coupon removed. Restarting checkout…' : 'Coupon removed. Restarting checkout…',
+              locale === 'my'
+                ? 'ကူပွန်ကို ဖယ်ရှားပြီး checkout ကို ပြန်စနေပါပြီ…'
+                : 'Coupon removed. Restarting checkout…',
             );
             return handleBuyCommand(
               chatId,

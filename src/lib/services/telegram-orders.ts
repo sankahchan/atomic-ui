@@ -681,7 +681,7 @@ export async function buildTelegramOrderStatusMessage(input: {
 
   if (order.customerMessage?.trim()) {
     noteLines.push(
-      `${input.locale === 'my' ? 'Order note' : 'Order note'}: ${escapeHtml(
+      `${input.locale === 'my' ? 'အော်ဒါ မှတ်ချက်' : 'Order note'}: ${escapeHtml(
         truncateTelegramOrderDetailText(order.customerMessage),
       )}`,
     );
@@ -689,7 +689,7 @@ export async function buildTelegramOrderStatusMessage(input: {
 
   if (order.refundRequestCustomerMessage?.trim()) {
     noteLines.push(
-      `${input.locale === 'my' ? 'Refund note' : 'Refund note'}: ${escapeHtml(
+      `${input.locale === 'my' ? 'Refund မှတ်ချက်' : 'Refund note'}: ${escapeHtml(
         truncateTelegramOrderDetailText(order.refundRequestCustomerMessage),
       )}`,
     );
