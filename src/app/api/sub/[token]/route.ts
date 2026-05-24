@@ -31,9 +31,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isIP } from 'node:net';
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { generateRandomString } from '@/lib/utils';
+import { consumeRateLimit } from '@/lib/rate-limit';
 import { resolveAccessKeyPublicIdentifier } from '@/lib/access-key-public-identifiers';
 import {
   claimAccessKeyDeviceInstall,
@@ -67,20 +69,54 @@ import {
  * Get client IP address from request headers
  * Checks multiple headers for proxied requests
  */
+function normalizeClientIp(rawIp: string | null | undefined): string | null {
+  if (!rawIp) {
+    return null;
+  }
+
+  let ip = rawIp.trim();
+  if (!ip) {
+    return null;
+  }
+
+  if (ip.startsWith('[') && ip.includes(']')) {
+    ip = ip.slice(1, ip.indexOf(']'));
+  }
+
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.slice(7);
+  }
+
+  const zoneIndex = ip.indexOf('%');
+  if (zoneIndex !== -1) {
+    ip = ip.slice(0, zoneIndex);
+  }
+
+  const ipv4WithPort = ip.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  if (ipv4WithPort) {
+    ip = ipv4WithPort[1];
+  }
+
+  if (ip === '::1') {
+    return '127.0.0.1';
+  }
+
+  return isIP(ip) ? ip : null;
+}
+
 function getClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim();
-  }
+  const candidates = [
+    forwardedFor ? forwardedFor.split(',')[0] : null,
+    request.headers.get('x-real-ip'),
+    request.headers.get('x-client-ip'),
+  ];
 
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp) {
-    return realIp;
-  }
-
-  const clientIp = request.headers.get('x-client-ip');
-  if (clientIp) {
-    return clientIp;
+  for (const candidate of candidates) {
+    const normalizedIp = normalizeClientIp(candidate);
+    if (normalizedIp) {
+      return normalizedIp;
+    }
   }
 
   return '127.0.0.1';
@@ -479,6 +515,26 @@ export async function handleSubscriptionRequest(
       || (platformHeader ? platformHeader.replace(/"/g, '') : null);
     const source = request.nextUrl.searchParams.get('source');
     const deviceToken = request.nextUrl.searchParams.get(DEVICE_INSTALL_QUERY_PARAM);
+
+    const rateLimitKey = `sub-token:${clientIp}`;
+    const budget = consumeRateLimit(rateLimitKey, {
+      limit: 180,
+      windowMs: 60_000,
+      blockMs: 60_000,
+    });
+
+    if (!budget.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        {
+          status: 429,
+          headers: {
+            'Cache-Control': 'no-store',
+            'Retry-After': String(Math.max(1, Math.ceil(budget.retryAfterMs / 1000))),
+          },
+        },
+      );
+    }
 
     // First, try to find a Dynamic Access Key by dynamicUrl
     const foundDynamicKey = await db.dynamicAccessKey.findFirst({
