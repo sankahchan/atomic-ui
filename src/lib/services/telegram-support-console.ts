@@ -303,7 +303,7 @@ export function buildTelegramSupportThreadQueueReplyKeyboard(input: {
         },
       ],
       ...(input.attachmentUrl?.trim()
-        ? [[{ text: isMyanmar ? '🖼 Attachment ဖွင့်ရန်' : '🖼 Open attachment', url: input.attachmentUrl.trim() }]]
+        ? [[{ text: isMyanmar ? '🖼 တွဲဖိုင် ဖွင့်မည်' : '🖼 Open attachment', url: input.attachmentUrl.trim() }]]
         : []),
     ],
   };

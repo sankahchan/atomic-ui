@@ -51,13 +51,13 @@ export function resolveTelegramSupportIssueLabel(
   const isMyanmar = locale === 'my';
   switch (resolveTelegramSupportIssueCategory(category)) {
     case 'ORDER':
-      return isMyanmar ? 'Order / ငွေပေးချေမှု' : 'Order / payment';
+      return isMyanmar ? 'အော်ဒါ / ငွေပေးချေမှု' : 'Order / payment';
     case 'KEY':
-      return isMyanmar ? 'Key / အသုံးပြုမှု' : 'Key / usage';
+      return isMyanmar ? 'သော့ / အသုံးပြုမှု' : 'Key / usage';
     case 'SERVER':
-      return isMyanmar ? 'Server / လမ်းကြောင်း' : 'Server / route issue';
+      return isMyanmar ? 'ဆာဗာ / လမ်းကြောင်း' : 'Server / route issue';
     case 'BILLING':
-      return isMyanmar ? 'ငွေပေးချေမှု / coupon' : 'Billing / coupon';
+      return isMyanmar ? 'ငွေတောင်းခံမှု / coupon' : 'Billing / coupon';
     case 'GENERAL':
     default:
       return isMyanmar ? 'အထွေထွေ အကူအညီ' : 'General help';
@@ -81,19 +81,19 @@ export function resolveTelegramSupportIssuePrompt(
   switch (category) {
     case 'ORDER':
       return isMyanmar
-        ? 'Payment, screenshot, order status, review delay ပြဿနာကို ပို့ပါ။ Order code ရှိပါက ထည့်ပါ။'
+        ? 'ငွေပေးချေမှု၊ screenshot၊ order status သို့ review နောက်ကျမှု ပြဿနာကို ပို့ပါ။ Order code ရှိပါက ထည့်ပါ။'
         : 'Tell us the payment, screenshot, order-status, or review issue. Include the order code if you have it.';
     case 'KEY':
       return isMyanmar
-        ? 'Key, usage, connection, renew, share page ပြဿနာကို ပို့ပါ။ Key name ရှိပါက ထည့်ပါ။'
+        ? 'သော့၊ အသုံးပြုမှု၊ connection၊ renew သို့ share page ပြဿနာကို ပို့ပါ။ Key name ရှိပါက ထည့်ပါ။'
         : 'Tell us the key, usage, connection, renew, or share-page issue. Include the key name if you have it.';
     case 'SERVER':
       return isMyanmar
-        ? 'Server name, route issue, slow connection, region problem ကို ပို့ပါ။'
+        ? 'ဆာဗာအမည်၊ route issue၊ connection နှေးခြင်း သို့ region ပြဿနာကို ပို့ပါ။'
         : 'Tell us the server name, route issue, slow connection, or region problem.';
     case 'BILLING':
       return isMyanmar
-        ? 'Receipt, billing, discount, coupon, payment follow-up ပြဿနာကို ပို့ပါ။'
+        ? 'receipt၊ billing၊ discount၊ coupon သို့ payment follow-up ပြဿနာကို ပို့ပါ။'
         : 'Tell us the receipt, billing, discount, coupon, or payment follow-up issue.';
     case 'GENERAL':
     default:
@@ -116,7 +116,7 @@ export function buildTelegramSupportThreadStartMessage(input: {
   return buildTelegramCommerceMessage({
     title:
       input.locale === 'my'
-        ? '🛟 <b>Support request စတင်ပြီးပါပြီ</b>'
+        ? '🛟 <b>အကူအညီ တောင်းဆိုချက် စတင်ပြီးပါပြီ</b>'
         : '🛟 <b>Support request started</b>',
     statsLine: `🧵 <b>${escapeHtml(input.threadCode)}</b> • ${escapeHtml(
       resolveTelegramSupportIssueLabel(input.issueCategory, input.locale),
@@ -127,7 +127,7 @@ export function buildTelegramSupportThreadStartMessage(input: {
         [
           escapeHtml(prompt),
           input.locale === 'my'
-            ? 'Screenshot သို့ file တစ်ခုကို တစ်ချက်တည်း ပို့နိုင်ပါသည်။'
+            ? 'Screenshot သို့ ဖိုင်တစ်ခုကို တစ်ချက်တည်း ပို့နိုင်ပါသည်။'
             : 'Send one screenshot or file next if it helps.',
         ],
       ),
@@ -184,9 +184,9 @@ export function buildTelegramSupportHubMessage(input: {
   const isMyanmar = input.locale === 'my';
   const quickRouteLines = isMyanmar
     ? [
-        '🧾 Order • payment, proof, review',
-        '🔑 Key • connect, renew, usage',
-        '🛠 Server • route, region, slow',
+        '🧾 အော်ဒါ • ငွေပေးချေမှု၊ အထောက်အထား၊ review',
+        '🔑 သော့ • ချိတ်ဆက်မှု၊ renew၊ အသုံးပြုမှု',
+        '🛠 ဆာဗာ • route၊ region၊ connection နှေးခြင်း',
       ]
     : [
         '🧾 Order • payment, proof, review',
@@ -195,7 +195,7 @@ export function buildTelegramSupportHubMessage(input: {
       ];
   const stats = [
     isMyanmar ? `${input.openThreadCount} ခု ဖွင့်ထား` : `${input.openThreadCount} open`,
-    isMyanmar ? `${input.recentThreadCount} ခု recent` : `${input.recentThreadCount} recent`,
+    isMyanmar ? `${input.recentThreadCount} ခု မကြာသေးမီက` : `${input.recentThreadCount} recent`,
     input.premiumRequestCount > 0
       ? isMyanmar
         ? `${input.premiumRequestCount} ခု premium`
@@ -236,7 +236,7 @@ export function buildTelegramSupportHubMessage(input: {
   if (input.latestPremiumRequest) {
     cards.push(
       buildTelegramCommerceCard(
-        isMyanmar ? '💎 <b>နောက်ဆုံး premium request</b>' : '💎 <b>Latest premium request</b>',
+        isMyanmar ? '💎 <b>နောက်ဆုံး premium တောင်းဆိုချက်</b>' : '💎 <b>Latest premium request</b>',
         [
           [`<b>${escapeHtml(input.latestPremiumRequest.requestCode)}</b>`, input.latestPremiumRequest.keyName ? escapeHtml(input.latestPremiumRequest.keyName) : null]
             .filter(Boolean)
@@ -262,7 +262,7 @@ export function buildTelegramSupportHubMessage(input: {
     footerLines: input.supportLinkConfigured
       ? [
           isMyanmar
-            ? 'Category တစ်ခုကို စတင်ပါ သို့မဟုတ် ဖွင့်ထားသော thread ကို ပြန်ဖွင့်ပါ။'
+            ? 'အောက်က အမျိုးအစားတစ်ခုကို စတင်ပါ သို့မဟုတ် ဖွင့်ထားသော thread ကို ပြန်ဖွင့်ပါ။'
             : 'Start a category or reopen an open thread below.',
         ]
       : [getTelegramUi(input.locale).noSupportLink],
@@ -352,21 +352,21 @@ export function buildTelegramSupportHubKeyboard(input: {
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
     [
       {
-        text: isMyanmar ? '🧾 Order / ငွေပေးချေမှု' : '🧾 Order / payment',
+        text: isMyanmar ? '🧾 အော်ဒါ / ငွေပေးချေမှု' : '🧾 Order / payment',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'order'),
       },
       {
-        text: isMyanmar ? '🔑 Key / အသုံးပြုမှု' : '🔑 Key / usage',
+        text: isMyanmar ? '🔑 သော့ / အသုံးပြုမှု' : '🔑 Key / usage',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'key'),
       },
     ],
     [
       {
-        text: isMyanmar ? '🛠 Server / လမ်းကြောင်း' : '🛠 Server / route',
+        text: isMyanmar ? '🛠 ဆာဗာ / လမ်းကြောင်း' : '🛠 Server / route',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'server'),
       },
       {
-        text: isMyanmar ? '💳 ငွေပေးချေမှု / coupon' : '💳 Billing / coupon',
+        text: isMyanmar ? '💳 ငွေတောင်းခံမှု / coupon' : '💳 Billing / coupon',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'billing'),
       },
     ],
@@ -390,7 +390,7 @@ export function buildTelegramSupportHubKeyboard(input: {
             callback_data: buildTelegramMenuCallbackData('support', 'keys'),
           },
           {
-            text: isMyanmar ? '💎 Premium' : '💎 Premium help',
+            text: isMyanmar ? '💎 Premium အကူအညီ' : '💎 Premium help',
             callback_data: buildTelegramMenuCallbackData('support', 'premium'),
           },
         ]
@@ -400,7 +400,7 @@ export function buildTelegramSupportHubKeyboard(input: {
             callback_data: buildTelegramMenuCallbackData('support', 'keys'),
           },
           {
-            text: isMyanmar ? '📬 Inbox' : '📬 Inbox',
+            text: isMyanmar ? '📬 ဝင်စာ' : '📬 Inbox',
             callback_data: buildTelegramMenuCallbackData('support', 'inbox'),
           },
         ],
@@ -445,7 +445,7 @@ export function buildTelegramSupportThreadKeyboard(input: {
 
   rows.push([
     {
-      text: isMyanmar ? '🛟 Support hub' : '🛟 Support hub',
+      text: isMyanmar ? '🛟 အကူအညီ စင်တာ' : '🛟 Support hub',
       callback_data: buildTelegramMenuCallbackData('support', 'home'),
     },
     {
@@ -457,14 +457,14 @@ export function buildTelegramSupportThreadKeyboard(input: {
   if (input.attachmentUrl?.trim()) {
     rows.push([
       {
-        text: isMyanmar ? '🖼 Attachment ဖွင့်ရန်' : '🖼 Open attachment',
+        text: isMyanmar ? '🖼 တွဲဖိုင် ဖွင့်မည်' : '🖼 Open attachment',
         url: input.attachmentUrl.trim(),
       },
     ]);
   }
 
   if (input.supportLink) {
-    rows.push([{ text: isMyanmar ? '🔗 Admin link' : '🔗 Direct admin link', url: input.supportLink }]);
+    rows.push([{ text: isMyanmar ? '🔗 တိုက်ရိုက် admin link' : '🔗 Direct admin link', url: input.supportLink }]);
   }
 
   return { inline_keyboard: rows };
@@ -648,7 +648,14 @@ export function buildTelegramSupportThreadStatusMessage(input: {
           formatTelegramDateTime(input.thread.escalatedAt, input.locale),
         )}`
       : null,
-    [input.thread.relatedOrderCode ? `Order: <b>${escapeHtml(input.thread.relatedOrderCode)}</b>` : null, input.thread.relatedKeyName ? `Key: <b>${escapeHtml(input.thread.relatedKeyName)}</b>` : null]
+    [
+      input.thread.relatedOrderCode
+        ? `${input.locale === 'my' ? 'အော်ဒါ' : 'Order'}: <b>${escapeHtml(input.thread.relatedOrderCode)}</b>`
+        : null,
+      input.thread.relatedKeyName
+        ? `${input.locale === 'my' ? 'သော့' : 'Key'}: <b>${escapeHtml(input.thread.relatedKeyName)}</b>`
+        : null,
+    ]
       .filter(Boolean)
       .join(' • ') || null,
   ];
@@ -721,13 +728,13 @@ export function buildTelegramSupportTriageMessage(input: { locale: SupportedLoca
   const isMyanmar = input.locale === 'my';
   return buildTelegramCommerceMessage({
     title: isMyanmar ? '🛟 <b>အကူအညီ စင်တာ</b>' : '🛟 <b>Support center</b>',
-    statsLine: isMyanmar ? 'Payment, key, နှင့် server အကူအညီ' : 'Fast help for payments, keys, and server issues',
+    statsLine: isMyanmar ? 'ငွေပေးချေမှု၊ သော့ နှင့် ဆာဗာ အကူအညီ' : 'Fast help for payments, keys, and server issues',
     cards: [
       buildTelegramCommerceCard(
         isMyanmar ? '🧭 <b>စတင်ရန်</b>' : '🧭 <b>Start here</b>',
         [
           isMyanmar
-            ? 'အောက်က category ကို ရွေးပြီး thread တစ်ခု စတင်ပါ။'
+            ? 'အောက်က အမျိုးအစားကို ရွေးပြီး thread တစ်ခု စတင်ပါ။'
             : 'Pick a category below to start a thread.',
           isMyanmar
             ? 'လိုအပ်ပါက screenshot သို့ file တစ်ခုကို နောက်တစ်ချက် ပို့နိုင်ပါသည်။'
@@ -748,27 +755,27 @@ export function buildTelegramSupportTriageKeyboard(input: { locale: SupportedLoc
   const rows = [
     [
       {
-        text: isMyanmar ? '💳 Payment' : '💳 Payment',
+        text: isMyanmar ? '💳 ငွေပေးချေမှု' : '💳 Payment',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'order'),
       },
       {
-        text: isMyanmar ? '🔑 Key' : '🔑 Key',
+        text: isMyanmar ? '🔑 သော့' : '🔑 Key',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'key'),
       },
     ],
     [
       {
-        text: isMyanmar ? '🖥 Server' : '🖥 Server',
+        text: isMyanmar ? '🖥 ဆာဗာ' : '🖥 Server',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'server'),
       },
       {
-        text: isMyanmar ? '❓ Other' : '❓ Other',
+        text: isMyanmar ? '❓ အခြား' : '❓ Other',
         callback_data: buildTelegramSupportThreadCallbackData('new', 'general'),
       },
     ],
     [
       {
-        text: isMyanmar ? '🧵 My Threads' : '🧵 My Threads',
+        text: isMyanmar ? '🧵 ကျွန်ုပ်၏ thread များ' : '🧵 My Threads',
         callback_data: buildTelegramSupportThreadCallbackData('status', 'list'),
       },
     ],
