@@ -2433,7 +2433,7 @@ function LoginProtectionCard() {
                         <CardContent className="space-y-4 px-0 pb-0">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="ops-detail-card">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'Jail' : 'Jail'}</p>
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'jail' : 'Jail'}</p>
                                     <p className="mt-2 font-semibold">{overview.fail2banStatus.jail}</p>
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         {overview.fail2banStatus.available
@@ -2714,7 +2714,7 @@ function LoginProtectionCard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>{isMyanmar ? 'Reputation' : 'Reputation'}</Label>
+                                        <Label>{isMyanmar ? 'ဂုဏ်သတင်း' : 'Reputation'}</Label>
                                         <Select
                                             value={incidentFilters.reputation}
                                             onValueChange={(value) =>

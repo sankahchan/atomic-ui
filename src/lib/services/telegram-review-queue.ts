@@ -202,7 +202,7 @@ export function buildTelegramReviewQueueSummaryKeyboard(input: {
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue_unclaimed'),
         },
         {
-          text: isMyanmar ? '🛟 Support queue' : '🛟 Support queue',
+          text: isMyanmar ? '🛟 အကူအညီ queue' : '🛟 Support queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
         },
         {
@@ -255,11 +255,11 @@ export function buildTelegramReviewQueueSummaryMessage(input: {
     : '';
 
   return [
-    '📋 <b>Review queue</b>',
+    isMyanmar ? '📋 <b>စစ်ဆေးရန် queue</b>' : '📋 <b>Review queue</b>',
     '',
     modeLabel,
     isMyanmar
-      ? `${input.totalPending} ခု pending • ${input.unclaimed} ခု မယူရသေး • ${input.mine} ခု ကိုယ်ပိုင်`
+      ? `${input.totalPending} ခု စောင့်နေ • ${input.unclaimed} ခု မယူရသေး • ${input.mine} ခု ကိုယ်ပိုင်`
       : `${input.totalPending} pending • ${input.unclaimed} unclaimed • ${input.mine} mine`,
     duplicateLabel,
     '',
@@ -371,7 +371,7 @@ export function buildTelegramOrderReviewDetailMessage(input: {
     serverParts.length > 0 ? `🖥 ${serverParts.join(' • ')}` : '',
     submittedAtLine,
     input.renewalTargetLabel
-      ? `${isMyanmar ? '🔁 Renew target' : '🔁 Renew target'}: <b>${escapeHtml(input.renewalTargetLabel)}</b>`
+      ? `${isMyanmar ? '🔁 သက်တမ်းတိုးမည့် key' : '🔁 Renew target'}: <b>${escapeHtml(input.renewalTargetLabel)}</b>`
       : '',
     order.giftRecipientLabel
       ? `${isMyanmar ? '🎁 လက်ခံသူ' : '🎁 Recipient'}: <b>${escapeHtml(order.giftRecipientLabel)}</b>`

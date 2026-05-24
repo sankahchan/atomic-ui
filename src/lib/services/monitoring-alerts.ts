@@ -291,8 +291,8 @@ export function buildBackupVerificationFailureAlertMessage(input: {
   for (const failure of input.failures.slice(0, 3)) {
     lines.push(
       `📦 <b>${escapeHtml(failure.filename)}</b>`,
-      `${isMyanmar ? 'Ready' : 'Ready'}: <b>${failure.restoreReady ? (isMyanmar ? 'Yes' : 'Yes') : (isMyanmar ? 'No' : 'No')}</b> • ${escapeHtml(formatTelegramDateTime(failure.verifiedAt || new Date(), input.locale))}`,
-      `${isMyanmar ? 'Error' : 'Error'}: ${escapeHtml(failure.error || (isMyanmar ? 'Unknown verification failure' : 'Unknown verification failure'))}`,
+      `${isMyanmar ? 'အဆင်သင့်' : 'Ready'}: <b>${failure.restoreReady ? (isMyanmar ? 'ဟုတ်' : 'Yes') : (isMyanmar ? 'မဟုတ်' : 'No')}</b> • ${escapeHtml(formatTelegramDateTime(failure.verifiedAt || new Date(), input.locale))}`,
+      `${isMyanmar ? 'အမှား' : 'Error'}: ${escapeHtml(failure.error || (isMyanmar ? 'မသိသော အတည်ပြုမှု မအောင်မြင်ခြင်း' : 'Unknown verification failure'))}`,
     );
   }
 
@@ -320,25 +320,25 @@ export function buildTelegramWebhookHealthAlertMessage(input: {
   const isMyanmar = input.locale === 'my';
   const lines = [
     isMyanmar
-      ? '🚨 <b>Telegram webhook health issue</b>'
+      ? '🚨 <b>Telegram webhook ကျန်းမာရေး ပြဿနာ</b>'
       : '🚨 <b>Telegram webhook health issue</b>',
-    `${isMyanmar ? 'Issue' : 'Issue'}: <b>${escapeHtml(input.issue.summary || (isMyanmar ? 'Unknown issue' : 'Unknown issue'))}</b>`,
-    `${isMyanmar ? 'Expected' : 'Expected'}: <code>${escapeHtml(compactWebhookUrl(input.issue.expectedWebhookUrl, isMyanmar ? 'Not configured' : 'Not configured'))}</code>`,
-    `${isMyanmar ? 'Current' : 'Current'}: <code>${escapeHtml(compactWebhookUrl(input.issue.currentWebhookUrl, isMyanmar ? 'Not set' : 'Not set'))}</code>`,
-    `${isMyanmar ? 'Pending updates' : 'Pending updates'}: <b>${escapeHtml(String(input.issue.pendingUpdateCount))}</b>`,
+    `${isMyanmar ? 'ပြဿနာ' : 'Issue'}: <b>${escapeHtml(input.issue.summary || (isMyanmar ? 'မသိသော ပြဿနာ' : 'Unknown issue'))}</b>`,
+    `${isMyanmar ? 'မျှော်မှန်းထားသည်' : 'Expected'}: <code>${escapeHtml(compactWebhookUrl(input.issue.expectedWebhookUrl, isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Not configured'))}</code>`,
+    `${isMyanmar ? 'လက်ရှိ' : 'Current'}: <code>${escapeHtml(compactWebhookUrl(input.issue.currentWebhookUrl, isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Not set'))}</code>`,
+    `${isMyanmar ? 'စောင့်နေသော update များ' : 'Pending updates'}: <b>${escapeHtml(String(input.issue.pendingUpdateCount))}</b>`,
   ];
 
   if (input.issue.lastErrorMessage || input.issue.lastErrorAt) {
     const lastErrorParts = [
       input.issue.lastErrorMessage
         ? escapeHtml(input.issue.lastErrorMessage)
-        : (isMyanmar ? 'Unknown delivery error' : 'Unknown delivery error'),
+        : (isMyanmar ? 'မသိသော ပို့ဆောင်မှု အမှား' : 'Unknown delivery error'),
       input.issue.lastErrorAt
         ? escapeHtml(formatTelegramDateTime(input.issue.lastErrorAt, input.locale))
         : null,
     ].filter(Boolean);
     lines.push(
-      `${isMyanmar ? 'Last error' : 'Last error'}: ${lastErrorParts.join(' • ')}`,
+      `${isMyanmar ? 'နောက်ဆုံး အမှား' : 'Last error'}: ${lastErrorParts.join(' • ')}`,
     );
   }
 
@@ -365,31 +365,31 @@ export function buildAdminQueueHealthAlertMessage(input: {
   const isMyanmar = input.locale === 'my';
   const lines = [
     isMyanmar
-      ? '🚨 <b>Admin queue aging</b>'
+      ? '🚨 <b>Admin queue ကြန့်ကြာမှု</b>'
       : '🚨 <b>Admin queue aging</b>',
   ];
 
   if (input.supportOverdueCount > 0) {
     lines.push(
-      `${isMyanmar ? 'Support overdue' : 'Support overdue'}: <b>${escapeHtml(String(input.supportOverdueCount))}</b>${input.oldestSupportOverdueMinutes !== null ? ` • <b>${escapeHtml(formatDurationMinutes(input.oldestSupportOverdueMinutes, input.locale))}</b> ${isMyanmar ? 'ကျော်နေ' : 'oldest overdue'}` : ''}`,
+      `${isMyanmar ? 'အကူအညီ နောက်ကျနေသည်' : 'Support overdue'}: <b>${escapeHtml(String(input.supportOverdueCount))}</b>${input.oldestSupportOverdueMinutes !== null ? ` • <b>${escapeHtml(formatDurationMinutes(input.oldestSupportOverdueMinutes, input.locale))}</b> ${isMyanmar ? 'ကျော်နေ' : 'oldest overdue'}` : ''}`,
     );
     if (input.supportThreadCodes.length > 0) {
       lines.push(
-        `${isMyanmar ? 'Threads' : 'Threads'}: <code>${escapeHtml(input.supportThreadCodes.join(', '))}</code>`,
+        `${isMyanmar ? 'thread များ' : 'Threads'}: <code>${escapeHtml(input.supportThreadCodes.join(', '))}</code>`,
       );
     }
   }
 
   if (input.pendingReviewCount > 0) {
     lines.push(
-      `${isMyanmar ? 'Review pending' : 'Review pending'}: <b>${escapeHtml(String(input.pendingReviewCount))}</b>${input.oldestReviewAgeMinutes !== null ? ` • <b>${escapeHtml(formatDurationMinutes(input.oldestReviewAgeMinutes, input.locale))}</b> ${isMyanmar ? 'စောင့်နေ' : 'oldest waiting'}` : ''}`,
+      `${isMyanmar ? 'review စောင့်နေသည်' : 'Review pending'}: <b>${escapeHtml(String(input.pendingReviewCount))}</b>${input.oldestReviewAgeMinutes !== null ? ` • <b>${escapeHtml(formatDurationMinutes(input.oldestReviewAgeMinutes, input.locale))}</b> ${isMyanmar ? 'စောင့်နေ' : 'oldest waiting'}` : ''}`,
     );
     lines.push(
-      `${isMyanmar ? 'Unclaimed' : 'Unclaimed'}: <b>${escapeHtml(String(input.unclaimedReviewCount))}</b>`,
+      `${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}: <b>${escapeHtml(String(input.unclaimedReviewCount))}</b>`,
     );
     if (input.reviewOrderCodes.length > 0) {
       lines.push(
-        `${isMyanmar ? 'Orders' : 'Orders'}: <code>${escapeHtml(input.reviewOrderCodes.join(', '))}</code>`,
+        `${isMyanmar ? 'အော်ဒါများ' : 'Orders'}: <code>${escapeHtml(input.reviewOrderCodes.join(', '))}</code>`,
       );
     }
   }

@@ -581,7 +581,7 @@ export default function DeployServerPage() {
                         <Input id="deploy-name" value={name} onChange={(e) => setName(e.target.value)} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="deploy-region">{isMyanmar ? 'Region' : 'Region'}</Label>
+                        <Label htmlFor="deploy-region">{isMyanmar ? 'region' : 'Region'}</Label>
                         <Select value={region} onValueChange={setRegion}>
                           <SelectTrigger id="deploy-region">
                             <SelectValue placeholder={isMyanmar ? 'region ကို ရွေးပါ' : 'Select a region'} />
@@ -650,11 +650,11 @@ export default function DeployServerPage() {
                 </div>
                 <div className="grid gap-3">
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Hostname' : 'Hostname'}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'host အမည်' : 'Hostname'}</p>
                     <p className="mt-2 text-sm font-medium">{name || (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
                   </div>
                   <div className="ops-mini-tile">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Region' : 'Region'}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'region' : 'Region'}</p>
                     <p className="mt-2 text-sm font-medium">{selectedRegion?.name ?? (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
                     {selectedRegion ? <p className="mt-1 text-xs text-muted-foreground">{selectedRegion.slug}</p> : null}
                   </div>
@@ -773,7 +773,7 @@ export default function DeployServerPage() {
                       <p className="mt-2 text-sm font-medium">{activeRun.attemptCount}</p>
                     </div>
                     <div className="ops-mini-tile">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Droplet ID' : 'Droplet ID'}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Droplet အိုင်ဒီ' : 'Droplet ID'}</p>
                       <p className="mt-2 text-sm font-medium">{activeRun.dropletId ? `#${activeRun.dropletId}` : (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Pending')}</p>
                     </div>
                   </div>

@@ -89,9 +89,9 @@ function compactTelegramRefundText(value?: string | null, maxLength = 96) {
 function formatTelegramRefundKindLabel(order: TelegramRefundQueueOrder, locale: SupportedLocale) {
   const isMyanmar = locale === 'my';
   if (order.kind === 'RENEW') {
-    return isMyanmar ? 'Renewal' : 'Renewal';
+    return isMyanmar ? 'သက်တမ်းတိုး' : 'Renewal';
   }
-  return isMyanmar ? 'New order' : 'New order';
+  return isMyanmar ? 'အော်ဒါအသစ်' : 'New order';
 }
 
 function buildTelegramRefundCustomerSummary(order: TelegramRefundQueueOrder) {
@@ -137,7 +137,7 @@ export function buildTelegramRefundQueueSummaryKeyboard(input: {
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
         },
         {
-          text: isMyanmar ? '💼 Finance' : '💼 Finance',
+          text: isMyanmar ? '💼 ငွေစာရင်း' : '💼 Finance',
           callback_data: buildTelegramMenuCallbackData('admin', 'finance'),
         },
       ],
@@ -230,7 +230,7 @@ export function buildTelegramRefundQueueCardKeyboard(input: {
               callback_data: buildTelegramAdminRefundCallbackData('next', input.orderId),
             },
             {
-              text: isMyanmar ? '💼 Finance' : '💼 Finance',
+              text: isMyanmar ? '💼 ငွေစာရင်း' : '💼 Finance',
               callback_data: buildTelegramMenuCallbackData('admin', 'finance'),
             },
           ]
@@ -240,7 +240,7 @@ export function buildTelegramRefundQueueCardKeyboard(input: {
               url: input.panelUrl,
             },
             {
-              text: isMyanmar ? '💼 Finance' : '💼 Finance',
+              text: isMyanmar ? '💼 ငွေစာရင်း' : '💼 Finance',
               callback_data: buildTelegramMenuCallbackData('admin', 'finance'),
             },
           ],
@@ -268,7 +268,7 @@ export function buildTelegramRefundQueueDetailMessage(input: {
     `📦 ${escapeHtml(formatTelegramRefundKindLabel(order, locale))}${order.planName ? ` • ${escapeHtml(order.planName)}` : ''}`,
     [
       order.paymentMethodLabel ? `💳 ${escapeHtml(order.paymentMethodLabel)}` : '',
-      order.financeStatus ? `${isMyanmar ? 'Finance' : 'Finance'} ${escapeHtml(order.financeStatus)}` : '',
+      order.financeStatus ? `${isMyanmar ? 'ငွေစာရင်း' : 'Finance'} ${escapeHtml(order.financeStatus)}` : '',
     ].filter(Boolean).join(' • '),
     order.refundRequestedAt
       ? `🕒 ${escapeHtml(formatTelegramDateTime(order.refundRequestedAt, locale))}`

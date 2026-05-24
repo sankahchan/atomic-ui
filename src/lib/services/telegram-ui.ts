@@ -51,7 +51,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     seasonPlans: isMyanmar ? 'Season အစီအစဉ်များ' : 'Season Plans',
     dynamicPlans: isMyanmar ? 'Dynamic အစီအစဉ်များ' : 'Dynamic Plans',
     trialPlans: isMyanmar ? 'Trial အစီအစဉ်များ' : 'Trial Plans',
-    serverSwitches: isMyanmar ? 'Server ပြောင်းလဲခွင့်' : 'Server switch limit',
+    serverSwitches: isMyanmar ? 'ဆာဗာ ပြောင်းခွင့်' : 'Server switch limit',
     serverSwitchesHint: isMyanmar ? 'User က server ဘယ်နှစ်ကြိမ်ပြောင်းခွင့်ရှိသလဲ။ (-1 ဆိုလျှင် အကန့်အသတ်မရှိ)' : 'Number of times the user can switch servers. (-1 for unlimited)',
     badge: isMyanmar ? 'တံဆိပ်' : 'Badge',
     badgeHint: isMyanmar ? 'Telegram plan card တွင် ပြမည့် badge' : 'Badge to display on the plan card in Telegram.',
@@ -70,7 +70,7 @@ export function getTelegramUi(locale: SupportedLocale) {
       isMyanmar ? `${days} ရက်ခန့် ကျန်သည် (${date})` : `${days} day(s) left (${date})`,
     openSharePage: isMyanmar ? 'Share Page ဖွင့်မည်' : 'Open Share Page',
     openSubscriptionUrl: isMyanmar ? 'Subscription URL ဖွင့်မည်' : 'Open Subscription URL',
-    openClientEndpoint: isMyanmar ? 'Client Endpoint ဖွင့်မည်' : 'Open Client Endpoint',
+    openClientEndpoint: isMyanmar ? 'ကလိုင်းယင့် endpoint ဖွင့်မည်' : 'Open Client Endpoint',
     getSupport: isMyanmar ? 'အကူအညီ' : 'Support',
     premiumLabel: isMyanmar ? 'Premium ပြောင်းလဲသတ်မှတ်သော့' : 'Premium dynamic key',
     premiumStableLink: isMyanmar
@@ -426,15 +426,15 @@ export function getTelegramUi(locale: SupportedLocale) {
     expirationLabel: isMyanmar ? 'သက်တမ်းကုန်ချိန်' : 'Expiration',
     quotaLabel: isMyanmar ? 'အသုံးပြုခွင့်ပမာဏ' : 'Quota',
     sharePageLabel: isMyanmar ? 'မျှဝေစာမျက်နှာ' : 'Share page',
-    subscriptionUrlLabel: isMyanmar ? 'Subscription URL' : 'Subscription URL',
-    clientEndpointLabel: isMyanmar ? 'Client endpoint' : 'Client endpoint',
-    outlineClientUrlLabel: isMyanmar ? 'Outline client URL' : 'Outline client URL',
+    subscriptionUrlLabel: isMyanmar ? 'subscription URL' : 'Subscription URL',
+    clientEndpointLabel: isMyanmar ? 'ကလိုင်းယင့် endpoint' : 'Client endpoint',
+    outlineClientUrlLabel: isMyanmar ? 'Outline ကလိုင်းယင့် URL' : 'Outline client URL',
     modeLabel: isMyanmar ? 'မုဒ်' : 'Mode',
     backendsLabel: isMyanmar ? 'Backend များ' : 'Backends',
     coverageLabel: isMyanmar ? 'လွှမ်းခြုံမှု' : 'Coverage',
-    idLabel: isMyanmar ? 'ID' : 'ID',
+    idLabel: isMyanmar ? 'အိုင်ဒီ' : 'ID',
     emailLabel: isMyanmar ? 'အီးမေးလ်' : 'Email',
-    telegramIdLabel: isMyanmar ? 'Telegram ID' : 'Telegram ID',
+    telegramIdLabel: isMyanmar ? 'Telegram အိုင်ဒီ' : 'Telegram ID',
     requesterLabel: isMyanmar ? 'တောင်းဆိုသူ' : 'Requester',
     serversTitle: isMyanmar ? '🖥 <b>သင့် server များ</b>' : '🖥 <b>Your servers</b>',
     serverChangeTitle: isMyanmar ? '🛠 <b>Server ပြောင်းရန် key ရွေးပါ</b>' : '🛠 <b>Choose a key for server replacement</b>',
@@ -881,11 +881,11 @@ export function getTelegramUi(locale: SupportedLocale) {
     latestOrderHint: isMyanmar ? 'နောက်ဆုံး order ကို ပြထားပါသည်။' : 'Showing the latest order.',
     orderTimelineTitle: isMyanmar ? 'အချိန်လိုက် မှတ်တမ်း' : 'Timeline',
     orderNextStepLabel: isMyanmar ? 'နောက်တစ်ဆင့်' : 'Next step',
-    orderTimelineCreated: isMyanmar ? 'Order စတင်' : 'Order created',
-    orderTimelinePaymentStage: isMyanmar ? 'Payment အဆင့် ဖွင့်ပြီး' : 'Payment step opened',
-    orderTimelineProofSubmitted: isMyanmar ? 'Proof ပို့ပြီး' : 'Proof submitted',
+    orderTimelineCreated: isMyanmar ? 'အော်ဒါ စတင်' : 'Order created',
+    orderTimelinePaymentStage: isMyanmar ? 'ငွေပေးချေမှု အဆင့် ဖွင့်ပြီး' : 'Payment step opened',
+    orderTimelineProofSubmitted: isMyanmar ? 'အထောက်အထား ပို့ပြီး' : 'Proof submitted',
     orderTimelineReviewed: isMyanmar ? 'Admin စစ်ပြီး' : 'Admin reviewed',
-    orderTimelineFulfilled: isMyanmar ? 'Access ပို့ပြီး' : 'Access delivered',
+    orderTimelineFulfilled: isMyanmar ? 'access ပို့ပြီး' : 'Access delivered',
     orderTimelineRejected: isMyanmar ? 'Order ပယ်လိုက်သည်' : 'Order rejected',
     orderTimelineCancelled: isMyanmar ? 'Order ပယ်ဖျက်သည်' : 'Order cancelled',
     orderNextChooseKey: isMyanmar ? 'Renew လုပ်မည့် key ကို ရွေးပါ။' : 'Choose which key you want to renew.',
@@ -901,10 +901,10 @@ export function getTelegramUi(locale: SupportedLocale) {
     orderStatusAwaitingKeySelection: isMyanmar ? 'Key ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting key selection',
     orderStatusAwaitingPlan: isMyanmar ? 'Plan ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting plan selection',
     orderStatusAwaitingMonths: isMyanmar ? 'လအရေအတွက် စောင့်နေသည်' : 'Awaiting month count',
-    orderStatusAwaitingServerSelection: isMyanmar ? 'Server ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting server selection',
-    orderStatusAwaitingKeyName: isMyanmar ? 'Key အမည် စောင့်နေသည်' : 'Awaiting key name',
-    orderStatusAwaitingPaymentMethod: isMyanmar ? 'Payment method ရွေးရန် စောင့်နေသည်' : 'Awaiting payment method',
-    orderStatusAwaitingPaymentProof: isMyanmar ? 'Payment proof စောင့်နေသည်' : 'Awaiting payment proof',
+    orderStatusAwaitingServerSelection: isMyanmar ? 'ဆာဗာ ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting server selection',
+    orderStatusAwaitingKeyName: isMyanmar ? 'သော့အမည် စောင့်နေသည်' : 'Awaiting key name',
+    orderStatusAwaitingPaymentMethod: isMyanmar ? 'ငွေပေးချေမှု နည်းလမ်း ရွေးရန် စောင့်နေသည်' : 'Awaiting payment method',
+    orderStatusAwaitingPaymentProof: isMyanmar ? 'ငွေပေးချေမှု အထောက်အထား စောင့်နေသည်' : 'Awaiting payment proof',
     orderStatusPendingReview: isMyanmar ? 'Admin စစ်ဆေးရန် စောင့်နေသည်' : 'Pending review',
     orderStatusApproved: isMyanmar ? 'အတည်ပြုထားပြီး ဖြစ်သည်' : 'Approved',
     orderStatusFulfilled: isMyanmar ? 'ပြီးစီးထားသည်' : 'Fulfilled',
@@ -926,7 +926,7 @@ export function getTelegramUi(locale: SupportedLocale) {
         : `📷 ${label} QR / payment account image`,
     serverAutoSelect: isMyanmar ? 'အကောင်းဆုံး server ကို အလိုအလျောက် ရွေးမည်' : 'Auto-select the best server',
     adminNote: isMyanmar ? 'စီမံခန့်ခွဲသူ မှတ်ချက်' : 'Admin note',
-    statusNoServers: isMyanmar ? '❌ Server မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
+    statusNoServers: isMyanmar ? '❌ ဆာဗာ မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
     statusTitle: isMyanmar ? '🖥️ <b>Server အခြေအနေ</b>\n\n' : '🖥️ <b>Server Status</b>\n\n',
     statusLabel: isMyanmar ? 'အခြေအနေ' : 'Status',
     latencyLabel: isMyanmar ? 'တုံ့ပြန်ချိန်' : 'Latency',
@@ -952,7 +952,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     resendSuccess: (name: string) => isMyanmar ? `📨 <b>${name}</b> အတွက် share page ကို ပြန်ပို့ပြီးပါပြီ။` : `📨 Resent the share page for <b>${name}</b>.`,
     sysinfoGathering: isMyanmar ? '🔄 System information စုဆောင်းနေပါသည်...' : '🔄 Gathering system information...',
     sysinfoTitle: isMyanmar ? '<b>စနစ်အချက်အလက်</b> 🖥️' : '<b>System Information</b> 🖥️',
-    sysinfoOs: isMyanmar ? 'OS' : 'OS',
+    sysinfoOs: isMyanmar ? 'စနစ်' : 'OS',
     sysinfoCpu: isMyanmar ? 'CPU အသုံးပြုမှု' : 'CPU Load',
     sysinfoMemory: isMyanmar ? 'မှတ်ဉာဏ်' : 'Memory',
     sysinfoDisk: isMyanmar ? 'သိုလှောင်မှု' : 'Disk',
@@ -1253,10 +1253,10 @@ export function buildTelegramLatestReplyPreviewLines(input: {
     lines.push(
       input.reply.mediaKind === 'IMAGE'
         ? input.locale === 'my'
-          ? 'တွဲဖိုင်: Image'
+          ? 'တွဲဖိုင်: ပုံ'
           : 'Attachment: Image'
         : input.locale === 'my'
-          ? `တွဲဖိုင်: ${input.reply.mediaFilename || 'File'}`
+          ? `တွဲဖိုင်: ${input.reply.mediaFilename || 'ဖိုင်'}`
           : `Attachment: ${input.reply.mediaFilename || 'File'}`,
     );
   }
