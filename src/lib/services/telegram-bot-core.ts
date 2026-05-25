@@ -8006,6 +8006,8 @@ export async function handleTelegramCallbackQuery(
                 threadId: thread.id,
                 supportLink: await getTelegramSupportLink(),
                 attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
+                threadStatus: thread.status,
+                waitingOn: 'USER',
               }),
             },
           );
@@ -8057,6 +8059,8 @@ export async function handleTelegramCallbackQuery(
                 supportLink: await getTelegramSupportLink(),
                 includeEscalate: thread.status !== 'ESCALATED',
                 attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
+                threadStatus: thread.status,
+                waitingOn: thread.waitingOn,
               }),
             },
           );
@@ -8109,6 +8113,8 @@ export async function handleTelegramCallbackQuery(
                 supportLink: await getTelegramSupportLink(),
                 includeEscalate: false,
                 attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
+                threadStatus: 'ESCALATED',
+                waitingOn: 'ADMIN',
               }),
             },
           );
