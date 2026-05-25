@@ -162,7 +162,7 @@ function EditServerDialog({
                 <DialogSectionTitle>{isMyanmar ? 'ဆာဗာ အချက်အလက်' : 'Server identity'}</DialogSectionTitle>
                 <DialogSectionDescription>
                   {isMyanmar
-                    ? 'လမ်းကြောင်းညွှန်မှု၊ health စောင့်ကြည့်မှုနှင့် report မျက်နှာပြင်များတွင် အသုံးပြုသော အမည်၊ တည်နေရာနှင့် tag များကို ပြင်ဆင်ပါ။'
+                    ? 'လမ်းကြောင်းညွှန်မှု၊ ကျန်းမာရေး စောင့်ကြည့်မှုနှင့် အစီရင်ခံစာ မျက်နှာပြင်များတွင် အသုံးပြုသော အမည်၊ တည်နေရာနှင့် တဂ်များကို ပြင်ဆင်ပါ။'
                     : 'Update the name, location, and display tags used across routing, health, and reporting views.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
@@ -213,7 +213,7 @@ function EditServerDialog({
                   <DialogSectionTitle>{t('server_details.edit.tags')}</DialogSectionTitle>
                   <DialogSectionDescription>
                     {isMyanmar
-                      ? 'ဤ server ကို routing သို့မဟုတ် reporting အဖွဲ့များထဲတွင် မည်သည့်နေရာတွင် ပြသမည်ကို သတ်မှတ်ပါ။'
+                      ? 'ဤဆာဗာကို လမ်းကြောင်းညွှန်မှု သို့မဟုတ် အစီရင်ခံစာ အဖွဲ့များထဲတွင် မည်သည့်နေရာတွင် ပြသမည်ကို သတ်မှတ်ပါ။'
                       : 'Highlight which routing or reporting groups this server should appear in.'}
                   </DialogSectionDescription>
                 </DialogSectionHeader>
@@ -249,7 +249,7 @@ function EditServerDialog({
                 <DialogSectionTitle>{isMyanmar ? 'မူလလမ်းကြောင်းညွှန်မှု အပြုအမူ' : 'Default routing behavior'}</DialogSectionTitle>
                 <DialogSectionDescription>
                   {isMyanmar
-                    ? 'အသစ်ဖန်တီးမည့် item များအတွက် ဤ server ကို မူလ target အဖြစ် သတ်မှတ်ပါ။'
+                    ? 'အသစ်ဖန်တီးမည့် အရာများအတွက် ဤဆာဗာကို မူလ ပစ်မှတ်အဖြစ် သတ်မှတ်ပါ။'
                     : 'Mark this server as a default target when new items need a preferred home.'}
                 </DialogSectionDescription>
               </DialogSectionHeader>
@@ -308,13 +308,13 @@ export default function ServerDetailPage() {
   const [outageNotifyUsers, setOutageNotifyUsers] = useState(true);
   const [outageFollowUpMessage, setOutageFollowUpMessage] = useState(
     locale === 'my'
-      ? 'အစားထိုးမှုကို ဆက်လက်လုပ်ဆောင်နေဆဲဖြစ်သည်။ server အသစ်ကို ပြင်ဆင်နေစဉ် ခဏလေး ထပ်မံစောင့်ပေးပါ။'
+      ? 'အစားထိုးမှုကို ဆက်လက်လုပ်ဆောင်နေဆဲဖြစ်သည်။ ဆာဗာအသစ်ကို ပြင်ဆင်နေစဉ် ခဏလေး ထပ်မံစောင့်ပေးပါ။'
       : 'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
   );
   const [manualNoticeType, setManualNoticeType] = useState<'ISSUE' | 'DOWNTIME' | 'MAINTENANCE'>('ISSUE');
   const [manualNoticeMessage, setManualNoticeMessage] = useState(
     locale === 'my'
-      ? 'ဤ server တွင် ပြဿနာတစ်ခု တွေ့ရှိထားသည်။ လမ်းကြောင်းကို တည်ငြိမ်အောင် ပြင်ဆင်နေစဉ် ခဏစောင့်ပေးပါ။ အစားထိုးရန် လိုအပ်ပါက ထပ်မံအသိပေးပါမည်။'
+      ? 'ဤဆာဗာတွင် ပြဿနာတစ်ခု တွေ့ရှိထားသည်။ လမ်းကြောင်းကို တည်ငြိမ်အောင် ပြင်ဆင်နေစဉ် ခဏစောင့်ပေးပါ။ အစားထိုးရန် လိုအပ်ပါက ထပ်မံအသိပေးပါမည်။'
       : 'We found an issue on this server. Please wait while we stabilize the route. We will update you again if a replacement is needed.',
   );
   const [latencyThresholdMs, setLatencyThresholdMs] = useState('500');
@@ -372,7 +372,9 @@ export default function ServerDetailPage() {
     onSuccess: (result) => {
       toast({
         title: t('server_details.toast.synced'),
-        description: `Found ${result.keysFound} keys. Created ${result.keysCreated}, removed ${result.keysRemoved}.`,
+        description: isMyanmar
+          ? `သော့ ${result.keysFound} ခုကို တွေ့ရှိပြီး ${result.keysCreated} ခု ဖန်တီးကာ ${result.keysRemoved} ခု ဖယ်ရှားပြီးပါပြီ။`
+          : `Found ${result.keysFound} keys. Created ${result.keysCreated}, removed ${result.keysRemoved}.`,
       });
       refetch();
     },
@@ -390,7 +392,9 @@ export default function ServerDetailPage() {
     onSuccess: () => {
       toast({
         title: t('server_details.toast.deleted'),
-        description: 'The server has been removed from Atomic-UI.',
+        description: isMyanmar
+          ? 'ဆာဗာကို Atomic-UI မှ ဖယ်ရှားပြီးပါပြီ။'
+          : 'The server has been removed from Atomic-UI.',
       });
       router.push('/dashboard/servers');
     },
@@ -405,16 +409,16 @@ export default function ServerDetailPage() {
   const lifecycleMutation = trpc.servers.setLifecycleMode.useMutation({
     onSuccess: () => {
       toast({
-        title: isMyanmar ? 'ဆာဗာ mode ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Server mode updated',
+        title: isMyanmar ? 'ဆာဗာ မုဒ်ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Server mode updated',
         description: isMyanmar
-          ? 'ဤဆာဗာအတွက် assignment safeguards များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။'
+          ? 'ဤဆာဗာအတွက် ခွဲဝေမှု ကာကွယ်ချက်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။'
           : 'Assignment safeguards were updated for this server.',
       });
       refetch();
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'ဆာဗာ mode ကို အပ်ဒိတ်မလုပ်နိုင်ပါ' : 'Failed to update server mode',
+        title: isMyanmar ? 'ဆာဗာ မုဒ်ကို အပ်ဒိတ်မလုပ်နိုင်ပါ' : 'Failed to update server mode',
         description: error.message,
         variant: 'destructive',
       });
@@ -423,14 +427,14 @@ export default function ServerDetailPage() {
   const outageReplaceMutation = trpc.servers.outageReplace.useMutation({
     onSuccess: (result) => {
       toast({
-        title: isMyanmar ? 'Outage အစားထိုးမှု ပြီးဆုံးပါပြီ' : 'Outage replacement completed',
+        title: isMyanmar ? 'ပြတ်တောက်မှု အစားထိုးမှု ပြီးဆုံးပါပြီ' : 'Outage replacement completed',
         description:
           result.failed > 0
             ? isMyanmar
-              ? `Key ${result.migrated} ခုကို ရွှေ့ပြီးပါပြီ၊ ${result.failed} ခုကို ထပ်စစ်ဆေးရန် လိုအပ်နေသေးသည်။`
+              ? `သော့ ${result.migrated} ခုကို ရွှေ့ပြီးပါပြီ၊ ${result.failed} ခုကို ထပ်စစ်ဆေးရန် လိုအပ်နေသေးသည်။`
               : `${result.migrated} keys moved, ${result.failed} still need attention.`
             : isMyanmar
-              ? `Key ${result.migrated} ခုကို ${result.targetServer.name} သို့ ရွှေ့ပြီးပါပြီ။`
+              ? `သော့ ${result.migrated} ခုကို ${result.targetServer.name} သို့ ရွှေ့ပြီးပါပြီ။`
               : `${result.migrated} keys moved to ${result.targetServer.name}.`,
       });
       refetch();
@@ -438,7 +442,7 @@ export default function ServerDetailPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Outage အစားထိုးမှု မအောင်မြင်ပါ' : 'Outage replacement failed',
+        title: isMyanmar ? 'ပြတ်တောက်မှု အစားထိုးမှု မအောင်မြင်ပါ' : 'Outage replacement failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -449,7 +453,7 @@ export default function ServerDetailPage() {
       toast({
         title: variables.markRecovered
           ? (isMyanmar ? 'ပြန်လည်ကောင်းမွန်မှု အသိပေးချက် ပို့ပြီးပါပြီ' : 'Recovery update sent')
-          : (isMyanmar ? 'Outage နောက်ဆက်တွဲ အသိပေးချက် ပို့ပြီးပါပြီ' : 'Outage follow-up sent'),
+          : (isMyanmar ? 'ပြတ်တောက်မှု နောက်ဆက်တွဲ အသိပေးချက် ပို့ပြီးပါပြီ' : 'Outage follow-up sent'),
         description: isMyanmar
           ? `ထိခိုက်သော Telegram အသုံးပြုသူ ${result.sentToTelegramUsers} ဦးထံ အပ်ဒိတ်ပို့ပြီးပါပြီ။`
           : `Telegram update sent to ${result.sentToTelegramUsers} affected user(s).`,
@@ -459,7 +463,7 @@ export default function ServerDetailPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Outage အပ်ဒိတ် ပို့မရပါ' : 'Failed to send outage update',
+        title: isMyanmar ? 'ပြတ်တောက်မှု အပ်ဒိတ် ပို့မရပါ' : 'Failed to send outage update',
         description: error.message,
         variant: 'destructive',
       });
@@ -485,8 +489,10 @@ export default function ServerDetailPage() {
   const slowPolicyMutation = trpc.servers.updateSlowPolicy.useMutation({
     onSuccess: () => {
       toast({
-        title: 'Slow policy updated',
-        description: 'Per-server degradation safeguards were saved.',
+        title: isMyanmar ? 'နှေးကွေးမှု မူဝါဒကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Slow policy updated',
+        description: isMyanmar
+          ? 'ဆာဗာတစ်ခုချင်းအလိုက် ကျဆင်းမှု ကာကွယ်ချက်များကို သိမ်းပြီးပါပြီ။'
+          : 'Per-server degradation safeguards were saved.',
       });
       refetch();
       healthDiagnosticsQuery.refetch();
@@ -494,7 +500,7 @@ export default function ServerDetailPage() {
     },
     onError: (error) => {
       toast({
-        title: 'Failed to update slow policy',
+        title: isMyanmar ? 'နှေးကွေးမှု မူဝါဒကို အပ်ဒိတ်မလုပ်နိုင်ပါ' : 'Failed to update slow policy',
         description: error.message,
         variant: 'destructive',
       });
@@ -586,7 +592,7 @@ export default function ServerDetailPage() {
   const recommendedAssignmentTarget = recommendedAssignmentTargetQuery.data || null;
 
   const handleDelete = () => {
-    if (confirm(`${t('server_details.danger.confirm')} "${server?.name}" from Atomic-UI?\n\n${t('server_details.danger.confirm_desc')}`)) {
+    if (confirm(`${t('server_details.danger.confirm')} "${server?.name}"${isMyanmar ? ' ကို Atomic-UI မှ' : ' from Atomic-UI'}?\n\n${t('server_details.danger.confirm_desc')}`)) {
       deleteMutation.mutate({ id: serverId });
     }
   };
@@ -660,6 +666,50 @@ export default function ServerDetailPage() {
   };
   const status = statusConfig[healthStatus as keyof typeof statusConfig] || statusConfig.UNKNOWN;
   const StatusIcon = status.icon;
+  const pageTitle = isMyanmar ? 'ဆာဗာ အသေးစိတ်' : 'Server Detail';
+  const managedServerLabel = isMyanmar ? 'စီမံထားသော Outline ဆာဗာ' : 'Managed Outline server';
+  const recentProbeLabel = server.healthCheck?.lastCheckedAt
+    ? isMyanmar
+      ? `${formatRelativeTime(server.healthCheck.lastCheckedAt)} က စစ်ဆေးခဲ့သည်`
+      : `Checked ${formatRelativeTime(server.healthCheck.lastCheckedAt)}`
+    : isMyanmar
+      ? 'မကြာသေးမီ စစ်ဆေးမှု မရှိသေးပါ'
+      : 'No recent probe';
+  const activeKeysLabel = isMyanmar ? 'အသုံးပြုနေသော သော့များ' : 'Active Keys';
+  const totalAssignedLabel = isMyanmar
+    ? `${server.accessKeys?.length || 0} ခု စုစုပေါင်း ချိတ်ထားသည်`
+    : `${server.accessKeys?.length || 0} total assigned`;
+  const expiringSoonLabel = isMyanmar
+    ? `၇ ရက်အတွင်း သက်တမ်းကုန်မည့် သော့ ${expiringSoonCount} ခု`
+    : `${expiringSoonCount} keys expiring within 7 days`;
+  const lastSyncLabel = server.lastSyncAt
+    ? isMyanmar
+      ? `နောက်ဆုံး စင့်ခ် ${formatRelativeTime(server.lastSyncAt)}`
+      : `Synced ${formatRelativeTime(server.lastSyncAt)}`
+    : isMyanmar
+      ? 'စင့်ခ် စောင့်နေသည်'
+      : 'Sync pending';
+  const workspaceCopy = {
+    heading: isMyanmar ? 'ဆာဗာ လုပ်ငန်းခွင်' : 'Server workspace',
+    healthLabel: isMyanmar ? 'ကျန်းမာရေး' : 'Health',
+    lifecycleLabel: isMyanmar ? 'လုပ်ဆောင်မှု အခြေအနေ' : 'Lifecycle',
+    outageLabel: isMyanmar ? 'ပြတ်တောက်မှု' : 'Outage',
+    historyLabel: isMyanmar ? 'မှတ်တမ်း' : 'History',
+    descriptions: {
+      health: isMyanmar
+        ? 'လက်ရှိ ကြာချိန်၊ uptime နှင့် အလိုအလျောက် အရန်ပစ်မှတ် အပြုအမူများအတွက် ကျန်းမာရေးနှင့် စစ်ဆေးချက်များကို ကြည့်ပါ။'
+        : 'Health and diagnostics for current latency, uptime, and smart fallback behavior.',
+      lifecycle: isMyanmar
+        ? 'ခွဲဝေမှု ထိန်းချုပ်ချက်များ၊ လမ်းကြောင်းမူဝါဒ၊ လက်ရှိသော့များနှင့် ဖျက်သိမ်းနိုင်သော ဆာဗာလုပ်ဆောင်ချက်များကို စီမံပါ။'
+        : 'Assignment controls, routing policy, current keys, and destructive server actions.',
+      outage: isMyanmar
+        ? 'အစားထိုးလုပ်ငန်းစဉ်များ၊ ပြောင်းရွှေ့မှု အခြေအနေတိုးတက်မှုနှင့် အသုံးပြုသူများထံ ပို့မည့် ပြတ်တောက်မှု အသိပေးချက်များကို စီမံပါ။'
+        : 'Replacement workflows, migration progress, and user-facing outage notifications.',
+      history: isMyanmar
+        ? 'ဤဆာဗာအတွက် ယခင် ပြတ်တောက်မှုများ၊ နောက်ဆက်တွဲ အသိပေးချက်များနှင့် ပြန်လည်ကောင်းမွန်မှု မှတ်တမ်းကို ကြည့်ပါ။'
+        : 'Past outages, follow-ups, and recovery history for this server.',
+    },
+  };
 
   return (
     <div className="space-y-6">
@@ -673,7 +723,7 @@ export default function ServerDetailPage() {
             </Button>
             <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
               <Server className="h-3.5 w-3.5" />
-              Server Detail
+              {pageTitle}
             </span>
             <Badge variant="outline" className={cn('rounded-full px-3 py-1', status.color)}>
               <StatusIcon className="mr-1 h-3 w-3" />
@@ -691,7 +741,7 @@ export default function ServerDetailPage() {
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight">{server.name}</h1>
               <p className="text-sm text-muted-foreground">
-                {server.location || 'Managed Outline server'}
+                {server.location || managedServerLabel}
               </p>
               <div className="flex flex-wrap gap-2">
                 {server.tags.map((tag) => (
@@ -715,16 +765,16 @@ export default function ServerDetailPage() {
               </p>
               <p className="mt-3 text-2xl font-semibold">{t(status.labelKey)}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {server.healthCheck?.lastCheckedAt ? `Checked ${formatRelativeTime(server.healthCheck.lastCheckedAt)}` : 'No recent probe'}
+                {recentProbeLabel}
               </p>
             </div>
             <div className="ops-kpi-tile">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Active Keys
+                {activeKeysLabel}
               </p>
               <p className="mt-3 text-2xl font-semibold">{activeKeyCount}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {server.accessKeys?.length || 0} total assigned
+                {totalAssignedLabel}
               </p>
             </div>
             <div className="ops-kpi-tile">
@@ -735,7 +785,7 @@ export default function ServerDetailPage() {
                 {server.healthCheck?.lastLatencyMs ? `${server.healthCheck.lastLatencyMs}ms` : '-'}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {expiringSoonCount} keys expiring within 7 days
+                {expiringSoonLabel}
               </p>
             </div>
             <div className="ops-kpi-tile">
@@ -746,7 +796,7 @@ export default function ServerDetailPage() {
                 {server.healthCheck?.uptimePercent ? `${server.healthCheck.uptimePercent.toFixed(1)}%` : '-'}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {server.lastSyncAt ? `Synced ${formatRelativeTime(server.lastSyncAt)}` : 'Sync pending'}
+                {lastSyncLabel}
               </p>
             </div>
           </div>
@@ -787,7 +837,7 @@ export default function ServerDetailPage() {
                 </Button>
                 <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
                   <Server className="h-3.5 w-3.5" />
-                  Server Detail
+                  {pageTitle}
                 </span>
                 <ServerLifecycleBadge mode={server.lifecycleMode} showActive className="rounded-full px-3 py-1" />
               </div>
@@ -801,7 +851,7 @@ export default function ServerDetailPage() {
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{server.name}</h1>
                   <p className="text-sm leading-7 text-muted-foreground sm:text-base">
-                    {server.location || 'Managed Outline server'}
+                    {server.location || managedServerLabel}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {server.tags.map((tag) => (
@@ -849,16 +899,16 @@ export default function ServerDetailPage() {
               </p>
               <p className="mt-3 text-2xl font-semibold">{t(status.labelKey)}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {server.healthCheck?.lastCheckedAt ? `Checked ${formatRelativeTime(server.healthCheck.lastCheckedAt)}` : 'No recent probe'}
+                {recentProbeLabel}
               </p>
             </div>
             <div className="ops-kpi-tile">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Active Keys
+                {activeKeysLabel}
               </p>
               <p className="mt-3 text-2xl font-semibold">{activeKeyCount}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {server.accessKeys?.length || 0} total assigned
+                {totalAssignedLabel}
               </p>
             </div>
             <div className="ops-kpi-tile">
@@ -869,7 +919,7 @@ export default function ServerDetailPage() {
                 {server.healthCheck?.lastLatencyMs ? `${server.healthCheck.lastLatencyMs}ms` : '-'}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {expiringSoonCount} keys expiring within 7 days
+                {expiringSoonLabel}
               </p>
             </div>
             <div className="ops-kpi-tile">
@@ -880,7 +930,7 @@ export default function ServerDetailPage() {
                 {server.healthCheck?.uptimePercent ? `${server.healthCheck.uptimePercent.toFixed(1)}%` : '-'}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {server.lastSyncAt ? `Synced ${formatRelativeTime(server.lastSyncAt)}` : 'Sync pending'}
+                {lastSyncLabel}
               </p>
             </div>
           </div>
@@ -889,22 +939,17 @@ export default function ServerDetailPage() {
 
       <div className="ops-panel space-y-3 p-3 sm:p-4">
         <div className="space-y-1">
-          <p className="ops-section-heading">Server workspace</p>
+          <p className="ops-section-heading">{workspaceCopy.heading}</p>
           <p className="text-sm text-muted-foreground">
-            {{
-              health: 'Health and diagnostics for current latency, uptime, and smart fallback behavior.',
-              lifecycle: 'Assignment controls, routing policy, current keys, and destructive server actions.',
-              outage: 'Replacement workflows, migration progress, and user-facing outage notifications.',
-              history: 'Past outages, follow-ups, and recovery history for this server.',
-            }[detailTab]}
+            {workspaceCopy.descriptions[detailTab]}
           </p>
         </div>
         <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'health' | 'lifecycle' | 'outage' | 'history')}>
           <TabsList className="grid h-auto grid-cols-2 gap-2 rounded-[1.2rem] border border-border/60 bg-background/45 p-1 sm:grid-cols-4 dark:bg-white/[0.03]">
-            <TabsTrigger value="health" className="rounded-[0.95rem] px-3 py-2 text-sm">Health</TabsTrigger>
-            <TabsTrigger value="lifecycle" className="rounded-[0.95rem] px-3 py-2 text-sm">Lifecycle</TabsTrigger>
-            <TabsTrigger value="outage" className="rounded-[0.95rem] px-3 py-2 text-sm">Outage</TabsTrigger>
-            <TabsTrigger value="history" className="rounded-[0.95rem] px-3 py-2 text-sm">History</TabsTrigger>
+            <TabsTrigger value="health" className="rounded-[0.95rem] px-3 py-2 text-sm">{workspaceCopy.healthLabel}</TabsTrigger>
+            <TabsTrigger value="lifecycle" className="rounded-[0.95rem] px-3 py-2 text-sm">{workspaceCopy.lifecycleLabel}</TabsTrigger>
+            <TabsTrigger value="outage" className="rounded-[0.95rem] px-3 py-2 text-sm">{workspaceCopy.outageLabel}</TabsTrigger>
+            <TabsTrigger value="history" className="rounded-[0.95rem] px-3 py-2 text-sm">{workspaceCopy.historyLabel}</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -950,7 +995,11 @@ export default function ServerDetailPage() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => {
-                    copyToClipboard(server.apiUrl, t('settings.toast.copied'), t('server_details.info.api_url') + ' copied.');
+                    copyToClipboard(
+                      server.apiUrl,
+                      t('settings.toast.copied'),
+                      `${t('server_details.info.api_url')}${isMyanmar ? ' ကို ကူးယူပြီးပါပြီ။' : ' copied.'}`,
+                    );
                   }}
                 >
                   <Copy className="w-4 h-4" />
@@ -1119,7 +1168,7 @@ export default function ServerDetailPage() {
                             {isMyanmar ? 'အလိုအလျောက် အရန်ပစ်မှတ်' : 'Smart fallback'}: {healthDiagnostics.current.fallbackTarget.serverName}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {healthDiagnostics.current.fallbackTarget.healthStatus || (isMyanmar ? 'မသိရ' : 'UNKNOWN')} {isMyanmar ? 'အခြေအနေ' : 'health'}
+                            {healthDiagnostics.current.fallbackTarget.healthStatus || (isMyanmar ? 'မသိရ' : 'UNKNOWN')} {isMyanmar ? 'ကျန်းမာရေး အခြေအနေ' : 'health'}
                             {typeof healthDiagnostics.current.fallbackTarget.healthLatencyMs === 'number'
                               ? ` · ${healthDiagnostics.current.fallbackTarget.healthLatencyMs}ms`
                               : ''}
@@ -1143,10 +1192,10 @@ export default function ServerDetailPage() {
 
                   <div className="rounded-[1.1rem] border border-border/60 bg-background/40 p-3 dark:bg-white/[0.03]">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <Badge variant="outline">Threshold {healthDiagnostics.current.thresholdMs}ms</Badge>
-                      <Badge variant="outline">UP {healthDiagnostics.statusBreakdown.up}</Badge>
-                      <Badge variant="outline">SLOW {healthDiagnostics.statusBreakdown.slow}</Badge>
-                      <Badge variant="outline">DOWN {healthDiagnostics.statusBreakdown.down}</Badge>
+                      <Badge variant="outline">{isMyanmar ? 'သတ်မှတ်ချက်' : 'Threshold'} {healthDiagnostics.current.thresholdMs}ms</Badge>
+                      <Badge variant="outline">{isMyanmar ? 'ကောင်း' : 'UP'} {healthDiagnostics.statusBreakdown.up}</Badge>
+                      <Badge variant="outline">{isMyanmar ? 'နှေး' : 'SLOW'} {healthDiagnostics.statusBreakdown.slow}</Badge>
+                      <Badge variant="outline">{isMyanmar ? 'ပျက်' : 'DOWN'} {healthDiagnostics.statusBreakdown.down}</Badge>
                     </div>
                     {latencyTrend.length > 0 ? (
                       <div className="h-[220px]">
@@ -1174,7 +1223,7 @@ export default function ServerDetailPage() {
                                 active && payload && payload.length ? (
                                   <div className="rounded-xl border border-cyan-400/18 bg-[rgba(5,12,26,0.94)] p-3 text-xs text-white shadow-[0_18px_36px_rgba(1,6,20,0.55)]">
                                     <p className="font-semibold text-cyan-100">{label}</p>
-                                    <p className="mt-2">{isMyanmar ? 'ကြာချိန်' : 'Latency'}: {payload[0]?.value ? `${payload[0].value}ms` : 'n/a'}</p>
+                                    <p className="mt-2">{isMyanmar ? 'ကြာချိန်' : 'Latency'}: {payload[0]?.value ? `${payload[0].value}ms` : (isMyanmar ? 'မရှိ' : 'n/a')}</p>
                                     <p>{isMyanmar ? 'အခြေအနေ' : 'Status'}: {payload[0]?.payload?.status || (isMyanmar ? 'မသိရ' : 'UNKNOWN')}</p>
                                   </div>
                                 ) : null
@@ -1333,7 +1382,7 @@ export default function ServerDetailPage() {
 
               {!canManageOutages ? (
                 <div className="rounded-[1rem] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                  {isMyanmar ? 'Owner/Admin အခွင့်အရေးရှိသော အကောင့်များသာ lifecycle နှင့် ပြတ်တောက်မှု ထိန်းချုပ်မှုများကို ပြောင်းလဲနိုင်ပါသည်။' : 'Only Owner/Admin scoped accounts can change lifecycle and outage controls.'}
+                  {isMyanmar ? 'ပိုင်ရှင်/စီမံခန့်ခွဲသူ အခွင့်အရေးရှိသော အကောင့်များသာ lifecycle နှင့် ပြတ်တောက်မှု ထိန်းချုပ်မှုများကို ပြောင်းလဲနိုင်ပါသည်။' : 'Only Owner/Admin scoped accounts can change lifecycle and outage controls.'}
                 </div>
               ) : null}
 
@@ -1500,7 +1549,7 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Gauge className="w-5 h-5 text-emerald-500" />
-                {isMyanmar ? 'Capacity အလိုက် လမ်းကြောင်းညှိခြင်း' : 'Capacity-aware routing'}
+                {isMyanmar ? 'စွမ်းရည်အလိုက် လမ်းကြောင်းညှိခြင်း' : 'Capacity-aware routing'}
               </CardTitle>
               <CardDescription>
                 {isMyanmar
@@ -1579,7 +1628,7 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
-                {isMyanmar ? 'Outage အစားထိုးခြင်း' : 'Outage replacement'}
+                {isMyanmar ? 'ပြတ်တောက်မှု အစားထိုးခြင်း' : 'Outage replacement'}
               </CardTitle>
               <CardDescription>
                 {isMyanmar
@@ -1612,13 +1661,13 @@ export default function ServerDetailPage() {
                 </Select>
                 {outageTargetServerId !== 'none' && loadStatsByServerId.get(outageTargetServerId) ? (
                   <p className="text-xs text-muted-foreground">
-                    {isMyanmar ? 'ပစ်မှတ်ဖိအား' : 'Target load'} {loadStatsByServerId.get(outageTargetServerId)?.loadScore}
+                    {isMyanmar ? 'ပစ်မှတ် ဖိအား' : 'Target load'} {loadStatsByServerId.get(outageTargetServerId)?.loadScore}
                     {loadStatsByServerId.get(outageTargetServerId)?.capacityPercent != null
                       ? isMyanmar
-                        ? ` · capacity ${loadStatsByServerId.get(outageTargetServerId)?.capacityPercent}%`
+                        ? ` · စွမ်းရည် ${loadStatsByServerId.get(outageTargetServerId)?.capacityPercent}%`
                         : ` · ${loadStatsByServerId.get(outageTargetServerId)?.capacityPercent}% capacity`
                       : isMyanmar
-                        ? ' · max-key cap မရှိ'
+                        ? ' · အများဆုံးသော့ ကန့်သတ်ချက် မရှိ'
                         : ' · no max-key cap'}
                     {loadStatsByServerId.get(outageTargetServerId)?.availableSlots != null
                       ? isMyanmar
@@ -1646,7 +1695,7 @@ export default function ServerDetailPage() {
                   <p className="font-medium text-foreground">{isMyanmar ? 'မူဝါဒ' : 'Policy'}</p>
                   <p className="mt-1">
                     {isMyanmar
-                      ? 'စီမံခန့်ခွဲရေး outage replacement များသည် expiry နှင့် usage ကို ထိန်းသိမ်းထားပြီး အသုံးပြုသူ၏ ၃ ကြိမ်ပြောင်းနိုင်ခွင့်ကို မစားသုံးပါ။'
+                      ? 'စီမံခန့်ခွဲရေး ပြတ်တောက်မှု အစားထိုးမှုများသည် expiry နှင့် usage ကို ထိန်းသိမ်းထားပြီး အသုံးပြုသူ၏ ၃ ကြိမ်ပြောင်းနိုင်ခွင့်ကို မစားသုံးပါ။'
                       : 'Admin outage replacements preserve expiry and usage, and do not consume the user’s 3-change limit.'}
                   </p>
                 </div>
@@ -1661,7 +1710,7 @@ export default function ServerDetailPage() {
                 />
                 <span className="text-muted-foreground">
                     {isMyanmar
-                      ? 'migration ပြီးဆုံးပြီးနောက် Telegram recovery message များ ပို့မည်။ grace window အတွင်း server မပြန်ကောင်းသေးပါက နှောင့်နှေးထားသော outage warning များကိုလည်း ဆက်ပို့မည်။'
+                      ? 'ပြောင်းရွှေ့မှု ပြီးဆုံးပြီးနောက် Telegram ပြန်လည်ကောင်းမွန်မှု မက်ဆေ့ချ်များ ပို့မည်။ စောင့်ဆိုင်းချိန် အတွင်း ဆာဗာ မပြန်ကောင်းသေးပါက နှောင့်နှေးထားသော ပြတ်တောက်မှု သတိပေးချက်များကိုလည်း ဆက်ပို့မည်။'
                       : 'Send Telegram recovery messages after the migration completes. Delayed outage warnings will still go out if the server stays down during the grace window.'}
                 </span>
               </label>
@@ -1675,14 +1724,14 @@ export default function ServerDetailPage() {
                       : 'Choose a target server to preview how many keys will move.'
                     : outagePreviewQuery.isLoading
                       ? isMyanmar
-                        ? 'outage preview ကို တင်နေသည်...'
+                        ? 'ပြတ်တောက်မှု ကြိုတင်ကြည့်ရှုချက်ကို တင်နေသည်...'
                         : 'Loading outage preview...'
                       : outagePreviewQuery.data
                         ? isMyanmar
                           ? `${outagePreviewQuery.data.totalKeys} အသုံးပြုဆဲ သို့မဟုတ် စောင့်ဆိုင်းနေသော သော့များကို ${outagePreviewQuery.data.sourceServer.name} မှ ${outagePreviewQuery.data.targetServer.name} သို့ ရွှေ့မည်။`
                           : `${outagePreviewQuery.data.totalKeys} active or pending key(s) will move from ${outagePreviewQuery.data.sourceServer.name} to ${outagePreviewQuery.data.targetServer.name}.`
                         : isMyanmar
-                          ? 'preview မရရှိသေးပါ။'
+                          ? 'ကြိုတင်ကြည့်ရှုချက် မရရှိသေးပါ။'
                           : 'No preview available yet.'}
                 </p>
                 {outagePreviewQuery.data ? (
@@ -1712,12 +1761,12 @@ export default function ServerDetailPage() {
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        {isMyanmar ? 'ချိတ်ဆက်ထားသော premium တောင်းဆိုမှုများ' : 'Linked premium requests'}
+                        {isMyanmar ? 'ချိတ်ဆက်ထားသော ပရီမီယမ် တောင်းဆိုမှုများ' : 'Linked premium requests'}
                       </p>
                       <p className="mt-1 text-xl font-semibold">{outagePreviewQuery.data.linkedPremiumRequestCount}</p>
                       <p className="text-xs text-muted-foreground">
                         {isMyanmar
-                          ? 'ဤ server နှင့် ချိတ်ဆက်ထားသော premium route issue သို့မဟုတ် region request များ'
+                          ? 'ဤဆာဗာနှင့် ချိတ်ဆက်ထားသော ပရီမီယမ် လမ်းကြောင်း ပြဿနာ သို့မဟုတ် ဒေသ တောင်းဆိုမှုများ'
                           : 'Premium route issues or region requests tied to this server.'}
                       </p>
                     </div>
@@ -1726,7 +1775,7 @@ export default function ServerDetailPage() {
                 {outagePreviewQuery.data?.linkedPremiumRequests?.length ? (
                   <div className="mt-3 rounded-xl border border-border/40 bg-background/35 p-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      {isMyanmar ? 'ဤပြတ်တောက်မှုနှင့် ချိတ်ဆက်မည့် premium တောင်းဆိုမှုများ' : 'Premium requests that will be linked to this outage'}
+                      {isMyanmar ? 'ဤပြတ်တောက်မှုနှင့် ချိတ်ဆက်မည့် ပရီမီယမ် တောင်းဆိုမှုများ' : 'Premium requests that will be linked to this outage'}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {outagePreviewQuery.data.linkedPremiumRequests.map((request) => (
@@ -1770,7 +1819,7 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ArrowRightLeft className="w-5 h-5 text-cyan-500" />
-                {isMyanmar ? 'Migration အခြေအနေ' : 'Migration progress'}
+                {isMyanmar ? 'ပြောင်းရွှေ့မှု အခြေအနေ' : 'Migration progress'}
               </CardTitle>
               <CardDescription>
                 {isMyanmar
@@ -1795,7 +1844,7 @@ export default function ServerDetailPage() {
                       <p className="mt-1 text-xl font-semibold">{activeOutageFailed}</p>
                     </div>
                     <div className="rounded-xl border border-border/40 p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'Recovery အသိပေးချက်များ' : 'Recovery notifications'}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isMyanmar ? 'ပြန်လည်ကောင်းမွန်မှု အသိပေးချက်များ' : 'Recovery notifications'}</p>
                       <p className="mt-1 text-xl font-semibold">
                         {activeOutageIncident.recoveryNotificationCount ?? currentOutageState.recoveryNotificationCount ?? 0}
                       </p>
@@ -1803,7 +1852,7 @@ export default function ServerDetailPage() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{isMyanmar ? 'Migration ပြီးစီးမှု' : 'Migration completion'}</span>
+                      <span className="text-muted-foreground">{isMyanmar ? 'ပြောင်းရွှေ့မှု ပြီးစီးမှု' : 'Migration completion'}</span>
                       <span>{activeOutageProgress}%</span>
                     </div>
                     <Progress value={activeOutageProgress} className="h-2" />
@@ -1821,7 +1870,7 @@ export default function ServerDetailPage() {
                           ? `${formatRelativeTime(currentOutageState.migrationTriggeredAt)} က စတင်ခဲ့သည်`
                           : `Started ${formatRelativeTime(currentOutageState.migrationTriggeredAt)}`
                         : isMyanmar
-                          ? 'Migration ကို မစတင်သေးပါ။'
+                          ? 'ပြောင်းရွှေ့မှုကို မစတင်သေးပါ။'
                           : 'Migration has not started yet.'}
                       {currentOutageState.migrationCompletedAt
                         ? isMyanmar
@@ -1846,11 +1895,11 @@ export default function ServerDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-cyan-500" />
-                {isMyanmar ? 'Outage အပ်ဒိတ်များ' : 'Outage updates'}
+                {isMyanmar ? 'ပြတ်တောက်မှု အပ်ဒိတ်များ' : 'Outage updates'}
               </CardTitle>
               <CardDescription>
                 {isMyanmar
-                  ? 'Outage အခြေအနေ ဆက်ရှိနေစဉ် ထိခိုက်သော အသုံးပြုသူများထံ Telegram နောက်ဆက်တွဲ အသိပေးချက် ပို့ပါ၊ သို့မဟုတ် server ပြန်ကောင်းလျှင် outage ကို စောစီးစွာ ပိတ်ပါ။'
+                  ? 'ပြတ်တောက်မှု အခြေအနေ ဆက်ရှိနေစဉ် ထိခိုက်သော အသုံးပြုသူများထံ Telegram နောက်ဆက်တွဲ အသိပေးချက် ပို့ပါ၊ သို့မဟုတ် ဆာဗာ ပြန်ကောင်းလျှင် ပြတ်တောက်မှုကို စောစီးစွာ ပိတ်ပါ။'
                   : 'Send a Telegram follow-up to affected users while the outage is active, or close the outage early if the server recovers.'}
               </CardDescription>
             </CardHeader>
@@ -1894,7 +1943,7 @@ export default function ServerDetailPage() {
                         {activeOutageIncident?.incidentCode || (isMyanmar ? 'ဖွင့်ထားသော ပြတ်တောက်မှု' : 'Open outage')}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {activeOutageIncident?.premiumSupportRequests?.length || 0} {isMyanmar ? 'ချိတ်ဆက်ထားသော premium တောင်းဆိုမှု' : 'linked premium request(s)'}
+                        {activeOutageIncident?.premiumSupportRequests?.length || 0} {isMyanmar ? 'ချိတ်ဆက်ထားသော ပရီမီယမ် တောင်းဆိုမှု' : 'linked premium request(s)'}
                       </p>
                     </div>
                   </div>
@@ -1919,7 +1968,7 @@ export default function ServerDetailPage() {
                       onClick={() =>
                         setOutageFollowUpMessage(
                           isMyanmar
-                            ? 'Server အသစ်ပြင်ဆင်နေဆဲဖြစ်သဖြင့် အစားထိုးပေးခြင်းကို ဆက်လက်လုပ်ဆောင်နေပါသည်။ ခဏလောက် ထပ်စောင့်ပေးပါ။'
+                            ? 'ဆာဗာအသစ် ပြင်ဆင်နေဆဲဖြစ်သဖြင့် အစားထိုးပေးခြင်းကို ဆက်လက်လုပ်ဆောင်နေပါသည်။ ခဏလောက် ထပ်စောင့်ပေးပါ။'
                             : 'We are still working on the replacement. Please wait a little longer while we prepare the new server.',
                         )
                       }
@@ -1978,7 +2027,7 @@ export default function ServerDetailPage() {
                       ) : (
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                       )}
-                      {isMyanmar ? 'ဖြေရှင်းပြီးကြောင်း update ပို့မည်' : 'Send resolution update'}
+                      {isMyanmar ? 'ဖြေရှင်းပြီးကြောင်း အပ်ဒိတ် ပို့မည်' : 'Send resolution update'}
                     </Button>
                   </div>
                 </>
@@ -1998,7 +2047,7 @@ export default function ServerDetailPage() {
               </CardTitle>
               <CardDescription>
                 {isMyanmar
-                  ? 'ဤ server နှင့် ချိတ်ထားသော Telegram အသုံးပြုသူများအားလုံးထံ issue သို့မဟုတ် downtime update ကို တိုက်ရိုက်ပို့ပါ။'
+                  ? 'ဤဆာဗာနှင့် ချိတ်ထားသော Telegram အသုံးပြုသူများအားလုံးထံ ပြဿနာ သို့မဟုတ် မရရှိနိုင်ချိန် အပ်ဒိတ်ကို တိုက်ရိုက်ပို့ပါ။'
                   : 'Send a direct downtime or issue update to all Telegram-linked users on this server.'}
               </CardDescription>
             </CardHeader>
@@ -2034,7 +2083,7 @@ export default function ServerDetailPage() {
 
               <p className="text-xs text-muted-foreground">
                 {isMyanmar
-                  ? 'Support link ရှိပါက Telegram bot သည် သတ်မှတ်ထားသော support button ကို အလိုအလျောက် ထည့်ပေးမည်။'
+                  ? 'အကူအညီ လင့်ခ် ရှိပါက Telegram bot သည် သတ်မှတ်ထားသော အကူအညီ ခလုတ်ကို အလိုအလျောက် ထည့်ပေးမည်။'
                   : 'The Telegram bot will include the configured support button automatically if a support link is available.'}
               </p>
 
@@ -2063,10 +2112,10 @@ export default function ServerDetailPage() {
       <div className="space-y-6">
           <Card className="ops-detail-card">
             <CardHeader>
-              <CardTitle>{isMyanmar ? 'Outage မှတ်တမ်း' : 'Outage history'}</CardTitle>
+              <CardTitle>{isMyanmar ? 'ပြတ်တောက်မှု မှတ်တမ်း' : 'Outage history'}</CardTitle>
               <CardDescription>
                 {isMyanmar
-                  ? 'ဤ server ၏ ယခင် outage များ၊ အစားထိုး target များ၊ နောက်ဆက်တွဲ update များနှင့် ချိတ်ဆက်ထားသော premium support request များကို ကြည့်ရှုပါ။'
+                  ? 'ဤဆာဗာ၏ ယခင် ပြတ်တောက်မှုများ၊ အစားထိုး ပစ်မှတ်များ၊ နောက်ဆက်တွဲ အပ်ဒိတ်များနှင့် ချိတ်ဆက်ထားသော ပရီမီယမ် အကူအညီ တောင်းဆိုမှုများကို ကြည့်ရှုပါ။'
                   : 'Review past outages, replacement targets, follow-ups, and linked premium support requests for this server.'}
               </CardDescription>
             </CardHeader>
@@ -2090,10 +2139,10 @@ export default function ServerDetailPage() {
                         <Badge variant="secondary">
                           {incident.cause === 'MANUAL_OUTAGE'
                             ? isMyanmar
-                              ? 'ကိုယ်တိုင် outage'
+                              ? 'ကိုယ်တိုင် ပြတ်တောက်မှု'
                               : 'Manual outage'
                             : isMyanmar
-                              ? 'ကျန်းမာရေးစစ်ဆေးမှု outage'
+                              ? 'ကျန်းမာရေးစစ်ဆေးမှု ပြတ်တောက်မှု'
                               : 'Health outage'}
                         </Badge>
                         {incident.migrationTargetServerName ? (
@@ -2234,7 +2283,9 @@ export default function ServerDetailPage() {
               ))}
               {server.accessKeys.length > 5 && (
                 <p className="text-center text-sm text-muted-foreground pt-2">
-                  And {server.accessKeys.length - 5} {t('server_details.keys.more')}
+                  {isMyanmar
+                    ? `နောက်ထပ် ${server.accessKeys.length - 5} ${t('server_details.keys.more')}`
+                    : `And ${server.accessKeys.length - 5} ${t('server_details.keys.more')}`}
                 </p>
               )}
             </div>
