@@ -131,6 +131,23 @@ type TelegramKeyboardLike = {
   keyboard?: TelegramKeyboardRowButton[][];
 };
 
+const telegramGraphemeSegmenter = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+  ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+  : null;
+
+function countTelegramDisplayCharacters(input: string) {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return 0;
+  }
+
+  if (telegramGraphemeSegmenter) {
+    return Array.from(telegramGraphemeSegmenter.segment(trimmed)).length;
+  }
+
+  return Array.from(trimmed).length;
+}
+
 export function measureTelegramKeyboardLayout(input: TelegramKeyboardLike | null | undefined) {
   const rows = input?.inline_keyboard || input?.keyboard || [];
   const buttonCount = rows.reduce((total, row) => total + row.length, 0);
@@ -143,7 +160,7 @@ export function measureTelegramKeyboardLayout(input: TelegramKeyboardLike | null
           : typeof button?.text === 'string'
             ? button.text
             : '';
-      return Math.max(buttonMax, text.trim().length);
+      return Math.max(buttonMax, countTelegramDisplayCharacters(text));
     }, 0);
     return Math.max(max, rowMax);
   }, 0);

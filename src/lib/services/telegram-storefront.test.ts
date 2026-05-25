@@ -15,6 +15,7 @@ import {
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
   buildTelegramStoreQuickStatusView,
+  buildTelegramStoreRenewView,
   buildTelegramStoreHelpView,
   buildTelegramStoreSupportContactView,
   buildTelegramStorefrontCallbackData,
@@ -415,6 +416,8 @@ test('store order summary and active keys keep the polished storefront labels', 
     summary.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }),
   );
+  assert.equal(summary.replyMarkup.inline_keyboard[3]?.[0]?.text, '💬 Support');
+  assert.equal(summary.replyMarkup.inline_keyboard[3]?.[1]?.text, '🏠 Menu');
 
   const active = buildTelegramStoreActiveKeysView([
     {
@@ -441,6 +444,26 @@ test('store order summary and active keys keep the polished storefront labels', 
   assert.equal(active.replyMarkup.inline_keyboard[0]?.[0]?.text, '📄 Open 🪨 Basic');
   assert.equal(active.replyMarkup.inline_keyboard[0]?.[1]?.text, '🔄 Renew');
   assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '➕  Buy New Plan');
+});
+
+test('store renew summary keeps the current key and support one tap away', () => {
+  const renew = buildTelegramStoreRenewView({
+    plan: samplePlans[1]!,
+    renewTarget: {
+      keyId: 'key_123',
+      kind: 'access',
+    },
+  });
+
+  assert.match(renew.text, /Continue with the current key or choose a different plan/);
+  assert.equal(renew.replyMarkup.inline_keyboard[1]?.[0]?.text, '📄  Open Current Key');
+  assert.equal(
+    renew.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'key_page', keyId: 'key_123' }),
+  );
+  assert.equal(renew.replyMarkup.inline_keyboard[1]?.[1]?.text, '🔍  Change Plan');
+  assert.equal(renew.replyMarkup.inline_keyboard[2]?.[0]?.text, '🔑 My Keys');
+  assert.equal(renew.replyMarkup.inline_keyboard[2]?.[1]?.text, '💬 Support');
 });
 
 test('storefront callback data preserves focused plan categories', () => {
@@ -531,6 +554,10 @@ test('store order confirmed and trial activated screens keep direct setup shortc
   );
   assert.equal(
     paid.replyMarkup.inline_keyboard[4]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'key_page', keyId: 'key_123' }),
+  );
+  assert.equal(
+    paid.replyMarkup.inline_keyboard[5]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
   );
 

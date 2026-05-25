@@ -287,6 +287,11 @@ test('telegram payment prompts stay clean and remove screenshot-guide clutter', 
   assert.doesNotMatch(keyboardTexts, /Good example/);
   assert.doesNotMatch(keyboardTexts, /Bad example/);
   assert.doesNotMatch(keyboardTexts, /Common mistake/);
+  assert.doesNotMatch(keyboardTexts, /Restart same plan/);
+  assert.doesNotMatch(keyboardTexts, /Buy new key/);
+  assert.match(keyboardTexts, /Upload screenshot/);
+  assert.match(keyboardTexts, /Check status/);
+  assert.match(keyboardTexts, /Orders/);
 });
 
 test('telegram premium prompts and order outcomes stay compact and HTML-safe', () => {
@@ -505,8 +510,8 @@ test('myanmar support summary and admin queue labels stay localized', () => {
   });
 
   assert.deepEqual(validateTelegramHtmlMessage(summary), { valid: true, invalidTags: [] });
-  assert.match(summary, /သင့် thread များ/);
-  assert.match(summary, /Admin အဖြေ စောင့်နေ/);
+  assert.match(summary, /သင့် စာတွဲများ/);
+  assert.match(summary, /စီမံသူ အဖြေကို စောင့်နေ/);
   assert.doesNotMatch(summary, /Your threads/);
 
   const firstRow = keyboard.inline_keyboard[0]?.map((button) => button.text).join(' | ') || '';
@@ -782,7 +787,7 @@ test('admin queue cards stay compact and button-first', () => {
   assert.match(premiumQueueSummary, /Use Review, Ask, or Handled on the next card/);
   assertTelegramMessageBudget(premiumQueueSummary, { maxLines: 5, maxChars: 220 });
   assert.doesNotMatch(premiumQueueCard, /Use the buttons below/);
-  assert.match(premiumQueueCard, /နောက်ဆုံး reply/);
+  assert.match(premiumQueueCard, /နောက်ဆုံး အကြောင်းပြန်ချက်/);
   assert.doesNotMatch(premiumQueueCard, /Latest reply/);
   assertTelegramMessageBudget(premiumQueueCard, { maxLines: 8, maxChars: 300 });
   assert.match(refundSummary, /Opening the next refund below/);
@@ -880,8 +885,8 @@ test('myanmar premium queue helpers stay localized and compact', () => {
     queueKeyboard.inline_keyboard[1]?.[0]?.callback_data,
   );
   assert.match(firstRow, /အားလုံး/);
-  assert.match(firstRow, /Admin စောင့်နေ/);
-  assert.match(firstRow, /User စောင့်နေ/);
+  assert.match(firstRow, /စီမံခန့်ခွဲသူ စောင့်နေ/);
+  assert.match(firstRow, /အသုံးပြုသူ စောင့်နေ/);
   assert.deepEqual(nextActionCallback, {
     section: 'admin',
     action: 'supportqueue_admin',
@@ -898,7 +903,7 @@ test('myanmar premium queue helpers stay localized and compact', () => {
   assert.deepEqual(validateTelegramHtmlMessage(refundCard), { valid: true, invalidTags: [] });
   assert.match(adminHome, /စစ်ရန်လိုသည်/);
   assert.match(adminHome, /နောက်လုပ်ဆောင်ချက်ကို/);
-  assert.match(premiumQueueSummary, /Premium support စစ်ရန်/);
+  assert.match(premiumQueueSummary, /ပရီမီယမ် အကူအညီ စောင့်ဆိုင်းစာရင်း/);
   assert.match(refundSummary, /Refund စစ်ရန်/);
   assert.match(refundSummary, /မယူရသေး/);
   assert.match(refundCard, /Refund တောင်းဆိုချက်/);
