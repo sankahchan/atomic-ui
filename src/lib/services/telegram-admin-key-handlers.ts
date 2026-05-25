@@ -532,11 +532,11 @@ function buildAccessManageKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '📦 quota သတ်မှတ်' : '📦 Set quota',
+          text: isMyanmar ? '📦 ဒေတာပမာဏ သတ်မှတ်' : '📦 Set quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'quota'),
         },
         {
-          text: isMyanmar ? '➕ quota ထပ်တိုး' : '➕ Add quota',
+          text: isMyanmar ? '➕ ဒေတာပမာဏ ထပ်တိုး' : '➕ Add quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'addquota'),
         },
       ],
@@ -558,7 +558,7 @@ function buildAccessManageKeyboard(input: {
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'toggle'),
         },
         {
-          text: isMyanmar ? '📨 access ပြန်ပို့မည်' : '📨 Resend access',
+          text: isMyanmar ? '📨 အသုံးပြုခွင့်ကို ပြန်ပို့မည်' : '📨 Resend access',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'resend'),
         },
       ],
@@ -570,7 +570,7 @@ function buildAccessManageKeyboard(input: {
             }]
           : []),
         {
-          text: isMyanmar ? 'Panel ဖွင့်မည်' : 'Open panel',
+          text: isMyanmar ? 'ထိန်းချုပ်ခန်းကို ဖွင့်မည်' : 'Open panel',
           url: input.panelUrl,
         },
       ],
@@ -609,11 +609,11 @@ function buildDynamicManageKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '📦 quota သတ်မှတ်' : '📦 Set quota',
+          text: isMyanmar ? '📦 ဒေတာပမာဏ သတ်မှတ်' : '📦 Set quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'quota'),
         },
         {
-          text: isMyanmar ? '➕ quota ထပ်တိုး' : '➕ Add quota',
+          text: isMyanmar ? '➕ ဒေတာပမာဏ ထပ်တိုး' : '➕ Add quota',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'addquota'),
         },
       ],
@@ -629,21 +629,21 @@ function buildDynamicManageKeyboard(input: {
       ],
       [
         {
-          text: isMyanmar ? '🌍 ဦးစားပေး region' : '🌍 Preferred region',
+          text: isMyanmar ? '🌍 ဦးစားပေး ဒေသ' : '🌍 Preferred region',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'region'),
         },
         {
-          text: isMyanmar ? '🧭 region mode' : '🧭 Region mode',
+          text: isMyanmar ? '🧭 ဒေသ မုဒ်' : '🧭 Region mode',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'mode'),
         },
       ],
       [
         {
-          text: isMyanmar ? '📨 access ပြန်ပို့မည်' : '📨 Resend access',
+          text: isMyanmar ? '📨 အသုံးပြုခွင့်ကို ပြန်ပို့မည်' : '📨 Resend access',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'resend'),
         },
         {
-          text: isMyanmar ? '💎 routing view' : '💎 Routing view',
+          text: isMyanmar ? '💎 လမ်းကြောင်း မြင်ကွင်း' : '💎 Routing view',
           callback_data: buildTelegramAdminKeyCallbackData('manage', 'routing'),
         },
       ],
@@ -655,7 +655,7 @@ function buildDynamicManageKeyboard(input: {
             }]
           : []),
         {
-          text: isMyanmar ? 'Panel ဖွင့်မည်' : 'Open panel',
+          text: isMyanmar ? 'ထိန်းချုပ်ခန်းကို ဖွင့်မည်' : 'Open panel',
           url: input.panelUrl,
         },
       ],
@@ -677,7 +677,7 @@ function buildDynamicRegionKeyboard(input: {
   ]);
   rows.unshift([
     {
-      text: isMyanmar ? '⚡ အလိုအလျောက် / preference ရှင်းမည်' : '⚡ Auto / clear preference',
+      text: isMyanmar ? '⚡ အလိုအလျောက် / ဦးစားပေးရွေးချယ်မှု ရှင်းမည်' : '⚡ Auto / clear preference',
       callback_data: buildTelegramAdminKeyCallbackData('setregion', 'auto'),
     },
   ]);
@@ -715,13 +715,13 @@ export async function promptAccessCreateName(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '➕ <b>ပုံမှန် key ဖန်တီးမည်</b>' : '➕ <b>Create normal key</b>',
+      isMyanmar ? '➕ <b>ပုံမှန်သော့ ဖန်တီးမည်</b>' : '➕ <b>Create normal key</b>',
       '',
       `${isMyanmar ? 'လက်ခံသူ' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
       ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
       '',
       isMyanmar
-        ? 'ယခု key name ကို စာသားဖြင့် ပို့ပေးပါ။'
+        ? 'ယခု သော့အမည်ကို စာသားဖြင့် ပို့ပေးပါ။'
         : 'Send the key name as text now.',
     ].join('\n'),
     {
@@ -742,13 +742,13 @@ export async function promptDynamicCreateName(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '💎 <b>dynamic key ဖန်တီးမည်</b>' : '💎 <b>Create dynamic key</b>',
+      isMyanmar ? '💎 <b>ဒိုင်နမစ်သော့ ဖန်တီးမည်</b>' : '💎 <b>Create dynamic key</b>',
       '',
       `${isMyanmar ? 'လက်ခံသူ' : 'Recipient'}: ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
       ...buildRecipientGuidanceLines(input.draft.recipient, input.locale),
       '',
       isMyanmar
-        ? 'ယခု dynamic key name ကို စာသားဖြင့် ပို့ပေးပါ။'
+        ? 'ယခု ဒိုင်နမစ်သော့အမည်ကို စာသားဖြင့် ပို့ပေးပါ။'
         : 'Send the dynamic key name as text now.',
     ].join('\n'),
     {
@@ -773,7 +773,7 @@ async function promptAccessServer(input: {
       '',
       `${isMyanmar ? 'သော့' : 'Key'}: <b>${escapeHtml(input.draft.name || '-')}</b>`,
       isMyanmar
-        ? 'Auto သည် draining/maintenance ကို ရှောင်ပါမည်။ Manual ရွေးချယ်မှုတွင် draining server ကိုလည်း ရွေးနိုင်ပါသည်။'
+        ? 'အလိုအလျောက်ရွေးချယ်မှုသည် draining/maintenance ကို ရှောင်ပါမည်။ လက်ဖြင့်ရွေးချယ်ပါက draining server ကိုလည်း ရွေးနိုင်ပါသည်။'
         : 'Auto skips draining and maintenance. Manual selection can still use draining servers.',
     ].join('\n'),
     {

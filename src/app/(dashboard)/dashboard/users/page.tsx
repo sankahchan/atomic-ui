@@ -274,7 +274,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Refund စစ်ဆေးမှု မအောင်မြင်ပါ' : 'Refund review failed',
+        title: isMyanmar ? 'ပြန်အမ်းငွေ စစ်ဆေးမှု မအောင်မြင်ပါ' : 'Refund review failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -291,7 +291,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Refund တာဝန်ခွဲဝေမှု မအောင်မြင်ပါ' : 'Refund assignment failed',
+        title: isMyanmar ? 'ပြန်အမ်းငွေ တာဝန်ခွဲဝေမှု မအောင်မြင်ပါ' : 'Refund assignment failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -306,7 +306,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Refund reviewer ပြန်လည်သတ်မှတ်မှု မအောင်မြင်ပါ' : 'Refund reassignment failed',
+        title: isMyanmar ? 'ပြန်အမ်းငွေ သုံးသပ်သူ ပြန်လည်သတ်မှတ်မှု မအောင်မြင်ပါ' : 'Refund reassignment failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -323,7 +323,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Telegram message မပို့နိုင်ပါ' : 'Telegram message failed',
+        title: isMyanmar ? 'Telegram စာကို မပို့နိုင်ပါ' : 'Telegram message failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -339,7 +339,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Receipt ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Receipt resend failed',
+        title: isMyanmar ? 'ပြေစာ ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Receipt resend failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -350,12 +350,12 @@ export default function UsersPage() {
       await quickActionLedgerQuery.refetch();
       toast({
         title: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပြန်ပို့ပြီးပါပြီ' : 'Share page resent',
-        description: isMyanmar ? 'ဖောက်သည်သည် Telegram ထဲတွင် share page ကို ထပ်မံ ရရှိပါပြီ။' : 'The customer received the share page again in Telegram.',
+        description: isMyanmar ? 'ဖောက်သည်သည် Telegram ထဲတွင် မျှဝေစာမျက်နှာကို ထပ်မံ ရရှိပါပြီ။' : 'The customer received the share page again in Telegram.',
       });
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Share page ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Share resend failed',
+        title: isMyanmar ? 'မျှဝေစာမျက်နှာ ပြန်ပို့မှု မအောင်မြင်ပါ' : 'Share resend failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -365,13 +365,13 @@ export default function UsersPage() {
     onSuccess: async () => {
       await quickActionLedgerQuery.refetch();
       toast({
-        title: isMyanmar ? 'ပရိုမိုးရှင်း override ကို သိမ်းပြီးပါပြီ' : 'Promo override saved',
+        title: isMyanmar ? 'ပရိုမိုးရှင်း ခြွင်းချက်ကို သိမ်းပြီးပါပြီ' : 'Promo override saved',
         description: isMyanmar ? 'ဖောက်သည်၏ ပရိုမိုးရှင်း အကျုံးဝင်မှုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Customer promo eligibility was updated.',
       });
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Promo override မအောင်မြင်ပါ' : 'Promo override failed',
+        title: isMyanmar ? 'ပရိုမိုးရှင်း ခြွင်းချက် မအောင်မြင်ပါ' : 'Promo override failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -382,8 +382,8 @@ export default function UsersPage() {
       await quickActionLedgerQuery.refetch();
       toast({
         title: result.status === 'CANCELLED'
-          ? (isMyanmar ? 'Coupon ကို ရုပ်သိမ်းပြီးပါပြီ' : 'Coupon revoked')
-          : (isMyanmar ? 'Coupon သက်တမ်းကုန်ပြီးပါပြီ' : 'Coupon expired'),
+          ? (isMyanmar ? 'ကူပွန်ကို ရုပ်သိမ်းပြီးပါပြီ' : 'Coupon revoked')
+          : (isMyanmar ? 'ကူပွန် သက်တမ်းကုန်ပြီးပါပြီ' : 'Coupon expired'),
         description: isMyanmar
           ? `${result.couponCode} ကို ဤဖောက်သည်အတွက် ထပ်မံ အသုံးမပြုနိုင်တော့ပါ။`
           : `${result.couponCode} is no longer available to this customer.`,
@@ -391,7 +391,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Coupon အပ်ဒိတ် မအောင်မြင်ပါ' : 'Coupon update failed',
+        title: isMyanmar ? 'ကူပွန် အပ်ဒိတ် မအောင်မြင်ပါ' : 'Coupon update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -402,7 +402,7 @@ export default function UsersPage() {
     onSuccess: async (updated) => {
       await refetch();
       toast({
-        title: isMyanmar ? 'Admin scope ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Admin scope updated',
+        title: isMyanmar ? 'စီမံခန့်ခွဲခွင့် အဆင့်ကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Admin scope updated',
         description: isMyanmar
           ? `${updated.email} သည် ယခု ${getAdminScopeLabel(updated.adminScope)} ဖြစ်ပါသည်။`
           : `${updated.email} is now ${getAdminScopeLabel(updated.adminScope)}.`,
@@ -410,7 +410,7 @@ export default function UsersPage() {
     },
     onError: (error) => {
       toast({
-        title: isMyanmar ? 'Admin scope အပ်ဒိတ် မအောင်မြင်ပါ' : 'Admin scope update failed',
+        title: isMyanmar ? 'စီမံခန့်ခွဲခွင့် အဆင့် အပ်ဒိတ် မအောင်မြင်ပါ' : 'Admin scope update failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -529,7 +529,7 @@ export default function UsersPage() {
                 helper={isMyanmar ? 'ထိန်းချုပ်ခန်းအတွင်းရှိ စီမံသူနှင့် ကလိုင်းယင့်အကောင့်များ။' : 'Admin and client accounts in the panel.'}
               />
               <UserStatCard
-                label={isMyanmar ? 'Admin များ' : 'Admins'}
+                label={isMyanmar ? 'စီမံသူများ' : 'Admins'}
                 value={adminCount}
                 helper={
                   isMyanmar
@@ -540,7 +540,7 @@ export default function UsersPage() {
               <UserStatCard
                 label={isMyanmar ? 'ကလိုင်းယင့်များ' : 'Clients'}
                 value={clientCount}
-                helper={isMyanmar ? 'အသုံးပြုသူများအတွက် portal-only account များ။' : 'Portal-only accounts for end users.'}
+                helper={isMyanmar ? 'အသုံးပြုသူများအတွက် ပေါ်တယ်သီးသန့် အကောင့်များ။' : 'Portal-only accounts for end users.'}
               />
               <UserStatCard
                 label={isMyanmar ? 'ချိတ်ထားသော သော့များ' : 'Assigned keys'}
@@ -621,7 +621,7 @@ export default function UsersPage() {
                 <Link href="/dashboard/sessions" className="ops-action-tile">
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <User className="h-4 w-4 text-primary" />
-                    {isMyanmar ? 'sessions များကို စစ်ဆေးမည်' : 'Review sessions'}
+                    {isMyanmar ? 'ဝင်ရောက်မှတ်တမ်းများကို စစ်ဆေးမည်' : 'Review sessions'}
                   </span>
                   <span className="text-xs text-muted-foreground">{t('dashboard.open')}</span>
                 </Link>
@@ -654,7 +654,7 @@ export default function UsersPage() {
                       <DialogTitle>{isMyanmar ? 'ငွေကြေး ထိန်းချုပ်မှုများ' : 'Finance controls'}</DialogTitle>
                       <DialogDescription>
                         {isMyanmar
-                          ? 'Telegram order refund သို့မဟုတ် credit လုပ်နိုင်သူများကို ကန့်သတ်ပြီး နေ့စဉ် finance digest ကိုလည်း ထိန်းချုပ်ပါ။'
+                          ? 'Telegram အော်ဒါများအတွက် ပြန်အမ်းငွေ သို့မဟုတ် credit လုပ်နိုင်သူများကို ကန့်သတ်ပြီး နေ့စဉ် ငွေကြေးအနှစ်ချုပ်ကိုလည်း ထိန်းချုပ်ပါ။'
                           : 'Limit who can refund or credit Telegram orders, and control the daily finance digest.'}
                       </DialogDescription>
                     </DialogHeader>
@@ -662,7 +662,7 @@ export default function UsersPage() {
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
                         <Label htmlFor="finance-owner-emails">
-                          {isMyanmar ? 'ယခင် owner email ခွင့်ပြုစာရင်း' : 'Legacy owner email allowlist'}
+                          {isMyanmar ? 'ယခင် Owner အီးမေးလ် ခွင့်ပြုစာရင်း' : 'Legacy owner email allowlist'}
                         </Label>
                         <Input
                           id="finance-owner-emails"
@@ -679,7 +679,7 @@ export default function UsersPage() {
                       <div className="space-y-2">
                         <Label htmlFor="finance-operator-emails">
                           {isMyanmar
-                            ? 'ယခင် finance operator email ခွင့်ပြုစာရင်း'
+                            ? 'ယခင် ငွေကြေးတာဝန်ခံ အီးမေးလ် ခွင့်ပြုစာရင်း'
                             : 'Legacy finance operator allowlist'}
                         </Label>
                         <Input
@@ -696,10 +696,10 @@ export default function UsersPage() {
                       </div>
                       <div className="flex items-center justify-between rounded-xl border border-border/50 p-3">
                         <div className="space-y-1">
-                          <p className="text-sm font-medium">{isMyanmar ? 'နေ့စဉ် finance digest' : 'Daily finance digest'}</p>
+                          <p className="text-sm font-medium">{isMyanmar ? 'နေ့စဉ် ငွေကြေးအနှစ်ချုပ်' : 'Daily finance digest'}</p>
                           <p className="text-xs text-muted-foreground">
                             {isMyanmar
-                              ? 'ဝင်ငွေ၊ refund၊ credit နှင့် စောင့်ဆိုင်းနေသည့် refund request အကျဉ်းချုပ်ကို admin chat များသို့ ပို့ပါ။'
+                              ? 'ဝင်ငွေ၊ ပြန်အမ်းငွေ၊ credit နှင့် စောင့်ဆိုင်းနေသည့် ပြန်အမ်းငွေတောင်းဆိုချက် အကျဉ်းချုပ်ကို စီမံသူ စကားပြောခန်းများသို့ ပို့ပါ။'
                               : 'Send revenue, refund, credit, and pending refund-request summaries to admin chats.'}
                           </p>
                         </div>
@@ -715,7 +715,7 @@ export default function UsersPage() {
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="finance-digest-hour">{isMyanmar ? 'digest ပို့ချိန် (နာရီ)' : 'Digest hour'}</Label>
+                          <Label htmlFor="finance-digest-hour">{isMyanmar ? 'အနှစ်ချုပ် ပို့ချိန် (နာရီ)' : 'Digest hour'}</Label>
                           <Input
                             id="finance-digest-hour"
                             inputMode="numeric"
@@ -724,7 +724,7 @@ export default function UsersPage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="finance-digest-minute">{isMyanmar ? 'digest ပို့ချိန် (မိနစ်)' : 'Digest minute'}</Label>
+                          <Label htmlFor="finance-digest-minute">{isMyanmar ? 'အနှစ်ချုပ် ပို့ချိန် (မိနစ်)' : 'Digest minute'}</Label>
                           <Input
                             id="finance-digest-minute"
                             inputMode="numeric"
@@ -747,7 +747,7 @@ export default function UsersPage() {
                         ) : (
                           <Send className="mr-2 h-4 w-4" />
                         )}
-                        {isMyanmar ? 'ယခုပင် digest ပို့မည်' : 'Send digest now'}
+                        {isMyanmar ? 'ယခုပင် အနှစ်ချုပ် ပို့မည်' : 'Send digest now'}
                       </Button>
                       <div className="flex gap-2">
                         <Button variant="outline" onClick={() => setFinanceDialogOpen(false)}>
@@ -912,7 +912,7 @@ export default function UsersPage() {
 
           {refundQueueQuery.isLoading ? (
             <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
-              {isMyanmar ? 'Refund queue ကို တင်နေသည်...' : 'Loading refund queue...'}
+              {isMyanmar ? 'ပြန်အမ်းငွေ တန်းစီစာရင်းကို တင်နေသည်...' : 'Loading refund queue...'}
             </div>
           ) : refundQueue.length === 0 ? (
             <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
@@ -1096,7 +1096,7 @@ export default function UsersPage() {
                               disabled={!canManageFinance || assignRefundReviewerMutation.isPending}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder={isMyanmar ? 'Reviewer သတ်မှတ်ပါ' : 'Assign reviewer'} />
+                                <SelectValue placeholder={isMyanmar ? 'သုံးသပ်သူကို သတ်မှတ်ပါ' : 'Assign reviewer'} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="unassigned">{isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned'}</SelectItem>
@@ -1387,7 +1387,7 @@ export default function UsersPage() {
 
                   {user.role === 'ADMIN' ? (
                     <div className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'Admin ခွင့်ပြုနယ်ပယ်' : 'Admin scope'}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'စီမံခန့်ခွဲခွင့် အဆင့်' : 'Admin scope'}</p>
                       <Select
                         value={normalizeAdminScope(user.adminScope) || 'ADMIN'}
                         onValueChange={(value) =>
@@ -1453,7 +1453,7 @@ export default function UsersPage() {
       >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{isMyanmar ? 'Customer အမြန်လုပ်ဆောင်ချက်များ' : 'Customer quick actions'}</DialogTitle>
+            <DialogTitle>{isMyanmar ? 'ဖောက်သည် အမြန်လုပ်ဆောင်ချက်များ' : 'Customer quick actions'}</DialogTitle>
             <DialogDescription>
               {isMyanmar
                 ? `${quickActionsUser?.email || 'ရွေးထားသော customer'} ကို user list မှ မထွက်ဘဲ စီမံပါ။`
@@ -1463,7 +1463,7 @@ export default function UsersPage() {
           {quickActionLedgerQuery.isLoading ? (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {isMyanmar ? 'Customer shortcuts များကို တင်နေသည်…' : 'Loading customer shortcuts…'}
+              {isMyanmar ? 'ဖောက်သည် shortcut များကို တင်နေသည်…' : 'Loading customer shortcuts…'}
             </div>
           ) : quickActionLedger ? (
             <div className="space-y-5">
@@ -1493,7 +1493,7 @@ export default function UsersPage() {
                     {quickActionTelegramOrders.filter((order) => order.status === 'FULFILLED').length}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {isMyanmar ? 'Receipt ကို ထပ်ပို့ရန် အဆင်သင့်' : 'Ready for receipt resend'}
+                    {isMyanmar ? 'ပြေစာကို ထပ်ပို့ရန် အဆင်သင့်' : 'Ready for receipt resend'}
                   </p>
                 </div>
                 <div className="rounded-xl border border-border/60 p-3">
@@ -1504,7 +1504,7 @@ export default function UsersPage() {
                     {quickActionAccessKeys.length + quickActionDynamicKeys.length}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {isMyanmar ? 'Share page ကို ထပ်ပို့နိုင်သည်' : 'Share page resend available'}
+                    {isMyanmar ? 'မျှဝေစာမျက်နှာကို ထပ်ပို့နိုင်သည်' : 'Share page resend available'}
                   </p>
                 </div>
               </div>
@@ -1515,7 +1515,7 @@ export default function UsersPage() {
                     <div>
                       <p className="text-sm font-medium">{isMyanmar ? 'Telegram စာကို တိုက်ရိုက်ပို့မည်' : 'Direct Telegram message'}</p>
                       <p className="text-xs text-muted-foreground">
-                        {isMyanmar ? 'ဤစာရင်းမှတစ်ဆင့် customer သို့ အတိုချုံး update တစ်စောင် ပို့ပါ။' : 'Send a short customer update from the directory.'}
+                        {isMyanmar ? 'ဤစာရင်းမှတစ်ဆင့် ဖောက်သည်ထံ အတိုချုံး အပ်ဒိတ်တစ်စောင် ပို့ပါ။' : 'Send a short customer update from the directory.'}
                       </p>
                     </div>
                     <Switch
@@ -1558,7 +1558,7 @@ export default function UsersPage() {
                   <p className="text-sm font-medium">{isMyanmar ? 'ပို့ဆောင်မှု shortcut များ' : 'Delivery shortcuts'}</p>
                   <div className="mt-3 space-y-3">
                     <div className="space-y-2">
-                      <Label>{isMyanmar ? 'Receipt ကို ထပ်ပို့မည်' : 'Resend receipt'}</Label>
+                      <Label>{isMyanmar ? 'ပြေစာကို ထပ်ပို့မည်' : 'Resend receipt'}</Label>
                       <Select value={quickActionReceiptOrderId} onValueChange={setQuickActionReceiptOrderId}>
                         <SelectTrigger>
                           <SelectValue placeholder={isMyanmar ? 'အပြီးသတ်ထားသော အော်ဒါကို ရွေးပါ' : 'Choose a fulfilled order'} />
@@ -1644,7 +1644,7 @@ export default function UsersPage() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-medium">{isMyanmar ? 'ပရိုမိုးရှင်း override များ' : 'Promo overrides'}</p>
+                <p className="text-sm font-medium">{isMyanmar ? 'ပရိုမိုးရှင်း ခြွင်းချက်များ' : 'Promo overrides'}</p>
                 <div className="grid gap-3 md:grid-cols-2">
                   {quickActionCouponEligibility.map((campaign) => (
                     <div key={campaign.campaignType} className="rounded-xl border border-border/60 p-4">
@@ -1728,7 +1728,7 @@ export default function UsersPage() {
 
               {quickActionCouponHistory.some((coupon) => coupon.status === 'ISSUED') ? (
                 <div className="space-y-3">
-                  <p className="text-sm font-medium">{isMyanmar ? 'Coupon လုပ်ဆောင်ချက်များ' : 'Coupon actions'}</p>
+                  <p className="text-sm font-medium">{isMyanmar ? 'ကူပွန် လုပ်ဆောင်ချက်များ' : 'Coupon actions'}</p>
                   <div className="grid gap-3 md:grid-cols-2">
                     {quickActionCouponHistory
                       .filter((coupon) => coupon.status === 'ISSUED')
@@ -1939,8 +1939,8 @@ export default function UsersPage() {
             >
               {reviewRefundRequestMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {refundReviewDialog?.action === 'APPROVE'
-                ? (isMyanmar ? 'Refund ကို အတည်ပြုမည်' : 'Approve refund')
-                : (isMyanmar ? 'Refund ကို ငြင်းပယ်မည်' : 'Reject refund')}
+                ? (isMyanmar ? 'ပြန်အမ်းငွေကို အတည်ပြုမည်' : 'Approve refund')
+                : (isMyanmar ? 'ပြန်အမ်းငွေကို ငြင်းပယ်မည်' : 'Reject refund')}
             </Button>
           </DialogFooter>
         </DialogContent>
