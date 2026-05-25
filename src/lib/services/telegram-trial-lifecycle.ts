@@ -94,7 +94,7 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
               `📶 အသုံးပြုပြီး :  ${usedGb} GB / ${limitGb} GB`,
               `<code>[${progressBar}] ${Math.round(progress)}%</code>`,
               '',
-              'နှစ်သက်ပါက paid plan သို့ upgrade လုပ်နိုင်ပါသည်။',
+              'နှစ်သက်ပါက အခပေး အစီအစဉ်သို့ အဆင့်မြှင့်နိုင်ပါသည်။',
             ].join('\n')
           : [
               '⏳ <b>Trial Reminder</b>',
@@ -112,11 +112,11 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
             inline_keyboard: [
               [
                 {
-                  text: isMyanmar ? '⚡ Flash plan များ' : '⚡ See Flash Plans',
+                  text: isMyanmar ? '⚡ အမြန်အစီအစဉ်များ' : '⚡ See Flash Plans',
                   callback_data: buildTelegramMenuCallbackData('trial', 'show_monthly'),
                 },
                 {
-                  text: isMyanmar ? '🌙 Season plan များ' : '🌙 See Season Plans',
+                  text: isMyanmar ? '🌙 ရာသီအစီအစဉ်များ' : '🌙 See Season Plans',
                   callback_data: buildTelegramMenuCallbackData('trial', 'show_quarterly'),
                 },
               ],
@@ -140,7 +140,7 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
             '⚠️ <b>အစမ်းသုံး မကြာမီကုန်မည်</b>',
             '━━━━━━━━━━━━━━━━━━',
             'သင်၏ အခမဲ့အစမ်းသုံးသည် <b>၆ နာရီအတွင်း</b> ကုန်ဆုံးမည်ဖြစ်သည်။',
-            'VPN ချိတ်ဆက်မှု မပြတ်သွားစေရန် ယခုပဲ plan ဝယ်ပါ!',
+            'VPN ချိတ်ဆက်မှု မပြတ်သွားစေရန် ယခုပဲ အစီအစဉ် ဝယ်ပါ!',
           ].join('\n')
         : [
             '⚠️ <b>Trial Expiring Soon</b>',
@@ -154,7 +154,7 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
           inline_keyboard: [
             [
               {
-                text: isMyanmar ? '🛒 ယခုပဲ upgrade လုပ်မည်' : '🛒 Upgrade Now',
+                text: isMyanmar ? '🛒 ယခုပဲ အဆင့်မြှင့်မည်' : '🛒 Upgrade Now',
                 callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
               },
               {
@@ -183,7 +183,7 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
             'သင်၏ အခမဲ့အစမ်းသုံးကာလ ကုန်ဆုံးသွားပါပြီ။',
             'ဝန်ဆောင်မှုကို နှစ်သက်ခဲ့မည်ဟု မျှော်လင့်ပါသည်!',
             '',
-            'ဆက်လက်အသုံးပြုလိုပါက plan တစ်ခု ဝယ်ယူပါ။',
+            'ဆက်လက်အသုံးပြုလိုပါက အစီအစဉ်တစ်ခု ဝယ်ယူပါ။',
           ].join('\n')
         : [
             '❌ <b>Trial Expired</b>',
@@ -199,7 +199,7 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
           inline_keyboard: [
             [
               {
-                text: isMyanmar ? '🛒 Paid plan များကြည့်မည်' : '🛒 View Paid Plans',
+                text: isMyanmar ? '🛒 အခပေး အစီအစဉ်များ ကြည့်မည်' : '🛒 View Paid Plans',
                 callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
               },
             ],
@@ -242,7 +242,7 @@ export async function runTelegramTrialLifecycleCycle(input: { now?: Date } = {})
                 callback_data: buildTelegramMenuCallbackData('trial', 'claim_discount'),
               },
               {
-                text: isMyanmar ? '🛒 Plan များကြည့်မည်' : '🛒 Shop Plans',
+                text: isMyanmar ? '🛒 အစီအစဉ်များ ကြည့်မည်' : '🛒 Shop Plans',
                 callback_data: buildTelegramMenuCallbackData('trial', 'back_main'),
               },
             ],

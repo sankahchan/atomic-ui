@@ -288,7 +288,7 @@ function buildAccessDraftProtectionWarningLines(
   return [
     '',
     locale === 'my'
-      ? '⚠️ Soft limit only: share page / client-link flow ကို ထိန်းနိုင်ပေမယ့် copied raw ss:// secret ကို device အခြားတစ်ခုမှာ ပြန်သုံးနိုင်သေးသည်။ Stronger anti-sharing အတွက် /createdynamic ကို အသုံးပြုပါ။'
+      ? '⚠️ ယင်းသည် ပျော့ပြောင်းကန့်သတ်ချက်သာ ဖြစ်ပါသည်။ မျှဝေစာမျက်နှာ / client-link လုပ်ငန်းစဉ်ကို ထိန်းနိုင်ပေမယ့် copy လုပ်ထားသော raw ss:// secret ကို အခြားစက်တစ်ခုတွင် ပြန်သုံးနိုင်သေးသည်။ ပိုမိုခိုင်မာသော မျှဝေမှုကာကွယ်ရေးအတွက် /createdynamic ကို အသုံးပြုပါ။'
       : '⚠️ Soft limit only: the share page and client-link flow can be gated, but a copied raw ss:// secret can still be reused. Use /createdynamic for stronger anti-sharing.',
   ];
 }
@@ -794,11 +794,11 @@ async function promptDynamicType(input: {
     input.botToken,
     input.chatId,
     [
-      isMyanmar ? '🧭 <b>dynamic mode ရွေးပါ</b>' : '🧭 <b>Choose dynamic mode</b>',
+      isMyanmar ? '🧭 <b>ဒိုင်နမစ် မုဒ် ရွေးပါ</b>' : '🧭 <b>Choose dynamic mode</b>',
       '',
       `${isMyanmar ? 'သော့' : 'Key'}: <b>${escapeHtml(input.draft.name || '-')}</b>`,
       isMyanmar
-        ? 'SELF_MANAGED သည် preferred routing/fallback အတွက် သင့်တော်ပါသည်။ MANUAL သည် admin controlled routing အတွက်ဖြစ်သည်။'
+        ? 'SELF_MANAGED သည် ဦးစားပေး လမ်းကြောင်းနှင့် အရန်ပြောင်းလဲမှုအတွက် သင့်တော်ပါသည်။ MANUAL သည် စီမံခန့်ခွဲသူက ထိန်းထားသော လမ်းကြောင်းအတွက် ဖြစ်သည်။'
         : 'SELF_MANAGED is better for preferred routing and fallback. MANUAL keeps routing under admin control.',
     ].join('\n'),
     {
@@ -806,11 +806,11 @@ async function promptDynamicType(input: {
         inline_keyboard: [
           [
             {
-              text: '⚡ Self-managed',
+              text: isMyanmar ? '⚡ ကိုယ်တိုင်စီမံ' : '⚡ Self-managed',
               callback_data: buildTelegramAdminKeyCallbackData('type', 'self'),
             },
             {
-              text: '🛠 Manual',
+              text: isMyanmar ? '🛠 လက်ဖြင့်စီမံ' : '🛠 Manual',
               callback_data: buildTelegramAdminKeyCallbackData('type', 'manual'),
             },
           ],
@@ -832,14 +832,14 @@ async function promptQuota(input: {
   const title =
     input.kind === 'create_access'
       ? isMyanmar
-        ? '📦 <b>Set quota</b>'
+        ? '📦 <b>ဒေတာပမာဏ သတ်မှတ်မည်</b>'
         : '📦 <b>Set quota</b>'
       : input.kind === 'create_dynamic'
         ? isMyanmar
-          ? '📦 <b>Set dynamic quota</b>'
+          ? '📦 <b>ဒိုင်နမစ် ဒေတာပမာဏ သတ်မှတ်မည်</b>'
           : '📦 <b>Set dynamic quota</b>'
         : isMyanmar
-          ? '📦 <b>Update quota</b>'
+          ? '📦 <b>ဒေတာပမာဏ အပ်ဒိတ်လုပ်မည်</b>'
           : '📦 <b>Update quota</b>';
   await input.deps.sendTelegramMessage(input.botToken, input.chatId, title, {
     replyMarkup: buildQuotaKeyboard(input.locale),
@@ -856,8 +856,8 @@ async function promptDeviceLimit(input: {
   const isMyanmar = input.locale === 'my';
   const title =
     input.kind === 'create_dynamic'
-      ? (isMyanmar ? '📱 <b>dynamic device limit သတ်မှတ်</b>' : '📱 <b>Set dynamic device limit</b>')
-      : (isMyanmar ? '📱 <b>device limit သတ်မှတ်</b>' : '📱 <b>Set device limit</b>');
+      ? (isMyanmar ? '📱 <b>ဒိုင်နမစ် စက်အရေအတွက် ကန့်သတ်ချက် သတ်မှတ်</b>' : '📱 <b>Set dynamic device limit</b>')
+      : (isMyanmar ? '📱 <b>စက်အရေအတွက် ကန့်သတ်ချက် သတ်မှတ်</b>' : '📱 <b>Set device limit</b>');
 
   await input.deps.sendTelegramMessage(
     input.botToken,
@@ -866,7 +866,7 @@ async function promptDeviceLimit(input: {
       title,
       '',
       isMyanmar
-        ? 'Device sharing ကို လျှော့ချရန် estimated limit သတ်မှတ်ပါ။ Blank မလိုပါက No limit ကိုရွေးပါ။'
+        ? 'စက်မျှဝေမှုကို လျှော့ချရန် ခန့်မှန်း ကန့်သတ်ချက် သတ်မှတ်ပါ။ မလိုပါက ကန့်သတ်ချက်မရှိ ကို ရွေးပါ။'
         : 'Set an estimated device cap to reduce sharing. Choose No limit if you do not want one.',
     ].join('\n'),
     {
@@ -885,7 +885,7 @@ async function promptAddQuota(input: {
   await input.deps.sendTelegramMessage(
     input.botToken,
     input.chatId,
-    isMyanmar ? '➕ <b>quota ထပ်တိုးမည်</b>' : '➕ <b>Add more quota</b>',
+    isMyanmar ? '➕ <b>ဒေတာပမာဏ ထပ်တိုးမည်</b>' : '➕ <b>Add more quota</b>',
     {
       replyMarkup: buildAddQuotaKeyboard(input.locale),
     },
@@ -906,7 +906,7 @@ async function promptCreateExpiry(input: {
       isMyanmar ? '⏳ <b>သက်တမ်း သတ်မှတ်မည်</b>' : '⏳ <b>Set expiration</b>',
       '',
       isMyanmar
-        ? 'Fixed date အတွက် YYYY-MM-DD (KST) ကို နောက် message အဖြစ် ပို့နိုင်ပါသည်။'
+        ? 'သတ်မှတ်ရက်စွဲအတွက် YYYY-MM-DD (KST) ကို နောက်မက်ဆေ့ချ်အဖြစ် ပို့နိုင်ပါသည်။'
         : 'For a fixed date, send YYYY-MM-DD (KST) in the next message.',
     ].join('\n'),
     {
@@ -929,7 +929,7 @@ async function promptManageExpiry(input: {
       isMyanmar ? '⏳ <b>သက်တမ်း အပ်ဒိတ်လုပ်မည်</b>' : '⏳ <b>Update expiration</b>',
       '',
       isMyanmar
-        ? 'Fixed date အတွက် YYYY-MM-DD (KST) ကို နောက် message အဖြစ် ပို့နိုင်ပါသည်။'
+        ? 'သတ်မှတ်ရက်စွဲအတွက် YYYY-MM-DD (KST) ကို နောက်မက်ဆေ့ချ်အဖြစ် ပို့နိုင်ပါသည်။'
         : 'For a fixed date, send YYYY-MM-DD (KST) in the next message.',
     ].join('\n'),
     {
@@ -962,7 +962,7 @@ async function promptAccessCreateConfirm(input: {
       : server
         ? renderServerChoiceLabel(server)
         : input.locale === 'my'
-          ? 'Unknown server'
+          ? 'မသိသော ဆာဗာ'
           : 'Unknown server';
 
   await input.deps.sendTelegramMessage(
@@ -978,7 +978,7 @@ async function promptAccessCreateConfirm(input: {
         input.draft.dataLimitGB
           ? `${input.draft.dataLimitGB} GB`
           : input.locale === 'my'
-            ? 'Unlimited'
+            ? 'အကန့်အသတ်မရှိ'
             : 'Unlimited'
       }`,
       `📱 ${escapeHtml(formatDraftDeviceLimit(input.draft.maxDevices, input.locale))}`,
@@ -1014,16 +1014,16 @@ async function promptDynamicCreateConfirm(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '✅ <b>Dynamic သော့ အတည်ပြုမည်</b>' : '✅ <b>Confirm dynamic key</b>',
+      input.locale === 'my' ? '✅ <b>ဒိုင်နမစ်သော့ အတည်ပြုမည်</b>' : '✅ <b>Confirm dynamic key</b>',
       '',
       `💎 <b>${escapeHtml(input.draft.name || '-')}</b>`,
       `👤 ${formatRecipientSummary(input.draft.recipient, input.locale)}`,
-      `🧭 ${escapeHtml(input.draft.keyType === 'SELF_MANAGED' ? 'Self-managed' : 'Manual')}`,
+      `🧭 ${escapeHtml(input.draft.keyType === 'SELF_MANAGED' ? (input.locale === 'my' ? 'ကိုယ်တိုင်စီမံ' : 'Self-managed') : (input.locale === 'my' ? 'လက်ဖြင့်စီမံ' : 'Manual'))}`,
       `📦 ${
         input.draft.dataLimitGB
           ? `${input.draft.dataLimitGB} GB`
           : input.locale === 'my'
-            ? 'Unlimited'
+            ? 'အကန့်အသတ်မရှိ'
             : 'Unlimited'
       }`,
       `📱 ${escapeHtml(formatDraftDeviceLimit(input.draft.maxDevices, input.locale))}`,
@@ -1182,7 +1182,9 @@ function formatAccessManageSummary(key: {
         ? `${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
         : (locale === 'my' ? 'အကန့်အသတ်မရှိ' : 'Unlimited'),
     )}`,
-    key.maxDevices ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} estimated devices` : '',
+    key.maxDevices
+      ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} ${locale === 'my' ? 'ခန့်မှန်းစက်များ' : 'estimated devices'}`
+      : '',
     `⏳ ${escapeHtml(
       formatExpirationSummary(
         {
@@ -1227,7 +1229,7 @@ function formatDynamicManageSummary(key: {
   }>;
 }, locale: SupportedLocale) {
   return [
-    locale === 'my' ? '🧭 <b>Dynamic သော့ စီမံမည်</b>' : '🧭 <b>Manage dynamic key</b>',
+    locale === 'my' ? '🧭 <b>ဒိုင်နမစ်သော့ စီမံမည်</b>' : '🧭 <b>Manage dynamic key</b>',
     '',
     `💎 <b>${escapeHtml(key.name)}</b>`,
     `🆔 <code>${key.id}</code>`,
@@ -1239,7 +1241,9 @@ function formatDynamicManageSummary(key: {
         ? `${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}`
         : (locale === 'my' ? 'အကန့်အသတ်မရှိ' : 'Unlimited'),
     )}`,
-    key.maxDevices ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} estimated devices` : '',
+    key.maxDevices
+      ? `📱 ${key.estimatedDevices ?? 0}/${key.maxDevices} ${locale === 'my' ? 'ခန့်မှန်းစက်များ' : 'estimated devices'}`
+      : '',
     `⏳ ${escapeHtml(
       formatExpirationSummary(
         {
@@ -1296,7 +1300,7 @@ export async function showAccessManageActions(input: {
     await input.deps.sendTelegramMessage(
       input.botToken,
       input.chatId,
-      input.locale === 'my' ? 'Access key မတွေ့ပါ။' : 'Access key not found.',
+      input.locale === 'my' ? 'အသုံးပြုခွင့်သော့ မတွေ့ပါ။' : 'Access key not found.',
     );
     return;
   }
@@ -1349,7 +1353,7 @@ export async function showDynamicManageActions(input: {
     await input.deps.sendTelegramMessage(
       input.botToken,
       input.chatId,
-      input.locale === 'my' ? 'Dynamic key မတွေ့ပါ။' : 'Dynamic key not found.',
+      input.locale === 'my' ? 'ဒိုင်နမစ်သော့ မတွေ့ပါ။' : 'Dynamic key not found.',
     );
     return;
   }
@@ -1390,8 +1394,8 @@ export async function promptManageMatches(input: {
     input.chatId,
     [
       input.type === 'access'
-        ? (isMyanmar ? '🔎 <b>ကိုက်ညီသော access key များ</b>' : '🔎 <b>Matching access keys</b>')
-        : (isMyanmar ? '🔎 <b>ကိုက်ညီသော dynamic key များ</b>' : '🔎 <b>Matching dynamic keys</b>'),
+        ? (isMyanmar ? '🔎 <b>ကိုက်ညီသော အသုံးပြုခွင့်သော့များ</b>' : '🔎 <b>Matching access keys</b>')
+        : (isMyanmar ? '🔎 <b>ကိုက်ညီသော ဒိုင်နမစ်သော့များ</b>' : '🔎 <b>Matching dynamic keys</b>'),
       '',
       ...input.matches.flatMap((match, index) => [
         `${index + 1}. <b>${escapeHtml(match.name)}</b> • ${escapeHtml(match.status)}`,
@@ -2063,7 +2067,7 @@ async function finalizeAccessCreate(input: {
         : `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`;
     } catch {
       deliveryLine = input.locale === 'my'
-        ? 'Direct delivery မအောင်မြင်ပါ။ Connect link ကို ပြန်ပေးပါမည်။'
+        ? 'တိုက်ရိုက်ပေးပို့မှု မအောင်မြင်ပါ။ ချိတ်ဆက်လင့်ခ်ကို ပြန်ပေးပါမည်။'
         : 'Direct delivery was not available. A connect link is included below.';
     }
   }
@@ -2077,7 +2081,7 @@ async function finalizeAccessCreate(input: {
     connectLine = [
       '',
       input.locale === 'my'
-        ? 'Send this connect link to the user:'
+        ? 'ဤချိတ်ဆက်လင့်ခ်ကို အသုံးပြုသူထံ ပို့ပါ:'
         : 'Send this connect link to the user:',
       connectLink.url,
       input.locale === 'my'
@@ -2138,7 +2142,7 @@ async function finalizeDynamicCreate(input: {
         : `Directly sent to <b>${escapeHtml(input.draft.recipient.label)}</b>.`;
     } catch {
       deliveryLine = input.locale === 'my'
-        ? 'Direct delivery မအောင်မြင်ပါ။ Connect link ကို ပြန်ပေးပါမည်။'
+        ? 'တိုက်ရိုက်ပေးပို့မှု မအောင်မြင်ပါ။ ချိတ်ဆက်လင့်ခ်ကို ပြန်ပေးပါမည်။'
         : 'Direct delivery was not available. A connect link is included below.';
     }
   }
@@ -2152,7 +2156,7 @@ async function finalizeDynamicCreate(input: {
     connectLine = [
       '',
       input.locale === 'my'
-        ? 'Send this connect link to the user:'
+        ? 'ဤချိတ်ဆက်လင့်ခ်ကို အသုံးပြုသူထံ ပို့ပါ:'
         : 'Send this connect link to the user:',
       connectLink.url,
       input.locale === 'my'
@@ -2165,7 +2169,7 @@ async function finalizeDynamicCreate(input: {
     input.botToken,
     input.chatId,
     [
-      input.locale === 'my' ? '✅ <b>Dynamic သော့ ဖန်တီးပြီးပါပြီ</b>' : '✅ <b>Dynamic key created</b>',
+      input.locale === 'my' ? '✅ <b>ဒိုင်နမစ်သော့ ဖန်တီးပြီးပါပြီ</b>' : '✅ <b>Dynamic key created</b>',
       '',
       `💎 <b>${escapeHtml(created.name)}</b>`,
       `🆔 <code>${created.id}</code>`,
@@ -2284,7 +2288,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
       input.botToken,
       input.chatId,
       input.locale === 'my'
-        ? '✅ Support thread reply ကို ပို့ပြီးပါပြီ။'
+        ? '✅ အကူအညီ စာတွဲ အကြောင်းပြန်ချက်ကို ပို့ပြီးပါပြီ။'
         : '✅ Sent the support-thread reply.',
     );
     return true;
@@ -2351,7 +2355,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Recipient ကို မတွေ့ပါ။ Email, @username, Telegram ID, သို့မဟုတ် chat ID တို့ဖြင့် ပြန်ပို့ပါ။'
+            ? 'လက်ခံသူကို မတွေ့ပါ။ Email, @username, Telegram ID, သို့မဟုတ် chat ID တို့ဖြင့် ပြန်ပို့ပါ။'
             : 'Recipient not found. Send an email, @username, Telegram ID, or chat ID.',
           {
             replyMarkup: buildRecipientKeyboard(input.locale),
@@ -2400,7 +2404,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Valid quota GB number ပို့ပါ။ ဥပမာ 25'
+            ? 'မှန်ကန်သော ဒေတာပမာဏ GB အရေအတွက်ကို ပို့ပါ။ ဥပမာ 25'
             : 'Send a valid quota number in GB, for example 25.',
         );
         return true;
@@ -2488,7 +2492,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Recipient ကို မတွေ့ပါ။ Email, @username, Telegram ID, သို့မဟုတ် chat ID တို့ဖြင့် ပြန်ပို့ပါ။'
+            ? 'လက်ခံသူကို မတွေ့ပါ။ Email, @username, Telegram ID, သို့မဟုတ် chat ID တို့ဖြင့် ပြန်ပို့ပါ။'
             : 'Recipient not found. Send an email, @username, Telegram ID, or chat ID.',
           {
             replyMarkup: buildRecipientKeyboard(input.locale),
@@ -2537,7 +2541,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Valid quota GB number ပို့ပါ။ ဥပမာ 25'
+            ? 'မှန်ကန်သော ဒေတာပမာဏ GB အရေအတွက်ကို ပို့ပါ။ ဥပမာ 25'
             : 'Send a valid quota number in GB, for example 25.',
         );
         return true;
@@ -2668,7 +2672,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
       await input.deps.sendTelegramMessage(
         input.botToken,
         input.chatId,
-        input.locale === 'my' ? 'Access key ကို မတွေ့ပါ။' : 'Access key not found.',
+        input.locale === 'my' ? 'အသုံးပြုခွင့်သော့ကို မတွေ့ပါ။' : 'Access key not found.',
         {
           replyMarkup: buildCancelKeyboard(input.locale),
         },
@@ -2699,7 +2703,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Valid quota GB number ပို့ပါ။ ဥပမာ 25'
+            ? 'မှန်ကန်သော ဒေတာပမာဏ GB အရေအတွက်ကို ပို့ပါ။ ဥပမာ 25'
             : 'Send a valid quota number in GB, for example 25.',
         );
         return true;
@@ -2741,7 +2745,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Valid quota GB number ပို့ပါ။ ဥပမာ 25'
+            ? 'မှန်ကန်သော ဒေတာပမာဏ GB အရေအတွက်ကို ပို့ပါ။ ဥပမာ 25'
             : 'Send a valid quota number in GB, for example 25.',
         );
         return true;
@@ -2882,7 +2886,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
       await input.deps.sendTelegramMessage(
         input.botToken,
         input.chatId,
-        input.locale === 'my' ? 'Dynamic key ကို မတွေ့ပါ။' : 'Dynamic key not found.',
+        input.locale === 'my' ? 'ဒိုင်နမစ်သော့ကို မတွေ့ပါ။' : 'Dynamic key not found.',
         {
           replyMarkup: buildCancelKeyboard(input.locale),
         },
@@ -2913,7 +2917,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Valid quota GB number ပို့ပါ။ ဥပမာ 25'
+            ? 'မှန်ကန်သော ဒေတာပမာဏ GB အရေအတွက်ကို ပို့ပါ။ ဥပမာ 25'
             : 'Send a valid quota number in GB, for example 25.',
         );
         return true;
@@ -2955,7 +2959,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Valid quota GB number ပို့ပါ။ ဥပမာ 25'
+            ? 'မှန်ကန်သော ဒေတာပမာဏ GB အရေအတွက်ကို ပို့ပါ။ ဥပမာ 25'
             : 'Send a valid quota number in GB, for example 25.',
         );
         return true;
@@ -3098,7 +3102,7 @@ export async function handleTelegramAdminKeyMediaInput(input: {
       input.botToken,
       input.chatId,
       input.locale === 'my'
-        ? '✅ Support attachment ကို customer ထံ ပို့ပြီးပါပြီ။'
+        ? '✅ အကူအညီတွဲဖက်ဖိုင်ကို အသုံးပြုသူထံ ပို့ပြီးပါပြီ။'
         : '✅ Sent the support attachment to the customer.',
     );
     return true;
@@ -3180,7 +3184,7 @@ export async function handleTelegramAdminKeyCallback(input: {
       input.botToken,
       input.chatId,
       input.locale === 'my'
-        ? '🛑 Telegram admin key wizard ကို ပယ်ဖျက်ပြီးပါပြီ။'
+        ? '🛑 Telegram စီမံခန့်ခွဲမှု သော့လမ်းညွှန်ကို ပယ်ဖျက်ပြီးပါပြီ။'
         : '🛑 Cancelled the Telegram admin key wizard.',
     );
     return { handled: true, callbackText: input.locale === 'my' ? 'ပယ်ဖျက်ပြီးပါပြီ။' : 'Cancelled.' };
@@ -3240,13 +3244,13 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Custom quota ကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
+            ? 'စိတ်ကြိုက် ဒေတာပမာဏကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
             : 'Send the custom quota in GB as text, for example 25.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
 
       const nextFlow: AccessCreateDraft = {
@@ -3261,7 +3265,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို သိမ်းလိုက်ပါပြီ။' : 'Quota saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို သိမ်းလိုက်ပါပြီ။' : 'Quota saved.' };
     }
 
     if (input.action === 'devices') {
@@ -3275,7 +3279,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Device limit ကို 1 နှင့် 20 ကြား စာသားပို့ပါ။ ဥပမာ 2'
+            ? 'စက်အရေအတွက် ကန့်သတ်ချက်ကို 1 နှင့် 20 ကြား စာသားပို့ပါ။ ဥပမာ 2'
             : 'Send the device limit as text between 1 and 20, for example 2.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
@@ -3309,7 +3313,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Fixed date ကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
+            ? 'သတ်မှတ်ရက်စွဲကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
             : 'Send the fixed date in YYYY-MM-DD (KST), for example 2026-04-30.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
@@ -3430,13 +3434,13 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Custom quota ကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
+            ? 'စိတ်ကြိုက် ဒေတာပမာဏကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
             : 'Send the custom quota in GB as text, for example 25.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
 
       const nextFlow: DynamicCreateDraft = {
@@ -3451,7 +3455,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         locale: input.locale,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို သိမ်းလိုက်ပါပြီ။' : 'Quota saved.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို သိမ်းလိုက်ပါပြီ။' : 'Quota saved.' };
     }
 
     if (input.action === 'devices') {
@@ -3465,7 +3469,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Device limit ကို 1 နှင့် 20 ကြား စာသားပို့ပါ။ ဥပမာ 2'
+            ? 'စက်အရေအတွက် ကန့်သတ်ချက်ကို 1 နှင့် 20 ကြား စာသားပို့ပါ။ ဥပမာ 2'
             : 'Send the device limit as text between 1 and 20, for example 2.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
@@ -3499,7 +3503,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Fixed date ကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
+            ? 'သတ်မှတ်ရက်စွဲကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
             : 'Send the fixed date in YYYY-MM-DD (KST), for example 2026-04-30.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
@@ -3559,7 +3563,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: created.id,
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Dynamic သော့ကို ဖန်တီးပြီးပါပြီ။' : 'Dynamic key created.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဒိုင်နမစ်သော့ကို ဖန်တီးပြီးပါပြီ။' : 'Dynamic key created.' };
     }
   }
 
@@ -3742,7 +3746,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ရွေးပါ။' : 'Choose quota.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို ရွေးပါ။' : 'Choose quota.' };
         case 'addquota':
           await promptAddQuota({
             chatId: input.chatId,
@@ -3760,7 +3764,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             input.botToken,
             input.chatId,
             input.locale === 'my'
-              ? '🔄 Usage ကို reset လုပ်မည်။ Confirm နှိပ်ပါ။'
+              ? '🔄 အသုံးပြုမှုကို ပြန်လည်သတ်မှတ်မည်။ အတည်ပြု ခလုတ်ကို နှိပ်ပါ။'
               : '🔄 This will reset usage. Press Confirm to continue.',
             {
               replyMarkup: buildDangerConfirmKeyboard({
@@ -3769,7 +3773,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               }),
             },
           );
-          return { handled: true, callbackText: input.locale === 'my' ? 'Reset ကို အတည်ပြုပါ။' : 'Confirm reset.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ပြန်သတ်မှတ်ခြင်းကို အတည်ပြုပါ။' : 'Confirm reset.' };
         case 'expiry':
           await promptManageExpiry({
             chatId: input.chatId,
@@ -3796,7 +3800,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               input.botToken,
               input.chatId,
               input.locale === 'my'
-                ? '⛔ Key ကို disable လုပ်မည်။ Confirm နှိပ်ပါ။'
+              ? '⛔ သော့ကို ပိတ်မည်။ အတည်ပြု ခလုတ်ကို နှိပ်ပါ။'
                 : '⛔ This will disable the key. Press Confirm to continue.',
               {
                 replyMarkup: buildDangerConfirmKeyboard({
@@ -3842,7 +3846,7 @@ export async function handleTelegramAdminKeyCallback(input: {
                 directDelivery: true,
               },
             });
-            return { handled: true, callbackText: input.locale === 'my' ? 'Access ကို ပို့လိုက်ပါပြီ။' : 'Access sent.' };
+            return { handled: true, callbackText: input.locale === 'my' ? 'အသုံးပြုခွင့်လင့်ခ်ကို ပို့လိုက်ပါပြီ။' : 'Access sent.' };
           } catch {
             const connectLink = await input.deps.createAccessKeyTelegramConnectLink({
               accessKeyId: flow.keyId,
@@ -3863,7 +3867,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               input.chatId,
               [
                 input.locale === 'my'
-                  ? 'Direct delivery မအောင်မြင်ပါ။ Linked Telegram chat မရှိနိုင်သောကြောင့် connect link ကို သုံးပါ။'
+                  ? 'တိုက်ရိုက်ပေးပို့မှု မအောင်မြင်ပါ။ ချိတ်ထားသော Telegram chat မရှိနိုင်သောကြောင့် ချိတ်ဆက်လင့်ခ်ကို သုံးပါ။'
                   : 'Direct delivery was not available. Use this connect link instead.',
                 '',
                 connectLink.url,
@@ -3907,13 +3911,13 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Custom quota ကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
+            ? 'စိတ်ကြိုက် ဒေတာပမာဏကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
             : 'Send the custom quota in GB as text, for example 25.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
       await applyAccessKeyQuota({
         keyId: flow.keyId || '',
@@ -3935,7 +3939,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: flow.keyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Quota updated.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Quota updated.' };
     }
 
     if (input.action === 'addquota') {
@@ -3949,7 +3953,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Add လုပ်မည့် quota ကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
+            ? 'ထပ်တိုးမည့် ဒေတာပမာဏကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
             : 'Send the quota top-up in GB as text, for example 25.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
@@ -3988,7 +3992,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         keyId: flow.keyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ထပ်ထည့်လိုက်ပါပြီ။' : 'Quota added.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို ထပ်ထည့်လိုက်ပါပြီ။' : 'Quota added.' };
     }
 
     if (input.action === 'setexpiry') {
@@ -4002,7 +4006,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Fixed date ကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
+            ? 'သတ်မှတ်ရက်စွဲကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
             : 'Send the fixed date in YYYY-MM-DD (KST), for example 2026-04-30.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
@@ -4213,7 +4217,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             locale: input.locale,
             deps: input.deps,
           });
-          return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ရွေးပါ။' : 'Choose quota.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို ရွေးပါ။' : 'Choose quota.' };
         case 'addquota':
           await promptAddQuota({
             chatId: input.chatId,
@@ -4231,7 +4235,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             input.botToken,
             input.chatId,
             input.locale === 'my'
-              ? '🔄 Dynamic usage ကို reset လုပ်မည်။ Confirm နှိပ်ပါ။'
+              ? '🔄 ဒိုင်နမစ် အသုံးပြုမှုကို ပြန်လည်သတ်မှတ်မည်။ အတည်ပြု ခလုတ်ကို နှိပ်ပါ။'
               : '🔄 This will reset dynamic-key usage. Press Confirm to continue.',
             {
               replyMarkup: buildDangerConfirmKeyboard({
@@ -4240,7 +4244,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               }),
             },
           );
-          return { handled: true, callbackText: input.locale === 'my' ? 'Reset ကို အတည်ပြုပါ။' : 'Confirm reset.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'ပြန်သတ်မှတ်ခြင်းကို အတည်ပြုပါ။' : 'Confirm reset.' };
         case 'expiry':
           await promptManageExpiry({
             chatId: input.chatId,
@@ -4278,11 +4282,11 @@ export async function handleTelegramAdminKeyCallback(input: {
             input.chatId,
             [
               input.locale === 'my'
-                ? '🌍 <b>Choose preferred region</b>'
+                ? '🌍 <b>ဦးစားပေး ဒေသ ရွေးပါ</b>'
                 : '🌍 <b>Choose preferred region</b>',
               '',
               input.locale === 'my'
-                ? 'Auto သည် region preference ကို clear လုပ်ပါမည်။'
+                ? 'Auto ကို ရွေးပါက ဒေသဦးစားပေးမှုကို ရှင်းလိုက်ပါမည်။'
                 : 'Auto clears the region preference.',
             ].join('\n'),
             {
@@ -4345,7 +4349,7 @@ export async function handleTelegramAdminKeyCallback(input: {
             input.chatId,
             [
               input.locale === 'my'
-                ? '💎 <b>Dynamic routing view</b>'
+                ? '💎 <b>ဒိုင်နမစ် လမ်းကြောင်း အမြင်</b>'
                 : '💎 <b>Dynamic routing view</b>',
               '',
               ...buildDynamicRoutingManageLines({
@@ -4359,7 +4363,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               }),
             ].join('\n'),
           );
-          return { handled: true, callbackText: input.locale === 'my' ? 'Routing အမြင်ကို ဖွင့်ထားပါသည်။' : 'Routing view.' };
+          return { handled: true, callbackText: input.locale === 'my' ? 'လမ်းကြောင်း အမြင်ကို ဖွင့်ထားပါသည်။' : 'Routing view.' };
         }
         case 'resend': {
           try {
@@ -4379,7 +4383,7 @@ export async function handleTelegramAdminKeyCallback(input: {
                 directDelivery: true,
               },
             });
-            return { handled: true, callbackText: input.locale === 'my' ? 'Access ကို ပို့လိုက်ပါပြီ။' : 'Access sent.' };
+            return { handled: true, callbackText: input.locale === 'my' ? 'အသုံးပြုခွင့်လင့်ခ်ကို ပို့လိုက်ပါပြီ။' : 'Access sent.' };
           } catch {
             const connectLink = await input.deps.createDynamicKeyTelegramConnectLink({
               dynamicAccessKeyId: flow.dynamicKeyId,
@@ -4400,7 +4404,7 @@ export async function handleTelegramAdminKeyCallback(input: {
               input.chatId,
               [
                 input.locale === 'my'
-                  ? 'Direct delivery မအောင်မြင်ပါ။ Linked Telegram chat မရှိနိုင်သောကြောင့် connect link ကို သုံးပါ။'
+                  ? 'တိုက်ရိုက်ပေးပို့မှု မအောင်မြင်ပါ။ ချိတ်ထားသော Telegram chat မရှိနိုင်သောကြောင့် ချိတ်ဆက်လင့်ခ်ကို သုံးပါ။'
                   : 'Direct delivery was not available. Use this connect link instead.',
                 '',
                 connectLink.url,
@@ -4444,13 +4448,13 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Custom quota ကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
+            ? 'စိတ်ကြိုက် ဒေတာပမာဏကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
             : 'Send the custom quota in GB as text, for example 25.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
           },
         );
-        return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
+        return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို စောင့်နေပါသည်။' : 'Awaiting quota.' };
       }
       await applyDynamicQuota({
         dynamicKeyId: flow.dynamicKeyId || '',
@@ -4472,7 +4476,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: flow.dynamicKeyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Quota updated.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို အပ်ဒိတ်လုပ်လိုက်ပါပြီ။' : 'Quota updated.' };
     }
 
     if (input.action === 'addquota') {
@@ -4486,7 +4490,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Add လုပ်မည့် quota ကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
+            ? 'ထပ်တိုးမည့် ဒေတာပမာဏကို GB ဖြင့် စာသားပို့ပါ။ ဥပမာ 25'
             : 'Send the quota top-up in GB as text, for example 25.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
@@ -4527,7 +4531,7 @@ export async function handleTelegramAdminKeyCallback(input: {
         dynamicKeyId: flow.dynamicKeyId || '',
         deps: input.deps,
       });
-      return { handled: true, callbackText: input.locale === 'my' ? 'Quota ကို ထပ်ထည့်လိုက်ပါပြီ။' : 'Quota added.' };
+      return { handled: true, callbackText: input.locale === 'my' ? 'ဒေတာပမာဏကို ထပ်ထည့်လိုက်ပါပြီ။' : 'Quota added.' };
     }
 
     if (input.action === 'setexpiry') {
@@ -4541,7 +4545,7 @@ export async function handleTelegramAdminKeyCallback(input: {
           input.botToken,
           input.chatId,
           input.locale === 'my'
-            ? 'Fixed date ကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
+            ? 'သတ်မှတ်ရက်စွဲကို YYYY-MM-DD (KST) ဖြင့် ပို့ပါ။ ဥပမာ 2026-04-30'
             : 'Send the fixed date in YYYY-MM-DD (KST), for example 2026-04-30.',
           {
             replyMarkup: buildCancelKeyboard(input.locale),
