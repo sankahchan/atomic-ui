@@ -226,6 +226,18 @@ test('store main menu matches the paid storefront button layout', () => {
       '👤 My Account',
     ],
   );
+  assert.equal(
+    view.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'flash' }),
+  );
+  assert.equal(
+    view.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'season' }),
+  );
+  assert.equal(
+    view.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }),
+  );
 });
 
 test('storefront views localize Burmese copy for the main menu and setup flow', () => {
@@ -337,6 +349,29 @@ test('store plan list keeps the fixed 9-plan catalog and dynamic ultra pricing',
   assert.match(view.text, /★ Popular  ·  ★★ Best Deal/);
   assert.equal(view.replyMarkup.inline_keyboard[0]?.[0]?.text, '1️⃣ 🪨 Basic');
   assert.equal(view.replyMarkup.inline_keyboard[2]?.[2]?.text, '9️⃣ 🚀 Ultra ★★');
+  assert.equal(view.replyMarkup.inline_keyboard[3]?.[0]?.text, '⚡ Flash');
+  assert.equal(view.replyMarkup.inline_keyboard[3]?.[1]?.text, '🌙 Season');
+  assert.equal(view.replyMarkup.inline_keyboard[4]?.[0]?.text, '🔑 Dynamic');
+  assert.equal(view.replyMarkup.inline_keyboard[5]?.[0]?.text, '🏠 Main Menu');
+  assert.equal(view.replyMarkup.inline_keyboard[5]?.[1]?.text, '💬 Support');
+});
+
+test('store plan list can focus one category and keeps category-aware navigation', () => {
+  const view = buildTelegramStorePlanListView(samplePlans, 'en', 'season');
+
+  assert.doesNotMatch(view.text, /Flash Plans/);
+  assert.match(view.text, /Season Plans/);
+  assert.doesNotMatch(view.text, /Dynamic Plans\s+·\s+Flexible/);
+  assert.match(view.text, /Tap a plan or switch categories below/);
+  assert.equal(view.replyMarkup.inline_keyboard[0]?.[0]?.text, '4️⃣ 🌿 Lite');
+  assert.equal(view.replyMarkup.inline_keyboard[1]?.[0]?.text, '⚡ Flash');
+  assert.equal(view.replyMarkup.inline_keyboard[1]?.[1]?.text, '✅ 🌙 Season');
+  assert.equal(view.replyMarkup.inline_keyboard[2]?.[0]?.text, '🔑 Dynamic');
+  assert.equal(view.replyMarkup.inline_keyboard[2]?.[1]?.text, '📦 All Plans');
+  assert.equal(
+    view.replyMarkup.inline_keyboard[2]?.[1]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+  );
 });
 
 test('store expiry reminders include data remaining, days left, and remind-later action', () => {
@@ -376,6 +411,10 @@ test('store order summary and active keys keep the polished storefront labels', 
   assert.equal(summary.replyMarkup.inline_keyboard[0]?.[0]?.text, '✅  Confirm & Pay   22,000 Ks');
   assert.equal(summary.replyMarkup.inline_keyboard[1]?.[0]?.text, '🏷  Change Coupon');
   assert.equal(summary.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀   Back to Plans');
+  assert.equal(
+    summary.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }),
+  );
 
   const active = buildTelegramStoreActiveKeysView([
     {
@@ -402,6 +441,21 @@ test('store order summary and active keys keep the polished storefront labels', 
   assert.equal(active.replyMarkup.inline_keyboard[0]?.[0]?.text, '📄 Open 🪨 Basic');
   assert.equal(active.replyMarkup.inline_keyboard[0]?.[1]?.text, '🔄 Renew');
   assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '➕  Buy New Plan');
+});
+
+test('storefront callback data preserves focused plan categories', () => {
+  assert.equal(
+    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'flash' }),
+    'show_plans_flash',
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData('show_plans_flash'),
+    { action: 'show_plans', category: 'flash' },
+  );
+  assert.deepEqual(
+    parseTelegramStorefrontCallbackData('show_plans'),
+    { action: 'show_plans' },
+  );
 });
 
 test('store paid key detail screen becomes a persistent hub', () => {

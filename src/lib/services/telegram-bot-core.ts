@@ -6571,7 +6571,7 @@ export async function handleTelegramCallbackQuery(
         case 'show_plans': {
           await cancelStaleTelegramConversationOrders(chatId, callbackQuery.from.id);
           const { plans } = await resolveTelegramStorePlans();
-          const view = buildTelegramStorePlanListView(plans, locale);
+          const view = buildTelegramStorePlanListView(plans, locale, storefrontAction.category);
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,
@@ -7791,7 +7791,15 @@ export async function handleTelegramCallbackQuery(
 
         if (menuAction.action === 'show_monthly' || menuAction.action === 'show_quarterly' || menuAction.action === 'claim_discount') {
           const { plans } = await resolveTelegramStorePlans();
-          const view = buildTelegramStorePlanListView(plans, locale);
+          const view = buildTelegramStorePlanListView(
+            plans,
+            locale,
+            menuAction.action === 'show_monthly'
+              ? 'flash'
+              : menuAction.action === 'show_quarterly'
+                ? 'season'
+                : null,
+          );
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,

@@ -158,7 +158,7 @@ export type TelegramStoreGuideKeyData = {
 };
 
 export type TelegramStoreCallbackPayload =
-  | { action: 'show_plans' }
+  | { action: 'show_plans'; category?: TelegramStoreCategory }
   | { action: 'main_menu' }
   | { action: 'my_account' }
   | { action: 'support_contact' }
@@ -904,6 +904,75 @@ function buildStorePlanKeyboardRow(plans: TelegramStoreResolvedPlan[]) {
   }));
 }
 
+function getStoreCategoryShortLabel(category: TelegramStoreCategory, locale: SupportedLocale = 'en') {
+  const isMyanmar = locale === 'my';
+  switch (category) {
+    case 'flash':
+      return isMyanmar ? '⚡ အမြန်' : '⚡ Flash';
+    case 'season':
+      return isMyanmar ? '🌙 ရာသီ' : '🌙 Season';
+    case 'dynamic':
+      return isMyanmar ? '🔑 ဒိုင်နမစ်' : '🔑 Dynamic';
+    default:
+      return category;
+  }
+}
+
+function getStoreCategorySummaryLine(category: TelegramStoreCategory, locale: SupportedLocale = 'en') {
+  const isMyanmar = locale === 'my';
+  switch (category) {
+    case 'flash':
+      return isMyanmar ? '⚡ အမြန်အစီအစဉ်များ  ·  30 ရက်  ·  🔄 3 ကြိမ်' : '⚡ Flash Plans  ·  30 Days  ·  🔄 3 switches';
+    case 'season':
+      return isMyanmar ? '🌙 ရာသီအစီအစဉ်များ ·  90 ရက်  ·  🔄 5 ကြိမ်' : '🌙 Season Plans  ·  90 Days  ·  🔄 5 switches';
+    case 'dynamic':
+      return isMyanmar ? '🔑 ဒိုင်နမစ်အစီအစဉ်များ · ပြောင်းလွယ်ပြင်လွယ် · 🔄 ∞' : '🔑 Dynamic Plans  ·  Flexible  ·  🔄 ∞';
+    default:
+      return category;
+  }
+}
+
+function buildStoreCategoryNavigationRows(
+  locale: SupportedLocale = 'en',
+  selectedCategory?: TelegramStoreCategory | null,
+) {
+  const isMyanmar = locale === 'my';
+  const decorate = (category: TelegramStoreCategory) =>
+    selectedCategory === category
+      ? `${isMyanmar ? '✅' : '✅'} ${getStoreCategoryShortLabel(category, locale)}`
+      : getStoreCategoryShortLabel(category, locale);
+
+  const rows: Array<Array<{ text: string; callback_data: string }>> = [
+    [
+      {
+        text: decorate('flash'),
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'flash' }),
+      },
+      {
+        text: decorate('season'),
+        callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'season' }),
+      },
+    ],
+  ];
+
+  const secondRow: Array<{ text: string; callback_data: string }> = [
+    {
+      text: decorate('dynamic'),
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }),
+    },
+  ];
+
+  if (selectedCategory) {
+    secondRow.push({
+      text: isMyanmar ? '📦 အားလုံး' : '📦 All Plans',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+    });
+  }
+
+  rows.push(secondRow);
+  return rows;
+}
+
 function buildTelegramStoreRenewCallbackData(input: {
   plan: TelegramStoreResolvedPlan | null;
   renewTarget?: TelegramStoreRenewTarget | null;
@@ -930,7 +999,7 @@ function buildTelegramStoreRenewCallbackData(input: {
 export function buildTelegramStorefrontCallbackData(payload: TelegramStoreCallbackPayload) {
   switch (payload.action) {
     case 'show_plans':
-      return 'show_plans';
+      return payload.category ? `show_plans_${payload.category}` : 'show_plans';
     case 'main_menu':
       return 'main_menu';
     case 'my_account':
@@ -987,6 +1056,12 @@ export function parseTelegramStorefrontCallbackData(data?: string | null): Teleg
 
   if (data === 'show_plans') {
     return { action: 'show_plans' };
+  }
+  if (data.startsWith('show_plans_')) {
+    const category = data.slice('show_plans_'.length).trim();
+    if (category === 'flash' || category === 'season' || category === 'dynamic') {
+      return { action: 'show_plans', category };
+    }
   }
   if (data === 'main_menu') {
     return { action: 'main_menu' };
@@ -1921,9 +1996,9 @@ export function buildTelegramStoreMainMenuView(input: {
     text,
     replyMarkup: {
       inline_keyboard: [
-        [{ text: isMyanmar ? '⚡ အမြန်အစီအစဉ်များ  ·  30 ရက်  ·  🔄 3 ကြိမ်' : '⚡ Flash Plans    ·  30 Days  ·  🔄 3×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [{ text: isMyanmar ? '🌙 ရာသီအစီအစဉ်များ ·  90 ရက်  ·  🔄 5 ကြိမ်' : '🌙 Season Plans   ·  90 Days  ·  🔄 5×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [{ text: isMyanmar ? '🔑 ဒိုင်နမစ်အစီအစဉ်များ · ပြောင်းလွယ်ပြင်လွယ် · 🔄 ∞' : '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+        [{ text: isMyanmar ? '⚡ အမြန်အစီအစဉ်များ  ·  30 ရက်  ·  🔄 3 ကြိမ်' : '⚡ Flash Plans    ·  30 Days  ·  🔄 3×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'flash' }) }],
+        [{ text: isMyanmar ? '🌙 ရာသီအစီအစဉ်များ ·  90 ရက်  ·  🔄 5 ကြိမ်' : '🌙 Season Plans   ·  90 Days  ·  🔄 5×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'season' }) }],
+        [{ text: isMyanmar ? '🔑 ဒိုင်နမစ်အစီအစဉ်များ · ပြောင်းလွယ်ပြင်လွယ် · 🔄 ∞' : '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }) }],
         [
           { text: isMyanmar ? '👤 အကောင့်' : '👤 My Account', callback_data: buildTelegramStorefrontCallbackData({ action: 'my_account' }) },
           { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
@@ -1936,6 +2011,7 @@ export function buildTelegramStoreMainMenuView(input: {
 export function buildTelegramStorePlanListView(
   plans: TelegramStoreResolvedPlan[],
   locale: SupportedLocale = 'en',
+  category?: TelegramStoreCategory | null,
 ) {
   const isMyanmar = locale === 'my';
   const flash = plans.filter((plan) => plan.category === 'flash');
@@ -1949,35 +2025,44 @@ export function buildTelegramStorePlanListView(
       : '';
     return `${plan.messageIndex} ${plan.listLabel.padEnd(11, ' ')} ${plan.dataLabel.padStart(7, ' ')} ${plan.priceLabel.padStart(11, ' ')}${dynamicSuffix}${trailingBadge}`;
   };
+  const sections = [
+    { category: 'flash' as const, heading: getStoreCategorySummaryLine('flash', locale), plans: flash },
+    { category: 'season' as const, heading: getStoreCategorySummaryLine('season', locale), plans: season },
+    { category: 'dynamic' as const, heading: getStoreCategorySummaryLine('dynamic', locale), plans: dynamic },
+  ].filter((section) => !category || section.category === category);
 
-  const text = [
+  const lines = [
     '🛰 *VPN Plan Store*',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '',
-    isMyanmar ? '⚡ အမြန်အစီအစဉ်များ  ·  30 ရက်  ·  🔄 3 ကြိမ်' : '⚡ Flash Plans  ·  30 Days  ·  🔄 3 switches',
-    '────────────────────────────────────────',
-    ...flash.map(renderRow),
-    '────────────────────────────────────────',
-    isMyanmar ? '🌙 ရာသီအစီအစဉ်များ ·  90 ရက်  ·  🔄 5 ကြိမ်' : '🌙 Season Plans  ·  90 Days  ·  🔄 5 switches',
-    '────────────────────────────────────────',
-    ...season.map(renderRow),
-    '────────────────────────────────────────',
-    isMyanmar ? '🔑 ဒိုင်နမစ်အစီအစဉ်များ · ပြောင်းလွယ်ပြင်လွယ် · 🔄 ∞' : '🔑 Dynamic Plans  ·  Flexible  ·  🔄 ∞',
-    '────────────────────────────────────────',
-    ...dynamic.map(renderRow),
-    '────────────────────────────────────────',
+  ];
+
+  for (const section of sections) {
+    lines.push(
+      section.heading,
+      '────────────────────────────────────────',
+      ...section.plans.map(renderRow),
+      '────────────────────────────────────────',
+    );
+  }
+
+  lines.push(
     isMyanmar ? '★ လူကြိုက်များ  ·  ★★ တန်ဆုံး' : '★ Popular  ·  ★★ Best Deal',
-    isMyanmar ? '👇 နှိပ်ပြီး အစီအစဉ်ကို ရွေးပါ:' : '👇 Tap a number to select your plan:',
-  ].join('\n');
+    category
+      ? (isMyanmar ? '👇 အစီအစဉ်ကို နှိပ်ပါ သို့မဟုတ် အောက်မှ အမျိုးအစား ပြောင်းပါ:' : '👇 Tap a plan or switch categories below:')
+      : (isMyanmar ? '👇 နှိပ်ပြီး အစီအစဉ်ကို ရွေးပါ:' : '👇 Tap a number to select your plan:'),
+  );
 
   return {
-    text,
+    text: lines.join('\n'),
     replyMarkup: {
       inline_keyboard: [
-        buildStorePlanKeyboardRow(flash),
-        buildStorePlanKeyboardRow(season),
-        buildStorePlanKeyboardRow(dynamic),
-        [{ text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) }],
+        ...sections.map((section) => buildStorePlanKeyboardRow(section.plans)),
+        ...buildStoreCategoryNavigationRows(locale, category || null),
+        [
+          { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Main Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+        ],
       ],
     },
   };
@@ -2051,7 +2136,7 @@ export function buildTelegramStoreOrderSummaryView(input: {
         }],
         [{
           text: isMyanmar ? '◀   အစီအစဉ်များသို့ ပြန်မည်' : '◀   Back to Plans',
-          callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+          callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: input.plan.category }),
         }],
       ],
     },
@@ -2100,7 +2185,7 @@ export function buildTelegramStoreRenewView(input: {
         }],
         [{
           text: isMyanmar ? '🔍  အခြားအစီအစဉ်ကို ရွေးမည်' : '🔍  Choose a Different Plan',
-          callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+          callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: input.plan.category }),
         }],
       ],
     },
@@ -2456,8 +2541,8 @@ export function buildTelegramStoreSwitchLimitReachedView(input: {
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
-        [{ text: isMyanmar ? '🌙 ရာသီအစီအစဉ်များ' : '🌙 Season Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [{ text: isMyanmar ? '🔑 ဒိုင်နမစ်အစီအစဉ်များ' : '🔑 Dynamic Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+        [{ text: isMyanmar ? '🌙 ရာသီအစီအစဉ်များ' : '🌙 Season Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'season' }) }],
+        [{ text: isMyanmar ? '🔑 ဒိုင်နမစ်အစီအစဉ်များ' : '🔑 Dynamic Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }) }],
         [{ text: isMyanmar ? '◀ ပြန်မည်' : '◀ Back', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
       ],
     },
