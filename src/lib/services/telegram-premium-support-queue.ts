@@ -59,14 +59,14 @@ function getTelegramPremiumSupportQueueState(input: {
   if (input.request.followUpPending) {
     return {
       code: 'admin' as const,
-      label: isMyanmar ? 'Admin အဖြေ စောင့်နေ' : 'Waiting for admin',
+      label: isMyanmar ? 'စီမံခန့်ခွဲသူ အဖြေ စောင့်နေ' : 'Waiting for admin',
     };
   }
 
   if (latestReply?.senderType === 'ADMIN') {
     return {
       code: 'user' as const,
-      label: isMyanmar ? 'User အဖြေ စောင့်နေ' : 'Waiting for user',
+      label: isMyanmar ? 'အသုံးပြုသူ အဖြေ စောင့်နေ' : 'Waiting for user',
     };
   }
 
@@ -147,8 +147,8 @@ export function buildTelegramSupportQueueSummaryKeyboard(input: {
     inline_keyboard: [
       [
         option('all', isMyanmar ? 'အားလုံး' : 'All'),
-        option('admin', isMyanmar ? 'Admin စောင့်နေ' : 'Need admin'),
-        option('user', isMyanmar ? 'User စောင့်နေ' : 'Need user'),
+        option('admin', isMyanmar ? 'စီမံခန့်ခွဲသူ စောင့်နေ' : 'Need admin'),
+        option('user', isMyanmar ? 'အသုံးပြုသူ စောင့်နေ' : 'Need user'),
       ],
       [
         {
@@ -156,17 +156,17 @@ export function buildTelegramSupportQueueSummaryKeyboard(input: {
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue_admin'),
         },
         {
-          text: isMyanmar ? '📋 Review များ' : '📋 Review queue',
+          text: isMyanmar ? '📋 စစ်ဆေးရန် စာရင်း' : '📋 Review queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
         },
         {
-          text: isMyanmar ? '💸 Refund များ' : '💸 Refunds',
+          text: isMyanmar ? '💸 ငွေပြန်အမ်းမှုများ' : '💸 Refunds',
           callback_data: buildTelegramMenuCallbackData('admin', 'refunds'),
         },
       ],
       [
         {
-          text: isMyanmar ? '🧭 Admin စင်တာ' : '🧭 Admin home',
+          text: isMyanmar ? '🧭 စီမံခန့်ခွဲမှု စင်တာ' : '🧭 Admin home',
           callback_data: buildTelegramMenuCallbackData('admin', 'home'),
         },
       ],
@@ -186,26 +186,26 @@ export function buildTelegramPremiumSupportQueueSummaryMessage(input: {
   const modeLabel =
     input.mode === 'admin'
       ? isMyanmar
-        ? 'Admin အဖြေ စောင့်နေ'
+        ? 'စီမံခန့်ခွဲသူ အဖြေ စောင့်နေ'
         : 'Need admin reply'
       : input.mode === 'user'
         ? isMyanmar
-          ? 'User အဖြေ စောင့်နေ'
+          ? 'အသုံးပြုသူ အဖြေ စောင့်နေ'
           : 'Waiting for user'
         : isMyanmar
-          ? 'ဖွင့်ထားသော thread အားလုံး'
+          ? 'ဖွင့်ထားသော စကားဝိုင်း အားလုံး'
           : 'All open threads';
   const stats = isMyanmar
-    ? `${input.totalOpen} ခု ဖွင့်ထား • ${input.waitingAdmin} ခု admin စောင့်နေ • ${input.waitingUser} ခု user စောင့်နေ`
+    ? `${input.totalOpen} ခု ဖွင့်ထား • ${input.waitingAdmin} ခု စီမံခန့်ခွဲသူ စောင့်နေ • ${input.waitingUser} ခု အသုံးပြုသူ စောင့်နေ`
     : `${input.totalOpen} open • ${input.waitingAdmin} need admin • ${input.waitingUser} waiting for user`;
   const nextHint = input.hasItems
     ? isMyanmar
-      ? 'နောက်ကတ်တွင် Review, Ask, သို့မဟုတ် Handled ကို ရွေးနိုင်ပါသည်။'
+      ? 'နောက်ကတ်တွင် စစ်ဆေးရန်၊ မေးမြန်းရန် သို့မဟုတ် ဖြေရှင်းပြီးဟု ရွေးနိုင်ပါသည်။'
       : 'Use Review, Ask, or Handled on the next card.'
     : '';
 
   return [
-    isMyanmar ? '💎 <b>Premium support စစ်ရန်</b>' : '💎 <b>Premium support queue</b>',
+    isMyanmar ? '💎 <b>ပရီမီယမ် အကူအညီ စောင့်ဆိုင်းစာရင်း</b>' : '💎 <b>Premium support queue</b>',
     '',
     `<b>${modeLabel}</b>`,
     stats,
@@ -336,12 +336,12 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
               callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
             },
             {
-              text: isMyanmar ? '🧾 Panel ဖွင့်မည်' : '🧾 Panel',
+              text: isMyanmar ? '🧾 ပန်နယ် ဖွင့်မည်' : '🧾 Panel',
               url: input.panelUrl,
             },
           ],
       ...(includeDetail
-        ? [[{ text: isMyanmar ? '🧾 Panel ဖွင့်မည်' : '🧾 Panel', url: input.panelUrl }]]
+        ? [[{ text: isMyanmar ? '🧾 ပန်နယ် ဖွင့်မည်' : '🧾 Panel', url: input.panelUrl }]]
         : []),
     ],
   };

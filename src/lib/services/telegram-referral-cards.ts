@@ -19,29 +19,29 @@ export function buildTelegramReferralMessage(input: {
   const referralLink = `https://t.me/your_bot_username?start=ref_${input.referralCode}`;
 
   return buildTelegramCommerceMessage({
-    title: isMyanmar ? '👥 <b>သင့် Referral အစီအစဉ်</b>' : '👥 <b>Your Referral Program</b>',
+    title: isMyanmar ? '👥 <b>သင့် မိတ်ဆက်အစီအစဉ်</b>' : '👥 <b>Your Referral Program</b>',
     statsLine: `🎫 <b>${input.referralCode}</b> • ${isMyanmar ? 'အခြေအနေ' : 'Status'}: <b>${isMyanmar ? 'အသုံးပြုနိုင်သည်' : 'Active'}</b>`,
     cards: [
       buildTelegramCommerceCard(
         isMyanmar ? '📊 <b>သင့်စွမ်းဆောင်ရည်</b>' : '📊 <b>Your Performance</b>',
         [
-          `${isMyanmar ? 'စုစုပေါင်း order' : 'Total orders'}: <b>${input.fulfilledOrders}</b>`,
+          `${isMyanmar ? 'စုစုပေါင်း အော်ဒါ' : 'Total orders'}: <b>${input.fulfilledOrders}</b>`,
           `${isMyanmar ? 'ရရှိသောဝင်ငွေ' : 'Revenue earned'}: <b>${input.revenue.toLocaleString()} MMK</b>`,
         ],
       ),
       buildTelegramCommerceCard(
-        isMyanmar ? '🔗 <b>သင့် referral link</b>' : '🔗 <b>Your referral link</b>',
+        isMyanmar ? '🔗 <b>သင့် မိတ်ဆက်လင့်ခ်</b>' : '🔗 <b>Your referral link</b>',
         [
           `<code>${referralLink}</code>`,
           '',
           isMyanmar 
-            ? 'ဤ link ကို သူငယ်ချင်းများထံ ပို့ပေးပါ။ သူတို့ order တိုင်းအတွက် သင် reward ရရှိပါမည်။' 
+            ? 'ဤလင့်ခ်ကို သူငယ်ချင်းများထံ ပို့ပေးပါ။ သူတို့ အော်ဒါတင်တိုင်း သင် ဆုလာဘ် ရရှိပါမည်။'
             : 'Share this link with your friends. You earn rewards for every order they complete.',
         ],
       ),
     ],
     footerLines: [
-      isMyanmar ? 'Reward များကို key သက်တမ်းတိုးရန် သုံးနိုင်ပါသည်။' : 'Rewards can be used to extend your keys.',
+      isMyanmar ? 'ဆုလာဘ်များကို သော့ သက်တမ်းတိုးရန် သုံးနိုင်ပါသည်။' : 'Rewards can be used to extend your keys.',
     ],
   });
 }
@@ -57,7 +57,7 @@ export function buildTelegramReferralKeyboard(input: {
     inline_keyboard: [
       [
         {
-          text: isMyanmar ? '📤 Link ကို Share မည်' : '📤 Share Link',
+          text: isMyanmar ? '📤 လင့်ခ်ကို မျှဝေမည်' : '📤 Share Link',
           url: `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(
             isMyanmar 
               ? 'ဒီ VPN bot က အရမ်းမြန်တယ်နော်၊ စမ်းသုံးကြည့်ဖို့ တိုက်တွန်းပါတယ်!' 

@@ -52,9 +52,9 @@ export function getTelegramUi(locale: SupportedLocale) {
     dynamicPlans: isMyanmar ? 'Dynamic အစီအစဉ်များ' : 'Dynamic Plans',
     trialPlans: isMyanmar ? 'Trial အစီအစဉ်များ' : 'Trial Plans',
     serverSwitches: isMyanmar ? 'ဆာဗာ ပြောင်းခွင့်' : 'Server switch limit',
-    serverSwitchesHint: isMyanmar ? 'User က server ဘယ်နှစ်ကြိမ်ပြောင်းခွင့်ရှိသလဲ။ (-1 ဆိုလျှင် အကန့်အသတ်မရှိ)' : 'Number of times the user can switch servers. (-1 for unlimited)',
+    serverSwitchesHint: isMyanmar ? 'အသုံးပြုသူက ဆာဗာကို ဘယ်နှစ်ကြိမ် ပြောင်းခွင့်ရှိသလဲ။ (-1 ဆိုလျှင် အကန့်အသတ်မရှိ)' : 'Number of times the user can switch servers. (-1 for unlimited)',
     badge: isMyanmar ? 'တံဆိပ်' : 'Badge',
-    badgeHint: isMyanmar ? 'Telegram plan card တွင် ပြမည့် badge' : 'Badge to display on the plan card in Telegram.',
+    badgeHint: isMyanmar ? 'တယ်လီဂရမ် အစီအစဉ်ကတ်တွင် ပြမည့် တံဆိပ်' : 'Badge to display on the plan card in Telegram.',
     none: isMyanmar ? 'မရှိပါ' : 'None',
     startsOnFirstUse: (days?: number | null) =>
       isMyanmar
@@ -68,110 +68,110 @@ export function getTelegramUi(locale: SupportedLocale) {
     expiredOn: (date: string) => (isMyanmar ? `${date} တွင် သက်တမ်းကုန်ပြီး` : `Expired on ${date}`),
     daysLeft: (days: number, date: string) =>
       isMyanmar ? `${days} ရက်ခန့် ကျန်သည် (${date})` : `${days} day(s) left (${date})`,
-    openSharePage: isMyanmar ? 'Share Page ဖွင့်မည်' : 'Open Share Page',
-    openSubscriptionUrl: isMyanmar ? 'Subscription URL ဖွင့်မည်' : 'Open Subscription URL',
+    openSharePage: isMyanmar ? 'မျှဝေစာမျက်နှာ ဖွင့်မည်' : 'Open Share Page',
+    openSubscriptionUrl: isMyanmar ? 'စာရင်းသွင်းလင့်ခ် ဖွင့်မည်' : 'Open Subscription URL',
     openClientEndpoint: isMyanmar ? 'ကလိုင်းယင့် endpoint ဖွင့်မည်' : 'Open Client Endpoint',
     getSupport: isMyanmar ? 'အကူအညီ' : 'Support',
-    premiumLabel: isMyanmar ? 'Premium ပြောင်းလဲသတ်မှတ်သော့' : 'Premium dynamic key',
+    premiumLabel: isMyanmar ? 'ပရီမီယမ် ပြောင်းလဲသတ်မှတ်သော့' : 'Premium dynamic key',
     premiumStableLink: isMyanmar
-      ? 'တည်ငြိမ်သော premium link တစ်ခုဖြင့် ဆက်သွယ်နိုင်ပါသည်။'
+      ? 'တည်ငြိမ်သော ပရီမီယမ် လင့်ခ်တစ်ခုဖြင့် ဆက်သွယ်နိုင်ပါသည်။'
       : 'Connect with one stable premium link.',
     premiumAutoFailover: isMyanmar
-      ? 'Server တစ်ခု ပြဿနာရှိပါက auto failover ဖြင့် ပြန်ရွေးပေးနိုင်ပါသည်။'
+      ? 'ဆာဗာတစ်ခု ပြဿနာရှိပါက အလိုအလျောက် fallback ဖြင့် ပြန်ရွေးပေးနိုင်ပါသည်။'
       : 'If one server has trouble, routing can fail over automatically.',
     premiumPreferredRegionSummary: (label: string) =>
       isMyanmar
-        ? `ဦးစားပေး region: ${label}`
+        ? `ဦးစားပေး ဒေသ: ${label}`
         : `Preferred region: ${label}`,
     premiumPreferredServerSummary: (label: string) =>
       isMyanmar
-        ? `ဦးစားပေး server pool: ${label}`
+        ? `ဦးစားပေး ဆာဗာအုပ်စု: ${label}`
         : `Preferred server pool: ${label}`,
     premiumSupportActionsTitle: isMyanmar
-      ? 'Premium shortcut များ'
+      ? 'ပရီမီယမ် အမြန်လုပ်ဆောင်ချက်များ'
       : 'Premium shortcuts',
-    premiumChangeRegion: isMyanmar ? 'Region ပြောင်းမည်' : 'Change region',
-    premiumReportRouteIssue: isMyanmar ? 'Route issue တိုင်မည်' : 'Report issue',
+    premiumChangeRegion: isMyanmar ? 'ဒေသ ပြောင်းရန်' : 'Change region',
+    premiumReportRouteIssue: isMyanmar ? 'လမ်းကြောင်း ပြဿနာ တိုင်မည်' : 'Report issue',
     premiumRegionPrompt: (keyName: string, available: string) =>
       isMyanmar
-        ? `🌍 <b>${keyName}</b> အတွက် ဦးစားပေး region ကို ရွေးပါ။\nAvailable: ${available}\nရွေးချယ်ပြီးနောက် admin review စောင့်ပါ။`
+        ? `🌍 <b>${keyName}</b> အတွက် ဦးစားပေး ဒေသကို ရွေးပါ။\nရရှိနိုင်သော ဒေသများ: ${available}\nရွေးချယ်ပြီးနောက် စီမံခန့်ခွဲသူ စစ်ဆေးမှုကို စောင့်ပါ။`
         : `🌍 Choose the preferred region for <b>${keyName}</b>.\nAvailable: ${available}\nAfter you choose one, wait for admin review.`,
     premiumNoRegions: isMyanmar
-      ? 'ℹ️ ဤ premium key အတွက် ရွေးချယ်နိုင်သော region မရှိသေးပါ။ Admin/support ကို ဆက်သွယ်ပေးပါ။'
+      ? 'ℹ️ ဤ ပရီမီယမ် သော့အတွက် ရွေးချယ်နိုင်သော ဒေသ မရှိသေးပါ။ စီမံခန့်ခွဲသူ သို့မဟုတ် အကူအညီကို ဆက်သွယ်ပေးပါ။'
       : 'ℹ️ There are no region choices configured for this premium key yet. Please contact admin/support.',
     premiumRegionRequestSubmitted: (keyName: string, regionLabel: string) =>
       isMyanmar
-        ? `📨 <b>${keyName}</b> အတွက် preferred region ကို <b>${regionLabel}</b> ဟု တောင်းဆိုထားပါသည်။\nAdmin review စောင့်ပါ။`
+        ? `📨 <b>${keyName}</b> အတွက် ဦးစားပေး ဒေသကို <b>${regionLabel}</b> ဟု တောင်းဆိုထားပါသည်။\nစီမံခန့်ခွဲသူ စစ်ဆေးမှုကို စောင့်ပါ။`
         : `📨 Preferred region for <b>${keyName}</b> requested as <b>${regionLabel}</b>.\nWait for admin review.`,
     premiumRouteIssueSubmitted: (keyName: string) =>
       isMyanmar
-        ? `🚨 <b>${keyName}</b> အတွက် premium route issue ကို ပို့ပြီးပါပြီ။\nလိုအပ်ပါက Reply သို့မဟုတ် /support ကို အသုံးပြုပါ။`
+        ? `🚨 <b>${keyName}</b> အတွက် ပရီမီယမ် လမ်းကြောင်း ပြဿနာကို ပို့ပြီးပါပြီ။\nလိုအပ်ပါက အကြောင်းပြန်ရန် သို့မဟုတ် /support ကို အသုံးပြုပါ။`
         : `🚨 Premium route issue sent for <b>${keyName}</b>.\nUse Reply or /support if you need to add detail.`,
     premiumSupportRequestSent: isMyanmar
-      ? 'Support request ကို ပို့ပြီးပါပြီ။'
+      ? 'အကူအညီ တောင်းဆိုချက်ကို ပို့ပြီးပါပြီ။'
       : 'Support request sent.',
     premiumSupportRequestNotFound: isMyanmar
-      ? '❌ Premium key ကို မတွေ့ပါ။ /mykeys မှ ပြန်ရွေးပေးပါ။'
+      ? '❌ ပရီမီယမ် သော့ကို မတွေ့ပါ။ /mykeys မှ ပြန်ရွေးပေးပါ။'
       : '❌ Premium key not found. Choose it again from /mykeys.',
     premiumSupportCancelled: isMyanmar
-      ? 'Support action ကို ပယ်ဖျက်လိုက်ပါပြီ။'
+      ? 'အကူအညီ လုပ်ဆောင်ချက်ကို ပယ်ဖျက်လိုက်ပါပြီ။'
       : 'Support action cancelled.',
-    premiumRegionUnknown: isMyanmar ? 'Auto / admin စစ်ဆေးမှု' : 'Auto / admin review',
+    premiumRegionUnknown: isMyanmar ? 'အလိုအလျောက် / စီမံခန့်ခွဲသူ စစ်ဆေးမှု' : 'Auto / admin review',
     premiumReviewAlertTitle: isMyanmar
-      ? '💎 <b>Premium dynamic key အကူအညီ တောင်းဆိုချက်</b>'
+      ? '💎 <b>ပရီမီယမ် ပြောင်းလဲသတ်မှတ်သော့ အကူအညီ တောင်းဆိုချက်</b>'
       : '💎 <b>Premium dynamic key support request</b>',
-    premiumIssueTypeRegion: isMyanmar ? 'Region ပြောင်းရန်' : 'Region change',
-    premiumIssueTypeRoute: isMyanmar ? 'Route ပြဿနာ' : 'Route issue',
+    premiumIssueTypeRegion: isMyanmar ? 'ဒေသ ပြောင်းရန်' : 'Region change',
+    premiumIssueTypeRoute: isMyanmar ? 'လမ်းကြောင်း ပြဿနာ' : 'Route issue',
     premiumRequestType: isMyanmar ? 'တောင်းဆိုချက်အမျိုးအစား' : 'Request type',
-    premiumCurrentPoolLabel: isMyanmar ? 'လက်ရှိ pool' : 'Current pool',
-    premiumRequestedRegionLabel: isMyanmar ? 'တောင်းဆိုထားသော region' : 'Requested region',
-    premiumResolvedServer: isMyanmar ? 'လက်ရှိ server' : 'Resolved server',
-    premiumNoRequestedRegion: isMyanmar ? 'Auto / admin စစ်ဆေးမှု' : 'Auto / admin review',
+    premiumCurrentPoolLabel: isMyanmar ? 'လက်ရှိ ဆာဗာအုပ်စု' : 'Current pool',
+    premiumRequestedRegionLabel: isMyanmar ? 'တောင်းဆိုထားသော ဒေသ' : 'Requested region',
+    premiumResolvedServer: isMyanmar ? 'လက်ရှိ ဆာဗာ' : 'Resolved server',
+    premiumNoRequestedRegion: isMyanmar ? 'အလိုအလျောက် / စီမံခန့်ခွဲသူ စစ်ဆေးမှု' : 'Auto / admin review',
     premiumCurrentPin: isMyanmar ? 'လက်ရှိ pin' : 'Current pin',
-    premiumReviewPanelLabel: isMyanmar ? 'Dynamic key page ဖွင့်ရန်' : 'Open dynamic key page',
+    premiumReviewPanelLabel: isMyanmar ? 'ပြောင်းလဲသတ်မှတ်သော့ စာမျက်နှာ ဖွင့်ရန်' : 'Open dynamic key page',
     premiumRequestCodeLabel: isMyanmar ? 'အကူအညီ တောင်းဆိုချက်ကုဒ်' : 'Support request code',
     premiumSupportRequestPending: (requestCode: string) =>
       isMyanmar
-        ? `ℹ️ Premium support request <b>${requestCode}</b> သည် ဖွင့်ထားပြီးဖြစ်ပါသည်။\nAdmin update ကို ဒီ chat မှာ စောင့်ပါ။`
+        ? `ℹ️ ပရီမီယမ် အကူအညီ တောင်းဆိုချက် <b>${requestCode}</b> သည် ဖွင့်ထားပြီးဖြစ်ပါသည်။\nစီမံခန့်ခွဲသူ အပ်ဒိတ်ကို ဒီ chat မှာ စောင့်ပါ။`
         : `ℹ️ Premium support request <b>${requestCode}</b> is already open.\nWait for the admin update here.`,
     premiumReplyToRequest: isMyanmar ? 'အကြောင်းပြန်မည်' : 'Reply',
     premiumFollowUpPrompt: (requestCode: string, keyName: string) =>
       isMyanmar
-        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် reply ကို ပို့ပါ။\nRoute, region, error detail ကို ထည့်နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။`
+        ? `✍️ <b>${requestCode}</b> (${keyName}) အတွက် အကြောင်းပြန်ချက်ကို ပို့ပါ။\nလမ်းကြောင်း၊ ဒေသ သို့မဟုတ် အမှားအသေးစိတ်ကို ထည့်နိုင်ပါသည်။ /cancel ဖြင့် ရပ်နိုင်ပါသည်။`
         : `✍️ Reply for <b>${requestCode}</b> (${keyName}).\nAdd route, region, or error detail. Use /cancel to stop.`,
     premiumFollowUpSubmitted: (requestCode: string) =>
       isMyanmar
-        ? `📨 <b>${requestCode}</b> အတွက် reply ကို ပို့ပြီးပါပြီ။\nUpdate ကို ဒီ chat မှာ စောင့်ပါ။`
+        ? `📨 <b>${requestCode}</b> အတွက် အကြောင်းပြန်ချက်ကို ပို့ပြီးပါပြီ။\nအပ်ဒိတ်ကို ဒီ chat မှာ စောင့်ပါ။`
         : `📨 Reply sent for <b>${requestCode}</b>.\nUpdates stay in this chat.`,
     premiumFollowUpCancelled: isMyanmar
-      ? 'Premium request နောက်ဆက်တွဲ message ကို ပယ်ဖျက်ပြီးပါပြီ။'
+      ? 'ပရီမီယမ် တောင်းဆိုချက် နောက်ဆက်တွဲ မက်ဆေ့ချ်ကို ပယ်ဖျက်ပြီးပါပြီ။'
       : 'Cancelled the premium follow-up message.',
     premiumFollowUpNotAllowed: isMyanmar
-      ? 'ဤ premium request ပိတ်ထားပါသည်။ အသစ်စတင်ရန် /premium ကို သုံးပါ။'
+      ? 'ဤ ပရီမီယမ် တောင်းဆိုချက် ပိတ်ထားပါသည်။ အသစ်စတင်ရန် /premium ကို သုံးပါ။'
       : 'This request is closed. Use /premium to start a new one.',
     premiumFollowUpHistoryTitle: isMyanmar ? 'နောက်ဆက်တွဲ စကားဝိုင်း' : 'Conversation',
     premiumFollowUpFromYou: isMyanmar ? 'သင်' : 'You',
     premiumFollowUpFromAdmin: isMyanmar ? 'စီမံခန့်ခွဲသူ' : 'Admin',
-    premiumFollowUpNeedsReview: isMyanmar ? 'စစ်ရန် စောင့်နေ' : 'Follow-up waiting',
-    premiumRenewalTitle: isMyanmar ? '💎 <b>Premium သက်တမ်းတိုး သတိပေးချက်</b>' : '💎 <b>Premium renewal reminder</b>',
+    premiumFollowUpNeedsReview: isMyanmar ? 'နောက်ဆက်တွဲ စစ်ရန် စောင့်နေ' : 'Follow-up waiting',
+    premiumRenewalTitle: isMyanmar ? '💎 <b>ပရီမီယမ် သက်တမ်းတိုး သတိပေးချက်</b>' : '💎 <b>Premium renewal reminder</b>',
     premiumRenewalBody: (daysLeft: number) =>
       isMyanmar
-        ? `သင့် premium dynamic key သက်တမ်းကုန်ရန် ${daysLeft} ရက်ခန့် ကျန်ပါသည်။`
+        ? `သင့် ပရီမီယမ် ပြောင်းလဲသတ်မှတ်သော့ သက်တမ်းကုန်ရန် ${daysLeft} ရက်ခန့် ကျန်ပါသည်။`
         : `Your premium dynamic key has about ${daysLeft} day(s) left before it expires.`,
     premiumRenewalBenefits: isMyanmar
-      ? 'သက်တမ်းတိုးပါက stable premium link, auto failover နှင့် preferred region support ကို ဆက်လက် အသုံးပြုနိုင်ပါသည်။'
+      ? 'သက်တမ်းတိုးပါက တည်ငြိမ်သော ပရီမီယမ် လင့်ခ်၊ အလိုအလျောက် fallback နှင့် ဦးစားပေး ဒေသ အကူအညီကို ဆက်လက် အသုံးပြုနိုင်ပါသည်။'
       : 'Renew to keep your stable premium link, auto failover, and preferred region support.',
-    premiumRenewNow: isMyanmar ? 'Premium ကို သက်တမ်းတိုးရန်' : 'Renew premium key',
-    premiumExpiredTitle: isMyanmar ? '⛔ <b>Premium key သက်တမ်းကုန်သွားပါပြီ</b>' : '⛔ <b>Premium key expired</b>',
+    premiumRenewNow: isMyanmar ? 'ပရီမီယမ် သော့ကို သက်တမ်းတိုးရန်' : 'Renew premium key',
+    premiumExpiredTitle: isMyanmar ? '⛔ <b>ပရီမီယမ် သော့ သက်တမ်းကုန်သွားပါပြီ</b>' : '⛔ <b>Premium key expired</b>',
     premiumExpiredBody: (keyName: string) =>
       isMyanmar
-        ? `<b>${keyName}</b> premium dynamic key သက်တမ်းကုန်သွားပါပြီ။ ဆက်လက်အသုံးပြုလိုပါက renewal order တင်ပေးပါ။`
+        ? `<b>${keyName}</b> ပရီမီယမ် ပြောင်းလဲသတ်မှတ်သော့ သက်တမ်းကုန်သွားပါပြီ။ ဆက်လက်အသုံးပြုလိုပါက သက်တမ်းတိုး အော်ဒါ တင်ပေးပါ။`
         : `Your premium dynamic key <b>${keyName}</b> has expired. Place a renewal order to keep using the service.`,
     premiumRequestApproved: (keyName: string, regionLabel?: string | null, supportLink?: string | null) =>
       isMyanmar
         ? [
-            `✅ <b>${keyName}</b> အတွက် premium request ကို လုပ်ဆောင်ပြီးပါပြီ။`,
-            regionLabel ? `ဦးစားပေး region: <b>${regionLabel}</b>` : 'Routing setting ကို ပြန်လည်စစ်ဆေးပြီးပါပြီ။',
+            `✅ <b>${keyName}</b> အတွက် ပရီမီယမ် တောင်းဆိုချက်ကို လုပ်ဆောင်ပြီးပါပြီ။`,
+            regionLabel ? `ဦးစားပေး ဒေသ: <b>${regionLabel}</b>` : 'လမ်းကြောင်း သတ်မှတ်ချက်ကို ပြန်လည်စစ်ဆေးပြီးပါပြီ။',
             supportLink ? `အကူအညီလိုပါက ${supportLink}` : '',
           ]
             .filter(Boolean)
@@ -186,7 +186,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumIssueHandled: (keyName: string, supportLink?: string | null) =>
       isMyanmar
         ? [
-            `✅ <b>${keyName}</b> အတွက် premium route issue ကို စစ်ဆေးပြီး update လုပ်ပြီးပါပြီ။`,
+            `✅ <b>${keyName}</b> အတွက် ပရီမီယမ် လမ်းကြောင်း ပြဿနာကို စစ်ဆေးပြီး အပ်ဒိတ်လုပ်ပြီးပါပြီ။`,
             supportLink ? `နောက်ထပ်အကူအညီလိုပါက ${supportLink}` : '',
           ]
             .filter(Boolean)
@@ -200,8 +200,8 @@ export function getTelegramUi(locale: SupportedLocale) {
     premiumSupportDismissed: (keyName: string, message?: string | null, supportLink?: string | null) =>
       isMyanmar
         ? [
-            `ℹ️ <b>${keyName}</b> အတွက် premium support request ကို မလုပ်ဆောင်တော့ပါ။`,
-            message || 'အသေးစိတ်အတွက် admin/support ကို ဆက်သွယ်ပါ။',
+            `ℹ️ <b>${keyName}</b> အတွက် ပရီမီယမ် အကူအညီ တောင်းဆိုချက်ကို မလုပ်ဆောင်တော့ပါ။`,
+            message || 'အသေးစိတ်အတွက် စီမံခန့်ခွဲသူ သို့မဟုတ် အကူအညီကို ဆက်သွယ်ပါ။',
             supportLink || '',
           ]
             .filter(Boolean)
@@ -213,208 +213,208 @@ export function getTelegramUi(locale: SupportedLocale) {
           ]
             .filter(Boolean)
             .join('\n'),
-    premiumHubTitle: isMyanmar ? '💎 <b>Premium စင်တာ</b>' : '💎 <b>Premium center</b>',
+    premiumHubTitle: isMyanmar ? '💎 <b>ပရီမီယမ် စင်တာ</b>' : '💎 <b>Premium center</b>',
     premiumHubEmpty: isMyanmar
-      ? 'ချိတ်ထားသော premium key မရှိသေးပါ။ Plan ရပြီးနောက် /premium ကို ပြန်ဖွင့်ပါ၊ သို့မဟုတ် /buy ဖြင့် plan များကို ကြည့်ပါ။'
+      ? 'ချိတ်ထားသော ပရီမီယမ် သော့ မရှိသေးပါ။ အစီအစဉ် ရပြီးနောက် /premium ကို ပြန်ဖွင့်ပါ၊ သို့မဟုတ် /buy ဖြင့် အစီအစဉ်များကို ကြည့်ပါ။'
       : 'No premium key is linked yet. Open /premium again after you receive a plan, or use /buy to compare packages.',
     premiumHubHint: isMyanmar
-      ? 'Region, issue, status ကို ဒီနေရာမှ တစ်ခါတည်း ဆက်လုပ်နိုင်ပါသည်။'
+      ? 'ဒေသ၊ ပြဿနာ၊ အခြေအနေတို့ကို ဒီနေရာမှ တစ်ခါတည်း ဆက်လုပ်နိုင်ပါသည်။'
       : 'Use this hub for region, issue, and status actions.',
-    premiumThreadStatusLabel: isMyanmar ? 'Thread အခြေအနေ' : 'Thread status',
-    premiumStatusTitle: isMyanmar ? '🧾 <b>Premium support အခြေအနေ</b>' : '🧾 <b>Premium support status</b>',
+    premiumThreadStatusLabel: isMyanmar ? 'စကားဝိုင်း အခြေအနေ' : 'Thread status',
+    premiumStatusTitle: isMyanmar ? '🧾 <b>ပရီမီယမ် အကူအညီ အခြေအနေ</b>' : '🧾 <b>Premium support status</b>',
     premiumStatusEmpty: isMyanmar
-      ? 'သင့်အတွက် premium request မရှိသေးပါ။ /premium သို့မဟုတ် /mykeys မှ request စတင်နိုင်ပါသည်။'
+      ? 'သင့်အတွက် ပရီမီယမ် တောင်းဆိုချက် မရှိသေးပါ။ /premium သို့မဟုတ် /mykeys မှ တောင်းဆိုချက် စတင်နိုင်ပါသည်။'
       : 'There are no premium requests for you yet. Use /premium or /mykeys to start one.',
-    premiumRegionStatusTitle: isMyanmar ? '🌍 <b>Premium region အခြေအနေ</b>' : '🌍 <b>Premium region status</b>',
+    premiumRegionStatusTitle: isMyanmar ? '🌍 <b>ပရီမီယမ် ဒေသ အခြေအနေ</b>' : '🌍 <b>Premium region status</b>',
     premiumRegionStatusEmpty: isMyanmar
-      ? 'ချိတ်ထားသော premium key မရှိသေးပါ။ Plan ရပြီးနောက် /premiumregion ကို အသုံးပြုပါ။'
+      ? 'ချိတ်ထားသော ပရီမီယမ် သော့ မရှိသေးပါ။ အစီအစဉ် ရပြီးနောက် /premiumregion ကို အသုံးပြုပါ။'
       : 'No premium key is linked yet. Use /premiumregion after you receive a premium plan.',
     premiumRegionStatusHint: isMyanmar
-      ? 'Preferred region, လက်ရှိ route နှင့် health ကို ဒီနေရာမှ တိုက်ရိုက် စစ်နိုင်ပါသည်။'
+      ? 'ဦးစားပေး ဒေသ၊ လက်ရှိ လမ်းကြောင်း နှင့် အခြေအနေကို ဒီနေရာမှ တိုက်ရိုက် စစ်နိုင်ပါသည်။'
       : 'Use this view to check your preferred region, route, and health.',
-    premiumRegionCurrentRouteLabel: isMyanmar ? 'လက်ရှိ route' : 'Current route',
-    premiumRegionPreferredLabel: isMyanmar ? 'ဦးစားပေး region များ' : 'Preferred regions',
-    premiumRegionAttachedLabel: isMyanmar ? 'ချိတ်ထားသော server များ' : 'Attached servers',
-    premiumRegionNoAttached: isMyanmar ? 'ချိတ်ထားသော server မရှိသေးပါ' : 'No attached server yet',
+    premiumRegionCurrentRouteLabel: isMyanmar ? 'လက်ရှိ လမ်းကြောင်း' : 'Current route',
+    premiumRegionPreferredLabel: isMyanmar ? 'ဦးစားပေး ဒေသများ' : 'Preferred regions',
+    premiumRegionAttachedLabel: isMyanmar ? 'ချိတ်ထားသော ဆာဗာများ' : 'Attached servers',
+    premiumRegionNoAttached: isMyanmar ? 'ချိတ်ထားသော ဆာဗာ မရှိသေးပါ' : 'No attached server yet',
     premiumRegionUp: isMyanmar ? 'ကောင်းမွန်' : 'Healthy',
     premiumRegionSlow: isMyanmar ? 'နှေးနေသည်' : 'Slow',
     premiumRegionDown: isMyanmar ? 'မရနိုင်ပါ' : 'Down',
     premiumRegionUnknownStatus: isMyanmar ? 'မသိရသေး' : 'Unknown',
     premiumRegionStatusFootnote: isMyanmar
-      ? 'Region အခြေအနေကို နောက်ဆုံး health check အချက်အလက်အပေါ် အခြေခံပြီး ပြထားပါသည်။'
+      ? 'ဒေသ အခြေအနေကို နောက်ဆုံး health check အချက်အလက်အပေါ် အခြေခံပြီး ပြထားပါသည်။'
       : 'Region status is based on the latest server health checks.',
-    premiumRegionAlertTitle: isMyanmar ? '⚠️ <b>Premium region သတိပေးချက်</b>' : '⚠️ <b>Premium region alert</b>',
-    premiumRegionAlertCurrentLabel: isMyanmar ? 'ထိခိုက်နေသော route' : 'Impacted route',
-    premiumRegionAlertSuggestedLabel: isMyanmar ? 'အကြံပြု fallback region များ' : 'Suggested fallback regions',
+    premiumRegionAlertTitle: isMyanmar ? '⚠️ <b>ပရီမီယမ် ဒေသ သတိပေးချက်</b>' : '⚠️ <b>Premium region alert</b>',
+    premiumRegionAlertCurrentLabel: isMyanmar ? 'ထိခိုက်နေသော လမ်းကြောင်း' : 'Impacted route',
+    premiumRegionAlertSuggestedLabel: isMyanmar ? 'အကြံပြု fallback ဒေသများ' : 'Suggested fallback regions',
     premiumRegionAlertNoFallback: isMyanmar
-      ? 'ယခုအချိန်တွင် ပိုကောင်းသော fallback region မတွေ့သေးပါ။ Admin/support ကို ဆက်သွယ်ပါ။'
+      ? 'ယခုအချိန်တွင် ပိုကောင်းသော fallback ဒေသ မတွေ့သေးပါ။ စီမံခန့်ခွဲသူ သို့မဟုတ် အကူအညီကို ဆက်သွယ်ပါ။'
       : 'There is no better fallback region yet. Please contact admin/support.',
     premiumRegionAlertHint: isMyanmar
-      ? 'အောက်ပါ region ခလုတ်များထဲမှ တစ်ခုကို နှိပ်ပြီး preferred region ပြောင်းရန် တောင်းဆိုနိုင်ပါသည်။'
+      ? 'အောက်ပါ ဒေသခလုတ်များထဲမှ တစ်ခုကို နှိပ်ပြီး ဦးစားပေး ဒေသ ပြောင်းရန် တောင်းဆိုနိုင်ပါသည်။'
       : 'Choose one of the regions below to request a preferred-region change.',
     premiumRegionAlertHealthyHint: isMyanmar
-      ? 'Route မတည်ငြိမ်ပါက /premiumregion ဖြင့် status ကို စစ်ပြီး admin ကို ဆက်သွယ်နိုင်ပါသည်။'
+      ? 'လမ်းကြောင်း မတည်ငြိမ်ပါက /premiumregion ဖြင့် အခြေအနေကို စစ်ပြီး စီမံခန့်ခွဲသူကို ဆက်သွယ်နိုင်ပါသည်။'
       : 'If routing still feels unstable, use /premiumregion to check status and contact admin.',
-    premiumRegionFallbackTitle: isMyanmar ? '🔁 <b>Premium fallback အသုံးပြုနေသည်</b>' : '🔁 <b>Premium fallback activated</b>',
+    premiumRegionFallbackTitle: isMyanmar ? '🔁 <b>ပရီမီယမ် fallback အသုံးပြုနေသည်</b>' : '🔁 <b>Premium fallback activated</b>',
     premiumRegionFallbackAppliedLabel: isMyanmar ? 'ယာယီ fallback' : 'Temporary fallback',
     premiumRegionFallbackUntilLabel: isMyanmar ? 'Fallback pin ကုန်ချိန်' : 'Fallback pin expires',
     premiumRegionFallbackHint: isMyanmar
-      ? 'Preferred region ပြန်ကောင်းလာပါက ထပ်မံအသိပေးပို့ပေးမည်။ လက်ရှိ fallback ကို ပြောင်းလိုပါက support ကို အသုံးပြုနိုင်ပါသည်။'
+      ? 'ဦးစားပေး ဒေသ ပြန်ကောင်းလာပါက ထပ်မံအသိပေးပို့ပေးမည်။ လက်ရှိ fallback ကို ပြောင်းလိုပါက အကူအညီကို အသုံးပြုနိုင်ပါသည်။'
       : 'We will notify you again when the preferred region is healthy. If you want to change this fallback, use support.',
-    premiumRegionRecoveredTitle: isMyanmar ? '✅ <b>Preferred region ပြန်ကောင်းလာပြီ</b>' : '✅ <b>Preferred region recovered</b>',
-    premiumRegionRecoveredLabel: isMyanmar ? 'ပြန်ကောင်းလာသော region' : 'Recovered region',
+    premiumRegionRecoveredTitle: isMyanmar ? '✅ <b>ဦးစားပေး ဒေသ ပြန်ကောင်းလာပြီ</b>' : '✅ <b>Preferred region recovered</b>',
+    premiumRegionRecoveredLabel: isMyanmar ? 'ပြန်ကောင်းလာသော ဒေသ' : 'Recovered region',
     premiumRegionCurrentFallbackLabel: isMyanmar ? 'လက်ရှိ fallback' : 'Current fallback',
     premiumRegionRecoveryTimeLabel: isMyanmar ? 'ပြန်ကောင်းလာချိန်' : 'Recovery time',
     premiumRegionRecoveredHint: isMyanmar
-      ? 'လိုအပ်ပါက အောက်ပါ region ခလုတ်ကို နှိပ်ပြီး preferred region သို့ ပြန်ပြောင်းရန် တောင်းဆိုနိုင်ပါသည်။'
+      ? 'လိုအပ်ပါက အောက်ပါ ဒေသခလုတ်ကို နှိပ်ပြီး ဦးစားပေး ဒေသသို့ ပြန်ပြောင်းရန် တောင်းဆိုနိုင်ပါသည်။'
       : 'If you want to move back to the preferred region, tap one of the region buttons below.',
     premiumStatusHint: isMyanmar
-      ? 'အသစ် request စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
+      ? 'အသစ် တောင်းဆိုချက် စတင်ရန် /premium ကို အသုံးပြုနိုင်ပါသည်။'
       : 'Use /premium to start a new request.',
-    premiumOpenRequestLabel: isMyanmar ? 'ဖွင့်ထားသော request' : 'Open request',
-    premiumLatestReplyLabel: isMyanmar ? 'နောက်ဆုံး reply' : 'Last reply',
-    premiumAwaitingAdminReply: isMyanmar ? 'Admin စစ်နေ' : 'Admin reviewing',
-    premiumAwaitingYourReply: isMyanmar ? 'Reply လိုအပ်' : 'Reply needed',
+    premiumOpenRequestLabel: isMyanmar ? 'ဖွင့်ထားသော တောင်းဆိုချက်' : 'Open request',
+    premiumLatestReplyLabel: isMyanmar ? 'နောက်ဆုံး အကြောင်းပြန်ချက်' : 'Last reply',
+    premiumAwaitingAdminReply: isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်နေ' : 'Admin reviewing',
+    premiumAwaitingYourReply: isMyanmar ? 'အကြောင်းပြန်ရန် လိုအပ်' : 'Reply needed',
     premiumStatusReplyHint: isMyanmar
-      ? 'အသေးစိတ်ထည့်ရန် Reply ကို နှိပ်ပါ။'
+      ? 'အသေးစိတ်ထည့်ရန် အကြောင်းပြန်ရန် ကို နှိပ်ပါ။'
       : 'Tap Reply to add detail.',
-    premiumStatusUpdatedLabel: isMyanmar ? 'နောက်ဆုံး update' : 'Updated',
+    premiumStatusUpdatedLabel: isMyanmar ? 'နောက်ဆုံး အပ်ဒိတ်' : 'Updated',
     premiumResponseTimeLabel: isMyanmar ? 'ပထမအဖြေ' : 'First response',
     premiumResolutionTimeLabel: isMyanmar ? 'ဖြေရှင်းပြီး' : 'Resolved',
-    premiumNoPinApplied: isMyanmar ? 'Pin မသတ်မှတ်ရသေး' : 'No pin applied',
+    premiumNoPinApplied: isMyanmar ? 'pin မသတ်မှတ်ရသေး' : 'No pin applied',
     premiumStatusPendingReview: isMyanmar ? 'စစ်နေဆဲ' : 'Pending',
     premiumStatusApproved: isMyanmar ? 'အတည်ပြုပြီး' : 'Approved',
     premiumStatusHandled: isMyanmar ? 'ဖြေရှင်းပြီး' : 'Handled',
     premiumStatusDismissed: isMyanmar ? 'ပိတ်လိုက်သည်' : 'Dismissed',
-    premiumHistorySubmitted: isMyanmar ? 'Request ပို့ပြီး' : 'Request submitted',
-    premiumHistoryReviewed: isMyanmar ? 'Admin စစ်ပြီး' : 'Admin reviewed',
-    premiumHistoryApproved: isMyanmar ? 'Preferred region update ပြီး' : 'Preferred region updated',
-    premiumHistoryHandled: isMyanmar ? 'Route issue ဖြေရှင်းပြီး' : 'Route issue handled',
-    premiumHistoryDismissed: isMyanmar ? 'Request ပိတ်လိုက်သည်' : 'Request dismissed',
+    premiumHistorySubmitted: isMyanmar ? 'တောင်းဆိုချက် ပို့ပြီး' : 'Request submitted',
+    premiumHistoryReviewed: isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်ပြီး' : 'Admin reviewed',
+    premiumHistoryApproved: isMyanmar ? 'ဦးစားပေး ဒေသ ပြောင်းလဲပြီး' : 'Preferred region updated',
+    premiumHistoryHandled: isMyanmar ? 'လမ်းကြောင်း ပြဿနာ ဖြေရှင်းပြီး' : 'Route issue handled',
+    premiumHistoryDismissed: isMyanmar ? 'တောင်းဆိုချက် ပိတ်လိုက်သည်' : 'Request dismissed',
     premiumHistoryPinApplied: isMyanmar ? 'ယာယီ pin သတ်မှတ်ထား' : 'Temporary pin applied',
     accessShareFallback: isMyanmar
-      ? 'အောက်ပါ share page ကိုဖွင့်ပြီး install လုပ်နည်း၊ manual setup နှင့် နောက်ဆုံး connection အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
+      ? 'အောက်ပါ မျှဝေစာမျက်နှာကို ဖွင့်ပြီး ထည့်သွင်းနည်း၊ လက်ဖြင့်ဆက်တင်နှင့် နောက်ဆုံး ချိတ်ဆက်မှု အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
       : 'Open the share page below for install steps, manual setup, and the latest connection details.',
     dynamicShareFallback: isMyanmar
-      ? 'အောက်ပါ share page ကိုဖွင့်ပြီး install လုပ်နည်း၊ manual setup နှင့် backend အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
+      ? 'အောက်ပါ မျှဝေစာမျက်နှာကို ဖွင့်ပြီး ထည့်သွင်းနည်း၊ လက်ဖြင့်ဆက်တင်နှင့် backend အသေးစိတ်ကို ကြည့်နိုင်ပါသည်။'
       : 'Open the share page below for install steps, manual setup, and the latest backend details.',
     dynamicShareDisabledFallback: isMyanmar
-      ? 'ဤ key အတွက် share page ကို ပိတ်ထားသည်။ Outline သို့မဟုတ် compatible client ထဲတွင် အောက်ပါ client endpoint ကို အသုံးပြုပါ။'
+      ? 'ဤ သော့အတွက် မျှဝေစာမျက်နှာကို ပိတ်ထားသည်။ Outline သို့မဟုတ် သဟဇာတဖြစ်သော client ထဲတွင် အောက်ပါ client endpoint ကို အသုံးပြုပါ။'
       : 'The share page is disabled for this key. Use the client endpoint below inside Outline or another compatible client.',
     accessQrCaption: isMyanmar
-      ? 'Direct import မရပါက ဤ QR code ကို သင့် VPN client ဖြင့် scan လုပ်ပါ။'
+      ? 'တိုက်ရိုက် ထည့်သွင်းမှု မရပါက ဤ QR ကုဒ်ကို သင့် VPN client ဖြင့် scan လုပ်ပါ။'
       : 'Scan this QR code with your VPN client if direct import is unavailable.',
     dynamicQrCaption: isMyanmar
-      ? 'Direct import မရပါက Outline သို့မဟုတ် compatible client ဖြင့် ဤ QR code ကို scan လုပ်ပါ။'
+      ? 'တိုက်ရိုက် ထည့်သွင်းမှု မရပါက Outline သို့မဟုတ် သဟဇာတဖြစ်သော client ဖြင့် ဤ QR ကုဒ်ကို scan လုပ်ပါ။'
       : 'Scan this QR code with Outline or another compatible client if direct import is unavailable.',
-    showQrCode: isMyanmar ? 'QR Code ပြမည်' : 'Show QR Code',
+    showQrCode: isMyanmar ? 'QR ကုဒ် ပြမည်' : 'Show QR Code',
     accessReasonTitle: (reason?: string) =>
       reason === 'CREATED'
-        ? (isMyanmar ? '🎉 <b>သင့် access key အသင့်ဖြစ်ပါပြီ</b>' : '🎉 <b>Your access key is ready</b>')
+        ? (isMyanmar ? '🎉 <b>သင့် အသုံးပြုခွင့်သော့ အသင့်ဖြစ်ပါပြီ</b>' : '🎉 <b>Your access key is ready</b>')
         : reason === 'KEY_ENABLED'
-          ? (isMyanmar ? '✅ <b>သင့် access key ကို ပြန်ဖွင့်ပြီးပါပြီ</b>' : '✅ <b>Your access key has been re-enabled</b>')
+          ? (isMyanmar ? '✅ <b>သင့် အသုံးပြုခွင့်သော့ကို ပြန်ဖွင့်ပြီးပါပြီ</b>' : '✅ <b>Your access key has been re-enabled</b>')
           : reason === 'LINKED'
             ? (isMyanmar ? '🔗 <b>Telegram ချိတ်ဆက်မှု အောင်မြင်ပါသည်</b>' : '🔗 <b>Telegram linked successfully</b>')
             : reason === 'USAGE_REQUEST'
               ? (isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု အသေးစိတ်</b>' : '📊 <b>Your VPN access details</b>')
               : reason === 'SUBSCRIPTION_REQUEST'
-                ? (isMyanmar ? '📎 <b>သင့် subscription link များ</b>' : '📎 <b>Your subscription links</b>')
-                : (isMyanmar ? '📨 <b>သင့် share page</b>' : '📨 <b>Your share page</b>'),
+                ? (isMyanmar ? '📎 <b>သင့် စာရင်းသွင်းလင့်ခ်များ</b>' : '📎 <b>Your subscription links</b>')
+                : (isMyanmar ? '📨 <b>သင့် မျှဝေစာမျက်နှာ</b>' : '📨 <b>Your share page</b>'),
     dynamicReasonTitle: (reason?: string) =>
       reason === 'CREATED'
-        ? (isMyanmar ? '🎉 <b>သင့် dynamic key အသင့်ဖြစ်ပါပြီ</b>' : '🎉 <b>Your dynamic key is ready</b>')
+        ? (isMyanmar ? '🎉 <b>သင့် ပြောင်းလဲသတ်မှတ်သော့ အသင့်ဖြစ်ပါပြီ</b>' : '🎉 <b>Your dynamic key is ready</b>')
         : reason === 'KEY_ENABLED'
-          ? (isMyanmar ? '✅ <b>သင့် dynamic key ကို ပြန်ဖွင့်ပြီးပါပြီ</b>' : '✅ <b>Your dynamic key has been re-enabled</b>')
+          ? (isMyanmar ? '✅ <b>သင့် ပြောင်းလဲသတ်မှတ်သော့ကို ပြန်ဖွင့်ပြီးပါပြီ</b>' : '✅ <b>Your dynamic key has been re-enabled</b>')
           : reason === 'LINKED'
             ? (isMyanmar ? '🔗 <b>Telegram ချိတ်ဆက်မှု အောင်မြင်ပါသည်</b>' : '🔗 <b>Telegram linked successfully</b>')
             : reason === 'USAGE_REQUEST'
-              ? (isMyanmar ? '📊 <b>သင့် dynamic VPN အသေးစိတ်</b>' : '📊 <b>Your dynamic VPN access details</b>')
+              ? (isMyanmar ? '📊 <b>သင့် ပြောင်းလဲသတ်မှတ် VPN အသေးစိတ်</b>' : '📊 <b>Your dynamic VPN access details</b>')
               : reason === 'SUBSCRIPTION_REQUEST'
-                ? (isMyanmar ? '📎 <b>သင့် dynamic subscription link များ</b>' : '📎 <b>Your dynamic subscription links</b>')
-                : (isMyanmar ? '📨 <b>သင့် dynamic share page</b>' : '📨 <b>Your dynamic share page</b>'),
+                ? (isMyanmar ? '📎 <b>သင့် ပြောင်းလဲသတ်မှတ် စာရင်းသွင်းလင့်ခ်များ</b>' : '📎 <b>Your dynamic subscription links</b>')
+                : (isMyanmar ? '📨 <b>သင့် ပြောင်းလဲသတ်မှတ် မျှဝေစာမျက်နှာ</b>' : '📨 <b>Your dynamic share page</b>'),
     modeSelfManaged: isMyanmar ? 'ကိုယ်တိုင်စီမံ' : 'Self-Managed',
     modeManual: isMyanmar ? 'လက်ဖြင့်စီမံ' : 'Manual',
-    coverageAutoSelected: isMyanmar ? 'Fetch လုပ်ချိန်တွင် အလိုအလျောက် ရွေးမည်' : 'Auto-selected at fetch time',
-    lifecycleDisabledTitle: isMyanmar ? '⛔ <b>သင့် access key ကို ပိတ်ထားပါသည်</b>' : '⛔ <b>Your access key has been disabled</b>',
+    coverageAutoSelected: isMyanmar ? 'ခေါ်ယူချိန်တွင် အလိုအလျောက် ရွေးမည်' : 'Auto-selected at fetch time',
+    lifecycleDisabledTitle: isMyanmar ? '⛔ <b>သင့် အသုံးပြုခွင့်သော့ကို ပိတ်ထားပါသည်</b>' : '⛔ <b>Your access key has been disabled</b>',
     lifecycleDisabledBody: isMyanmar ? 'Administrator က ပြန်ဖွင့်ပေးသည့်အထိ traffic ကို အသုံးမပြုနိုင်ပါ။' : 'Traffic is blocked until the key is re-enabled by an administrator.',
-    lifecycleExpiring7Title: isMyanmar ? '⏳ <b>သင့် access key သက်တမ်း မကြာမီကုန်မည်</b>' : '⏳ <b>Your access key will expire soon</b>',
+    lifecycleExpiring7Title: isMyanmar ? '⏳ <b>သင့် အသုံးပြုခွင့်သော့ သက်တမ်း မကြာမီကုန်မည်</b>' : '⏳ <b>Your access key will expire soon</b>',
     lifecycleExpiring7Body: (days: number) => isMyanmar ? `သက်တမ်းကုန်ရန် ${days} ရက်ခန့် ကျန်ပါသည်။` : `There are about ${days} day(s) left before expiration.`,
-    lifecycleExpiring3Title: isMyanmar ? '⚠️ <b>သင့် access key သက်တမ်း အလွန်နီးကပ်ပါပြီ</b>' : '⚠️ <b>Your access key expires very soon</b>',
+    lifecycleExpiring3Title: isMyanmar ? '⚠️ <b>သင့် အသုံးပြုခွင့်သော့ သက်တမ်း အလွန်နီးကပ်ပါပြီ</b>' : '⚠️ <b>Your access key expires very soon</b>',
     lifecycleExpiring3Body: (days: number) => isMyanmar ? `${days} ရက်ခန့်သာ ကျန်ပါသည်။` : `Only about ${days} day(s) remain.`,
-    lifecycleExpiredTitle: isMyanmar ? '⌛ <b>သင့် access key သက်တမ်းကုန်သွားပါပြီ</b>' : '⌛ <b>Your access key has expired</b>',
-    lifecycleExpiredBody: isMyanmar ? 'ဤ key ကို မလုပ်ဆောင်နိုင်တော့ပါ။ သက်တမ်းတိုးလိုပါက support ကို ဆက်သွယ်ပါ။' : 'The key is no longer active. Contact support if it should be renewed.',
+    lifecycleExpiredTitle: isMyanmar ? '⌛ <b>သင့် အသုံးပြုခွင့်သော့ သက်တမ်းကုန်သွားပါပြီ</b>' : '⌛ <b>Your access key has expired</b>',
+    lifecycleExpiredBody: isMyanmar ? 'ဤ သော့ကို မလုပ်ဆောင်နိုင်တော့ပါ။ သက်တမ်းတိုးလိုပါက အကူအညီကို ဆက်သွယ်ပါ။' : 'The key is no longer active. Contact support if it should be renewed.',
     startLinked: (username: string) =>
       isMyanmar
-        ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📊 /status ဖြင့် အမြန်အခြေအနေ စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည်။`
+        ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် သော့များနှင့် သက်တမ်းတိုးမှုများကို စစ်ပါ\n• 🛒 /buy ဖြင့် အော်ဒါအသစ် စတင်ပါ\n• 📊 /status ဖြင့် အမြန်အခြေအနေ စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ မီနူးကို နှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည်။`
         : `✅ Telegram linked for <b>${username}</b>.\n\n<b>Start here</b>\n• 🗂 /mykeys for keys and renewals\n• 🛒 /buy for a new order\n• 📊 /status for your quick status\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
     linkExpired: isMyanmar ? '⚠️ ဤ Telegram link သက်တမ်းကုန်သွားပါပြီ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '⚠️ This Telegram link has expired. Ask the admin to generate a new one.',
     linkInvalid: isMyanmar ? '❌ ဤ Telegram link ကို မသုံးနိုင်တော့ပါ။ Admin ထံမှ link အသစ်တောင်းပါ။' : '❌ That Telegram link is not valid anymore. Ask the admin for a fresh link.',
     welcomeBack: (username: string) =>
       isMyanmar
-        ? `✅ <b>${username}</b> ကို ပြန်လည်ကြိုဆိုပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key နှင့် renew ကို စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📊 /status ဖြင့် အမြန်အခြေအနေ စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။`
+        ? `✅ <b>${username}</b> ကို ပြန်လည်ကြိုဆိုပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် သော့များနှင့် သက်တမ်းတိုးမှုများကို စစ်ပါ\n• 🛒 /buy ဖြင့် အော်ဒါအသစ် စတင်ပါ\n• 📊 /status ဖြင့် အမြန်အခြေအနေ စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ မီနူးကို နှိပ်ပြီး အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။`
         : `✅ Welcome back, <b>${username}</b>!\n\n<b>Start here</b>\n• 🗂 /mykeys for keys and renewals\n• 🛒 /buy for a new order\n• 📊 /status for your quick status\n• 🛟 /support for help\n\nUse the menu below for the fastest path.`,
     accountLinked: (username: string) =>
       isMyanmar
-        ? `✅ Account ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် key များ စစ်ပါ\n• 🛒 /buy ဖြင့် order အသစ် စတင်ပါ\n• 📊 /status ဖြင့် အမြန်အခြေအနေ စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ menu ကို နှိပ်ပြီး စတင်နိုင်ပါသည်။`
+        ? `✅ အကောင့် ချိတ်ဆက်မှု အောင်မြင်ပါသည်!\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် သော့များကို စစ်ပါ\n• 🛒 /buy ဖြင့် အော်ဒါအသစ် စတင်ပါ\n• 📊 /status ဖြင့် အမြန်အခြေအနေ စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ မီနူးကို နှိပ်ပြီး စတင်နိုင်ပါသည်။`
         : `✅ Account linked successfully!\n\n<b>Start here</b>\n• 🗂 /mykeys for your linked keys\n• 🛒 /buy for a new order\n• 📊 /status for your quick status\n• 🛟 /support for help\n\nUse the menu below to continue.`,
     adminRecognized: isMyanmar ? '\n\nသင့်ကို administrator အဖြစ် သတ်မှတ်ထားပါသည်။' : '\n\nYou are recognized as an administrator.',
     languagePrompt: isMyanmar ? '🌐 ဘာသာစကား ရွေးချယ်ပါ။' : '🌐 Choose your language.',
     languagePromptDesc: isMyanmar
-      ? 'ဆက်သွယ်မှုများ၊ order flow နှင့် key ပို့ပေးခြင်းတို့ကို သင့်ရွေးချယ်ထားသော ဘာသာစကားဖြင့် ဆက်လုပ်ပေးပါမည်။'
+      ? 'ဆက်သွယ်မှုများ၊ အော်ဒါလုပ်ငန်းစဉ်နှင့် သော့ပို့ပေးခြင်းတို့ကို သင့်ရွေးချယ်ထားသော ဘာသာစကားဖြင့် ဆက်လုပ်ပေးပါမည်။'
       : 'The bot will continue in your selected language for orders, support, and key delivery.',
     languageChanged: (languageName: string) =>
       isMyanmar
         ? `✅ ဘာသာစကားကို <b>${languageName}</b> သို့ ပြောင်းပြီးပါပြီ။`
         : `✅ Language updated to <b>${languageName}</b>.`,
     languageCommandHelp: isMyanmar
-      ? '/start - Main menu ကို ပြန်ဖွင့်ပြီး လိုအပ်ပါက language ကို ပြန်ရွေးပါ'
+      ? '/start - အဓိက မီနူးကို ပြန်ဖွင့်ပြီး လိုအပ်ပါက ဘာသာစကားကို ပြန်ရွေးပါ'
       : '/start - Reopen the main menu and pick your language again if needed',
     hello: (username: string, welcome: string, telegramUserId: number, adminMsg: string) =>
       isMyanmar
-        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nQuick menu ကို အသုံးပြု၍ အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
+        ? `👋 မင်္ဂလာပါ၊ <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nအမြန်မီနူးကို အသုံးပြု၍ အလွယ်တကူ ဆက်လုပ်နိုင်ပါသည်။\n\nသင့် Telegram ID: <code>${telegramUserId}</code>`
         : `👋 Hello, <b>${username}</b>!${adminMsg}\n\n${welcome}\n\nQuick menu: use the buttons below for the fastest navigation.\n\nYour Telegram ID: <code>${telegramUserId}</code>`,
     defaultWelcome: DEFAULT_TELEGRAM_WELCOME_MESSAGES[locale],
-    emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် key မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
+    emailNoKeys: (email: string) => isMyanmar ? `❌ ${email} အတွက် သော့ မတွေ့ပါ။` : `❌ No keys found for email: ${email}`,
     emailLinked: (count: number) => isMyanmar
-      ? `✅ Key ${count} ခုကို ဤ Telegram account နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\n/status ဖြင့် အမြန်အခြေအနေ စစ်နိုင်ပြီး /mykeys ဖြင့် key များကို ပြန်ဖွင့်နိုင်ပါသည်။`
+      ? `✅ သော့ ${count} ခုကို ဤ Telegram အကောင့်နှင့် ချိတ်ဆက်ပြီးပါပြီ။\n\n/status ဖြင့် အမြန်အခြေအနေ စစ်နိုင်ပြီး /mykeys ဖြင့် သော့များကို ပြန်ဖွင့်နိုင်ပါသည်။`
       : `✅ Linked ${formatTelegramCountLabel(count, locale, 'key')} to this Telegram account.\n\nUse /status for a quick summary or /mykeys to reopen your keys.`,
     keyNotFoundDefault: DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES[locale],
     usageTitle: isMyanmar ? '📊 <b>သင့် VPN အသုံးပြုမှု</b>\n\n' : '📊 <b>Your VPN Usage</b>\n\n',
     myKeysEmpty: isMyanmar
-      ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော key မရှိသေးပါ။ Key အသစ်ဝယ်ရန် /buy ကို သုံးပါ။ First-time user ဖြစ်ပါက /start ကို ပြန်ပို့ပြီး free trial offer ရှိမရှိ စစ်နိုင်ပါသည်။'
+      ? '❌ ဤ Telegram အကောင့်နှင့် ချိတ်ထားသော သော့ မရှိသေးပါ။ သော့အသစ်ဝယ်ရန် /buy ကို သုံးပါ။ ပထမဆုံး အသုံးပြုသူဖြစ်ပါက /start ကို ပြန်ပို့ပြီး အခမဲ့ အစမ်းအပ်နှံချက် ရှိမရှိ စစ်နိုင်ပါသည်။'
       : '❌ No linked keys were found for this Telegram account yet. Use /buy for a new key. If you are brand new, send /start again to check the free-trial offer.',
-    myKeysTitle: isMyanmar ? '🗂 <b>သင့် key များ</b>' : '🗂 <b>Your keys</b>',
-    myKeysSectionStandard: isMyanmar ? '🔑 <b>Standard key များ</b>' : '🔑 <b>Standard keys</b>',
-    myKeysSectionTrial: isMyanmar ? '🎁 <b>Trial key များ</b>' : '🎁 <b>Trial keys</b>',
-    myKeysSectionPremium: isMyanmar ? '💎 <b>Premium key များ</b>' : '💎 <b>Premium keys</b>',
+    myKeysTitle: isMyanmar ? '🗂 <b>သင့် သော့များ</b>' : '🗂 <b>Your keys</b>',
+    myKeysSectionStandard: isMyanmar ? '🔑 <b>ပုံမှန် သော့များ</b>' : '🔑 <b>Standard keys</b>',
+    myKeysSectionTrial: isMyanmar ? '🎁 <b>အစမ်း သော့များ</b>' : '🎁 <b>Trial keys</b>',
+    myKeysSectionPremium: isMyanmar ? '💎 <b>ပရီမီယမ် သော့များ</b>' : '💎 <b>Premium keys</b>',
     myKeysTypeStandard: isMyanmar ? 'ပုံမှန် access key' : 'Normal access key',
     myKeysTypeTrial: isMyanmar ? 'အခမဲ့ အစမ်းသော့' : 'Free trial key',
-    myKeysTypePremium: isMyanmar ? 'Premium ပြောင်းလဲသတ်မှတ်သော့' : 'Premium dynamic key',
-    myKeysCurrentPoolLabel: isMyanmar ? 'လက်ရှိ pool' : 'Current pool',
-    myKeysServerIssue: isMyanmar ? 'Server ပြဿနာ' : 'Server issue',
+    myKeysTypePremium: isMyanmar ? 'ပရီမီယမ် ပြောင်းလဲသတ်မှတ်သော့' : 'Premium dynamic key',
+    myKeysCurrentPoolLabel: isMyanmar ? 'လက်ရှိ ဆာဗာအုပ်စု' : 'Current pool',
+    myKeysServerIssue: isMyanmar ? 'ဆာဗာ ပြဿနာ' : 'Server issue',
     myKeysPremiumStatus: isMyanmar ? 'အခြေအနေ' : 'Status',
     myKeysOpenSupport: isMyanmar ? 'အကူအညီ' : 'Support',
     subEmpty: isMyanmar ? '❌ ဤ Telegram account နှင့် ချိတ်ထားသော active key မရှိပါ။' : '❌ No active keys are linked to this Telegram account.',
     subSent: (count: number) => isMyanmar
-      ? `📎 Share page ${count} ခုကို ဤ chat သို့ ပို့ပြီးပါပြီ။`
+      ? `📎 မျှဝေစာမျက်နှာ ${count} ခုကို ဤ chat သို့ ပို့ပြီးပါပြီ။`
       : `📎 Sent ${formatTelegramCountLabel(count, locale, 'share page')} to this chat.`,
-    noSupportLink: isMyanmar ? 'ℹ️ လက်ရှိ support link မသတ်မှတ်ရသေးပါ။' : 'ℹ️ No support link is configured right now.',
+    noSupportLink: isMyanmar ? 'ℹ️ လက်ရှိ အကူအညီ လင့်ခ် မသတ်မှတ်ရသေးပါ။' : 'ℹ️ No support link is configured right now.',
     supportLabel: isMyanmar ? '🛟 အကူအညီ' : '🛟 Support',
     supportHubTitle: isMyanmar ? '🛟 <b>အကူအညီ စင်တာ</b>' : '🛟 <b>Support center</b>',
     supportHubHint: isMyanmar
-      ? 'Order, key, server issue နှင့် premium support ကို ဒီနေရာကနေ စတင်နိုင်ပါသည်။'
+      ? 'အော်ဒါ၊ သော့၊ ဆာဗာ ပြဿနာ နှင့် ပရီမီယမ် အကူအညီကို ဒီနေရာကနေ စတင်နိုင်ပါသည်။'
       : 'Start here for order, key, server-issue, and premium support help.',
     supportHubOrdersHint: isMyanmar
-      ? '• Order, payment, နှင့် screenshot ပြဿနာကို အောက်က button များမှ စတင်နိုင်ပါသည်။'
+      ? '• အော်ဒါ၊ ငွေပေးချေမှု နှင့် စခရင်ရှော့ ပြဿနာကို အောက်က ခလုတ်များမှ စတင်နိုင်ပါသည်။'
       : '• Start order, payment, and screenshot help from the buttons below.',
     supportHubInboxHint: isMyanmar
-      ? '• Thread အခြေအနေများနှင့် support reply များကို ဒီစင်တာမှ တစ်နေရာတည်းမှာ စစ်နိုင်ပါသည်။'
+      ? '• စကားဝိုင်း အခြေအနေများနှင့် အကူအညီ အကြောင်းပြန်ချက်များကို ဒီစင်တာမှ တစ်နေရာတည်းမှာ စစ်နိုင်ပါသည်။'
       : '• Review thread status and support replies here in one place.',
     supportHubPremiumHint: isMyanmar
-      ? '• Premium user များအတွက် /premium, /supportstatus, /premiumregion ကို အသုံးပြုနိုင်ပါသည်။'
+      ? '• ပရီမီယမ် အသုံးပြုသူများအတွက် /premium, /supportstatus, /premiumregion ကို အသုံးပြုနိုင်ပါသည်။'
       : '• Premium users can continue with /premium, /supportstatus, and /premiumregion.',
     supportHubServerHint: isMyanmar
-      ? '• Normal key server ပြဿနာရှိပါက /server ဖြင့် server change request စတင်ပါ။'
+      ? '• ပုံမှန် သော့ ဆာဗာ ပြဿနာရှိပါက /server ဖြင့် ဆာဗာပြောင်း တောင်းဆိုချက် စတင်ပါ။'
       : '• If a normal-key server has an issue, use /server to start a server-change request.',
     supportHubDirectLink: (supportLink: string) =>
       isMyanmar
@@ -426,7 +426,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     expirationLabel: isMyanmar ? 'သက်တမ်းကုန်ချိန်' : 'Expiration',
     quotaLabel: isMyanmar ? 'အသုံးပြုခွင့်ပမာဏ' : 'Quota',
     sharePageLabel: isMyanmar ? 'မျှဝေစာမျက်နှာ' : 'Share page',
-    subscriptionUrlLabel: isMyanmar ? 'subscription URL' : 'Subscription URL',
+    subscriptionUrlLabel: isMyanmar ? 'စာရင်းသွင်းလင့်ခ်' : 'Subscription URL',
     clientEndpointLabel: isMyanmar ? 'ကလိုင်းယင့် endpoint' : 'Client endpoint',
     outlineClientUrlLabel: isMyanmar ? 'Outline ကလိုင်းယင့် URL' : 'Outline client URL',
     modeLabel: isMyanmar ? 'မုဒ်' : 'Mode',
@@ -837,11 +837,11 @@ export function getTelegramUi(locale: SupportedLocale) {
     orderManualReviewActionLabel: isMyanmar ? 'Panel တွင် စစ်ရန်' : 'Need manual review',
     orderReviewActionUnauthorized: isMyanmar ? 'ဤ action ကို admin များသာ လုပ်နိုင်ပါသည်။' : 'Only admins can perform this action.',
     orderReviewActionApproved: (code: string) =>
-      isMyanmar ? `Order ${code} ကို Telegram မှ အတည်ပြုပြီးပါပြီ။` : `Approved order ${code} from Telegram.`,
+      isMyanmar ? `အော်ဒါ ${code} ကို Telegram မှ အတည်ပြုပြီးပါပြီ။` : `Approved order ${code} from Telegram.`,
     orderReviewActionRejected: (code: string) =>
-      isMyanmar ? `Order ${code} ကို Telegram မှ ပယ်လိုက်ပါပြီ။` : `Rejected order ${code} from Telegram.`,
+      isMyanmar ? `အော်ဒါ ${code} ကို Telegram မှ ပယ်လိုက်ပါပြီ။` : `Rejected order ${code} from Telegram.`,
     orderReviewActionFailed: (message: string) =>
-      isMyanmar ? `Telegram action မအောင်မြင်ပါ: ${message}` : `Telegram action failed: ${message}`,
+      isMyanmar ? `Telegram လုပ်ဆောင်ချက် မအောင်မြင်ပါ: ${message}` : `Telegram action failed: ${message}`,
     paymentInstructionsLabel: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment instructions',
     paymentMethodsLabel: isMyanmar ? 'ငွေပေးချေမှု အကောင့်များ' : 'Payment methods',
     paymentMethodLabel: isMyanmar ? 'ရွေးထားသော ငွေပေးချေမှုနည်းလမ်း' : 'Payment method',
@@ -851,61 +851,61 @@ export function getTelegramUi(locale: SupportedLocale) {
     discountLabel: isMyanmar ? 'လျှော့စျေး' : 'Discount',
     couponCodeLabel: isMyanmar ? 'ကူပွန်' : 'Coupon',
     orderCodeLabel: isMyanmar ? 'အော်ဒါ' : 'Order',
-    orderTypeLabel: isMyanmar ? 'Order အမျိုးအစား' : 'Order type',
-    orderStatusTitle: isMyanmar ? '🧾 <b>Order အခြေအနေ</b>' : '🧾 <b>Order status</b>',
-    ordersTitle: isMyanmar ? '🧾 <b>သင့် recent order များ</b>' : '🧾 <b>Your recent orders</b>',
-    ordersAttentionTitle: isMyanmar ? '⚡ <b>သင့် action လိုအပ်</b>' : '⚡ <b>Needs your action</b>',
+    orderTypeLabel: isMyanmar ? 'အော်ဒါ အမျိုးအစား' : 'Order type',
+    orderStatusTitle: isMyanmar ? '🧾 <b>အော်ဒါ အခြေအနေ</b>' : '🧾 <b>Order status</b>',
+    ordersTitle: isMyanmar ? '🧾 <b>သင့် မကြာသေးမီ အော်ဒါများ</b>' : '🧾 <b>Your recent orders</b>',
+    ordersAttentionTitle: isMyanmar ? '⚡ <b>သင့် လုပ်ဆောင်ချက် လိုအပ်</b>' : '⚡ <b>Needs your action</b>',
     ordersReviewTitle: isMyanmar ? '🕐 <b>စစ်ဆေးနေဆဲ</b>' : '🕐 <b>Being reviewed</b>',
     ordersCompletedTitle: isMyanmar ? '✅ <b>ပြီးစီးပြီး</b>' : '✅ <b>Completed</b>',
-    ordersEmpty: isMyanmar ? 'ℹ️ ဤ Telegram account အတွက် order မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။' : 'ℹ️ There are no orders for this Telegram account yet. Start with /buy or /renew.',
+    ordersEmpty: isMyanmar ? 'ℹ️ ဤ Telegram အကောင့်အတွက် အော်ဒါ မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။' : 'ℹ️ There are no orders for this Telegram account yet. Start with /buy or /renew.',
     ordersHint: isMyanmar ? 'ပိုအသေးစိတ်ကြည့်ရန် /order ORDER-CODE သို့မဟုတ် /order ကို အသုံးပြုပါ။' : 'Use /order ORDER-CODE or /order to view one order in detail.',
     ordersLatestActiveHint: isMyanmar
-      ? 'သင်၏ နောက်ဆုံး active order ကို အောက်တွင် အသေးစိတ်ပြထားပါသည်။'
+      ? 'သင်၏ နောက်ဆုံး အသက်ဝင် အော်ဒါကို အောက်တွင် အသေးစိတ်ပြထားပါသည်။'
       : 'Your most recent active order is shown in detail below.',
     orderStatusUsage: isMyanmar ? 'အသုံးပြုပုံ: /order သို့မဟုတ် /order ORDER-CODE' : 'Usage: /order or /order ORDER-CODE',
     orderStatusNotFound: (code: string) =>
       isMyanmar
-        ? `❌ <b>${code}</b> နှင့် ကိုက်ညီသော order မတွေ့ပါ။`
+        ? `❌ <b>${code}</b> နှင့် ကိုက်ညီသော အော်ဒါ မတွေ့ပါ။`
         : `❌ No order matched <b>${code}</b>.`,
     orderStatusLatestNotFound: isMyanmar
-      ? 'ℹ️ ကြည့်ရန် order မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။'
+      ? 'ℹ️ ကြည့်ရန် အော်ဒါ မရှိသေးပါ။ /buy သို့မဟုတ် /renew ဖြင့် စတင်နိုင်ပါသည်။'
       : 'ℹ️ There is no order to show yet. Start with /buy or /renew.',
     createdAtLabel: isMyanmar ? 'စတင်ချိန်' : 'Created',
-    paymentSubmittedLabel: isMyanmar ? 'Proof ပို့ချိန်' : 'Proof submitted',
-    reviewedAtLabel: isMyanmar ? 'Admin စစ်ဆေးချိန်' : 'Reviewed',
+    paymentSubmittedLabel: isMyanmar ? 'အထောက်အထား ပို့ချိန်' : 'Proof submitted',
+    reviewedAtLabel: isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်ဆေးချိန်' : 'Reviewed',
     fulfilledAtLabel: isMyanmar ? 'ပြီးစီးချိန်' : 'Fulfilled',
     rejectedAtLabel: isMyanmar ? 'ပယ်ချိန်' : 'Rejected',
     durationLabel: isMyanmar ? 'သက်တမ်းကာလ' : 'Duration',
-    preferredServerLabel: isMyanmar ? 'ရွေးထားသော server' : 'Preferred server',
-    deliveredKeyLabel: isMyanmar ? 'ထုတ်ပေးထားသော key' : 'Delivered key',
-    latestOrderHint: isMyanmar ? 'နောက်ဆုံး order ကို ပြထားပါသည်။' : 'Showing the latest order.',
+    preferredServerLabel: isMyanmar ? 'ရွေးထားသော ဆာဗာ' : 'Preferred server',
+    deliveredKeyLabel: isMyanmar ? 'ထုတ်ပေးထားသော သော့' : 'Delivered key',
+    latestOrderHint: isMyanmar ? 'နောက်ဆုံး အော်ဒါကို ပြထားပါသည်။' : 'Showing the latest order.',
     orderTimelineTitle: isMyanmar ? 'အချိန်လိုက် မှတ်တမ်း' : 'Timeline',
     orderNextStepLabel: isMyanmar ? 'နောက်တစ်ဆင့်' : 'Next step',
     orderTimelineCreated: isMyanmar ? 'အော်ဒါ စတင်' : 'Order created',
     orderTimelinePaymentStage: isMyanmar ? 'ငွေပေးချေမှု အဆင့် ဖွင့်ပြီး' : 'Payment step opened',
     orderTimelineProofSubmitted: isMyanmar ? 'အထောက်အထား ပို့ပြီး' : 'Proof submitted',
-    orderTimelineReviewed: isMyanmar ? 'Admin စစ်ပြီး' : 'Admin reviewed',
-    orderTimelineFulfilled: isMyanmar ? 'access ပို့ပြီး' : 'Access delivered',
-    orderTimelineRejected: isMyanmar ? 'Order ပယ်လိုက်သည်' : 'Order rejected',
-    orderTimelineCancelled: isMyanmar ? 'Order ပယ်ဖျက်သည်' : 'Order cancelled',
-    orderNextChooseKey: isMyanmar ? 'Renew လုပ်မည့် key ကို ရွေးပါ။' : 'Choose which key you want to renew.',
-    orderNextChoosePlan: isMyanmar ? 'Plan ကို ရွေးပါ။' : 'Choose your plan.',
-    orderNextChooseServer: isMyanmar ? 'အသုံးပြုလိုသော server ကို ရွေးပါ။' : 'Choose the server you prefer.',
-    orderNextChoosePaymentMethod: isMyanmar ? 'ငွေပေးချေမည့် method ကို ရွေးပါ။' : 'Choose the payment method you will use.',
-    orderNextUploadProof: isMyanmar ? 'ငွေပေးချေပြီး screenshot ကို ပို့ပါ။' : 'Complete payment and send the screenshot.',
-    orderNextWaitReview: isMyanmar ? 'Admin review စောင့်ပါ။ အတည်ပြုပြီးနောက် access ကို ဤ chat သို့ ပို့မည်။' : 'Wait for admin review. Your access will be delivered here after approval.',
-    orderNextRetry: isMyanmar ? 'အော်ဒါကို retry လုပ်ပါ သို့မဟုတ် /buy /renew ဖြင့် ပြန်စပါ။' : 'Retry this order or start again with /buy or /renew.',
-    orderNextDelivered: isMyanmar ? 'Key ကို ပြန်ဖွင့်ရန် share page သို့မဟုတ် renew button ကို အသုံးပြုနိုင်ပါသည်။' : 'Use the share page or renew button to continue with this key.',
+    orderTimelineReviewed: isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်ပြီး' : 'Admin reviewed',
+    orderTimelineFulfilled: isMyanmar ? 'အသုံးပြုခွင့် ပို့ပြီး' : 'Access delivered',
+    orderTimelineRejected: isMyanmar ? 'အော်ဒါ ပယ်လိုက်သည်' : 'Order rejected',
+    orderTimelineCancelled: isMyanmar ? 'အော်ဒါ ပယ်ဖျက်သည်' : 'Order cancelled',
+    orderNextChooseKey: isMyanmar ? 'သက်တမ်းတိုးမည့် သော့ကို ရွေးပါ။' : 'Choose which key you want to renew.',
+    orderNextChoosePlan: isMyanmar ? 'အစီအစဉ်ကို ရွေးပါ။' : 'Choose your plan.',
+    orderNextChooseServer: isMyanmar ? 'အသုံးပြုလိုသော ဆာဗာကို ရွေးပါ။' : 'Choose the server you prefer.',
+    orderNextChoosePaymentMethod: isMyanmar ? 'ငွေပေးချေမည့် နည်းလမ်းကို ရွေးပါ။' : 'Choose the payment method you will use.',
+    orderNextUploadProof: isMyanmar ? 'ငွေပေးချေပြီး စခရင်ရှော့ကို ပို့ပါ။' : 'Complete payment and send the screenshot.',
+    orderNextWaitReview: isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်ဆေးမှုကို စောင့်ပါ။ အတည်ပြုပြီးနောက် အသုံးပြုခွင့်ကို ဤ chat သို့ ပို့မည်။' : 'Wait for admin review. Your access will be delivered here after approval.',
+    orderNextRetry: isMyanmar ? 'အော်ဒါကို ထပ်ကြိုးစားပါ သို့မဟုတ် /buy /renew ဖြင့် ပြန်စပါ။' : 'Retry this order or start again with /buy or /renew.',
+    orderNextDelivered: isMyanmar ? 'သော့ကို ဆက်အသုံးပြုရန် မျှဝေစာမျက်နှာ သို့မဟုတ် သက်တမ်းတိုး ခလုတ်ကို အသုံးပြုနိုင်ပါသည်။' : 'Use the share page or renew button to continue with this key.',
     orderKindNew: isMyanmar ? 'အသစ်' : 'New',
     orderKindRenew: isMyanmar ? 'သက်တမ်းတိုး' : 'Renewal',
-    orderStatusAwaitingKeySelection: isMyanmar ? 'Key ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting key selection',
-    orderStatusAwaitingPlan: isMyanmar ? 'Plan ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting plan selection',
+    orderStatusAwaitingKeySelection: isMyanmar ? 'သော့ ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting key selection',
+    orderStatusAwaitingPlan: isMyanmar ? 'အစီအစဉ် ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting plan selection',
     orderStatusAwaitingMonths: isMyanmar ? 'လအရေအတွက် စောင့်နေသည်' : 'Awaiting month count',
     orderStatusAwaitingServerSelection: isMyanmar ? 'ဆာဗာ ရွေးချယ်ရန် စောင့်နေသည်' : 'Awaiting server selection',
     orderStatusAwaitingKeyName: isMyanmar ? 'သော့အမည် စောင့်နေသည်' : 'Awaiting key name',
     orderStatusAwaitingPaymentMethod: isMyanmar ? 'ငွေပေးချေမှု နည်းလမ်း ရွေးရန် စောင့်နေသည်' : 'Awaiting payment method',
     orderStatusAwaitingPaymentProof: isMyanmar ? 'ငွေပေးချေမှု အထောက်အထား စောင့်နေသည်' : 'Awaiting payment proof',
-    orderStatusPendingReview: isMyanmar ? 'Admin စစ်ဆေးရန် စောင့်နေသည်' : 'Pending review',
+    orderStatusPendingReview: isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်ဆေးရန် စောင့်နေသည်' : 'Pending review',
     orderStatusApproved: isMyanmar ? 'အတည်ပြုထားပြီး ဖြစ်သည်' : 'Approved',
     orderStatusFulfilled: isMyanmar ? 'ပြီးစီးထားသည်' : 'Fulfilled',
     orderStatusRejected: isMyanmar ? 'ပယ်ထားသည်' : 'Rejected',
@@ -913,10 +913,10 @@ export function getTelegramUi(locale: SupportedLocale) {
     paymentProofLabel: isMyanmar ? 'ငွေပေးချေမှု အထောက်အထား' : 'Proof',
     duplicateProofWarning: (orderCode: string) =>
       isMyanmar
-        ? `⚠️ ဤ screenshot သည် ယခင် order <b>${orderCode}</b> တွင် အသုံးပြုထားသည့်ပုံစံနှင့် ကိုက်ညီနေပါသည်။`
+        ? `⚠️ ဤ စခရင်ရှော့သည် ယခင် အော်ဒါ <b>${orderCode}</b> တွင် အသုံးပြုထားသည့်ပုံစံနှင့် ကိုက်ညီနေပါသည်။`
         : `⚠️ This screenshot matches payment proof previously used on order <b>${orderCode}</b>.`,
     requestedNameLabel: isMyanmar ? 'တောင်းဆိုထားသော အမည်' : 'Requested name',
-    renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် key' : 'Renew target',
+    renewalTargetLabel: isMyanmar ? 'သက်တမ်းတိုးမည့် သော့' : 'Renew target',
     accountNameLabel: isMyanmar ? 'အကောင့်အမည်' : 'Account name',
     accountNumberLabel: isMyanmar ? 'အကောင့်နံပါတ်' : 'Account number',
     customerMessage: isMyanmar ? 'အသုံးပြုသူ မက်ဆေ့ချ်' : 'Customer message',
@@ -924,53 +924,53 @@ export function getTelegramUi(locale: SupportedLocale) {
       isMyanmar
         ? `📷 ${label} QR / ငွေပေးချေမှု အကောင့်ပုံ`
         : `📷 ${label} QR / payment account image`,
-    serverAutoSelect: isMyanmar ? 'အကောင်းဆုံး server ကို အလိုအလျောက် ရွေးမည်' : 'Auto-select the best server',
+    serverAutoSelect: isMyanmar ? 'အကောင်းဆုံး ဆာဗာကို အလိုအလျောက် ရွေးမည်' : 'Auto-select the best server',
     adminNote: isMyanmar ? 'စီမံခန့်ခွဲသူ မှတ်ချက်' : 'Admin note',
     statusNoServers: isMyanmar ? '❌ ဆာဗာ မသတ်မှတ်ရသေးပါ။' : '❌ No servers configured.',
-    statusTitle: isMyanmar ? '🖥️ <b>Server အခြေအနေ</b>\n\n' : '🖥️ <b>Server Status</b>\n\n',
+    statusTitle: isMyanmar ? '🖥️ <b>ဆာဗာ အခြေအနေ</b>\n\n' : '🖥️ <b>Server Status</b>\n\n',
     statusLabel: isMyanmar ? 'အခြေအနေ' : 'Status',
     latencyLabel: isMyanmar ? 'တုံ့ပြန်ချိန်' : 'Latency',
     uptimeLabel: isMyanmar ? 'လည်ပတ်ချိန်' : 'Uptime',
-    keysLabel: isMyanmar ? 'Key များ' : 'Keys',
-    expiringNone: (days: number) => isMyanmar ? `✅ နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် key မရှိပါ။` : `✅ No keys are expiring in the next ${days} day(s).`,
-    expiringTitle: (days: number) => isMyanmar ? `⏳ <b>နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် key များ</b>` : `⏳ <b>Keys expiring in the next ${days} day(s)</b>`,
+    keysLabel: isMyanmar ? 'သော့များ' : 'Keys',
+    expiringNone: (days: number) => isMyanmar ? `✅ နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် သော့ မရှိပါ။` : `✅ No keys are expiring in the next ${days} day(s).`,
+    expiringTitle: (days: number) => isMyanmar ? `⏳ <b>နောက် ${days} ရက်အတွင်း သက်တမ်းကုန်မည့် သော့များ</b>` : `⏳ <b>Keys expiring in the next ${days} day(s)</b>`,
     findUsage: isMyanmar ? '🔎 အသုံးပြုပုံ: /find NAME_OR_KEY_ID' : '🔎 Usage: /find NAME_OR_KEY_ID',
-    findKeyFound: isMyanmar ? '🔎 <b>Key ကို တွေ့ရှိပါသည်</b>' : '🔎 <b>Key found</b>',
-    findNoMatches: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော access key မရှိပါ။` : `❌ No access keys matched "${query}".`,
+    findKeyFound: isMyanmar ? '🔎 <b>သော့ကို တွေ့ရှိပါသည်</b>' : '🔎 <b>Key found</b>',
+    findNoMatches: (query: string) => isMyanmar ? `❌ "${query}" နှင့် ကိုက်ညီသော အသုံးပြုခွင့်သော့ မရှိပါ။` : `❌ No access keys matched "${query}".`,
     findMatches: (query: string) => isMyanmar ? `🔎 <b>"${query}" အတွက် ကိုက်ညီမှုများ</b>` : `🔎 <b>Matches for "${query}"</b>`,
-    findProvideQuery: isMyanmar ? '❌ Key ID သို့မဟုတ် ရှာဖွေရန် စာသားတစ်ခု ထည့်ပါ။' : '❌ Please provide a key identifier or search term.',
-    adminOnly: isMyanmar ? '❌ ဤ command ကို administrator များသာ အသုံးပြုနိုင်ပါသည်။' : '❌ This command is only available to administrators.',
+    findProvideQuery: isMyanmar ? '❌ သော့ ID သို့မဟုတ် ရှာဖွေရန် စာသားတစ်ခု ထည့်ပါ။' : '❌ Please provide a key identifier or search term.',
+    adminOnly: isMyanmar ? '❌ ဤ command ကို စီမံခန့်ခွဲသူများသာ အသုံးပြုနိုင်ပါသည်။' : '❌ This command is only available to administrators.',
     enableUsage: isMyanmar ? 'အသုံးပြုပုံ: /enable KEY-ID' : 'Usage: /enable KEY-ID',
     disableUsage: isMyanmar ? 'အသုံးပြုပုံ: /disable KEY-ID' : 'Usage: /disable KEY-ID',
-    multiMatchUseIds: isMyanmar ? '⚠️ Key အများအပြား ကိုက်ညီနေပါသည်။ အောက်ပါ ID များထဲမှ တစ်ခုကို တိတိကျကျ အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one of these exact IDs:',
-    keyNotFound: isMyanmar ? '❌ Key မတွေ့ပါ။' : '❌ Key not found.',
+    multiMatchUseIds: isMyanmar ? '⚠️ သော့ အများအပြား ကိုက်ညီနေပါသည်။ အောက်ပါ ID များထဲမှ တစ်ခုကို တိတိကျကျ အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one of these exact IDs:',
+    keyNotFound: isMyanmar ? '❌ သော့ မတွေ့ပါ။' : '❌ Key not found.',
     keyEnabled: (name: string) => isMyanmar ? `✅ <b>${name}</b> ကို ပြန်ဖွင့်ပြီးပါပြီ။` : `✅ Re-enabled <b>${name}</b>.`,
     keyDisabled: (name: string) => isMyanmar ? `⛔ <b>${name}</b> ကို ပိတ်လိုက်ပါပြီ။` : `⛔ Disabled <b>${name}</b>.`,
     resendUsage: isMyanmar ? 'အသုံးပြုပုံ: /resend KEY-ID' : 'Usage: /resend KEY-ID',
-    resendMulti: isMyanmar ? '⚠️ Key အများအပြား ကိုက်ညီနေပါသည်။ တိတိကျကျ ID တစ်ခုကို အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one exact ID:',
+    resendMulti: isMyanmar ? '⚠️ သော့ အများအပြား ကိုက်ညီနေပါသည်။ တိတိကျကျ ID တစ်ခုကို အသုံးပြုပါ:' : '⚠️ Multiple keys matched. Use one exact ID:',
     resendFailed: (message: string) => isMyanmar ? `❌ ပြန်ပို့မှု မအောင်မြင်ပါ: ${message}` : `❌ Failed to resend: ${message}`,
-    resendSuccess: (name: string) => isMyanmar ? `📨 <b>${name}</b> အတွက် share page ကို ပြန်ပို့ပြီးပါပြီ။` : `📨 Resent the share page for <b>${name}</b>.`,
-    sysinfoGathering: isMyanmar ? '🔄 System information စုဆောင်းနေပါသည်...' : '🔄 Gathering system information...',
+    resendSuccess: (name: string) => isMyanmar ? `📨 <b>${name}</b> အတွက် မျှဝေစာမျက်နှာကို ပြန်ပို့ပြီးပါပြီ။` : `📨 Resent the share page for <b>${name}</b>.`,
+    sysinfoGathering: isMyanmar ? '🔄 စနစ်အချက်အလက် စုဆောင်းနေပါသည်...' : '🔄 Gathering system information...',
     sysinfoTitle: isMyanmar ? '<b>စနစ်အချက်အလက်</b> 🖥️' : '<b>System Information</b> 🖥️',
     sysinfoOs: isMyanmar ? 'စနစ်' : 'OS',
     sysinfoCpu: isMyanmar ? 'CPU အသုံးပြုမှု' : 'CPU Load',
     sysinfoMemory: isMyanmar ? 'မှတ်ဉာဏ်' : 'Memory',
     sysinfoDisk: isMyanmar ? 'သိုလှောင်မှု' : 'Disk',
-    sysinfoFailed: isMyanmar ? '❌ System information မရယူနိုင်ပါ။' : '❌ Failed to retrieve system information.',
-    backupCreating: isMyanmar ? '📦 Backup ဖန်တီးနေပါသည်... ကျေးဇူးပြု၍ ခဏစောင့်ပါ။' : '📦 Creating backup... please wait.',
-    backupCaption: (date: string) => isMyanmar ? `${date} တွင် backup ဖန်တီးထားပါသည်` : `Backup created at ${date}`,
-    backupFailed: (message: string) => isMyanmar ? `❌ Backup မအောင်မြင်ပါ: ${message}` : `❌ Backup failed: ${message}`,
-    helpTitle: isMyanmar ? '📚 <b>အသုံးပြုနိုင်သော Command များ</b>' : '📚 <b>Available Commands</b>',
-    helpEmailHint: isMyanmar ? 'ဤ Telegram account ကို ချိတ်ရန် သင့် email ကို တိုက်ရိုက် ပို့နိုင်ပါသည်။' : 'You can also send your email address directly to link this Telegram account.',
+    sysinfoFailed: isMyanmar ? '❌ စနစ်အချက်အလက် မရယူနိုင်ပါ။' : '❌ Failed to retrieve system information.',
+    backupCreating: isMyanmar ? '📦 အရန်မိတ္တူ ဖန်တီးနေပါသည်... ကျေးဇူးပြု၍ ခဏစောင့်ပါ။' : '📦 Creating backup... please wait.',
+    backupCaption: (date: string) => isMyanmar ? `${date} တွင် အရန်မိတ္တူ ဖန်တီးထားပါသည်` : `Backup created at ${date}`,
+    backupFailed: (message: string) => isMyanmar ? `❌ အရန်မိတ္တူ မအောင်မြင်ပါ: ${message}` : `❌ Backup failed: ${message}`,
+    helpTitle: isMyanmar ? '📚 <b>အသုံးပြုနိုင်သော command များ</b>' : '📚 <b>Available Commands</b>',
+    helpEmailHint: isMyanmar ? 'ဤ Telegram အကောင့်ကို ချိတ်ရန် သင့် email ကို တိုက်ရိုက် ပို့နိုင်ပါသည်။' : 'You can also send your email address directly to link this Telegram account.',
     unknownCommand: isMyanmar ? '❓ မသိသော command ဖြစ်သည်။ အသုံးပြုနိုင်သော command များကို ကြည့်ရန် /help ကို အသုံးပြုပါ။' : '❓ Unknown command. Use /help to see the available commands.',
     digestTitle: isMyanmar ? '🧾 <b>Atomic-UI Telegram အနှစ်ချုပ်</b>' : '🧾 <b>Atomic-UI Telegram Digest</b>',
     digestWindow: (hours: number) => isMyanmar ? `အချိန်ကာလ: နောက်ဆုံး ${hours} နာရီ` : `Window: last ${hours} hour(s)`,
-    digestActiveKeys: isMyanmar ? 'Active key များ' : 'Active keys',
-    digestPendingKeys: isMyanmar ? 'Pending key များ' : 'Pending keys',
-    digestDepletedKeys: isMyanmar ? 'Depleted key များ' : 'Depleted keys',
+    digestActiveKeys: isMyanmar ? 'အသက်ဝင် သော့များ' : 'Active keys',
+    digestPendingKeys: isMyanmar ? 'စောင့်ဆိုင်းနေသော သော့များ' : 'Pending keys',
+    digestDepletedKeys: isMyanmar ? 'အသုံးကုန် သော့များ' : 'Depleted keys',
     digestExpiringSoon: isMyanmar ? '၇ ရက်အတွင်း သက်တမ်းကုန်မည်' : 'Expiring in 7 days',
-    digestOpenIncidents: isMyanmar ? 'ဖွင့်ထားသော incident များ' : 'Open incidents',
-    digestEvents: isMyanmar ? 'Subscription page event များ' : 'Subscription page events',
+    digestOpenIncidents: isMyanmar ? 'ဖွင့်ထားသော အဖြစ်အပျက်များ' : 'Open incidents',
+    digestEvents: isMyanmar ? 'မျှဝေစာမျက်နှာ လှုပ်ရှားမှုများ' : 'Subscription page events',
     digestServerHealth: isMyanmar ? 'ဆာဗာ ကျန်းမာရေး' : 'Server health',
     digestHealthSummary: (up: number, slow: number, down: number, unknown: number) =>
       isMyanmar
@@ -1210,11 +1210,11 @@ export function formatTelegramReplyStateLabel(input: {
   locale: SupportedLocale;
 }) {
   if ((input.status || '').toUpperCase() === 'PENDING_REVIEW' || input.followUpPending) {
-    return input.locale === 'my' ? '🕒 Admin စစ်နေ' : '🕒 Admin reviewing';
+    return input.locale === 'my' ? '🕒 စီမံခန့်ခွဲသူ စစ်နေ' : '🕒 Admin reviewing';
   }
 
   if (input.latestReplySenderType === 'ADMIN') {
-    return input.locale === 'my' ? '🟡 Reply လိုအပ်' : '🟡 Reply needed';
+    return input.locale === 'my' ? '🟡 အကြောင်းပြန်ရန် လိုအပ်' : '🟡 Reply needed';
   }
 
   return input.locale === 'my' ? '✅ နောက်ဆုံးအခြေအနေဖြစ်သည်' : '✅ Up to date';

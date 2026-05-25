@@ -444,7 +444,7 @@ export default function SupportThreadDetailPage() {
                     value={(thread.waitingOn || '').toUpperCase() === 'USER' ? (isMyanmar ? 'ဖောက်သည်' : 'Customer') : (isMyanmar ? 'စီမံခန့်ခွဲသူ' : 'Admin')}
                     meta={
                       thread.firstResponseDueAt
-                        ? `${isMyanmar ? 'SLA' : 'SLA'} ${formatDateTime(thread.firstResponseDueAt)}`
+                        ? `${isMyanmar ? 'တုံ့ပြန်ကတိချိန်' : 'SLA'} ${formatDateTime(thread.firstResponseDueAt)}`
                         : isMyanmar
                           ? 'SLA သတ်မှတ်ချိန် မရှိသေးပါ'
                           : 'No SLA deadline set'

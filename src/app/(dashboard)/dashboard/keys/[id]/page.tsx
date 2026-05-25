@@ -732,7 +732,7 @@ function SubscriptionShareCard({
     shareRegeneratedDesc: isMyanmar ? 'အဟောင်း မျှဝေလင့်ခ်သည် မအသုံးပြုနိုင်တော့ပါ။' : 'The old shared link is no longer valid.',
     shortRegeneratedTitle: isMyanmar ? 'အတိုလင့်ခ်ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Short link regenerated',
     shortRegeneratedDesc: isMyanmar ? 'အတို မျှဝေလင့်ခ်အသစ်ကို အသုံးပြုနိုင်ပါပြီ။' : 'The new short share link is ready to use.',
-    slugRegenerationFailed: isMyanmar ? 'Slug ပြန်ဖန်တီးမှု မအောင်မြင်ပါ' : 'Slug regeneration failed',
+    slugRegenerationFailed: isMyanmar ? 'အမည်တို ပြန်ဖန်တီးမှု မအောင်မြင်ပါ' : 'Slug regeneration failed',
     shareSentTitle: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပို့ပြီးပါပြီ' : 'Share page sent',
     shareSentDesc: isMyanmar ? 'နောက်ဆုံး မျှဝေစာမျက်နှာကို တယ်လီဂရမ်မှတစ်ဆင့် ပို့ပြီးပါပြီ။' : 'The latest share page was sent through Telegram.',
     telegramFailed: isMyanmar ? 'တယ်လီဂရမ် ပို့မှု မအောင်မြင်ပါ' : 'Telegram send failed',
@@ -1831,24 +1831,24 @@ function AccessDistributionSecurityCard({
   const formatAuditAction = (action: string) => {
     switch (action) {
       case 'ACCESS_KEY_SHARE_PROTECTION_UPDATED':
-        return isMyanmar ? 'Share protection အပ်ဒိတ်လုပ်ခဲ့သည်' : 'Updated share protection';
+        return isMyanmar ? 'မျှဝေကာကွယ်မှုကို အပ်ဒိတ်လုပ်ခဲ့သည်' : 'Updated share protection';
       case 'ACCESS_KEY_DISTRIBUTION_LINK_CREATED':
-        return isMyanmar ? 'Invite link ဖန်တီးခဲ့သည်' : 'Created invite link';
+        return isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ် ဖန်တီးခဲ့သည်' : 'Created invite link';
       case 'ACCESS_KEY_DISTRIBUTION_LINK_REVOKED':
-        return isMyanmar ? 'Invite link revoke လုပ်ခဲ့သည်' : 'Revoked invite link';
+        return isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ်ကို ပြန်ရုပ်သိမ်းခဲ့သည်' : 'Revoked invite link';
       case 'ACCESS_KEY_SHARE_TOKEN_REGENERATED':
-        return isMyanmar ? 'Share token ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated share token';
+        return isMyanmar ? 'မျှဝေတိုကင်ကို ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated share token';
       case 'ACCESS_KEY_PUBLIC_SLUG_REGENERATED':
         return isMyanmar ? 'အတိုအမည် ပြန်ဖန်တီးခဲ့သည်' : 'Regenerated short slug';
       case 'ACCESS_KEY_ACCESS_RESENT':
       case 'TELEGRAM_SHARE_SENT':
-        return isMyanmar ? 'Access ကို ထပ်ပို့ခဲ့သည်' : 'Resent access';
+        return isMyanmar ? 'အသုံးပြုခွင့်လင့်ခ်ကို ထပ်ပို့ခဲ့သည်' : 'Resent access';
       case 'ACCESS_KEY_RENEWAL_REMINDER_SENT':
       case 'ACCESS_KEY_RENEWAL_REMINDER_TRIGGERED':
-        return isMyanmar ? 'Renewal reminder ပို့ခဲ့သည်' : 'Sent renewal reminder';
+        return isMyanmar ? 'သက်တမ်းတိုး သတိပေးချက် ပို့ခဲ့သည်' : 'Sent renewal reminder';
       case 'ACCESS_KEY_SUPPORT_MESSAGE_SENT':
       case 'ACCESS_KEY_SUPPORT_MESSAGE_TRIGGERED':
-        return isMyanmar ? 'Support message ပို့ခဲ့သည်' : 'Sent support message';
+        return isMyanmar ? 'အကူအညီ မက်ဆေ့ချ် ပို့ခဲ့သည်' : 'Sent support message';
       case 'ACCESS_KEY_PROBLEM_REPORTED':
         return isMyanmar ? 'ပြဿနာတင်ပြခဲ့သည်' : 'Reported a problem';
       default:
@@ -2140,28 +2140,28 @@ function SupportWorkflowCard({
   const supportUi = {
     title: isMyanmar ? 'ပံ့ပိုးကူညီမှု လုပ်ဆောင်ချက်' : 'Support Workflow',
     description: isMyanmar ? `${keyName} အတွက် အသုံးပြုသူထံသို့ အကူအညီပို့ခြင်းနှင့် ပြဿနာတင်ပြမှုများကို တစ်နေရာတည်းကနေ စီမံပါ။` : `Resend access, send reminders, and report issues for ${keyName} from one place.`,
-    resend: isMyanmar ? 'Access ကို ထပ်ပို့မည်' : 'Resend Access',
-    renewal: isMyanmar ? 'Renewal သတိပေးပို့မည်' : 'Send Renewal Reminder',
-    support: isMyanmar ? 'Support message ပို့မည်' : 'Send Support Message',
+    resend: isMyanmar ? 'အသုံးပြုခွင့်လင့်ခ်ကို ထပ်ပို့မည်' : 'Resend Access',
+    renewal: isMyanmar ? 'သက်တမ်းတိုး သတိပေးချက် ပို့မည်' : 'Send Renewal Reminder',
+    support: isMyanmar ? 'အကူအညီ မက်ဆေ့ချ် ပို့မည်' : 'Send Support Message',
     report: isMyanmar ? 'ပြဿနာ တင်ပြမည်' : 'Report Problem',
-    disabledHint: isMyanmar ? 'Telegram delivery ကို ပိတ်ထားသဖြင့် Telegram လုပ်ဆောင်ချက်များ မရနိုင်ပါ။' : 'Telegram delivery is disabled for this key, so Telegram actions are unavailable.',
+    disabledHint: isMyanmar ? 'Telegram ပေးပို့မှုကို ပိတ်ထားသဖြင့် Telegram လုပ်ဆောင်ချက်များ မရနိုင်ပါ။' : 'Telegram delivery is disabled for this key, so Telegram actions are unavailable.',
     sentTitle: isMyanmar ? 'ပို့ပြီးပါပြီ' : 'Sent',
-    resendSuccess: isMyanmar ? 'Access link ကို Telegram မှတစ်ဆင့် ထပ်ပို့ပြီးပါပြီ။' : 'The access link has been resent through Telegram.',
-    renewalSuccess: isMyanmar ? 'Renewal reminder ကို ပို့ပြီးပါပြီ။' : 'The renewal reminder has been sent.',
-    supportSuccess: isMyanmar ? 'Support message ကို ပို့ပြီးပါပြီ။' : 'The support message has been sent.',
+    resendSuccess: isMyanmar ? 'အသုံးပြုခွင့်လင့်ခ်ကို Telegram မှတစ်ဆင့် ထပ်ပို့ပြီးပါပြီ။' : 'The access link has been resent through Telegram.',
+    renewalSuccess: isMyanmar ? 'သက်တမ်းတိုး သတိပေးချက်ကို ပို့ပြီးပါပြီ။' : 'The renewal reminder has been sent.',
+    supportSuccess: isMyanmar ? 'အကူအညီ မက်ဆေ့ချ်ကို ပို့ပြီးပါပြီ။' : 'The support message has been sent.',
     reportSuccess: isMyanmar ? 'ပြဿနာကို မှတ်တမ်းတင်ပြီးပါပြီ။' : 'The problem has been reported and logged.',
     errorTitle: isMyanmar ? 'လုပ်ဆောင်မှု မအောင်မြင်ပါ' : 'Action failed',
-    supportDialogTitle: isMyanmar ? 'Support message ပို့ရန်' : 'Send support message',
-    supportDialogDesc: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့မည့် support message ကို ရေးပါ။' : 'Write the support message to send to this user.',
-    supportMacrosTitle: isMyanmar ? 'အမြန် reply စာပုံစံများ' : 'Quick reply macros',
+    supportDialogTitle: isMyanmar ? 'အကူအညီ မက်ဆေ့ချ် ပို့ရန်' : 'Send support message',
+    supportDialogDesc: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့မည့် အကူအညီ မက်ဆေ့ချ်ကို ရေးပါ။' : 'Write the support message to send to this user.',
+    supportMacrosTitle: isMyanmar ? 'အမြန် အကြောင်းပြန် စာပုံစံများ' : 'Quick reply macros',
     supportMacrosDesc: isMyanmar
-      ? 'မကြာခဏပို့လေ့ရှိသော reply template များကို ရွေးပြီး message ထဲသို့ ထည့်နိုင်သည်။'
+      ? 'မကြာခဏပို့လေ့ရှိသော အကြောင်းပြန် စာပုံစံများကို ရွေးပြီး မက်ဆေ့ချ်ထဲသို့ ထည့်နိုင်သည်။'
       : 'Load a common support reply into the message box, then adjust it if needed.',
-    supportPlaceholder: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့လိုသော message ကို ရေးပါ...' : 'Write the message you want to send to this user...',
-    supportRequired: isMyanmar ? 'Support message ကို ရေးပါ။' : 'Enter a support message.',
+    supportPlaceholder: isMyanmar ? 'အသုံးပြုသူထံသို့ ပို့လိုသော မက်ဆေ့ချ်ကို ရေးပါ...' : 'Write the message you want to send to this user...',
+    supportRequired: isMyanmar ? 'အကူအညီ မက်ဆေ့ချ်ကို ရေးပါ။' : 'Enter a support message.',
     reportDialogTitle: isMyanmar ? 'ပြဿနာ တင်ပြရန်' : 'Report a problem',
     reportDialogDesc: isMyanmar ? 'ဤအသုံးပြုခွင့်သော့အတွက် ပြဿနာအသေးစိတ်ကို မှတ်တမ်းတင်ပါ။' : 'Capture the issue details for this access key.',
-    reportPlaceholder: isMyanmar ? 'ဥပမာ - အသုံးပြုသူက subscription fetch မရကြောင်း အကြောင်းကြားထားသည်...' : 'For example: User reported that subscription fetch is failing...',
+    reportPlaceholder: isMyanmar ? 'ဥပမာ - အသုံးပြုသူက စာရင်းသွင်းလင့်ခ် ခေါ်ယူမရကြောင်း အကြောင်းကြားထားသည်...' : 'For example: User reported that subscription fetch is failing...',
     reportRequired: isMyanmar ? 'ပြဿနာအကျဉ်းကို ရေးပါ။' : 'Enter a problem summary.',
     severity: isMyanmar ? 'အရေးကြီးမှု' : 'Severity',
     severityInfo: isMyanmar ? 'အချက်အလက်' : 'Info',
@@ -2169,14 +2169,14 @@ function SupportWorkflowCard({
     severityCritical: isMyanmar ? 'ပြင်းထန်' : 'Critical',
     cancel: isMyanmar ? 'မလုပ်တော့' : 'Cancel',
     send: isMyanmar ? 'ပို့မည်' : 'Send',
-    createIncident: isMyanmar ? 'Incident တစ်ခု ဖန်တီးမည်' : 'Create Incident',
+    createIncident: isMyanmar ? 'အဖြစ်အပျက် တစ်ခု ဖန်တီးမည်' : 'Create Incident',
     recentActivity: isMyanmar ? 'မကြာသေးမီ လုပ်ဆောင်ချက်' : 'Recent Activity',
-    openIncidents: isMyanmar ? 'ဖွင့်ထားသော Incident များ' : 'Open Incidents',
+    openIncidents: isMyanmar ? 'ဖွင့်ထားသော အဖြစ်အပျက်များ' : 'Open Incidents',
     none: isMyanmar ? 'မရှိသေးပါ' : 'None yet',
     assignedTo: isMyanmar ? 'တာဝန်ပေးထားသူ' : 'Assigned to',
-    actionResent: isMyanmar ? 'Access ကို ထပ်ပို့ခဲ့သည်' : 'Access resent',
-    actionRenewal: isMyanmar ? 'Renewal reminder ပို့ခဲ့သည်' : 'Renewal reminder sent',
-    actionSupport: isMyanmar ? 'Support message ပို့ခဲ့သည်' : 'Support message sent',
+    actionResent: isMyanmar ? 'အသုံးပြုခွင့်လင့်ခ်ကို ထပ်ပို့ခဲ့သည်' : 'Access resent',
+    actionRenewal: isMyanmar ? 'သက်တမ်းတိုး သတိပေးချက် ပို့ခဲ့သည်' : 'Renewal reminder sent',
+    actionSupport: isMyanmar ? 'အကူအညီ မက်ဆေ့ချ် ပို့ခဲ့သည်' : 'Support message sent',
     actionProblem: isMyanmar ? 'ပြဿနာ တင်ပြခဲ့သည်' : 'Problem reported',
     supportMessageTitle: isMyanmar ? 'မက်ဆေ့ချ်' : 'Message',
     supportMessageDesc: isMyanmar
@@ -2998,7 +2998,7 @@ export default function KeyDetailPage() {
       <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'delivery' | 'activity' | 'support')} className="space-y-4">
         <div className="ops-panel space-y-3 p-3 sm:p-4">
           <div className="space-y-1">
-            <p className="ops-section-heading">{isMyanmar ? 'အသုံးပြုခွင့်သော့ workspace' : 'Access key workspace'}</p>
+            <p className="ops-section-heading">{isMyanmar ? 'အသုံးပြုခွင့်သော့ လုပ်ငန်းခွင်' : 'Access key workspace'}</p>
             <p className="text-sm text-muted-foreground">{detailTabCopy[detailTab]}</p>
           </div>
           <TabsList className={cn(
@@ -3051,7 +3051,7 @@ export default function KeyDetailPage() {
                     )}
 
                     <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">{isMyanmar ? 'အသုံးပြုခွင့် URL' : 'Access URL'}</Label>
+                      <Label className="text-sm text-muted-foreground">{isMyanmar ? 'အသုံးပြုခွင့် လင့်ခ်' : 'Access URL'}</Label>
                       {key.maxDevices && key.boundDeviceInstallsOnly ? (
                         <p className="text-xs text-amber-500">{ACCESS_KEY_RAW_COPY_WARNING}</p>
                       ) : null}
@@ -3065,7 +3065,7 @@ export default function KeyDetailPage() {
                           onClick={() => copyToClipboard(
                             decoratedAccessUrl,
                             isMyanmar ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
-                            isMyanmar ? 'အသုံးပြုခွင့် URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Access URL copied to clipboard.'
+                            isMyanmar ? 'အသုံးပြုခွင့် လင့်ခ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Access URL copied to clipboard.'
                           )}
                         >
                           <Copy className="h-4 w-4" />
@@ -3075,7 +3075,7 @@ export default function KeyDetailPage() {
 
                     <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
                       <div className="ops-inline-stat">
-                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'port' : 'Port'}</p>
+                        <p className="text-sm text-muted-foreground">{isMyanmar ? 'ပို့တ်' : 'Port'}</p>
                         <p className="font-mono">{key.port}</p>
                       </div>
                       <div className="ops-inline-stat">
@@ -3084,7 +3084,7 @@ export default function KeyDetailPage() {
                       </div>
                       {key.prefix ? (
                         <div className="ops-inline-stat sm:col-span-2">
-                          <p className="text-sm text-muted-foreground">{isMyanmar ? 'Prefix (ဖုံးကွယ်မှု)' : 'Prefix (Obfuscation)'}</p>
+                          <p className="text-sm text-muted-foreground">{isMyanmar ? 'ရှေ့ဆက်စာ (ဖုံးကွယ်မှု)' : 'Prefix (Obfuscation)'}</p>
                           <p className="font-mono">{key.prefix}</p>
                         </div>
                       ) : null}
@@ -3305,15 +3305,15 @@ export default function KeyDetailPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">{locale === 'my' ? 'Subscription လင့်ခ်' : 'Subscription URL'}</Label>
+                    <Label className="text-sm text-muted-foreground">{locale === 'my' ? 'စာရင်းသွင်းလင့်ခ်' : 'Subscription URL'}</Label>
                     <p className="text-xs text-muted-foreground">
                       {locale === 'my'
-                        ? 'ဤ URL ကို အသုံးပြုသူနှင့် မျှဝေပါ။ Client များက နောက်ဆုံး config ကို အလိုအလျောက် ရယူနိုင်သည်။'
+                        ? 'ဤလင့်ခ်ကို အသုံးပြုသူနှင့် မျှဝေပါ။ Client များက နောက်ဆုံး config ကို အလိုအလျောက် ရယူနိုင်သည်။'
                         : 'Share this URL with the user. Clients can fetch the latest config automatically.'}
                     </p>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 rounded-2xl border border-border/60 bg-background/55 p-3 font-mono text-sm break-all dark:bg-white/[0.03]">
-                        {subscriptionApiUrl || (locale === 'my' ? 'Subscription token ကို တင်နေသည်...' : 'Loading subscription token...')}
+                        {subscriptionApiUrl || (locale === 'my' ? 'စာရင်းသွင်း တိုကင်ကို တင်နေသည်...' : 'Loading subscription token...')}
                       </div>
                       <Button
                         variant="outline"
@@ -3323,7 +3323,7 @@ export default function KeyDetailPage() {
                             copyToClipboard(
                               subscriptionApiUrl,
                               locale === 'my' ? 'ကူးယူပြီးပါပြီ!' : 'Copied!',
-                              locale === 'my' ? 'စာရင်းသွင်း URL ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Subscription URL copied to clipboard.',
+                              locale === 'my' ? 'စာရင်းသွင်းလင့်ခ်ကို ကူးယူရေးဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Subscription URL copied to clipboard.',
                             );
                           }
                         }}
@@ -3343,7 +3343,7 @@ export default function KeyDetailPage() {
                               origin: typeof window !== 'undefined' ? window.location.origin : undefined,
                             })
                           : locale === 'my'
-                            ? 'Public slug ကို ဖွင့်ပြီးနောက် ရရှိနိုင်ပါသည်'
+                            ? 'အများသုံး အမည်တိုကို ဖွင့်ပြီးနောက် ရရှိနိုင်ပါသည်'
                             : 'Available after enabling public slug'}
                       </p>
                     </div>
@@ -3355,7 +3355,7 @@ export default function KeyDetailPage() {
                               origin: typeof window !== 'undefined' ? window.location.origin : undefined,
                             })
                           : locale === 'my'
-                            ? 'Public slug ကို ဖွင့်ပြီးနောက် ရရှိနိုင်ပါသည်'
+                            ? 'အများသုံး အမည်တိုကို ဖွင့်ပြီးနောက် ရရှိနိုင်ပါသည်'
                             : 'Available after enabling public slug'}
                       </p>
                     </div>
@@ -3366,7 +3366,7 @@ export default function KeyDetailPage() {
               <ClientEndpointTestCard
                 endpointUrl={subscriptionApiUrl}
                 probeUrl={subscriptionProbeUrl}
-                title={locale === 'my' ? 'ကလိုင်းယင့် URL စမ်းသပ်မှု' : 'Client URL Test'}
+                title={locale === 'my' ? 'ကလိုင်းယင့်လင့်ခ် စမ်းသပ်မှု' : 'Client URL Test'}
                 description={locale === 'my' ? 'အသုံးပြုနေသော Outline ကလိုင်းယင့်လိပ်စာကို စမ်းသပ်ပြီး စာရင်းသွင်းဒေတာ မှန်ကန်စွာ ရရှိကြောင်း အတည်ပြုပါ။' : 'Probe the live Outline client endpoint and confirm the subscription payload resolves cleanly.'}
               />
 

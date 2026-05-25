@@ -364,10 +364,10 @@ function buildTelegramOrderProgressSummary(input: {
     return isMyanmar ? 'ပြီးဆုံးပြီး' : 'Delivered';
   }
   if (status === 'PENDING_REVIEW' || status === 'APPROVED') {
-    return isMyanmar ? 'Admin စစ်ဆေးနေ' : 'Admin review';
+    return isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်ဆေးနေ' : 'Admin review';
   }
   if (status === 'AWAITING_PAYMENT_PROOF') {
-    return isMyanmar ? 'Screenshot တင်ပါ' : 'Upload screenshot';
+    return isMyanmar ? 'စခရင်ရှော့ တင်ပါ' : 'Upload screenshot';
   }
   if (status === 'AWAITING_PAYMENT_METHOD') {
     return isMyanmar ? 'ငွေပေးချေမှုနည်းလမ်းရွေးပါ' : 'Choose payment method';
@@ -689,7 +689,7 @@ export async function buildTelegramOrderStatusMessage(input: {
 
   if (order.refundRequestCustomerMessage?.trim()) {
     noteLines.push(
-      `${input.locale === 'my' ? 'Refund မှတ်ချက်' : 'Refund note'}: ${escapeHtml(
+      `${input.locale === 'my' ? 'ငွေပြန်အမ်း မှတ်ချက်' : 'Refund note'}: ${escapeHtml(
         truncateTelegramOrderDetailText(order.refundRequestCustomerMessage),
       )}`,
     );
