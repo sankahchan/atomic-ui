@@ -19,6 +19,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  myanmar-copy:
+    name: myanmar-copy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm ci \
+              --fetch-retries=5 \
+              --fetch-retry-factor=2 \
+              --fetch-retry-mintimeout=10000 \
+              --fetch-retry-maxtimeout=60000 && exit 0
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "npm ci failed after $attempt attempts"
+              exit 1
+            fi
+
+            echo "npm ci failed on attempt $attempt; retrying..."
+            sleep $((attempt * 10))
+          done
+
+      - name: Run Myanmar copy guard
+        run: npm run test:myanmar-copy
+
   typecheck:
     name: typecheck
     runs-on: ubuntu-latest
