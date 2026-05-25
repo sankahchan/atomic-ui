@@ -960,9 +960,9 @@ export function getTelegramUi(locale: SupportedLocale) {
     backupCreating: isMyanmar ? '📦 အရန်မိတ္တူ ဖန်တီးနေပါသည်... ကျေးဇူးပြု၍ ခဏစောင့်ပါ။' : '📦 Creating backup... please wait.',
     backupCaption: (date: string) => isMyanmar ? `${date} တွင် အရန်မိတ္တူ ဖန်တီးထားပါသည်` : `Backup created at ${date}`,
     backupFailed: (message: string) => isMyanmar ? `❌ အရန်မိတ္တူ မအောင်မြင်ပါ: ${message}` : `❌ Backup failed: ${message}`,
-    helpTitle: isMyanmar ? '📚 <b>အသုံးပြုနိုင်သော command များ</b>' : '📚 <b>Available Commands</b>',
+    helpTitle: isMyanmar ? '📚 <b>အသုံးပြုနိုင်သော အမိန့်များ</b>' : '📚 <b>Available Commands</b>',
     helpEmailHint: isMyanmar ? 'ဤ Telegram အကောင့်ကို ချိတ်ရန် သင့် email ကို တိုက်ရိုက် ပို့နိုင်ပါသည်။' : 'You can also send your email address directly to link this Telegram account.',
-    unknownCommand: isMyanmar ? '❓ မသိသော command ဖြစ်သည်။ အသုံးပြုနိုင်သော command များကို ကြည့်ရန် /help ကို အသုံးပြုပါ။' : '❓ Unknown command. Use /help to see the available commands.',
+    unknownCommand: isMyanmar ? '❓ မသိသော အမိန့်ဖြစ်သည်။ အသုံးပြုနိုင်သော အမိန့်များကို ကြည့်ရန် /help ကို အသုံးပြုပါ။' : '❓ Unknown command. Use /help to see the available commands.',
     digestTitle: isMyanmar ? '🧾 <b>Atomic-UI Telegram အနှစ်ချုပ်</b>' : '🧾 <b>Atomic-UI Telegram Digest</b>',
     digestWindow: (hours: number) => isMyanmar ? `အချိန်ကာလ: နောက်ဆုံး ${hours} နာရီ` : `Window: last ${hours} hour(s)`,
     digestActiveKeys: isMyanmar ? 'အသက်ဝင် သော့များ' : 'Active keys',
@@ -974,7 +974,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     digestServerHealth: isMyanmar ? 'ဆာဗာ ကျန်းမာရေး' : 'Server health',
     digestHealthSummary: (up: number, slow: number, down: number, unknown: number) =>
       isMyanmar
-        ? `${up} up, ${slow} slow, ${down} down, ${unknown} unknown`
+        ? `${up} ကောင်း, ${slow} နှေး, ${down} ပိတ်, ${unknown} မသိ`
         : `${up} up, ${slow} slow, ${down} down, ${unknown} unknown`,
   };
 }
@@ -1246,7 +1246,7 @@ export function buildTelegramLatestReplyPreviewLines(input: {
   const maxLength = input.maxLength ?? 120;
   const preview = input.reply.message.slice(0, maxLength);
   const lines = [
-    `${input.locale === 'my' ? 'နောက်ဆုံး reply' : 'Last reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
+    `${input.locale === 'my' ? 'နောက်ဆုံး အကြောင်းပြန်ချက်' : 'Last reply'}: ${senderLabel} • ${formatTelegramDateTime(input.reply.createdAt, input.locale)}`,
   ];
 
   if (input.reply.mediaKind) {

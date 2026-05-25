@@ -516,7 +516,7 @@ function getAnnouncementCardStyleLabel(
     case 'PROMO':
       return isMyanmar ? 'ပရိုမိုးရှင်း ကတ်' : 'Promo card';
     case 'PREMIUM':
-      return isMyanmar ? 'Premium အဆင့်ကတ်' : 'Premium card';
+      return isMyanmar ? 'ပရီမီယမ် အဆင့်ကတ်' : 'Premium card';
     case 'OPERATIONS':
       return isMyanmar ? 'လုပ်ငန်းဆောင်ရွက်မှု ကတ်' : 'Operations card';
     case 'DEFAULT':
@@ -533,7 +533,7 @@ function getAnnouncementSegmentLabel(
     case 'TRIAL_TO_PAID':
       return isMyanmar ? 'အစမ်းသုံးမှ ငွေပေးချေမှုသို့' : 'Trial to paid';
     case 'PREMIUM_UPSELL':
-      return isMyanmar ? 'Premium အဆင့်မြှင့် အကြံပြု' : 'Premium upsell';
+      return isMyanmar ? 'ပရီမီယမ် အဆင့်မြှင့် အကြံပြု' : 'Premium upsell';
     case 'RENEWAL_SOON':
       return isMyanmar ? 'သက်တမ်းတိုးရန် မကြာမီ' : 'Renewal soon';
     case 'HIGH_VALUE':
@@ -1388,7 +1388,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   const telegramUi = {
     enabled: isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled',
     disabled: isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled',
-    botUsername: isMyanmar ? 'ဘော့ Username' : 'Bot Username',
+    botUsername: isMyanmar ? 'ဘော့ အသုံးပြုသူအမည်' : 'Bot Username',
     botUsernamePlaceholder: '@yourbot',
     defaultLanguage: isMyanmar ? 'ဘော့ မူရင်းဘာသာစကား' : 'Bot default language',
     defaultLanguageDesc: isMyanmar
@@ -1396,13 +1396,13 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       : 'Use this language until a user chooses their own bot language.',
     languageSelectorOnStart: isMyanmar ? 'ပထမဆုံး /start မှာ ဘာသာစကား ရွေးခိုင်းမည်' : 'Show language selector on first /start',
     languageSelectorOnStartDesc: isMyanmar
-      ? 'အသုံးပြုသူအသစ်များသည် English / မြန်မာ ကို ရွေးပြီး welcome flow ကို ဆက်လုပ်မည်။'
+      ? 'အသုံးပြုသူအသစ်များသည် အင်္ဂလိပ် / မြန်မာ ကို ရွေးပြီး welcome flow ကို ဆက်လုပ်မည်။'
       : 'New users choose English or Burmese before the welcome flow continues.',
     englishLanguage: 'English',
     burmeseLanguage: isMyanmar ? 'မြန်မာ' : 'Burmese',
     enableBot: isMyanmar ? 'Telegram ဘော့ကို ဖွင့်မည်' : 'Enable Telegram bot',
     enableBotDesc: isMyanmar ? 'အသုံးပြုသူများက သော့ကို ချိတ်ဆက်နိုင်ခြင်း၊ မျှဝေစာမျက်နှာ ရယူနိုင်ခြင်းနှင့် ကိုယ်တိုင်ဝန်ဆောင်မှု အမိန့်များ အသုံးပြုနိုင်ခြင်းကို ခွင့်ပြုမည်။' : 'Allow users to link keys, receive share pages, and run self-service bot commands.',
-    dailyDigest: isMyanmar ? 'စီမံသူ အနှစ်ချုပ်ကို နေ့စဉ် ပို့မည်' : 'Daily admin digest',
+    dailyDigest: isMyanmar ? 'စီမံသူ နေ့စဉ် အနှစ်ချုပ်ကို ပို့မည်' : 'Daily admin digest',
     dailyDigestDesc: isMyanmar ? 'သက်တမ်းကုန်နီးသော သော့များ၊ အသုံးပြုမှုနှင့် မျှဝေစာမျက်နှာ လှုပ်ရှားမှု အနှစ်ချုပ်များကို စီမံသူ စကားပြောခန်းများသို့ ပို့မည်။' : 'Send expiring-key, usage, and share-page activity summaries to admin chats.',
     digestHour: isMyanmar ? 'အနှစ်ချုပ် ပို့ချိန် (နာရီ)' : 'Digest hour',
     digestMinute: isMyanmar ? 'အနှစ်ချုပ် ပို့ချိန် (မိနစ်)' : 'Digest minute',
@@ -1431,7 +1431,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     webhookUnavailable: isMyanmar ? 'ဤပတ်ဝန်းကျင်တွင် ဝဘ်ဟွတ် URL မရနိုင်ပါ' : 'Webhook URL unavailable in this environment',
     pendingUpdates: isMyanmar ? 'စောင့်ဆိုင်းနေသော အပ်ဒိတ်များ' : 'Pending updates',
     lastError: isMyanmar ? 'နောက်ဆုံးအမှား' : 'Last error',
-    commandSurface: isMyanmar ? 'ဘော့ အမိန့် မျက်နှာပြင်' : 'Bot command surface',
+    commandSurface: isMyanmar ? 'ဘော့အမိန့် မျက်နှာပြင်' : 'Bot command surface',
     userCommands: isMyanmar ? 'အသုံးပြုသူ အမိန့်များ' : 'User commands',
     adminCommands: isMyanmar ? 'စီမံခန့်ခွဲရေး အမိန့်များ' : 'Admin commands',
     sendDigestNow: isMyanmar ? 'အနှစ်ချုပ်ကို ယခုချက်ချင်း ပို့မည်' : 'Send digest now',
@@ -1450,7 +1450,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     announcementCardStyle: isMyanmar ? 'ကတ်ပုံစံ' : 'Card style',
     announcementCardPreview: isMyanmar ? 'ကတ်အကြိုကြည့်ရှုမှု' : 'Card preview',
     announcementCardPreviewDesc: isMyanmar
-      ? 'Telegram တွင် ပို့မည့် branded card preview ကို ကြည့်နိုင်သည်။'
+      ? 'Telegram တွင် ပို့မည့် အမှတ်တံဆိပ်ပါ ကတ် အကြိုကြည့်ရှုမှုကို ကြည့်နိုင်သည်။'
       : 'Preview the branded card style that will be sent to Telegram.',
     announcementRecurrence: isMyanmar ? 'ထပ်ပို့မည့် အချိန်ဇယား' : 'Repeat schedule',
     announcementOneTime: isMyanmar ? 'တစ်ကြိမ်သာ' : 'One-time',
