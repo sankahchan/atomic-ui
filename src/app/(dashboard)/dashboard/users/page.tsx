@@ -80,6 +80,22 @@ function UserStatCard({
   );
 }
 
+function getRoleLabel(role: string, isMyanmar: boolean) {
+  if (!isMyanmar) {
+    return role;
+  }
+
+  if (role === 'ADMIN') {
+    return 'စီမံသူ';
+  }
+
+  if (role === 'CLIENT') {
+    return 'ကလိုင်းယင့်';
+  }
+
+  return role;
+}
+
 export default function UsersPage() {
   const { locale, t } = useLocale();
   const { toast } = useToast();
@@ -533,7 +549,7 @@ export default function UsersPage() {
                 value={adminCount}
                 helper={
                   isMyanmar
-                    ? `owner-level စီမံသူ ${ownerCount} ယောက် သတ်မှတ်ထားသည်။`
+                    ? `ပိုင်ရှင်အဆင့် စီမံသူ ${ownerCount} ယောက် သတ်မှတ်ထားသည်။`
                     : `${ownerCount} owner-level admin${ownerCount === 1 ? '' : 's'} configured.`
                 }
               />
@@ -791,7 +807,7 @@ export default function UsersPage() {
               <div className="ops-detail-card space-y-2">
                 <p className="text-sm text-muted-foreground">
                   {isMyanmar
-                    ? 'Admin များသည် control center အပြည့်အဝကို စီမံနိုင်သည်။ Client အသုံးပြုသူများသည် subscription နှင့် key delivery portal ကိုသာ ဝင်ရောက်နိုင်သည်။'
+                    ? 'စီမံသူများသည် ထိန်းချုပ်ခန်းတစ်ခုလုံးကို စီမံနိုင်သည်။ ကလိုင်းယင့် အသုံးပြုသူများသည် ၎င်းတို့၏ စာရင်းသွင်းမှုနှင့် သော့ပို့ဆောင်ရေး ပေါ်တယ်ကိုသာ ဝင်ရောက်နိုင်သည်။'
                     : 'Admins can manage the full control center. Client users only access their subscription and key delivery portal.'}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
@@ -800,7 +816,7 @@ export default function UsersPage() {
                           {isMyanmar ? 'အခန်းကဏ္ဍ ခွဲဝေမှု' : 'Role split'}
                     </p>
                     <p className="mt-2 text-sm font-medium">
-                      {isMyanmar ? `${adminCount} admin / ${clientCount} client` : `${adminCount} admin / ${clientCount} client`}
+                      {isMyanmar ? `${adminCount} စီမံသူ / ${clientCount} ကလိုင်းယင့်` : `${adminCount} admin / ${clientCount} client`}
                     </p>
                   </div>
                   <div className="ops-mini-tile">
@@ -1182,12 +1198,12 @@ export default function UsersPage() {
                 <SelectTrigger id="user-role-filter">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">{isMyanmar ? 'အခန်းကဏ္ဍအားလုံး' : 'All roles'}</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="CLIENT">Client</SelectItem>
-                </SelectContent>
-              </Select>
+                  <SelectContent>
+                    <SelectItem value="ALL">{isMyanmar ? 'အခန်းကဏ္ဍအားလုံး' : 'All roles'}</SelectItem>
+                    <SelectItem value="ADMIN">{isMyanmar ? 'စီမံသူ' : 'Admin'}</SelectItem>
+                    <SelectItem value="CLIENT">{isMyanmar ? 'ကလိုင်းယင့်' : 'Client'}</SelectItem>
+                  </SelectContent>
+                </Select>
             </div>
 
             <div className="ops-table-meta">{filteredUsers.length} {isMyanmar ? 'အသုံးပြုသူ' : 'users'}</div>
@@ -1235,15 +1251,15 @@ export default function UsersPage() {
                                 <p className="font-medium">{user.email}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {user.role === 'ADMIN'
-                                    ? (isMyanmar ? 'Dashboard ဝင်ခွင့်' : 'Dashboard access')
-                                    : (isMyanmar ? 'Portal only ဝင်ခွင့်' : 'Portal-only access')}
+                                    ? (isMyanmar ? 'ထိန်းချုပ်ခန်း ဝင်ခွင့်' : 'Dashboard access')
+                                    : (isMyanmar ? 'ပေါ်တယ်သီးသန့် ဝင်ခွင့်' : 'Portal-only access')}
                                 </p>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
-                              {user.role}
+                              {getRoleLabel(user.role, isMyanmar)}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1308,7 +1324,7 @@ export default function UsersPage() {
                                 onClick={() => handleDelete(user.id, user.email || 'Unknown')}
                                 disabled={user.role === 'ADMIN' || (deleteMutation.isPending && deletingUserId === user.id)}
                                 title={user.role === 'ADMIN'
-                                  ? (isMyanmar ? 'Admin ကို ဖျက်၍ မရပါ' : 'Cannot delete admin')
+                                  ? (isMyanmar ? 'စီမံသူကို ဖျက်၍ မရပါ' : 'Cannot delete admin')
                                   : (isMyanmar ? 'အသုံးပြုသူကို ဖျက်မည်' : 'Delete user')}
                               >
                                 {deleteMutation.isPending && deletingUserId === user.id ? (
@@ -1350,13 +1366,13 @@ export default function UsersPage() {
                           <p className="font-medium">{user.email}</p>
                           <p className="text-xs text-muted-foreground">
                             {user.role === 'ADMIN'
-                              ? (isMyanmar ? 'Dashboard ဝင်ခွင့်' : 'Dashboard access')
-                              : (isMyanmar ? 'Portal only ဝင်ခွင့်' : 'Portal-only access')}
+                              ? (isMyanmar ? 'ထိန်းချုပ်ခန်း ဝင်ခွင့်' : 'Dashboard access')
+                              : (isMyanmar ? 'ပေါ်တယ်သီးသန့် ဝင်ခွင့်' : 'Portal-only access')}
                           </p>
                         </div>
                       </div>
                       <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
-                        {user.role}
+                        {getRoleLabel(user.role, isMyanmar)}
                       </Badge>
                     </div>
 

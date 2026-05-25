@@ -64,18 +64,18 @@ type ProvisioningRun = {
   createdAt: string;
 };
 
-function getProvisioningStatusLabel(status: ProvisioningRun['status']) {
+function getProvisioningStatusLabel(status: ProvisioningRun['status'], isMyanmar = false) {
   switch (status) {
     case 'creating_droplet':
-      return 'Creating';
+      return isMyanmar ? 'ဖန်တီးနေသည်' : 'Creating';
     case 'waiting_for_ip':
-      return 'Waiting for IP';
+      return isMyanmar ? 'IP ကို စောင့်နေသည်' : 'Waiting for IP';
     case 'ready_for_outline':
-      return 'Install ready';
+      return isMyanmar ? 'တပ်ဆင်ရန် အသင့်ဖြစ်သည်' : 'Install ready';
     case 'failed':
-      return 'Failed';
+      return isMyanmar ? 'မအောင်မြင်ပါ' : 'Failed';
     case 'completed':
-      return 'Completed';
+      return isMyanmar ? 'ပြီးဆုံးပါပြီ' : 'Completed';
     default:
       return status;
   }
@@ -293,12 +293,12 @@ export default function DeployServerPage() {
     [sizeOptions, size]
   );
   const tokenStatusLabel = configQuery.data?.tokenError
-    ? 'Invalid'
+    ? (isMyanmar ? 'မမှန်ကန်ပါ' : 'Invalid')
     : configQuery.data?.needsTokenMigration
-      ? 'Needs resave'
+      ? (isMyanmar ? 'ပြန်သိမ်းရန် လိုအပ်သည်' : 'Needs resave')
       : configQuery.data?.hasToken
-        ? 'Configured'
-        : 'Required';
+        ? (isMyanmar ? 'သတ်မှတ်ပြီး' : 'Configured')
+        : (isMyanmar ? 'လိုအပ်သည်' : 'Required');
 
   const handleSaveToken = () => {
     if (!token) return;
@@ -404,7 +404,7 @@ export default function DeployServerPage() {
                 <div className="ops-mini-tile">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ဆာဗာ အခြေအနေ' : 'Droplet state'}</p>
                   <p className="mt-2 text-sm font-medium">
-                    {activeRun ? getProvisioningStatusLabel(activeRun.status) : step >= 2 ? (isMyanmar ? 'ပြင်ဆင်နေသည်' : 'Configuring') : (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Waiting')}
+                    {activeRun ? getProvisioningStatusLabel(activeRun.status, isMyanmar) : step >= 2 ? (isMyanmar ? 'ပြင်ဆင်နေသည်' : 'Configuring') : (isMyanmar ? 'စောင့်ဆိုင်းနေသည်' : 'Waiting')}
                   </p>
                 </div>
                 <div className="ops-mini-tile">
@@ -445,7 +445,7 @@ export default function DeployServerPage() {
                           <p className="text-xs text-muted-foreground">{run.region} · {run.size}</p>
                         </div>
                         <Badge variant="outline" className={getProvisioningStatusClass(run.status)}>
-                          {getProvisioningStatusLabel(run.status)}
+                          {getProvisioningStatusLabel(run.status, isMyanmar)}
                         </Badge>
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">{run.summary}</p>
@@ -523,13 +523,13 @@ export default function DeployServerPage() {
                   />
                   <p className="text-sm text-muted-foreground">
                     {isMyanmar
-                      ? 'DigitalOcean API settings မှ read/write access ပါသော တိုကင်တစ်ခု ဖန်တီးပါ။ နောက်ပိုင်း တပ်ဆင်မှုများတွင် ဤအဆင့်ကို ကျော်နိုင်စေရန် သိမ်းဆည်းမီ encrypt လုပ်ပါမည်။'
+                      ? 'DigitalOcean API settings မှ ဖတ်/ရေးခွင့် ပါသော တိုကင်တစ်ခု ဖန်တီးပါ။ နောက်ပိုင်း တပ်ဆင်မှုများတွင် ဤအဆင့်ကို ကျော်နိုင်စေရန် သိမ်းဆည်းချိန်တွင် ဝှက်စာဖြင့် သိမ်းပါမည်။'
                       : 'Generate a token with read/write access from DigitalOcean API settings. It is encrypted before storage so future deploys can skip this step.'}
                   </p>
                   {configQuery.data?.needsTokenMigration ? (
                     <p className="text-sm font-medium text-amber-600 dark:text-amber-300">
                       {isMyanmar
-                        ? 'သိမ်းထားသော တိုကင်သည် အဟောင်း plaintext format မှ ဖြစ်သည်။ သိမ်းထားစဉ် encrypt လုပ်နိုင်ရန် တစ်ကြိမ် ပြန်ထည့်ပါ။'
+                        ? 'သိမ်းထားသော တိုကင်သည် စာသားအဖြစ်သာ သိမ်းထားသော ပုံစံဟောင်းမှ ဖြစ်သည်။ သိမ်းထားချိန်တွင် ဝှက်စာဖြင့် သိမ်းနိုင်ရန် တစ်ကြိမ် ပြန်ထည့်ပါ။'
                         : 'The saved token came from an older plaintext format. Re-enter it once to encrypt it at rest.'}
                     </p>
                   ) : null}
@@ -557,7 +557,7 @@ export default function DeployServerPage() {
                   </p>
                   <p className="inline-flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-primary" />
-                    {isMyanmar ? 'Outline setup မတိုင်မီ Docker ကို cloud-init ဖြင့် တပ်ဆင်ပေးသည်။' : 'Docker is installed by cloud-init before Outline setup.'}
+                    {isMyanmar ? 'Outline ပြင်ဆင်မှု မတိုင်မီ `cloud-init` ဖြင့် Docker ကို တပ်ဆင်ပေးသည်။' : 'Docker is installed by cloud-init before Outline setup.'}
                   </p>
                   <p className="inline-flex items-center gap-2">
                     <TerminalSquare className="h-4 w-4 text-primary" />
@@ -766,7 +766,7 @@ export default function DeployServerPage() {
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="ops-mini-tile">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'လုပ်ဆောင်ချက် အခြေအနေ' : 'Run status'}</p>
-                      <p className="mt-2 text-sm font-medium">{getProvisioningStatusLabel(activeRun.status)}</p>
+                      <p className="mt-2 text-sm font-medium">{getProvisioningStatusLabel(activeRun.status, isMyanmar)}</p>
                     </div>
                     <div className="ops-mini-tile">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ကြိုးစားမှု အကြိမ်ရေ' : 'Attempts'}</p>
@@ -783,7 +783,7 @@ export default function DeployServerPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <p className="ops-section-heading">{isMyanmar ? 'တပ်ဆင်အမိန့်' : 'Install command'}</p>
-                      <p className="text-sm text-muted-foreground">{isMyanmar ? 'Outline setup ကို ပြီးစီးစေရန် ဤအမိန့်ကို သင့်စက်ပေါ်တွင် လည်ပတ်ပါ။' : 'Run this on your machine to finish Outline setup.'}</p>
+                      <p className="text-sm text-muted-foreground">{isMyanmar ? 'Outline ပြင်ဆင်မှုကို အပြီးသတ်ရန် ဤအမိန့်ကို သင့်စက်ပေါ်တွင် လည်ပတ်ပါ။' : 'Run this on your machine to finish Outline setup.'}</p>
                     </div>
                     <Button
                       size="icon"

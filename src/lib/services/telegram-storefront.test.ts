@@ -238,7 +238,7 @@ test('storefront views localize Burmese copy for the main menu and setup flow', 
 
   assert.match(menu.text, /ပြန်လည်ကြိုဆိုပါတယ်/);
   assert.match(menu.text, /နောက်ဆုံးသက်တမ်း/);
-  assert.equal(menu.replyMarkup.inline_keyboard[0]?.[0]?.text, '⚡ Flash Plans    ·  30 ရက်  ·  🔄 3 ကြိမ်');
+  assert.equal(menu.replyMarkup.inline_keyboard[0]?.[0]?.text, '⚡ အမြန်အစီအစဉ်များ  ·  30 ရက်  ·  🔄 3 ကြိမ်');
   assert.equal(menu.replyMarkup.inline_keyboard[3]?.[1]?.text, '💬 အကူအညီ');
 
   const setup = buildTelegramStorePlatformSelectView({
@@ -248,7 +248,7 @@ test('storefront views localize Burmese copy for the main menu and setup flow', 
   });
 
   assert.match(setup.text, /ချိတ်ဆက်ရန် \*၂ မိနစ်မပြည့်\* အချိန်သာလိုသည်/);
-  assert.match(setup.text, /သင်၏ Key/);
+  assert.match(setup.text, /သင်၏ သော့/);
   assert.equal(setup.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀ ပြန်မည်');
 });
 
@@ -631,10 +631,10 @@ test('store support and switch confirmation screens localize Burmese copy', () =
     locale: 'my',
     supportUrl: 'https://t.me/example_support',
   });
-  assert.match(support.text, /Support Center/);
-  assert.match(support.text, /Payment/);
-  assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💳 Payment');
-  assert.equal(support.replyMarkup.inline_keyboard[2]?.[0]?.text, '💬 Admin Chat ဖွင့်မည်');
+  assert.match(support.text, /အကူအညီ စင်တာ/);
+  assert.match(support.text, /ငွေပေးချေမှု/);
+  assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💳 ငွေပေးချေမှု');
+  assert.equal(support.replyMarkup.inline_keyboard[2]?.[0]?.text, '💬 စီမံသူ စကားပြောခန်းကို ဖွင့်မည်');
 
   const confirmation = buildTelegramStoreSwitchConfirmationView({
     keyId: 'key_123',
@@ -646,7 +646,7 @@ test('store support and switch confirmation screens localize Burmese copy', () =
     locale: 'my',
   });
 
-  assert.match(confirmation.text, /Server ပြောင်းခြင်း အတည်ပြုပါ/);
+  assert.match(confirmation.text, /ဆာဗာပြောင်းခြင်းကို အတည်ပြုပါ/);
   assert.match(confirmation.text, /ပြန်မလုပ်နိုင်ပါ/);
   assert.equal(confirmation.replyMarkup.inline_keyboard[0]?.[0]?.text, '✅ ပြောင်းမည်');
 });

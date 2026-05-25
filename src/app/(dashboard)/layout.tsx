@@ -66,7 +66,7 @@ function Sidebar({
   onToggle: () => void;
 }) {
   const pathname = usePathname();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
 
   return (
     <aside
@@ -112,7 +112,7 @@ function Sidebar({
       <nav className="custom-scrollbar flex-1 overflow-y-auto px-2 py-5">
         {!isCollapsed && (
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/80">
-            Core
+            {locale === 'my' ? 'အဓိက' : 'Core'}
           </p>
         )}
         <ul className="space-y-1.5">
@@ -161,11 +161,13 @@ function Sidebar({
         ) : (
           <>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Release
+              {locale === 'my' ? 'ဗားရှင်း' : 'Release'}
             </p>
             <p className="mt-2 text-sm font-semibold text-foreground">{APP_RELEASE_LABEL}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Core navigation stays here. Everything else lives in the tools menu.
+              {locale === 'my'
+                ? 'အဓိက လမ်းညွှန်များကို ဒီနေရာတွင်ထားပြီး ကျန်ကိရိယာများကို ကိရိယာ မီနူးထဲတွင် စုထားသည်။'
+                : 'Core navigation stays here. Everything else lives in the tools menu.'}
             </p>
           </>
         )}
@@ -193,6 +195,14 @@ function Header({
   const { theme, setTheme } = useTheme();
   const { locale, t } = useLocale();
   const [mounted, setMounted] = useState(false);
+  const userRoleLabel =
+    locale === 'my'
+      ? user?.role === 'ADMIN'
+        ? 'စီမံသူ'
+        : user?.role === 'CLIENT'
+          ? 'ကလိုင်းယင့်'
+          : user?.role
+      : user?.role;
 
   useEffect(() => {
     setMounted(true);
@@ -272,7 +282,7 @@ function Header({
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">{user.email}</span>
               <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary dark:border dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-200">
-                {user.role}
+                {userRoleLabel}
               </span>
             </div>
           )}
