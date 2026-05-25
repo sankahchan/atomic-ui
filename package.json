@@ -32,6 +32,7 @@
     "change-password": "npx tsx scripts/change-credentials.ts",
     "password:change": "tsx scripts/change-password.ts",
     "test": "tsx --test $(find src -name '*.test.ts' -print)",
+    "test:myanmar-copy": "tsx --test src/lib/myanmar-copy-guard.test.ts",
     "smoke": "tsx scripts/smoke-test.ts",
     "smoke:telegram": "tsx scripts/smoke-test-telegram.ts",
     "smoke:e2e": "playwright test --config=playwright.config.ts",
