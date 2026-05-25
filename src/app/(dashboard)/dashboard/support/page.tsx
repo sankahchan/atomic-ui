@@ -741,7 +741,7 @@ export default function SupportCenterPage() {
                           {thread.assignedAdminName || (isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned')}
                         </p>
                         <p>
-                          <span className="font-medium text-foreground">{isMyanmar ? 'SLA:' : 'SLA:'}</span>{' '}
+                          <span className="font-medium text-foreground">{isMyanmar ? 'တုံ့ပြန်ကတိချိန်:' : 'SLA:'}</span>{' '}
                           {thread.firstResponseDueAt ? formatDateTime(thread.firstResponseDueAt) : (isMyanmar ? 'ဖြေရှင်းပြီး / ကတိချိန် မရှိ' : 'Handled / no SLA')}
                         </p>
                         <p>

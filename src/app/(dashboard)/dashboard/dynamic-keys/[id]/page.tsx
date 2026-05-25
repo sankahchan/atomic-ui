@@ -742,15 +742,15 @@ function SubscriptionShareCard({
     previewAddToOutline: isMyanmar ? 'Outline ထဲသို့ ထည့်မည်' : 'Add to Outline',
     shortSlug: isMyanmar ? 'အတိုလင့်ခ် အမည်တို' : 'Short Link Slug',
     slugPlaceholder: isMyanmar ? 'my-dynamic-key' : 'my-dynamic-key',
-    slugHelp: isMyanmar ? 'အတို မျှဝေစာမျက်နှာ URL နှင့် Outline ကလိုင်းယင့် URL အတွက် အသုံးပြုသည်။' : 'Used for the short share page and short Outline client URL.',
+    slugHelp: isMyanmar ? 'အတို မျှဝေစာမျက်နှာ URL နှင့် Outline ကလိုင်းယင့် လင့်ခ်အတွက် အသုံးပြုသည်။' : 'Used for the short share page and short Outline client URL.',
     regenerateShortSlug: isMyanmar ? 'အတိုလင့်ခ် အမည်တိုကို ပြန်ဖန်တီးမည်' : 'Regenerate short slug',
     copyLink: isMyanmar ? 'လင့်ခ်ကို ကူးယူမည်' : 'Copy Link',
     copyClientUrl: isMyanmar ? 'ကလိုင်းယင့် URL ကို ကူးယူမည်' : 'Copy Client URL',
     connectTelegram: isMyanmar ? 'Telegram နှင့် ချိတ်ဆက်လင့်ခ် ဖန်တီးမည်' : 'Connect Telegram',
     sendTelegram: isMyanmar ? 'Telegram ဖြင့် ပို့မည်' : 'Send via Telegram',
     regenerateLink: isMyanmar ? 'လင့်ခ်ကို ပြန်ဖန်တီးမည်' : 'Regenerate Link',
-    sharePageUrl: isMyanmar ? 'မျှဝေစာမျက်နှာ URL:' : 'Share Page URL:',
-    clientUrl: isMyanmar ? 'ကလိုင်းယင့် URL:' : 'Client URL:',
+    sharePageUrl: isMyanmar ? 'မျှဝေစာမျက်နှာ လင့်ခ်:' : 'Share Page URL:',
+    clientUrl: isMyanmar ? 'ကလိုင်းယင့် လင့်ခ်:' : 'Client URL:',
     sharePageDisabled: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပိတ်ထားသည်' : 'Share page disabled',
     regenerateLinkHint: isMyanmar ? 'လင့်ခ်ကို ပြန်ဖန်တီးပါက အဟောင်းတိုကင် URL ကိုသာ လဲမည်။ အတိုအမည်လင့်ခ်များသည် အမည်တိုကို မပြောင်းမချင်း သို့မဟုတ် မျှဝေစာမျက်နှာကို မပိတ်မချင်း ဆက်လက် အလုပ်လုပ်နေမည်။' : 'Regenerating the link rotates the legacy token URL only. Your short slug links stay active until you change the slug or disable the share page.',
     pageViews: isMyanmar ? 'စာမျက်နှာကြည့်ရှုမှု' : 'Page Views',
@@ -763,7 +763,7 @@ function SubscriptionShareCard({
     updateFailed: isMyanmar ? 'အပ်ဒိတ် မအောင်မြင်ပါ' : 'Update failed',
     updatedDesc: isMyanmar ? 'မျှဝေစာမျက်နှာ ဆက်တင်များကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'Share page settings have been updated.',
     shortRegeneratedTitle: isMyanmar ? 'အတိုလင့်ခ်ကို ပြန်ဖန်တီးပြီးပါပြီ' : 'Short link regenerated',
-    shortRegeneratedDesc: isMyanmar ? 'အတို URL အသစ်များကို မျှဝေရန် အသင့်ဖြစ်နေပါပြီ။' : 'The new short URLs are ready to share.',
+    shortRegeneratedDesc: isMyanmar ? 'အတိုလင့်ခ် အသစ်များကို မျှဝေရန် အသင့်ဖြစ်နေပါပြီ။' : 'The new short URLs are ready to share.',
     welcomeUpdatedTitle: isMyanmar ? 'ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Welcome message updated',
     welcomeUpdatedDesc: isMyanmar ? 'မျှဝေစာမျက်နှာ ကြိုဆိုစာကို အပ်ဒိတ်လုပ်ပြီးပါပြီ။' : 'The share page welcome message has been updated.',
     shareSentTitle: isMyanmar ? 'မျှဝေစာမျက်နှာကို ပို့ပြီးပါပြီ' : 'Share page sent',
@@ -4352,7 +4352,7 @@ export default function DynamicKeyDetailPage() {
                   <div className="mt-2">
                     <Badge variant={dak.loadBalancerAlgorithm === 'LEAST_LOAD' ? 'default' : 'secondary'} className="text-xs">
                       {dak.loadBalancerAlgorithm === 'IP_HASH'
-                        ? locale === 'my' ? 'IP အလိုက်' : 'IP Hash'
+                        ? locale === 'my' ? 'IP လိပ်စာအလိုက်' : 'IP Hash'
                         : dak.loadBalancerAlgorithm === 'ROUND_ROBIN'
                           ? locale === 'my' ? 'အလှည့်ကျ' : 'Round Robin'
                           : dak.loadBalancerAlgorithm === 'LEAST_LOAD'

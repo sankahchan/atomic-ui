@@ -282,10 +282,10 @@ export function AnnouncementExperimentsPanel({
           <Select value={experimentAudience} onValueChange={onExperimentAudienceChange}>
             <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="ACTIVE_USERS">Active Telegram users</SelectItem>
-              <SelectItem value="STANDARD_USERS">Standard users</SelectItem>
-              <SelectItem value="PREMIUM_USERS">Premium users</SelectItem>
-              <SelectItem value="TRIAL_USERS">Trial users</SelectItem>
+              <SelectItem value="ACTIVE_USERS">{isMyanmar ? 'အသက်ဝင် Telegram အသုံးပြုသူများ' : 'Active Telegram users'}</SelectItem>
+              <SelectItem value="STANDARD_USERS">{isMyanmar ? 'ပုံမှန် အသုံးပြုသူများ' : 'Standard users'}</SelectItem>
+              <SelectItem value="PREMIUM_USERS">{isMyanmar ? 'ပရီမီယမ် အသုံးပြုသူများ' : 'Premium users'}</SelectItem>
+              <SelectItem value="TRIAL_USERS">{isMyanmar ? 'အစမ်း အသုံးပြုသူများ' : 'Trial users'}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -294,11 +294,11 @@ export function AnnouncementExperimentsPanel({
           <Select value={experimentType} onValueChange={onExperimentTypeChange}>
             <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="PROMO">Promo</SelectItem>
-              <SelectItem value="ANNOUNCEMENT">Announcement</SelectItem>
-              <SelectItem value="INFO">Info</SelectItem>
-              <SelectItem value="NEW_SERVER">New server</SelectItem>
-              <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+              <SelectItem value="PROMO">{isMyanmar ? 'အရောင်းမြှင့်တင်မှု' : 'Promo'}</SelectItem>
+              <SelectItem value="ANNOUNCEMENT">{isMyanmar ? 'ကြေညာချက်' : 'Announcement'}</SelectItem>
+              <SelectItem value="INFO">{isMyanmar ? 'အချက်အလက်' : 'Info'}</SelectItem>
+              <SelectItem value="NEW_SERVER">{isMyanmar ? 'ဆာဗာအသစ်' : 'New server'}</SelectItem>
+              <SelectItem value="MAINTENANCE">{isMyanmar ? 'ပြုပြင်ထိန်းသိမ်းမှု' : 'Maintenance'}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -313,7 +313,9 @@ export function AnnouncementExperimentsPanel({
             className="mt-2"
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Variant A {normalizedExperimentVariantASplit}% • Variant B {normalizedExperimentVariantBSplit}%
+            {isMyanmar
+              ? `ဗားရှင်း A ${normalizedExperimentVariantASplit}% • ဗားရှင်း B ${normalizedExperimentVariantBSplit}%`
+              : `Variant A ${normalizedExperimentVariantASplit}% • Variant B ${normalizedExperimentVariantBSplit}%`}
           </p>
         </div>
       </div>
@@ -333,7 +335,7 @@ export function AnnouncementExperimentsPanel({
           </Select>
         </div>
         <div>
-          <Label>Segment</Label>
+          <Label>{isMyanmar ? 'အုပ်စု' : 'Segment'}</Label>
           <Select value={experimentTargetSegment} onValueChange={onExperimentTargetSegmentChange}>
             <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -404,10 +406,10 @@ export function AnnouncementExperimentsPanel({
                 <Select value={experimentVariantACardStyle} onValueChange={onExperimentVariantACardStyleChange}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="DEFAULT">Default</SelectItem>
-                    <SelectItem value="PROMO">Promo</SelectItem>
-                    <SelectItem value="PREMIUM">Premium</SelectItem>
-                    <SelectItem value="OPERATIONS">Operations</SelectItem>
+                    <SelectItem value="DEFAULT">{isMyanmar ? 'မူလပုံစံ' : 'Default'}</SelectItem>
+                    <SelectItem value="PROMO">{isMyanmar ? 'အရောင်းမြှင့်တင်မှု' : 'Promo'}</SelectItem>
+                    <SelectItem value="PREMIUM">{isMyanmar ? 'ပရီမီယမ်' : 'Premium'}</SelectItem>
+                    <SelectItem value="OPERATIONS">{isMyanmar ? 'လုပ်ငန်းဆောင်ရွက်မှု' : 'Operations'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -450,10 +452,10 @@ export function AnnouncementExperimentsPanel({
                 <Select value={experimentVariantBCardStyle} onValueChange={onExperimentVariantBCardStyleChange}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="DEFAULT">Default</SelectItem>
-                    <SelectItem value="PROMO">Promo</SelectItem>
-                    <SelectItem value="PREMIUM">Premium</SelectItem>
-                    <SelectItem value="OPERATIONS">Operations</SelectItem>
+                    <SelectItem value="DEFAULT">{isMyanmar ? 'မူလပုံစံ' : 'Default'}</SelectItem>
+                    <SelectItem value="PROMO">{isMyanmar ? 'အရောင်းမြှင့်တင်မှု' : 'Promo'}</SelectItem>
+                    <SelectItem value="PREMIUM">{isMyanmar ? 'ပရီမီယမ်' : 'Premium'}</SelectItem>
+                    <SelectItem value="OPERATIONS">{isMyanmar ? 'လုပ်ငန်းဆောင်ရွက်မှု' : 'Operations'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -484,7 +486,7 @@ export function AnnouncementExperimentsPanel({
       </div>
       <div className="mt-4 space-y-3">
         {experiments.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No saved experiments yet.</p>
+          <p className="text-xs text-muted-foreground">{isMyanmar ? 'သိမ်းထားသော စမ်းသပ်ချက် မရှိသေးပါ။' : 'No saved experiments yet.'}</p>
         ) : (
           experiments.map((experiment) => {
             const experimentAnalytics = analyticsByExperiment.get(experiment.id);

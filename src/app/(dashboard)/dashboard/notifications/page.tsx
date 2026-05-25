@@ -1514,10 +1514,10 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     announcementExperimentName: isMyanmar ? 'စမ်းသပ်ချက် အမည်' : 'Experiment name',
     announcementExperimentVariantA: isMyanmar ? 'ဗားရှင်း A' : 'Variant A',
     announcementExperimentVariantB: isMyanmar ? 'ဗားရှင်း B' : 'Variant B',
-    announcementExperimentSplit: isMyanmar ? 'audience ခွဲဝေမှု' : 'Audience split',
-    announcementExperimentSave: isMyanmar ? 'Experiment သိမ်းမည်' : 'Save experiment',
-    announcementExperimentLaunch: isMyanmar ? 'Experiment စတင်မည်' : 'Launch experiment',
-    announcementExperimentSaved: isMyanmar ? 'Experiment သိမ်းပြီးပါပြီ' : 'Experiment saved',
+    announcementExperimentSplit: isMyanmar ? 'ပရိသတ် ခွဲဝေမှု' : 'Audience split',
+    announcementExperimentSave: isMyanmar ? 'စမ်းသပ်ချက် သိမ်းမည်' : 'Save experiment',
+    announcementExperimentLaunch: isMyanmar ? 'စမ်းသပ်ချက် စတင်မည်' : 'Launch experiment',
+    announcementExperimentSaved: isMyanmar ? 'စမ်းသပ်ချက် သိမ်းပြီးပါပြီ' : 'Experiment saved',
     announcementExperimentLaunched: isMyanmar ? 'Experiment စတင်ပြီးပါပြီ' : 'Experiment launched',
     announcementExperimentCreateNew: isMyanmar ? 'အသစ်ဖန်တီးမည်' : 'Create new',
     announcementExperimentJumpHistory: isMyanmar ? 'မှတ်တမ်းသို့ သွားမည်' : 'Jump to history',
@@ -2990,7 +2990,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                         variants: [
                           {
                             variantKey: 'A',
-                            label: 'Variant A',
+                            label: isMyanmar ? 'ဗားရှင်း A' : 'Variant A',
                             allocationPercent: normalizedExperimentVariantASplit,
                             title: announcementExperimentVariantATitle.trim(),
                             message: announcementExperimentVariantAMessage.trim(),
@@ -2999,7 +2999,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                           },
                           {
                             variantKey: 'B',
-                            label: 'Variant B',
+                            label: isMyanmar ? 'ဗားရှင်း B' : 'Variant B',
                             allocationPercent: normalizedExperimentVariantBSplit,
                             title: announcementExperimentVariantBTitle.trim(),
                             message: announcementExperimentVariantBMessage.trim(),

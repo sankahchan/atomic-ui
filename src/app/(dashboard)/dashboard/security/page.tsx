@@ -761,7 +761,7 @@ function getRuleTypeLabel(type: string, isMyanmar: boolean) {
 function getRuleTargetTypeLabel(targetType: string, isMyanmar: boolean) {
     switch (targetType) {
         case 'IP':
-            return isMyanmar ? 'IP' : 'IP';
+            return isMyanmar ? 'IP လိပ်စာ' : 'IP';
         case 'CIDR':
             return isMyanmar ? 'CIDR အပိုင်း' : 'CIDR';
         case 'COUNTRY':
@@ -806,7 +806,7 @@ function getSuppressionScopeLabel(scopeType: string, isMyanmar: boolean) {
         case 'INCIDENT':
             return isMyanmar ? 'အဖြစ်အပျက်' : 'Incident';
         case 'IP':
-            return isMyanmar ? 'IP' : 'IP';
+            return isMyanmar ? 'IP လိပ်စာ' : 'IP';
         default:
             return scopeType;
     }
@@ -2613,7 +2613,7 @@ function LoginProtectionCard() {
                                             onChange={(event) =>
                                                 setIncidentFilters((current) => ({ ...current, search: event.target.value }))
                                             }
-                                            placeholder={isMyanmar ? 'IP, email, host, ASN...' : 'IP, email, host, ASN...'}
+                                            placeholder={isMyanmar ? 'IP လိပ်စာ၊ အီးမေးလ်၊ host၊ ASN...' : 'IP, email, host, ASN...'}
                                         />
                                     </div>
                                     <div className="space-y-2">
