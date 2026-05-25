@@ -1262,6 +1262,11 @@ export function buildTelegramOrderActionKeyboard(input: {
         url: input.supportLink,
       }
     : null;
+  const ordersButton = {
+    text: input.locale === 'my' ? '🧾 အော်ဒါများ' : '🧾 Orders',
+    callback_data: buildTelegramMenuCallbackData('orders', 'action'),
+  };
+  let hasCheckStatusRow = false;
 
   if (input.order.status === 'AWAITING_PAYMENT_METHOD') {
     rows.push(
@@ -1273,6 +1278,7 @@ export function buildTelegramOrderActionKeyboard(input: {
         ...(supportButton ? [supportButton] : []),
       ],
     );
+    rows.push([ordersButton]);
   }
 
   if (
@@ -1297,22 +1303,15 @@ export function buildTelegramOrderActionKeyboard(input: {
             callback_data: buildTelegramOrderActionCallbackData('pm', input.order.id),
           }]),
     ]);
-
-    if (input.order.paymentMethodCode) {
-      if (input.order.status !== 'PENDING_REVIEW') {
-        rows.push([
-          {
-            text: ui.orderActionRestartSamePlan,
-            callback_data: buildTelegramOrderActionCallbackData('rt', input.order.id),
-          },
-          ...(supportButton ? [supportButton] : []),
-        ]);
-      } else if (supportButton) {
-        rows.push([supportButton]);
-      }
-    } else if (supportButton) {
-      rows.push([supportButton]);
-    }
+    rows.push([
+      {
+        text: ui.orderActionCheckStatus,
+        callback_data: buildTelegramOrderActionCallbackData('st', input.order.id),
+      },
+      ...(supportButton ? [supportButton] : []),
+    ]);
+    rows.push([ordersButton]);
+    hasCheckStatusRow = true;
   }
 
   if (input.order.status === 'REJECTED' || input.order.status === 'CANCELLED') {
@@ -1331,31 +1330,14 @@ export function buildTelegramOrderActionKeyboard(input: {
     }
   }
 
-  if (
-    input.order.status === 'AWAITING_PAYMENT_METHOD'
-    || input.order.status === 'AWAITING_PAYMENT_PROOF'
-    || input.order.status === 'PENDING_REVIEW'
-  ) {
+  if (!hasCheckStatusRow) {
     rows.push([
       {
-        text: input.locale === 'my' ? '🧾 အော်ဒါများ' : '🧾 Orders',
-        callback_data: buildTelegramMenuCallbackData('orders', 'action'),
+        text: ui.orderActionCheckStatus,
+        callback_data: buildTelegramOrderActionCallbackData('st', input.order.id),
       },
-      ...(input.order.status !== 'PENDING_REVIEW'
-        ? [{
-            text: ui.orderActionBuyNewKey,
-            callback_data: buildTelegramOrderActionCallbackData('by', input.order.id, 'order_retry'),
-          }]
-        : []),
     ]);
   }
-
-  rows.push([
-    {
-      text: ui.orderActionCheckStatus,
-      callback_data: buildTelegramOrderActionCallbackData('st', input.order.id),
-    },
-  ]);
 
   if (
     supportButton &&
@@ -6363,14 +6345,16 @@ async function sendOrEditTelegramMarkdownView(input: {
 
 function buildTelegramStoreCouponPrompt(input: {
   planName: string;
+  locale: SupportedLocale;
 }) {
+  const isMyanmar = input.locale === 'my';
   return [
-    '🏷 *Apply Coupon Code*',
+    isMyanmar ? '🏷 *ကူပွန်ကုဒ် ထည့်မည်*' : '🏷 *Apply Coupon Code*',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '',
-    `Plan: *${input.planName}*`,
+    `${isMyanmar ? 'အစီအစဉ်' : 'Plan'}: *${input.planName}*`,
     '',
-    'Send your coupon code in the next message\\.',
+    isMyanmar ? 'နောက်စာတွင် coupon code ကို ပို့ပါ\\.' : 'Send your coupon code in the next message\\.',
   ].join('\n');
 }
 
@@ -6858,7 +6842,18 @@ export async function handleTelegramCallbackQuery(
                 : null,
           });
 
-          const view = buildTelegramStoreOrderSummaryView({ plan, locale });
+          const view = buildTelegramStoreOrderSummaryView({
+            plan,
+            locale,
+            kind: storefrontAction.action === 'renew_plan' ? 'RENEW' : 'NEW',
+            renewTarget:
+              storefrontAction.action === 'renew_plan'
+                ? {
+                    keyId: storefrontAction.keyId,
+                    kind: storefrontAction.kind,
+                  }
+                : null,
+          });
           await sendOrEditTelegramMarkdownView({
             botToken: config.botToken,
             chatId,
@@ -6910,12 +6905,20 @@ export async function handleTelegramCallbackQuery(
             messageId,
             text: buildTelegramStoreCouponPrompt({
               planName: escapeTelegramMarkdownV2(selectedPlan.detailName),
+              locale,
             }),
             replyMarkup: {
               inline_keyboard: [[
                 {
-                  text: '◀ Back to Plans',
-                  callback_data: 'show_plans',
+                  text: locale === 'my' ? '◀ အစီအစဉ်များသို့ ပြန်မည်' : '◀ Back to Plans',
+                  callback_data: buildTelegramStorefrontCallbackData({
+                    action: 'show_plans',
+                    category: selectedPlan.category,
+                  }),
+                },
+                {
+                  text: locale === 'my' ? '💬 အကူအညီ' : '💬 Support',
+                  callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
                 },
               ]],
             },
