@@ -281,10 +281,10 @@ export function buildBackupVerificationFailureAlertMessage(input: {
   const isMyanmar = input.locale === 'my';
   const lines = [
     isMyanmar
-      ? '🚨 <b>Backup verification failed</b>'
+      ? '🚨 <b>အရန်မိတ္တူ စစ်ဆေးမှု မအောင်မြင်ပါ</b>'
       : '🚨 <b>Backup verification failed</b>',
     isMyanmar
-      ? `${input.failures.length} ခု backup verify မအောင်မြင်ပါ။`
+      ? `${input.failures.length} ခု အရန်မိတ္တူ စစ်ဆေးမှု မအောင်မြင်ပါ။`
       : `${formatCountLabel(input.failures.length, 'backup')} failed verification.`,
   ];
 
@@ -299,13 +299,13 @@ export function buildBackupVerificationFailureAlertMessage(input: {
   if (input.failures.length > 3) {
     lines.push(
       isMyanmar
-        ? `နောက်ထပ် ${input.failures.length - 3} ခုကို dashboard ၏ Backup & Restore တွင် စစ်နိုင်ပါသည်။`
+        ? `နောက်ထပ် ${input.failures.length - 3} ခုကို စီမံခန့်ခွဲမှု စာမျက်နှာ၏ Backup & Restore တွင် စစ်နိုင်ပါသည်။`
         : `+${input.failures.length - 3} more in Backup & Restore.`,
     );
   } else {
     lines.push(
       isMyanmar
-        ? 'Backup & Restore dashboard ထဲတွင် failure detail ကို စစ်ဆေးပါ။'
+        ? 'Backup & Restore စာမျက်နှာထဲတွင် မအောင်မြင်မှု အသေးစိတ်ကို စစ်ဆေးပါ။'
         : 'Open Backup and Restore for details.',
     );
   }
@@ -344,7 +344,7 @@ export function buildTelegramWebhookHealthAlertMessage(input: {
 
   lines.push(
     isMyanmar
-      ? 'Notifications workspace ထဲတွင် webhook status ကို စစ်ပြီး လိုအပ်ပါက webhook ကို reset လုပ်ပါ။'
+      ? 'Notifications workspace ထဲတွင် webhook အခြေအနေကို စစ်ပြီး လိုအပ်ပါက webhook ကို ပြန်သတ်မှတ်ပါ။'
       : 'Open Notifications and reset the webhook if URL or HTTPS changed.',
   );
 
@@ -365,7 +365,7 @@ export function buildAdminQueueHealthAlertMessage(input: {
   const isMyanmar = input.locale === 'my';
   const lines = [
     isMyanmar
-      ? '🚨 <b>Admin queue ကြန့်ကြာမှု</b>'
+      ? '🚨 <b>စီမံခန့်ခွဲမှု စာရင်း ကြန့်ကြာမှု</b>'
       : '🚨 <b>Admin queue aging</b>',
   ];
 
@@ -375,14 +375,14 @@ export function buildAdminQueueHealthAlertMessage(input: {
     );
     if (input.supportThreadCodes.length > 0) {
       lines.push(
-        `${isMyanmar ? 'thread များ' : 'Threads'}: <code>${escapeHtml(input.supportThreadCodes.join(', '))}</code>`,
+        `${isMyanmar ? 'စာတွဲများ' : 'Threads'}: <code>${escapeHtml(input.supportThreadCodes.join(', '))}</code>`,
       );
     }
   }
 
   if (input.pendingReviewCount > 0) {
     lines.push(
-      `${isMyanmar ? 'review စောင့်နေသည်' : 'Review pending'}: <b>${escapeHtml(String(input.pendingReviewCount))}</b>${input.oldestReviewAgeMinutes !== null ? ` • <b>${escapeHtml(formatDurationMinutes(input.oldestReviewAgeMinutes, input.locale))}</b> ${isMyanmar ? 'စောင့်နေ' : 'oldest waiting'}` : ''}`,
+      `${isMyanmar ? 'စစ်ဆေးရန် စောင့်နေသည်' : 'Review pending'}: <b>${escapeHtml(String(input.pendingReviewCount))}</b>${input.oldestReviewAgeMinutes !== null ? ` • <b>${escapeHtml(formatDurationMinutes(input.oldestReviewAgeMinutes, input.locale))}</b> ${isMyanmar ? 'စောင့်နေ' : 'oldest waiting'}` : ''}`,
     );
     lines.push(
       `${isMyanmar ? 'မယူရသေး' : 'Unclaimed'}: <b>${escapeHtml(String(input.unclaimedReviewCount))}</b>`,
@@ -396,7 +396,7 @@ export function buildAdminQueueHealthAlertMessage(input: {
 
   lines.push(
     isMyanmar
-      ? `Review queue ကို ${input.reviewThresholdHours} နာရီထက် ပိုစောင့်နေသော item များအတွက် alert ပို့ထားပါသည်။`
+      ? `${input.reviewThresholdHours} နာရီထက် ပိုစောင့်နေသော စစ်ဆေးရန်စာရင်းများ သို့မဟုတ် နောက်ကျနေသော အကူအညီ အကြောင်းပြန်မှုများအတွက် သတိပေးချက် ပို့ထားပါသည်။`
       : `Threshold: ${input.reviewThresholdHours}h review wait or overdue support response.`,
   );
 
@@ -412,13 +412,13 @@ function buildAdminQueueHealthKeyboard(locale: SupportedLocale): MonitoringAlert
           callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
         },
         {
-          text: locale === 'my' ? '🛟 Support စာရင်း' : '🛟 Support queue',
+          text: locale === 'my' ? '🛟 အကူအညီ စာရင်း' : '🛟 Support queue',
           callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
         },
       ],
       [
         {
-          text: locale === 'my' ? '🧭 Admin စင်တာ' : '🧭 Admin home',
+          text: locale === 'my' ? '🧭 စီမံခန့်ခွဲမှု ပင်မစာမျက်နှာ' : '🧭 Admin home',
           callback_data: buildTelegramMenuCallbackData('admin', 'home'),
         },
       ],

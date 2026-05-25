@@ -234,14 +234,14 @@ export function buildTelegramPremiumSupportQueueCardMessage(input: {
   const replyStateLabel =
     latestReply?.senderType === 'ADMIN'
       ? input.locale === 'my'
-        ? '🟡 User စောင့်နေ'
+        ? '🟡 အသုံးပြုသူ စောင့်နေ'
         : '🟡 Waiting for user'
       : input.request.followUpPending
         ? input.locale === 'my'
-          ? '🕒 Admin စောင့်နေ'
+          ? '🕒 စီမံခန့်ခွဲသူ စောင့်နေ'
           : '🕒 Waiting for admin'
         : input.locale === 'my'
-          ? '✅ Update ပြီး'
+          ? '✅ အပ်ဒိတ် ပြီး'
           : '✅ Up to date';
   const latestReplyPreview = buildTelegramLatestReplyPreviewLines({
     reply: latestReply,
@@ -259,7 +259,7 @@ export function buildTelegramPremiumSupportQueueCardMessage(input: {
   const statusSnapshot = `🕒 <b>${escapeHtml(state.label)}</b> • ${escapeHtml(age)}${overdue ? ` • <b>${input.locale === 'my' ? 'နောက်ကျ' : 'Overdue'}</b>` : ''}`;
   return [
     input.locale === 'my'
-      ? '💎 <b>Premium အကူအညီ</b>'
+      ? '💎 <b>ပရီမီယမ် အကူအညီ စာတွဲ</b>'
       : '💎 <b>Premium support thread</b>',
     '',
     `<b>${escapeHtml(input.request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}`,
@@ -336,12 +336,12 @@ export function buildTelegramSupportQueueReplyKeyboard(input: {
               callback_data: buildTelegramSupportQueueCallbackData('nx', input.requestId, input.mode),
             },
             {
-              text: isMyanmar ? '🧾 ပန်နယ် ဖွင့်မည်' : '🧾 Panel',
+              text: isMyanmar ? '🧾 စီမံခန့်ခွဲမှု စာမျက်နှာ ဖွင့်မည်' : '🧾 Panel',
               url: input.panelUrl,
             },
           ],
       ...(includeDetail
-        ? [[{ text: isMyanmar ? '🧾 ပန်နယ် ဖွင့်မည်' : '🧾 Panel', url: input.panelUrl }]]
+        ? [[{ text: isMyanmar ? '🧾 စီမံခန့်ခွဲမှု စာမျက်နှာ ဖွင့်မည်' : '🧾 Panel', url: input.panelUrl }]]
         : []),
     ],
   };
@@ -369,14 +369,14 @@ export function buildTelegramPremiumSupportQueueDetailMessage(input: {
       ? `${input.locale === 'my' ? 'လမ်းကြောင်း' : 'Route'} ${escapeHtml(input.request.currentResolvedServerName)}`
       : '',
     input.request.appliedPinServerName
-      ? `${input.locale === 'my' ? 'ချိတ်ထားသောဆာဗာ' : 'Pin'} ${escapeHtml(input.request.appliedPinServerName)}`
+      ? `${input.locale === 'my' ? 'ချိတ်ထားသော ဆာဗာ' : 'Pin'} ${escapeHtml(input.request.appliedPinServerName)}`
       : '',
   ].filter(Boolean);
   const poolLabel = compactTelegramSupportQueueText(input.request.currentPoolSummary, 72);
   const contextParts = [
-    poolLabel ? `${input.locale === 'my' ? 'လမ်းကြောင်းစု' : 'Pool'} ${escapeHtml(poolLabel)}` : '',
+    poolLabel ? `${input.locale === 'my' ? 'ဆာဗာအုပ်စု' : 'Pool'} ${escapeHtml(poolLabel)}` : '',
     input.request.linkedOutageServerName
-      ? `${input.locale === 'my' ? 'ဖြစ်ရပ်' : 'Incident'} ${escapeHtml(input.request.linkedOutageServerName)}`
+      ? `${input.locale === 'my' ? 'ပြတ်တောက်မှု' : 'Incident'} ${escapeHtml(input.request.linkedOutageServerName)}`
       : '',
   ].filter(Boolean);
   const note = compactTelegramSupportQueueText(
@@ -386,7 +386,7 @@ export function buildTelegramPremiumSupportQueueDetailMessage(input: {
 
   return [
     input.locale === 'my'
-      ? 'ℹ️ <b>Premium support အသေးစိတ်</b>'
+      ? 'ℹ️ <b>ပရီမီယမ် အကူအညီ အသေးစိတ်</b>'
       : 'ℹ️ <b>Premium support detail</b>',
     '',
     `<b>${escapeHtml(input.request.requestCode)}</b> • ${escapeHtml(formatTelegramPremiumSupportTypeLabel(input.request.requestType, getTelegramUi(input.locale)))}`,
@@ -514,7 +514,7 @@ export async function handleTelegramSupportQueueCommand(input: {
       input.botToken,
       input.chatId,
       input.locale === 'my'
-        ? '📭 Open support thread မရှိသေးပါ။'
+        ? '📭 ဖွင့်ထားသော အကူအညီ စာတွဲ မရှိသေးပါ။'
         : '📭 There are no open support threads right now.',
       {
         replyMarkup: buildTelegramSupportQueueSummaryKeyboard({
@@ -575,7 +575,7 @@ export async function sendTelegramNextSupportQueueCard(input: {
       input.botToken,
       input.chatId,
       input.locale === 'my'
-        ? '📭 ဤ support queue filter အတွက် နောက်ထပ် thread မရှိတော့ပါ။'
+        ? '📭 ဤအကူအညီ စာရင်း စစ်ထုတ်မှုအတွက် နောက်ထပ် စာတွဲ မရှိတော့ပါ။'
         : '📭 There are no more support threads in this queue filter.',
       {
         replyMarkup: buildTelegramSupportQueueSummaryKeyboard({
