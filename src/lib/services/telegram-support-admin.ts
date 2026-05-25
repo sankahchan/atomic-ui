@@ -387,6 +387,8 @@ export async function replyTelegramSupportThreadAsAdmin(input: {
           supportLink,
           attachmentUrl:
             updatedThread.replies[updatedThread.replies.length - 1]?.mediaUrl || null,
+          threadStatus: updatedThread.status,
+          waitingOn: updatedThread.waitingOn,
         }),
       },
     );
@@ -466,6 +468,8 @@ export async function handleTelegramSupportThreadAsAdmin(input: {
           supportLink,
           attachmentUrl:
             updatedThread.replies[updatedThread.replies.length - 1]?.mediaUrl || null,
+          threadStatus: updatedThread.status,
+          waitingOn: updatedThread.waitingOn,
         }),
       },
     );
@@ -547,6 +551,8 @@ export async function escalateTelegramSupportThreadToPanel(input: {
           includeEscalate: false,
           attachmentUrl:
             updatedThread.replies[updatedThread.replies.length - 1]?.mediaUrl || null,
+          threadStatus: updatedThread.status,
+          waitingOn: updatedThread.waitingOn,
         }),
       },
     );

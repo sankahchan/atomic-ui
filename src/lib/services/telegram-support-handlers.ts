@@ -65,6 +65,8 @@ export async function handleTelegramSupportThreadStart(input: {
       threadId: thread.id,
       supportLink,
       attachmentUrl: thread.replies[thread.replies.length - 1]?.mediaUrl || null,
+      threadStatus: thread.status,
+      waitingOn: thread.waitingOn,
     }),
   });
 
@@ -158,6 +160,8 @@ export async function handleTelegramSupportReplyText(input: {
         threadId: thread.id,
         supportLink,
         attachmentUrl: null,
+        threadStatus: thread.status,
+        waitingOn: 'ADMIN',
       }),
     },
   );
@@ -266,6 +270,8 @@ export async function handleTelegramSupportReplyMedia(input: {
         threadId: thread.id,
         supportLink,
         attachmentUrl: null,
+        threadStatus: thread.status,
+        waitingOn: 'ADMIN',
       }),
     },
   );
