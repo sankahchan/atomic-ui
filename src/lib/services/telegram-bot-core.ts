@@ -121,6 +121,7 @@ import {
   addTelegramPremiumSupportReply,
   buildTelegramDynamicPremiumPendingKeyboard,
   buildTelegramDynamicPremiumRegionKeyboard,
+  buildTelegramPremiumSupportRequestKeyboard,
   buildTelegramDynamicPremiumSupportKeyboard,
   buildTelegramPremiumSupportStatusMessage,
   createTelegramPremiumSupportRequestRecord,
@@ -8900,20 +8901,15 @@ export async function handleTelegramCallbackQuery(
             chatId,
             buildTelegramPremiumSupportStatusMessage({ locale, request }),
             {
-              replyMarkup:
-                request.status === 'PENDING_REVIEW'
-                  ? buildTelegramDynamicPremiumPendingKeyboard({
-                      dynamicAccessKeyId: request.dynamicAccessKeyId,
-                      requestId: request.id,
-                      locale,
-                      supportLink,
-                    })
-                  : buildTelegramDynamicPremiumSupportKeyboard(
-                      request.dynamicAccessKeyId,
-                      locale,
-                      supportLink,
-                      request.id,
-                    ),
+              replyMarkup: buildTelegramPremiumSupportRequestKeyboard({
+                dynamicAccessKeyId: request.dynamicAccessKeyId,
+                requestId: request.id,
+                locale,
+                status: request.status,
+                followUpPending: request.followUpPending,
+                latestReplySenderType: request.replies?.[request.replies.length - 1]?.senderType || null,
+                supportLink,
+              }),
             },
           );
           await answerTelegramCallbackQuery(
@@ -8951,20 +8947,15 @@ export async function handleTelegramCallbackQuery(
             chatId,
             ui.premiumFollowUpPrompt(request.requestCode, request.dynamicAccessKey.name),
             {
-              replyMarkup:
-                request.status === 'PENDING_REVIEW'
-                  ? buildTelegramDynamicPremiumPendingKeyboard({
-                      dynamicAccessKeyId: request.dynamicAccessKeyId,
-                      requestId: request.id,
-                      locale,
-                      supportLink,
-                    })
-                  : buildTelegramDynamicPremiumSupportKeyboard(
-                      request.dynamicAccessKeyId,
-                      locale,
-                      supportLink,
-                      request.id,
-                    ),
+              replyMarkup: buildTelegramPremiumSupportRequestKeyboard({
+                dynamicAccessKeyId: request.dynamicAccessKeyId,
+                requestId: request.id,
+                locale,
+                status: request.status,
+                followUpPending: request.followUpPending,
+                latestReplySenderType: request.replies?.[request.replies.length - 1]?.senderType || null,
+                supportLink,
+              }),
             },
           );
           await answerTelegramCallbackQuery(

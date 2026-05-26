@@ -11,6 +11,7 @@ import {
 import {
   buildTelegramCommerceViewCallbackData,
   buildTelegramDynamicSupportActionCallbackData,
+  buildTelegramMenuCallbackData,
 } from '@/lib/services/telegram-callbacks';
 import {
   buildTelegramCommerceCard,
@@ -93,6 +94,17 @@ export function buildTelegramDynamicPremiumSupportKeyboard(
 
   rows.push([
     {
+      text: locale === 'my' ? '🗂 သော့များ' : '🗂 My keys',
+      callback_data: buildTelegramMenuCallbackData('support', 'keys'),
+    },
+    {
+      text: locale === 'my' ? '💎 ပရီမီယမ် စင်တာ' : '💎 Premium center',
+      callback_data: buildTelegramCommerceViewCallbackData('premium', 'home', '1'),
+    },
+  ]);
+
+  rows.push([
+    {
       text: ui.orderActionCancel,
       callback_data: buildTelegramDynamicSupportActionCallbackData('ca', dynamicAccessKeyId),
     },
@@ -132,6 +144,94 @@ export function buildTelegramDynamicPremiumPendingKeyboard(input: {
     {
       text: ui.premiumReplyToRequest,
       callback_data: buildTelegramDynamicSupportActionCallbackData('rp', input.requestId),
+    },
+  ]);
+
+  if (input.supportLink) {
+    rows.push([{ text: ui.getSupport, url: input.supportLink }]);
+  }
+
+  rows.push([
+    {
+      text: input.locale === 'my' ? '🗂 သော့များ' : '🗂 My keys',
+      callback_data: buildTelegramMenuCallbackData('support', 'keys'),
+    },
+    {
+      text: input.locale === 'my' ? '💎 ပရီမီယမ် စင်တာ' : '💎 Premium center',
+      callback_data: buildTelegramCommerceViewCallbackData('premium', 'home', '1'),
+    },
+  ]);
+
+  return {
+    inline_keyboard: rows,
+  };
+}
+
+export function buildTelegramPremiumSupportRequestKeyboard(input: {
+  dynamicAccessKeyId: string;
+  requestId: string;
+  locale: SupportedLocale;
+  status: string;
+  followUpPending?: boolean | null;
+  latestReplySenderType?: string | null;
+  supportLink?: string | null;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const normalizedStatus = (input.status || '').toUpperCase();
+  const latestReplySenderType = (input.latestReplySenderType || '').toUpperCase();
+  const isMyanmar = input.locale === 'my';
+  const replyLabel =
+    latestReplySenderType === 'ADMIN'
+      ? (isMyanmar ? '✍️ အခု အကြောင်းပြန်မည်' : '✍️ Reply now')
+      : (isMyanmar ? '✍️ အချက်အလက် ထပ်ပို့မည်' : '✍️ Add detail');
+
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+
+  if (normalizedStatus === 'DISMISSED') {
+    rows.push([
+      {
+        text: ui.premiumChangeRegion,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rg', input.dynamicAccessKeyId),
+      },
+      {
+        text: ui.premiumReportRouteIssue,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('is', input.dynamicAccessKeyId),
+      },
+    ]);
+  } else {
+    rows.push([
+      {
+        text: ui.orderActionCheckStatus,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('st', input.requestId),
+      },
+      {
+        text: replyLabel,
+        callback_data: buildTelegramDynamicSupportActionCallbackData('rp', input.requestId),
+      },
+    ]);
+
+    if (normalizedStatus === 'APPROVED' || normalizedStatus === 'HANDLED') {
+      rows.push([
+        {
+          text: ui.premiumChangeRegion,
+          callback_data: buildTelegramDynamicSupportActionCallbackData('rg', input.dynamicAccessKeyId),
+        },
+        {
+          text: ui.premiumReportRouteIssue,
+          callback_data: buildTelegramDynamicSupportActionCallbackData('is', input.dynamicAccessKeyId),
+        },
+      ]);
+    }
+  }
+
+  rows.push([
+    {
+      text: isMyanmar ? '🗂 သော့များ' : '🗂 My keys',
+      callback_data: buildTelegramMenuCallbackData('support', 'keys'),
+    },
+    {
+      text: isMyanmar ? '💎 ပရီမီယမ် စင်တာ' : '💎 Premium center',
+      callback_data: buildTelegramCommerceViewCallbackData('premium', 'home', '1'),
     },
   ]);
 
@@ -553,6 +653,18 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
       formatTelegramPremiumSupportStatusLabel(request.status, ui),
     )}</b>`,
     `${escapeHtml(currentState)} • ${escapeHtml(followUpIndicator)}`,
+    [
+      `${isMyanmar ? 'တင်ထားချိန်' : 'Requested'} ${formatTelegramDateTime(request.createdAt, input.locale)}`,
+      request.reviewedAt
+        ? `${isMyanmar ? 'စစ်ဆေးချိန်' : 'Reviewed'} ${formatTelegramDateTime(request.reviewedAt, input.locale)}`
+        : request.handledAt
+          ? `${isMyanmar ? 'ပြီးဆုံးချိန်' : 'Handled'} ${formatTelegramDateTime(request.handledAt, input.locale)}`
+          : request.dismissedAt
+            ? `${isMyanmar ? 'ပိတ်သိမ်းချိန်' : 'Dismissed'} ${formatTelegramDateTime(request.dismissedAt, input.locale)}`
+            : null,
+    ]
+      .filter(Boolean)
+      .join(' • '),
     request.customerMessage?.trim()
       ? `${isMyanmar ? '📝 မှတ်စု' : '📝 Note'}: ${escapeHtml(compactPremiumText(request.customerMessage, 96) || '')}`
       : null,
@@ -599,16 +711,24 @@ export function buildTelegramPremiumSupportStatusMessage(input: {
   const nextStepText =
     request.status === 'PENDING_REVIEW'
       ? input.locale === 'my'
-        ? 'Admin review ကို စောင့်ပါ။ လိုအပ်ပါက extra detail တောင်းနိုင်ပါသည်။'
-        : 'Wait for admin review. More detail may be requested.'
+        ? 'Check status ဖြင့် ပြန်စစ်နိုင်ပြီး၊ လိုအပ်ပါက အချက်အလက် ထပ်ပို့နိုင်ပါသည်။'
+        : 'Use Check status to refresh, or Reply if you need to add more detail.'
       : currentState === ui.premiumAwaitingYourReply
         ? input.locale === 'my'
-          ? 'Admin အဖြေ ရှိပါသည်။ Reply ဖြင့် ဆက်ပါ။'
-          : 'Admin replied. Tap Reply.'
+          ? 'Admin အဖြေ ရှိပါသည်။ Reply now ဖြင့် ဆက်ပို့ပါ။'
+          : 'Admin replied. Tap Reply now.'
         : currentState === ui.premiumAwaitingAdminReply
           ? input.locale === 'my'
-            ? 'Admin က သင့် reply ကို စစ်နေပါသည်။'
-            : 'Admin is reviewing your reply.'
+            ? 'Admin က သင့် update ကို စစ်နေပါသည်။ Check status ဖြင့် ပြန်စစ်နိုင်ပါသည်။'
+            : 'Admin is reviewing your update. Use Check status while you wait.'
+          : request.status === 'DISMISSED'
+            ? input.locale === 'my'
+              ? 'ဤတောင်းဆိုချက် ပိတ်သိမ်းထားပါသည်။ Premium center မှ issue အသစ် စတင်နိုင်ပါသည်။'
+              : 'This request is closed. Start a new issue from Premium center if you still need help.'
+            : request.status === 'APPROVED' || request.status === 'HANDLED'
+              ? input.locale === 'my'
+                ? 'Premium center သို့မဟုတ် My keys သို့ ပြန်ပြီး နောက်တစ်ဆင့် ဆက်လုပ်နိုင်ပါသည်။'
+                : 'Open Premium center or My Keys for the next action.'
           : ui.premiumStatusReplyHint;
 
   return buildTelegramCommerceMessage({
@@ -1031,20 +1151,15 @@ function buildTelegramPremiumStatusDetailKeyboard(input: {
   supportLink?: string | null;
   page: number;
 }) {
-  const requestKeyboard =
-    input.request.status === 'PENDING_REVIEW'
-      ? buildTelegramDynamicPremiumPendingKeyboard({
-          dynamicAccessKeyId: input.request.dynamicAccessKeyId,
-          requestId: input.request.id,
-          locale: input.locale,
-          supportLink: input.supportLink,
-        }).inline_keyboard
-      : buildTelegramDynamicPremiumSupportKeyboard(
-          input.request.dynamicAccessKeyId,
-          input.locale,
-          input.supportLink,
-          input.request.id,
-        ).inline_keyboard;
+  const requestKeyboard = buildTelegramPremiumSupportRequestKeyboard({
+    dynamicAccessKeyId: input.request.dynamicAccessKeyId,
+    requestId: input.request.id,
+    locale: input.locale,
+    status: input.request.status,
+    followUpPending: input.request.followUpPending,
+    latestReplySenderType: input.request.replies?.[input.request.replies.length - 1]?.senderType || null,
+    supportLink: input.supportLink,
+  }).inline_keyboard;
 
   requestKeyboard.push([{
     text: input.locale === 'my' ? '← တောင်းဆိုချက်များသို့ ပြန်မည်' : '← Back to requests',

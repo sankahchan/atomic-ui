@@ -294,6 +294,9 @@ export async function handleTelegramSupportStatusCommand(input: {
     handledAt?: Date | null;
     dismissedAt?: Date | null;
     followUpPending?: boolean | null;
+    replies?: Array<{
+      senderType: string;
+    }>;
     dynamicAccessKey: {
       name: string;
     };
@@ -314,6 +317,7 @@ export async function handleTelegramSupportStatusCommand(input: {
       requestType: request.requestType,
       status: request.status,
       followUpPending: request.followUpPending,
+      latestReplySenderType: request.replies?.[request.replies.length - 1]?.senderType || null,
       createdAt: request.createdAt,
       updatedAt: request.updatedAt,
       dynamicKeyName: request.dynamicAccessKey.name,

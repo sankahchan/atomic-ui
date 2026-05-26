@@ -283,13 +283,13 @@ test('telegram payment prompts stay clean and remove screenshot-guide clutter', 
   assert.doesNotMatch(paymentPrompt, /Good example/);
   assert.doesNotMatch(paymentPrompt, /Bad example/);
   assert.doesNotMatch(paymentPrompt, /Payment Guide/);
-  assert.doesNotMatch(keyboardTexts, /Payment guide/);
+  assert.match(keyboardTexts, /Payment guide/);
   assert.doesNotMatch(keyboardTexts, /Good example/);
   assert.doesNotMatch(keyboardTexts, /Bad example/);
   assert.doesNotMatch(keyboardTexts, /Common mistake/);
   assert.doesNotMatch(keyboardTexts, /Restart same plan/);
   assert.doesNotMatch(keyboardTexts, /Buy new key/);
-  assert.match(keyboardTexts, /Upload screenshot/);
+  assert.doesNotMatch(keyboardTexts, /Upload screenshot/);
   assert.match(keyboardTexts, /Check status/);
   assert.match(keyboardTexts, /Orders/);
 });
