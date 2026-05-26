@@ -15,6 +15,7 @@ import {
   buildTelegramPremiumDetailMessage,
   buildTelegramPremiumHubMessage,
   buildTelegramPremiumRegionDetailMessage,
+  buildTelegramPremiumSupportRequestKeyboard,
   buildTelegramPremiumSupportListMessage,
   buildTelegramPremiumSupportStatusMessage,
 } from '@/lib/services/telegram-premium';
@@ -643,8 +644,9 @@ test('support status summary shows a short thread list instead of only the lates
         id: 'request_1',
         requestCode: 'PRM-111',
         requestType: 'REGION_CHANGE',
-        status: 'OPEN',
+        status: 'PENDING_REVIEW',
         followUpPending: true,
+        latestReplySenderType: 'CUSTOMER',
         createdAt: new Date('2026-04-20T06:00:00.000Z'),
         updatedAt: new Date('2026-04-20T09:30:00.000Z'),
         dynamicKeyName: 'Onn',
@@ -659,6 +661,37 @@ test('support status summary shows a short thread list instead of only the lates
   assert.match(message, /PRM-111/);
   assert.match(message, /Open a thread below or start a new one\./);
   assert.ok(message.split('\n').length <= 18);
+});
+
+test('premium support request keyboard keeps open requests actionable without restarting the flow', () => {
+  const pendingKeyboard = buildTelegramPremiumSupportRequestKeyboard({
+    dynamicAccessKeyId: 'dak_1',
+    requestId: 'req_1',
+    locale: 'en',
+    status: 'PENDING_REVIEW',
+    followUpPending: true,
+    latestReplySenderType: 'CUSTOMER',
+    supportLink: 'https://t.me/outlineadminsupport',
+  });
+
+  assert.equal(pendingKeyboard.inline_keyboard[0]?.[0]?.text, 'Check status');
+  assert.equal(pendingKeyboard.inline_keyboard[0]?.[1]?.text, '✍️ Add detail');
+  assert.equal(pendingKeyboard.inline_keyboard[1]?.[0]?.text, '🗂 My keys');
+  assert.equal(pendingKeyboard.inline_keyboard[1]?.[1]?.text, '💎 Premium center');
+  assert.equal(pendingKeyboard.inline_keyboard[2]?.[0]?.url, 'https://t.me/outlineadminsupport');
+
+  const dismissedKeyboard = buildTelegramPremiumSupportRequestKeyboard({
+    dynamicAccessKeyId: 'dak_1',
+    requestId: 'req_2',
+    locale: 'en',
+    status: 'DISMISSED',
+    latestReplySenderType: 'ADMIN',
+  });
+
+  assert.equal(dismissedKeyboard.inline_keyboard[0]?.[0]?.text, 'Change region');
+  assert.equal(dismissedKeyboard.inline_keyboard[0]?.[1]?.text, 'Report issue');
+  assert.equal(dismissedKeyboard.inline_keyboard[1]?.[0]?.text, '🗂 My keys');
+  assert.equal(dismissedKeyboard.inline_keyboard[1]?.[1]?.text, '💎 Premium center');
 });
 
 test('support hub summary stays compact and removes the old bullet wall', () => {
@@ -790,7 +823,8 @@ test('premium support detail stays compact and avoids timeline dumps', () => {
   assert.match(message, /Pending • 🕒 Admin reviewing/);
   assert.match(message, /Next step:/);
   assert.match(message, /Last reply/);
-  assert.match(message, /Wait for admin review\. More detail may be requested\./);
+  assert.match(message, /Use Check status to refresh, or Reply if you need to add more detail\./);
+  assert.match(message, /Requested Apr 20, 2026, 05:00 PM/);
   assert.doesNotMatch(message, /What happens next/);
   assert.doesNotMatch(message, /Timeline/i);
   assert.doesNotMatch(message, /Follow-up history/i);

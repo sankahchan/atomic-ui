@@ -512,8 +512,8 @@ export async function escalateTelegramSupportThreadToPanel(input: {
   const message =
     input.customerMessage?.trim()
     || (locale === 'my'
-      ? 'ဤ issue ကို dashboard panel သို့ escalate လုပ်ထားပါသည်။ Panel ထဲမှ review ဆက်လုပ်ပါမည်။'
-      : 'This issue has been escalated to the dashboard panel for deeper review.');
+      ? 'ဤ issue ကို dashboard panel သို့ escalate လုပ်ထားပါသည်။ Review ကို panel ထဲမှာ ဆက်လုပ်မည်ဖြစ်ပြီး၊ အပြောင်းအလဲရှိပါက ဒီ chat မှာပဲ အသေးစိတ် ထပ်ပို့နိုင်ပါသည်။'
+      : 'This issue has been escalated to the dashboard panel for deeper review. If anything changes, add more detail here in this chat.');
 
   await addTelegramSupportReply({
     threadId: thread.id,

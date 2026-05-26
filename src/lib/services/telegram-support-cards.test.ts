@@ -7,6 +7,7 @@ import {
   buildTelegramSupportThreadKeyboard,
 } from '@/lib/services/telegram-support-cards';
 import {
+  buildTelegramCommerceViewCallbackData,
   buildTelegramMenuCallbackData,
   buildTelegramSupportThreadCallbackData,
 } from '@/lib/services/telegram-callbacks';
@@ -44,6 +45,15 @@ test('support thread keyboard adapts the primary CTA to thread state', () => {
 
   assert.equal(waitingOnUser.inline_keyboard[0]?.[0]?.text, '✍️ အချက်အလက် ထပ်ပို့မည်');
   assert.equal(waitingOnUser.inline_keyboard[0]?.[1]?.text, '🧵 ကျွန်ုပ်၏ စာတွဲများ');
+
+  const escalated = buildTelegramSupportThreadKeyboard({
+    locale: 'en',
+    threadId: 'thread_789',
+    threadStatus: 'ESCALATED',
+    waitingOn: 'ADMIN',
+  });
+
+  assert.equal(escalated.inline_keyboard[0]?.[0]?.text, '✍️ Add detail');
 });
 
 test('support status summary keyboard offers direct category shortcuts', () => {
@@ -65,11 +75,13 @@ test('support status summary keyboard offers direct category shortcuts', () => {
   assert.equal(keyboard.inline_keyboard[3]?.[0]?.text, '🛠 Server / route');
   assert.equal(keyboard.inline_keyboard[3]?.[1]?.text, '💳 Billing / coupon');
   assert.equal(keyboard.inline_keyboard[4]?.[0]?.text, '💬 General help');
+  assert.equal(keyboard.inline_keyboard[4]?.[1]?.text, '💎 Premium center');
   assert.equal(
     keyboard.inline_keyboard[4]?.[1]?.callback_data,
-    buildTelegramMenuCallbackData('support', 'home'),
+    buildTelegramCommerceViewCallbackData('premium', 'home', '1'),
   );
   assert.equal(keyboard.inline_keyboard[5]?.[0]?.text, '🗂 My keys');
+  assert.equal(keyboard.inline_keyboard[5]?.[1]?.text, '🛟 Support hub');
   assert.equal(keyboard.inline_keyboard[6]?.[0]?.url, 'https://t.me/outlineadminsupport');
 });
 
