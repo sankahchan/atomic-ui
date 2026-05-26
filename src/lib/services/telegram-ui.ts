@@ -722,11 +722,17 @@ export function getTelegramUi(locale: SupportedLocale) {
     orderSupportHint: isMyanmar
       ? 'အတည်ပြုမခံရသေးခင် မည်သည့်အချိန်မဆို /cancel ဖြင့် လက်ရှိ order ကို ပယ်ဖျက်နိုင်ပါသည်။'
       : 'Before approval, you can cancel the current order at any time with /cancel.',
+    orderAwaitingProofHint: isMyanmar
+      ? 'ငွေပေးချေမှု လမ်းညွှန်ကို ပြန်ဖွင့်လိုပါက အောက်က button ကို သုံးပြီး screenshot တစ်ပုံကို ဒီ chat ထဲပို့ပါ။'
+      : 'Use the payment guide button below if you need the transfer details again, then send one screenshot in this chat.',
+    orderPendingReviewHint: isMyanmar
+      ? 'စစ်ဆေးမှု စတင်ပြီးပါပြီ။ Update ကို ကြည့်ရန် Check status ကို သုံးပြီး screenshot အစားထိုးလိုပါကသာ proof ကို ပြန်ပို့ပါ။'
+      : 'Review has started. Use Check status for updates, and resend proof only if you need to replace the screenshot.',
     orderActionPayNow: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Pay now',
     orderActionAlreadyPaid: isMyanmar ? 'ငွေပေးချေပြီးပါပြီ' : 'I already paid',
     orderActionViewPaymentGuide: isMyanmar ? 'ငွေပေးချေမှု လမ်းညွှန်' : 'Payment guide',
     orderActionUploadProof: isMyanmar ? 'စခရင်ရှော့ ပို့ရန်' : 'Upload screenshot',
-    orderActionReplaceProof: isMyanmar ? 'စခရင်ရှော့ အသစ်နဲ့ အစားထိုးရန်' : 'Replace screenshot',
+    orderActionReplaceProof: isMyanmar ? 'စခရင်ရှော့ ပြန်ပို့ရန်' : 'Resend proof',
     orderActionCheckStatus: isMyanmar ? 'အခြေအနေ စစ်ရန်' : 'Check status',
     orderActionRequestRefund: isMyanmar ? 'ငွေပြန်အမ်းမှု တောင်းဆိုရန်' : 'Request refund',
     orderActionCancel: isMyanmar ? 'အော်ဒါ ပယ်ရန်' : 'Cancel order',

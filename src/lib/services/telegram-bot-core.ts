@@ -475,6 +475,7 @@ export function buildTelegramSalesPlanPromptText(locale: SupportedLocale, lines:
 export function buildTelegramSalesPaymentPrompt(input: {
   locale: SupportedLocale;
   orderCode: string;
+  orderStatus?: string | null;
   planSummary: string;
   paymentInstructions: string;
   paymentMethod?: TelegramSalesPaymentMethod | null;
@@ -576,6 +577,22 @@ export function buildTelegramSalesPaymentPrompt(input: {
       : '🧾 Send one clear screenshot showing the amount and transfer details.',
   );
 
+  if (input.orderStatus === 'PENDING_REVIEW') {
+    lines.push(
+      '',
+      escapeHtml(ui.orderPendingReviewHint),
+    );
+  } else if (input.orderStatus === 'AWAITING_PAYMENT_PROOF') {
+    lines.push(
+      '',
+      escapeHtml(
+        isMyanmar
+          ? 'Screenshot ပို့ပြီးနောက် latest state ကို သိလိုပါက အောက်က Check status button ကို သုံးနိုင်ပါသည်။'
+          : 'After you send the screenshot, use Check status below if you want the latest review state.',
+      ),
+    );
+  }
+
   if (input.supportLink) {
     lines.push(
       '',
@@ -618,6 +635,7 @@ export async function sendTelegramOrderPaymentPromptCard(input: {
     buildTelegramSalesPaymentPrompt({
       locale: input.locale,
       orderCode: input.orderCode,
+      orderStatus: input.order.status,
       planSummary: input.planSummary,
       paymentInstructions: input.paymentInstructions,
       paymentMethod: input.paymentMethod,
@@ -1284,15 +1302,11 @@ export function buildTelegramOrderActionKeyboard(input: {
   }
 
   if (
-    input.order.status === 'AWAITING_PAYMENT_PROOF' ||
-    input.order.status === 'PENDING_REVIEW'
+    input.order.status === 'AWAITING_PAYMENT_PROOF'
   ) {
     rows.push([
       {
-        text:
-          input.order.status === 'PENDING_REVIEW'
-            ? ui.orderActionReplaceProof
-            : ui.orderActionUploadProof,
+        text: ui.orderActionViewPaymentGuide,
         callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
       },
       ...(input.order.paymentMethodCode
@@ -1309,6 +1323,28 @@ export function buildTelegramOrderActionKeyboard(input: {
       {
         text: ui.orderActionCheckStatus,
         callback_data: buildTelegramOrderActionCallbackData('st', input.order.id),
+      },
+      ...(supportButton ? [supportButton] : []),
+    ]);
+    rows.push([ordersButton]);
+    hasCheckStatusRow = true;
+  }
+
+  if (input.order.status === 'PENDING_REVIEW') {
+    rows.push([
+      {
+        text: ui.orderActionCheckStatus,
+        callback_data: buildTelegramOrderActionCallbackData('st', input.order.id),
+      },
+      {
+        text: ui.orderActionReplaceProof,
+        callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
+      },
+    ]);
+    rows.push([
+      {
+        text: ui.orderActionViewPaymentGuide,
+        callback_data: buildTelegramOrderActionCallbackData('up', input.order.id),
       },
       ...(supportButton ? [supportButton] : []),
     ]);
