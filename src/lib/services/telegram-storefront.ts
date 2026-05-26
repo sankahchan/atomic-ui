@@ -2311,7 +2311,42 @@ export function buildTelegramStoreActiveKeysView(
             },
           ]
         )),
-        [{ text: isMyanmar ? '➕  အစီအစဉ်အသစ် ဝယ်မည်' : '➕  Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+        [
+          { text: isMyanmar ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup Guide', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }) },
+          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+        ],
+        [
+          { text: isMyanmar ? '➕  အစီအစဉ်အသစ် ဝယ်မည်' : '➕  Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
+          { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+        ],
+      ],
+    },
+  };
+}
+
+export function buildTelegramStoreMyKeysEmptyView(locale: SupportedLocale = 'en') {
+  const isMyanmar = locale === 'my';
+  return {
+    text: [
+      isMyanmar ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      '',
+      isMyanmar ? 'Active key မရှိသေးပါ\\.' : 'No active keys right now\\.',
+      '',
+      isMyanmar
+        ? 'ပထမဦးစွာ plan တစ်ခုဝယ်ပါ။ Activate ဖြစ်ပြီးနောက် setup, QR, renew ကို ဒီနေရာမှ ဖွင့်နိုင်ပါမည်\\.'
+        : 'Buy a plan first. After activation, setup, QR, and renew actions will open from here\\.',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: isMyanmar ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
+          { text: isMyanmar ? '❓ အကူအညီ' : '❓ Help', callback_data: buildTelegramStorefrontCallbackData({ action: 'help' }) },
+        ],
+        [
+          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+          { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+        ],
       ],
     },
   };
@@ -2721,10 +2756,16 @@ export function buildTelegramStoreKeyPageView(input: {
     }]);
   }
 
-  inlineKeyboard.push([{
-    text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Back to Menu',
-    callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
-  }]);
+  inlineKeyboard.push([
+    {
+      text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
+    },
+    {
+      text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Back to Menu',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }),
+    },
+  ]);
 
   const lines = [
     isTrial
@@ -3004,6 +3045,7 @@ export function buildTelegramStorePlatformSelectView(input: {
       isMyanmar ? '🔧 *အဆင့်မြင့်သုံးစွဲသူများ*   →  Hiddify / V2Ray' : '🔧 *Power Users*   →  Hiddify or V2Ray',
       '',
       isMyanmar ? 'သင်အသုံးပြုနေသော စက်ပစ္စည်းကို ရွေးပါ 👇' : 'Which device are you on? 👇',
+      isMyanmar ? 'မဖွင့်ရသေးလျှင် QR သို့မဟုတ် Support ကို အောက်မှသုံးနိုင်ပါသည်\\.' : 'If the app link does not open, use QR or Support below\\.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
@@ -3043,13 +3085,32 @@ export function buildTelegramStorePlatformSelectView(input: {
             }),
           },
         ],
-        [{
-          text: isMyanmar ? '◀ ပြန်မည်' : '◀ Back',
-          callback_data: buildTelegramStorefrontCallbackData({
-            action: 'key_page',
-            keyId: input.keyId,
-          }),
-        }],
+        [
+          {
+            text: isMyanmar ? '🧩 QR ကုဒ်' : '🧩 QR Code',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'show_qr',
+              keyId: input.keyId,
+            }),
+          },
+          {
+            text: isMyanmar ? '💬 အကူအညီ' : '💬 Support',
+            callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
+          },
+        ],
+        [
+          {
+            text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys',
+            callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
+          },
+          {
+            text: isMyanmar ? '◀ ပြန်မည်' : '◀ Back',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'key_page',
+              keyId: input.keyId,
+            }),
+          },
+        ],
       ],
     },
   };
@@ -3080,6 +3141,9 @@ export function buildTelegramStorePlatformGuideView(input: {
       isMyanmar
         ? '💡 _ပထမဆုံးအသုံးပြုခြင်းဆိုလျှင် Outline ကိုသုံးပါ — တစ်ချက်နှိပ်ရုံဖြင့် ချိတ်ဆက်နိုင်သည်\\._'
         : '💡 _First time? Use Outline — one tap to connect\\._',
+      isMyanmar
+        ? 'မအလုပ်ဖြစ်သေးလျှင် QR ကို သုံးပါ သို့မဟုတ် Support ကို ဆက်သွယ်ပါ\\.'
+        : 'If this still does not open, use the QR option or contact Support\\.',
     ].join('\n').trim(),
     replyMarkup: {
       inline_keyboard: [
@@ -3092,13 +3156,32 @@ export function buildTelegramStorePlatformGuideView(input: {
             platform: button.platform,
           }),
         })),
-        [{
-          text: isMyanmar ? '◀ ပြန်မည်' : '◀ Back',
-          callback_data: buildTelegramStorefrontCallbackData({
-            action: 'platform_select',
-            keyId: input.keyId,
-          }),
-        }],
+        [
+          {
+            text: isMyanmar ? '🧩 QR ကုဒ်' : '🧩 QR Code',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'show_qr',
+              keyId: input.keyId,
+            }),
+          },
+          {
+            text: isMyanmar ? '💬 အကူအညီ' : '💬 Support',
+            callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
+          },
+        ],
+        [
+          {
+            text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys',
+            callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
+          },
+          {
+            text: isMyanmar ? '◀ ပြန်မည်' : '◀ Back',
+            callback_data: buildTelegramStorefrontCallbackData({
+              action: 'platform_select',
+              keyId: input.keyId,
+            }),
+          },
+        ],
       ],
     },
   };
@@ -3294,6 +3377,16 @@ export function buildTelegramStoreSupportContactView(input: {
       },
     ],
   ];
+  rows.push([
+    {
+      text: input.locale === 'my' ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup Guide',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }),
+    },
+    {
+      text: input.locale === 'my' ? '🔑 သော့များ' : '🔑 My Keys',
+      callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
+    },
+  ]);
   if (input.supportUrl?.trim()) {
     rows.push([{ text: input.locale === 'my' ? '💬 စီမံသူ စကားပြောခန်းကို ဖွင့်မည်' : '💬 Open Admin Chat', url: input.supportUrl.trim() }]);
   }
@@ -3316,14 +3409,13 @@ export function buildTelegramStoreHelpView(input?: {
   const isMyanmar = locale === 'my';
   return {
     text: [
-      isMyanmar ? '❓ *အကူအညီ & FAQ*' : '❓ *Help & FAQ*',
+      isMyanmar ? '❓ *အကူအညီ & Setup*' : '❓ *Help & Setup*',
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      isMyanmar ? '📲 ချိတ်ဆက်နည်း   :  /setup' : '📲 Connect      :  /setup',
-      isMyanmar ? '🔑 သော့များ        :  /mykeys' : '🔑 My keys      :  /mykeys',
-      isMyanmar ? '🔄 သက်တမ်းတိုး    :  /renew' : '🔄 Renew        :  /renew',
-      isMyanmar ? '🌍 ဆာဗာပြောင်းရန် :  /switchserver' : '🌍 Switch       :  /switchserver',
-      isMyanmar ? `💬 အကူအညီ        :  ${escapeTelegramMarkdownV2(supportHandle)}` : `💬 Support      :  ${escapeTelegramMarkdownV2(supportHandle)}`,
+      isMyanmar ? '🔑 Active key မရှိသေးလျှင် plan ကို အရင်ဝယ်ပါ\\.' : '🔑 If you do not have an active key yet, buy a plan first\\.',
+      isMyanmar ? '📲 Key ရှိပြီးသားဆိုလျှင် Setup Guide သို့မဟုတ် My Keys ကို ဖွင့်ပါ\\.' : '📲 If you already have a key, open Setup Guide or My Keys\\.',
+      isMyanmar ? '🧩 Renew, switch, QR လိုပါက key အသေးစိတ်ကနေ ဆက်လုပ်ပါ\\.' : '🧩 For renew, switch, or QR, open the key detail card\\.',
+      isMyanmar ? `💬 လူဖြင့်ကူညီလိုပါက ${escapeTelegramMarkdownV2(supportHandle)} ကို သုံးပါ\\.` : `💬 For a human handoff, use ${escapeTelegramMarkdownV2(supportHandle)}\\.`,
       '',
       isMyanmar ? 'အောက်မှ shortcut ကိုနှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည် 👇' : 'Tap a shortcut below to continue 👇',
     ].join('\n'),
@@ -3357,6 +3449,7 @@ export function buildTelegramStoreSetupHomeView(locale: SupportedLocale = 'en') 
       isMyanmar ? '🔧 *အဆင့်မြင့်သုံးစွဲသူများ*   →  Hiddify / V2Ray' : '🔧 *Power Users*   →  Hiddify or V2Ray',
       '',
       isMyanmar ? 'သင်အသုံးပြုနေသော စက်ပစ္စည်းကို ရွေးပါ 👇' : 'Which device are you on? 👇',
+      isMyanmar ? 'သော့စာရင်း သို့မဟုတ် အကူအညီလိုပါက အောက်က shortcut များကို သုံးနိုင်ပါသည်\\.' : 'Use the shortcuts below if you need your key list or setup help\\.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
@@ -3369,6 +3462,11 @@ export function buildTelegramStoreSetupHomeView(locale: SupportedLocale = 'en') 
           { text: '🍏 macOS', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_platform', platform: 'macos' }) },
         ],
         [
+          { text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
+          { text: isMyanmar ? '❓ အကူအညီ' : '❓ Help', callback_data: buildTelegramStorefrontCallbackData({ action: 'help' }) },
+        ],
+        [
+          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
           { text: isMyanmar ? '◀ ပြန်မည်' : '◀ Back', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
         ],
       ],
@@ -3393,6 +3491,7 @@ export function buildTelegramStoreSetupKeyPickerView(input: {
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
       isMyanmar ? 'ဤစက်ပစ္စည်းတွင် ဖွင့်မည့် အသုံးပြုနေသော သော့ကို ရွေးပါ 👇' : 'Choose which active key you want to open on this device 👇',
+      isMyanmar ? 'မတွေ့သေးလျှင် My Keys သို့မဟုတ် Support ကို သုံးပါ\\.' : 'Use My Keys or Support if you need a different route\\.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
@@ -3407,7 +3506,11 @@ export function buildTelegramStoreSetupKeyPickerView(input: {
           },
         ]),
         [
+          { text: isMyanmar ? '◀ စက်ပစ္စည်းများ' : '◀ Devices', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }) },
           { text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
+        ],
+        [
+          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
           { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
         ],
       ],
@@ -3424,15 +3527,20 @@ export function buildTelegramStoreSetupNoKeyView(locale: SupportedLocale = 'en')
       '',
       isMyanmar ? 'သင့်တွင် အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'You do not have an active key yet\\.',
       '',
-      isMyanmar ? 'အစီအစဉ်ဝယ်ပြီးနောက် *သော့များ* ကိုနှိပ်ပါ သို့မဟုတ် အောက်မှ အစီအစဉ်များကို ကြည့်ပါ\\.' : 'Tap *My Keys* after you buy a plan, or browse plans below\\.',
+      isMyanmar
+        ? 'ပထမဦးစွာ plan တစ်ခုဝယ်ပါ။ Activate ဖြစ်ပြီးနောက် setup link ကို *သော့များ* မှ ဖွင့်နိုင်ပါမည်\\.'
+        : 'Buy a plan first. After activation, open your setup link from *My Keys*\\.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
         [
-          { text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
           { text: isMyanmar ? '🛒 အစီအစဉ်များကို ကြည့်မည်' : '🛒 View Plans', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
+          { text: isMyanmar ? '❓ အကူအညီ' : '❓ Help', callback_data: buildTelegramStorefrontCallbackData({ action: 'help' }) },
         ],
-        [{ text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
+        [
+          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+          { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+        ],
       ],
     },
   };

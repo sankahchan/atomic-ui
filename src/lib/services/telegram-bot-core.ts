@@ -314,6 +314,7 @@ import {
   buildTelegramStoreKeyPageView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreMyAccountView,
+  buildTelegramStoreMyKeysEmptyView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
   buildTelegramStorePlatformGuideView,
@@ -6517,27 +6518,13 @@ export async function handleTelegramCallbackQuery(
           });
 
           if (items.length === 0) {
-            const text = [
-              locale === 'my' ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
-              '━━━━━━━━━━━━━━━━━━━━━━━━━━',
-              '',
-              locale === 'my' ? 'Active key မရှိသေးပါ\\.' : 'No active keys right now\\.',
-              '',
-              locale === 'my' ? 'အောက်မှ နှိပ်ပြီး plan အသစ်ဝယ်ပါ\\.' : 'Tap below to buy a new plan\\.',
-            ].join('\n');
+            const view = buildTelegramStoreMyKeysEmptyView(locale);
             await sendOrEditTelegramMarkdownView({
               botToken: config.botToken,
               chatId,
               messageId,
-              text,
-              replyMarkup: {
-                inline_keyboard: [[
-                  {
-                    text: locale === 'my' ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan',
-                    callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
-                  },
-                ]],
-              },
+              text: view.text,
+              replyMarkup: view.replyMarkup,
             });
           } else {
             const view = buildTelegramStoreActiveKeysView(items, locale);

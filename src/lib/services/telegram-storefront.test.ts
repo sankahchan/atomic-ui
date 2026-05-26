@@ -12,11 +12,14 @@ import {
   buildTelegramStoreTrialKeyPageView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreMyAccountView,
+  buildTelegramStoreMyKeysEmptyView,
   buildTelegramStoreOrderSummaryView,
   buildTelegramStorePlanListView,
   buildTelegramStoreQuickStatusView,
   buildTelegramStoreRenewView,
   buildTelegramStoreHelpView,
+  buildTelegramStoreSetupHomeView,
+  buildTelegramStoreSetupNoKeyView,
   buildTelegramStoreSupportContactView,
   buildTelegramStorefrontCallbackData,
   parseTelegramStorefrontCallbackData,
@@ -262,7 +265,8 @@ test('storefront views localize Burmese copy for the main menu and setup flow', 
 
   assert.match(setup.text, /ချိတ်ဆက်ရန် \*၂ မိနစ်မပြည့်\* အချိန်သာလိုသည်/);
   assert.match(setup.text, /သင်၏ သော့/);
-  assert.equal(setup.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀ ပြန်မည်');
+  assert.equal(setup.replyMarkup.inline_keyboard[2]?.[0]?.text, '🧩 QR ကုဒ်');
+  assert.equal(setup.replyMarkup.inline_keyboard[3]?.[1]?.text, '◀ ပြန်မည်');
 });
 
 test('store usage bars use color semantics and account summary stays compact', () => {
@@ -324,22 +328,23 @@ test('store help view stays short and action-oriented', () => {
     supportUrl: 'https://t.me/outlineadminsupport',
   });
 
-  assert.match(help.text, /📲 Connect\s+:  \/setup/);
-  assert.match(help.text, /🔑 My keys\s+:  \/mykeys/);
-  assert.match(help.text, /🔄 Renew\s+:  \/renew/);
-  assert.match(help.text, /🌍 Switch\s+:  \/switchserver/);
-  assert.match(help.text, /💬 Support\s+:  @outlineadminsupport/);
-  assert.doesNotMatch(help.text, /How do I connect\?/);
+  assert.match(help.text, /If you do not have an active key yet, buy a plan first/);
+  assert.match(help.text, /open Setup Guide or My Keys/);
+  assert.match(help.text, /open the key detail card/);
+  assert.match(help.text, /@outlineadminsupport/);
+  assert.doesNotMatch(help.text, /\/switchserver/);
   assert.ok(help.text.split('\n').length <= 10);
+  assert.equal(help.replyMarkup.inline_keyboard[0]?.[0]?.text, '📲 Setup Guide');
+  assert.equal(help.replyMarkup.inline_keyboard[0]?.[1]?.text, '🔑 My Keys');
   assert.equal(help.replyMarkup.inline_keyboard[1]?.[0]?.text, '🛒 View Plans');
 
   const helpMyanmar = buildTelegramStoreHelpView({
     locale: 'my',
     supportUrl: 'https://t.me/outlineadminsupport',
   });
-  assert.match(helpMyanmar.text, /📲 ချိတ်ဆက်နည်း/);
-  assert.match(helpMyanmar.text, /🔄 သက်တမ်းတိုး/);
-  assert.match(helpMyanmar.text, /💬 အကူအညီ/);
+  assert.match(helpMyanmar.text, /အကူအညီ & Setup/);
+  assert.match(helpMyanmar.text, /Setup Guide သို့မဟုတ် My Keys/);
+  assert.match(helpMyanmar.text, /လူဖြင့်ကူညီလိုပါက/);
 });
 
 test('store plan list keeps the fixed 9-plan catalog and dynamic ultra pricing', () => {
@@ -443,7 +448,10 @@ test('store order summary and active keys keep the polished storefront labels', 
   assert.match(active.text, /Tap a key below to open details/);
   assert.equal(active.replyMarkup.inline_keyboard[0]?.[0]?.text, '📄 Open 🪨 Basic');
   assert.equal(active.replyMarkup.inline_keyboard[0]?.[1]?.text, '🔄 Renew');
-  assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '➕  Buy New Plan');
+  assert.equal(active.replyMarkup.inline_keyboard[1]?.[0]?.text, '📲 Setup Guide');
+  assert.equal(active.replyMarkup.inline_keyboard[1]?.[1]?.text, '💬 Support');
+  assert.equal(active.replyMarkup.inline_keyboard[2]?.[0]?.text, '➕  Buy New Plan');
+  assert.equal(active.replyMarkup.inline_keyboard[2]?.[1]?.text, '🏠 Menu');
 });
 
 test('store renew summary keeps the current key and support one tap away', () => {
@@ -530,6 +538,8 @@ test('store paid key detail screen becomes a persistent hub', () => {
     paid.replyMarkup.inline_keyboard[5]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
   );
+  assert.equal(paid.replyMarkup.inline_keyboard[6]?.[0]?.text, '🔑 My Keys');
+  assert.equal(paid.replyMarkup.inline_keyboard[6]?.[1]?.text, '🏠 Back to Menu');
 });
 
 test('store order confirmed and trial activated screens keep direct setup shortcuts', () => {
@@ -590,10 +600,13 @@ test('store setup guide platform select and platform screens keep key-specific c
   assert.match(select.text, /Setting up takes less than \*2 minutes\*/);
   assert.match(select.text, /Your key works on all devices/);
   assert.match(select.text, /`ss:\/\/example-key`/);
+  assert.match(select.text, /use QR or Support below/);
   assert.equal(select.replyMarkup.inline_keyboard[0]?.[0]?.text, '🤖 Android');
-  assert.equal(select.replyMarkup.inline_keyboard[2]?.[0]?.text, '◀ Back');
+  assert.equal(select.replyMarkup.inline_keyboard[2]?.[0]?.text, '🧩 QR Code');
+  assert.equal(select.replyMarkup.inline_keyboard[2]?.[1]?.text, '💬 Support');
+  assert.equal(select.replyMarkup.inline_keyboard[3]?.[0]?.text, '🔑 My Keys');
   assert.equal(
-    select.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
+    select.replyMarkup.inline_keyboard[3]?.[1]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'key_page', keyId: 'key_123' }),
   );
 
@@ -608,18 +621,40 @@ test('store setup guide platform select and platform screens keep key-specific c
   assert.match(guide.text, /Download your app/);
   assert.match(guide.text, /🔵 OUTLINE/);
   assert.match(guide.text, /Tap \*Connect\* 🟢/);
+  assert.match(guide.text, /use the QR option or contact Support/);
   const download1 = guide.replyMarkup.inline_keyboard[0]?.[0];
   const download2 = guide.replyMarkup.inline_keyboard[1]?.[0];
   const download3 = guide.replyMarkup.inline_keyboard[2]?.[0];
-  const backButton = guide.replyMarkup.inline_keyboard[4]?.[0];
+  const backButton = guide.replyMarkup.inline_keyboard[5]?.[1];
   assert.equal(download1 && 'url' in download1 ? download1.url : null, 'https://play.google.com/store/apps/details?id=org.outline.android.client');
   assert.equal(download2 && 'url' in download2 ? download2.url : null, 'https://play.google.com/store/apps/details?id=app.hiddify.com');
   assert.equal(download3 && 'url' in download3 ? download3.url : null, 'https://play.google.com/store/apps/details?id=com.v2ray.ang');
   assert.equal(guide.replyMarkup.inline_keyboard[3]?.length, 3);
+  assert.equal(guide.replyMarkup.inline_keyboard[4]?.[0]?.text, '🧩 QR Code');
+  assert.equal(guide.replyMarkup.inline_keyboard[5]?.[0]?.text, '🔑 My Keys');
   assert.equal(
     backButton && 'callback_data' in backButton ? backButton.callback_data : null,
     buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
   );
+});
+
+test('store no-key states explain the first setup steps clearly', () => {
+  const myKeysEmpty = buildTelegramStoreMyKeysEmptyView();
+  assert.match(myKeysEmpty.text, /No active keys right now/);
+  assert.match(myKeysEmpty.text, /setup, QR, and renew actions will open from here/);
+  assert.equal(myKeysEmpty.replyMarkup.inline_keyboard[0]?.[0]?.text, '➕ Buy New Plan');
+  assert.equal(myKeysEmpty.replyMarkup.inline_keyboard[0]?.[1]?.text, '❓ Help');
+
+  const setupNoKey = buildTelegramStoreSetupNoKeyView();
+  assert.match(setupNoKey.text, /Buy a plan first/);
+  assert.match(setupNoKey.text, /open your setup link from \*My Keys\*/);
+  assert.equal(setupNoKey.replyMarkup.inline_keyboard[0]?.[0]?.text, '🛒 View Plans');
+  assert.equal(setupNoKey.replyMarkup.inline_keyboard[0]?.[1]?.text, '❓ Help');
+
+  const setupHome = buildTelegramStoreSetupHomeView();
+  assert.match(setupHome.text, /shortcuts below if you need your key list or setup help/);
+  assert.equal(setupHome.replyMarkup.inline_keyboard[2]?.[0]?.text, '🔑 My Keys');
+  assert.equal(setupHome.replyMarkup.inline_keyboard[2]?.[1]?.text, '❓ Help');
 });
 
 test('storefront callback parser handles setup-guide platform routes', () => {
@@ -715,7 +750,8 @@ test('store support and switch confirmation screens localize Burmese copy', () =
   assert.match(support.text, /အကူအညီ စင်တာ/);
   assert.match(support.text, /ငွေပေးချေမှု/);
   assert.equal(support.replyMarkup.inline_keyboard[0]?.[0]?.text, '💳 ငွေပေးချေမှု');
-  assert.equal(support.replyMarkup.inline_keyboard[2]?.[0]?.text, '💬 စီမံသူ စကားပြောခန်းကို ဖွင့်မည်');
+  assert.equal(support.replyMarkup.inline_keyboard[2]?.[0]?.text, '📲 ချိတ်ဆက်နည်း');
+  assert.equal(support.replyMarkup.inline_keyboard[3]?.[0]?.text, '💬 စီမံသူ စကားပြောခန်းကို ဖွင့်မည်');
 
   const confirmation = buildTelegramStoreSwitchConfirmationView({
     keyId: 'key_123',
