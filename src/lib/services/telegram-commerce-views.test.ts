@@ -406,6 +406,11 @@ test('orders keyboard labels show the next action instead of generic open text',
         status: 'AWAITING_PAYMENT_PROOF',
       },
       {
+        id: 'ord_review',
+        orderCode: 'ORD-REVIEW',
+        status: 'PENDING_REVIEW',
+      },
+      {
         id: 'ord_done',
         orderCode: 'ORD-DONE',
         status: 'FULFILLED',
@@ -420,8 +425,8 @@ test('orders keyboard labels show the next action instead of generic open text',
   const buttonLabels = keyboard.inline_keyboard.flat().map((button) => button.text);
 
   assert.ok(buttonLabels.includes('🟡 ORD-PAY • Pay'));
-  assert.ok(buttonLabels.includes('🟡 ORD-PROOF • Proof'));
-  assert.ok(buttonLabels.includes('🟢 ORD-DONE • Done'));
+  assert.ok(buttonLabels.includes('🟡 ORD-PROOF • Send proof'));
+  assert.ok(buttonLabels.includes('🟣 ORD-REVIEW • Status'));
   assert.match(buttonLabels.join('\n'), /Next/);
   assert.doesNotMatch(buttonLabels.join('\n'), /Open ORD-/);
   assert.ok(buttonLabels.every((label) => label.length <= 36));
@@ -661,7 +666,7 @@ test('support hub summary stays compact and removes the old bullet wall', () => 
   assert.match(message, /Fast lane/);
   assert.doesNotMatch(message, /Best path/);
   assert.doesNotMatch(message, /https?:\/\//);
-  assert.ok(message.split('\n').length <= 20);
+  assert.ok(message.split('\n').length <= 21);
 });
 
 test('support thread detail stays compact and keeps actions out of the text body', () => {
@@ -768,7 +773,7 @@ test('premium support detail stays compact and avoids timeline dumps', () => {
   assert.doesNotMatch(message, /The admin is reviewing your latest message\./);
   assert.doesNotMatch(message, /Request type:|Status: <b>Pending review/);
   assert.doesNotMatch(message, /Current premium pool: <b>.*<\/b>\nRequested region: <b>.*<\/b>\nResolved server: <b>.*<\/b>\nUpdated:/);
-  assert.ok(message.split('\n').length <= 20);
+  assert.ok(message.split('\n').length <= 21);
 });
 
 test('premium region detail stays compact and focuses on routing snapshot', () => {
@@ -901,10 +906,62 @@ test('order detail stays compact and keeps links in buttons', async () => {
   assert.match(message, /Current status/);
   assert.match(message, /Payment & review/);
   assert.match(message, /Notes/);
+  assert.match(message, /Use the payment guide button below if you need the transfer details again/);
   assert.doesNotMatch(message, /Customer note/);
   assert.doesNotMatch(message, /What you can do now/i);
   assert.doesNotMatch(message, /Order timeline/i);
   assert.doesNotMatch(message, /\[Created\]/);
   assert.doesNotMatch(message, /https?:\/\//);
-  assert.ok(message.split('\n').length <= 19);
+  assert.ok(message.split('\n').length <= 21);
+});
+
+test('pending-review order detail explains status-first recovery instead of blind proof resubmits', async () => {
+  const message = await buildTelegramOrderStatusMessage({
+    locale: 'en',
+    order: {
+      id: 'ord_456',
+      orderCode: 'ORD-456',
+      kind: 'NEW',
+      status: 'PENDING_REVIEW',
+      planName: '1 Month / 150 GB',
+      planCode: '1m_150gb',
+      durationMonths: 1,
+      durationDays: null,
+      requestedName: 'Onn',
+      requestedEmail: null,
+      selectedServerName: 'SG-2',
+      selectedServerCountryCode: 'SG',
+      paymentMethodLabel: 'KBZPay',
+      createdAt: new Date('2026-04-20T08:00:00.000Z'),
+      paymentSubmittedAt: new Date('2026-04-20T08:30:00.000Z'),
+      reviewedAt: null,
+      fulfilledAt: null,
+      rejectedAt: null,
+      refundRequestStatus: null,
+      refundRequestedAt: null,
+      refundRequestReviewedAt: null,
+      refundReviewReasonCode: null,
+      customerMessage: null,
+      refundRequestCustomerMessage: null,
+      referralCode: null,
+      orderMode: 'SELF',
+      giftRecipientLabel: null,
+      approvedAccessKeyId: null,
+      targetAccessKeyId: null,
+      approvedDynamicKeyId: null,
+      targetDynamicKeyId: null,
+      financeStatus: 'PAID',
+    } as any,
+    ensureAccessKeySubscriptionToken: async () => 'sub-token',
+    getDynamicKeyMessagingUrls: () => ({
+      sharePageUrl: null,
+      subscriptionUrl: null,
+      outlineClientUrl: null,
+    }),
+  });
+  assert.ok(message);
+
+  assert.match(message, /Proof received • admin review/);
+  assert.match(message, /Review has started\. Use Check status for updates/);
+  assert.doesNotMatch(message, /Upload screenshot/);
 });

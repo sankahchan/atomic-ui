@@ -161,9 +161,9 @@ function buildTelegramOrderListButtonLabel(input: {
     order.status === 'AWAITING_PAYMENT_METHOD'
       ? isMyanmar ? 'ငွေပေးချေမည်' : 'Pay'
       : order.status === 'AWAITING_PAYMENT_PROOF'
-        ? isMyanmar ? 'အထောက်အထား' : 'Proof'
+        ? isMyanmar ? 'ပို့ရန်' : 'Send proof'
         : order.status === 'PENDING_REVIEW' || order.status === 'APPROVED'
-          ? isMyanmar ? 'စစ်ဆေးမည်' : 'Review'
+          ? isMyanmar ? 'အခြေအနေ' : 'Status'
           : order.status === 'FULFILLED'
             ? isMyanmar ? 'ပြီးပါပြီ' : 'Done'
             : order.status === 'REJECTED'
@@ -364,10 +364,10 @@ function buildTelegramOrderProgressSummary(input: {
     return isMyanmar ? 'ပြီးဆုံးပြီး' : 'Delivered';
   }
   if (status === 'PENDING_REVIEW' || status === 'APPROVED') {
-    return isMyanmar ? 'စီမံခန့်ခွဲသူ စစ်ဆေးနေ' : 'Admin review';
+    return isMyanmar ? 'အထောက်အထား ရရှိပြီး • စစ်ဆေးနေ' : 'Proof received • admin review';
   }
   if (status === 'AWAITING_PAYMENT_PROOF') {
-    return isMyanmar ? 'စခရင်ရှော့ တင်ပါ' : 'Upload screenshot';
+    return isMyanmar ? 'စခရင်ရှော့ စောင့်နေ' : 'Waiting for screenshot';
   }
   if (status === 'AWAITING_PAYMENT_METHOD') {
     return isMyanmar ? 'ငွေပေးချေမှုနည်းလမ်းရွေးပါ' : 'Choose payment method';
@@ -785,7 +785,14 @@ export async function buildTelegramOrderStatusMessage(input: {
   }
 
   if (order.status === 'AWAITING_PAYMENT_PROOF' || order.status === 'PENDING_REVIEW') {
-    footerLines.push(ui.orderSupportHint);
+    footerLines.push(
+      escapeHtml(
+        order.status === 'PENDING_REVIEW'
+          ? ui.orderPendingReviewHint
+          : ui.orderAwaitingProofHint,
+      ),
+      escapeHtml(ui.orderSupportHint),
+    );
   }
 
   return buildTelegramCommerceMessage({
