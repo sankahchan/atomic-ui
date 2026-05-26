@@ -319,6 +319,7 @@ import {
   buildTelegramStorePlanListView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
+  buildTelegramStoreQrRecoveryReplyMarkup,
   buildTelegramStoreQuickStatusView,
   buildTelegramStoreReferralView,
   buildTelegramStoreRenewView,
@@ -6690,6 +6691,7 @@ export async function handleTelegramCallbackQuery(
             keyId: keyView.id,
             platform: storefrontAction.platform,
             accessKey: keyView.accessKeyText,
+            showSwitchButton: keyView.showSwitchButton,
             locale,
           });
           await sendOrEditTelegramMarkdownView({
@@ -6730,6 +6732,13 @@ export async function handleTelegramCallbackQuery(
                 chatId,
                 qrBuffer,
                 keyView.kind === 'dynamic' ? ui.dynamicQrCaption : ui.accessQrCaption,
+                {
+                  replyMarkup: buildTelegramStoreQrRecoveryReplyMarkup({
+                    keyId: keyView.id,
+                    showSwitchButton: keyView.showSwitchButton,
+                    locale,
+                  }),
+                },
               );
               await answerTelegramCallbackQuery(
                 config.botToken,
@@ -6780,11 +6789,13 @@ export async function handleTelegramCallbackQuery(
                     keyId: keyView.id,
                     platform: storefrontAction.platform,
                     accessKey: keyView.accessKeyText,
+                    showSwitchButton: keyView.showSwitchButton,
                     locale,
                   })
                 : buildTelegramStorePlatformSelectView({
                     keyId: keyView.id,
                     accessKey: keyView.accessKeyText,
+                    showSwitchButton: keyView.showSwitchButton,
                     locale,
                   });
 
@@ -7298,9 +7309,11 @@ export async function handleTelegramCallbackQuery(
 
           const usedCount = key.switchesUsed + 1;
           const successView = buildTelegramStoreSwitchSuccessView({
+            keyId: key.id,
             newServer: `${targetServer.flag} ${targetServer.name}`,
             used: usedCount,
             maxLabel: key.switchesMaxLabel,
+            allowSwitchAgain: key.switchesMax !== 0 && usedCount < key.switchesMax,
             locale,
           });
           await sendOrEditTelegramMarkdownView({

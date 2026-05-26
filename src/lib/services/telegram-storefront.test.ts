@@ -8,7 +8,9 @@ import {
   buildTelegramStoreOrderConfirmedView,
   buildTelegramStorePlatformGuideView,
   buildTelegramStorePlatformSelectView,
+  buildTelegramStoreQrRecoveryReplyMarkup,
   buildTelegramStoreSwitchConfirmationView,
+  buildTelegramStoreSwitchSuccessView,
   buildTelegramStoreTrialKeyPageView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreMyAccountView,
@@ -266,7 +268,8 @@ test('storefront views localize Burmese copy for the main menu and setup flow', 
   assert.match(setup.text, /ချိတ်ဆက်ရန် \*၂ မိနစ်မပြည့်\* အချိန်သာလိုသည်/);
   assert.match(setup.text, /သင်၏ သော့/);
   assert.equal(setup.replyMarkup.inline_keyboard[2]?.[0]?.text, '🧩 QR ကုဒ်');
-  assert.equal(setup.replyMarkup.inline_keyboard[3]?.[1]?.text, '◀ ပြန်မည်');
+  assert.equal(setup.replyMarkup.inline_keyboard[3]?.[1]?.text, '🔑 သော့များ');
+  assert.equal(setup.replyMarkup.inline_keyboard[4]?.[0]?.text, '◀ ပြန်မည်');
 });
 
 test('store usage bars use color semantics and account summary stays compact', () => {
@@ -594,19 +597,24 @@ test('store setup guide platform select and platform screens keep key-specific c
   const select = buildTelegramStorePlatformSelectView({
     keyId: 'key_123',
     accessKey: 'ss://example-key',
+    showSwitchButton: true,
   });
 
   assert.match(select.text, /📱 \*Let's Get You Connected\\!\*/);
   assert.match(select.text, /Setting up takes less than \*2 minutes\*/);
   assert.match(select.text, /Your key works on all devices/);
   assert.match(select.text, /`ss:\/\/example-key`/);
-  assert.match(select.text, /use QR or Support below/);
+  assert.match(select.text, /use QR, switch server, or Support below/);
   assert.equal(select.replyMarkup.inline_keyboard[0]?.[0]?.text, '🤖 Android');
-  assert.equal(select.replyMarkup.inline_keyboard[2]?.[0]?.text, '🧩 QR Code');
-  assert.equal(select.replyMarkup.inline_keyboard[2]?.[1]?.text, '💬 Support');
-  assert.equal(select.replyMarkup.inline_keyboard[3]?.[0]?.text, '🔑 My Keys');
+  assert.equal(select.replyMarkup.inline_keyboard[2]?.[0]?.text, '🌍 Switch Server');
+  assert.equal(select.replyMarkup.inline_keyboard[2]?.[1]?.text, '🧩 QR Code');
+  assert.equal(select.replyMarkup.inline_keyboard[3]?.[0]?.text, '💬 Support');
   assert.equal(
     select.replyMarkup.inline_keyboard[3]?.[1]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
+  );
+  assert.equal(
+    select.replyMarkup.inline_keyboard[4]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'key_page', keyId: 'key_123' }),
   );
 
@@ -614,6 +622,7 @@ test('store setup guide platform select and platform screens keep key-specific c
     keyId: 'key_123',
     platform: 'android',
     accessKey: 'ss://example-key',
+    showSwitchButton: true,
   });
 
   assert.match(guide.text, /🤖 \*Android  —  You're almost connected\\!\*/);
@@ -621,17 +630,19 @@ test('store setup guide platform select and platform screens keep key-specific c
   assert.match(guide.text, /Download your app/);
   assert.match(guide.text, /🔵 OUTLINE/);
   assert.match(guide.text, /Tap \*Connect\* 🟢/);
-  assert.match(guide.text, /use the QR option or contact Support/);
+  assert.match(guide.text, /use the QR option, switch server, or contact Support/);
   const download1 = guide.replyMarkup.inline_keyboard[0]?.[0];
   const download2 = guide.replyMarkup.inline_keyboard[1]?.[0];
   const download3 = guide.replyMarkup.inline_keyboard[2]?.[0];
-  const backButton = guide.replyMarkup.inline_keyboard[5]?.[1];
+  const backButton = guide.replyMarkup.inline_keyboard[6]?.[0];
   assert.equal(download1 && 'url' in download1 ? download1.url : null, 'https://play.google.com/store/apps/details?id=org.outline.android.client');
   assert.equal(download2 && 'url' in download2 ? download2.url : null, 'https://play.google.com/store/apps/details?id=app.hiddify.com');
   assert.equal(download3 && 'url' in download3 ? download3.url : null, 'https://play.google.com/store/apps/details?id=com.v2ray.ang');
   assert.equal(guide.replyMarkup.inline_keyboard[3]?.length, 3);
-  assert.equal(guide.replyMarkup.inline_keyboard[4]?.[0]?.text, '🧩 QR Code');
-  assert.equal(guide.replyMarkup.inline_keyboard[5]?.[0]?.text, '🔑 My Keys');
+  assert.equal(guide.replyMarkup.inline_keyboard[4]?.[0]?.text, '🌍 Switch Server');
+  assert.equal(guide.replyMarkup.inline_keyboard[4]?.[1]?.text, '🧩 QR Code');
+  assert.equal(guide.replyMarkup.inline_keyboard[5]?.[0]?.text, '💬 Support');
+  assert.equal(guide.replyMarkup.inline_keyboard[5]?.[1]?.text, '🔑 My Keys');
   assert.equal(
     backButton && 'callback_data' in backButton ? backButton.callback_data : null,
     buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
@@ -736,10 +747,73 @@ test('store switch confirmation message is safe for MarkdownV2', () => {
 
   assert.match(confirmation.text, /SG\\-2/);
   assert.match(confirmation.text, /undone\\\./);
+  assert.match(confirmation.text, /reconnect with Setup Guide or the QR path/);
   assert.equal(
     confirmation.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
     buildTelegramStorefrontCallbackData({ action: 'doswitch', keyId: 'key_123', serverId: 'server_456' }),
   );
+});
+
+test('store QR recovery markup keeps setup and switch actions one tap away', () => {
+  const replyMarkup = buildTelegramStoreQrRecoveryReplyMarkup({
+    keyId: 'key_123',
+    showSwitchButton: true,
+  });
+
+  assert.equal(replyMarkup.inline_keyboard[0]?.[0]?.text, '📲 Setup Guide');
+  assert.equal(
+    replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'platform_select', keyId: 'key_123' }),
+  );
+  assert.equal(replyMarkup.inline_keyboard[0]?.[1]?.text, '🌍 Switch Server');
+  assert.equal(
+    replyMarkup.inline_keyboard[0]?.[1]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
+  );
+  assert.equal(replyMarkup.inline_keyboard[1]?.[0]?.text, '🔑 My Keys');
+  assert.equal(
+    replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
+  );
+  assert.equal(replyMarkup.inline_keyboard[1]?.[1]?.text, '💬 Support');
+  assert.equal(
+    replyMarkup.inline_keyboard[1]?.[1]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'support_contact' }),
+  );
+});
+
+test('store switch success view keeps reconnect and recovery exits in context', () => {
+  const success = buildTelegramStoreSwitchSuccessView({
+    keyId: 'key_123',
+    newServer: '🇲🇾 Malaysia',
+    used: 2,
+    maxLabel: '3',
+    allowSwitchAgain: true,
+  });
+
+  assert.match(success.text, /Reopen Setup Guide or use the QR path to reconnect/);
+  assert.equal(success.replyMarkup.inline_keyboard[0]?.[0]?.text, '📲 Setup Guide');
+  assert.equal(success.replyMarkup.inline_keyboard[0]?.[1]?.text, '🧩 QR Code');
+  assert.equal(success.replyMarkup.inline_keyboard[1]?.[0]?.text, '🌍 Switch Again');
+  assert.equal(
+    success.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
+    buildTelegramStorefrontCallbackData({ action: 'switch', keyId: 'key_123' }),
+  );
+  assert.equal(success.replyMarkup.inline_keyboard[1]?.[1]?.text, '💬 Support');
+  assert.equal(success.replyMarkup.inline_keyboard[2]?.[0]?.text, '🔑 My Keys');
+  assert.equal(success.replyMarkup.inline_keyboard[2]?.[1]?.text, '🏠 Back to Menu');
+
+  const finalSwitch = buildTelegramStoreSwitchSuccessView({
+    keyId: 'key_123',
+    newServer: '🇲🇾 Malaysia',
+    used: 3,
+    maxLabel: '3',
+    allowSwitchAgain: false,
+  });
+  assert.equal(finalSwitch.replyMarkup.inline_keyboard[1]?.[0]?.text, '🔑 My Keys');
+  assert.equal(finalSwitch.replyMarkup.inline_keyboard[1]?.[1]?.text, '💬 Support');
+  assert.equal(finalSwitch.replyMarkup.inline_keyboard[2]?.[0]?.text, '🏠 Back to Menu');
+  assert.equal(finalSwitch.replyMarkup.inline_keyboard[2]?.length, 1);
 });
 
 test('store support and switch confirmation screens localize Burmese copy', () => {
@@ -765,5 +839,6 @@ test('store support and switch confirmation screens localize Burmese copy', () =
 
   assert.match(confirmation.text, /ဆာဗာပြောင်းခြင်းကို အတည်ပြုပါ/);
   assert.match(confirmation.text, /ပြန်မလုပ်နိုင်ပါ/);
+  assert.match(confirmation.text, /Setup Guide သို့မဟုတ် QR/);
   assert.equal(confirmation.replyMarkup.inline_keyboard[0]?.[0]?.text, '✅ ပြောင်းမည်');
 });
