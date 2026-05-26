@@ -1094,7 +1094,10 @@ export async function handleRefundCommand(input: {
     summaryMessage,
   );
 
-  for (const { order } of refundableOrders) {
+  for (const order of buildTelegramRefundStatusCardQueue({
+    recentRefundRequests,
+    refundableOrders,
+  })) {
     await input.sendTelegramOrderStatusCard({
       botToken: input.botToken,
       chatId: input.chatId,
@@ -1104,6 +1107,32 @@ export async function handleRefundCommand(input: {
   }
 
   return sentSummary ? null : summaryMessage;
+}
+
+export function buildTelegramRefundStatusCardQueue(input: {
+  recentRefundRequests: Array<TelegramUserOrder>;
+  refundableOrders: Array<{
+    order: TelegramUserOrder;
+    refundEligibility: {
+      usedBytes: bigint | number;
+    };
+  }>;
+}) {
+  const seen = new Set<string>();
+  const queue: TelegramUserOrder[] = [];
+
+  for (const order of [
+    ...input.recentRefundRequests,
+    ...input.refundableOrders.map(({ order }) => order),
+  ]) {
+    if (!order?.id || seen.has(order.id)) {
+      continue;
+    }
+    seen.add(order.id);
+    queue.push(order);
+  }
+
+  return queue;
 }
 
 export function buildTelegramRefundSummaryMessage(input: {
@@ -1160,9 +1189,17 @@ export function buildTelegramRefundSummaryMessage(input: {
     title: ui.refundCenterTitle,
     statsLine: `${input.recentRefundRequests.length} recent • ${input.refundableOrders.length} eligible`,
     intro:
-      input.locale === 'my'
-        ? 'Refund summary ကို အတိုချုံးပြထားသည်။ Refund လုပ်နိုင်သော order card များကို အောက်တွင် ဆက်ပို့ပါမည်။'
-        : 'This refund summary stays short. Eligible order cards are sent below.',
+      input.recentRefundRequests.length > 0 && input.refundableOrders.length > 0
+        ? input.locale === 'my'
+          ? 'Refund summary ကို အတိုချုံးပြထားသည်။ လက်ရှိ request card များနှင့် refund လုပ်နိုင်သော order card များကို အောက်တွင် ဆက်ပို့ပါမည်။'
+          : 'This refund summary stays short. Recent request cards and eligible order cards are sent below.'
+        : input.recentRefundRequests.length > 0
+          ? input.locale === 'my'
+            ? 'Refund summary ကို အတိုချုံးပြထားသည်။ လက်ရှိ request card များကို အောက်တွင် ဆက်ပို့ပါမည်။'
+            : 'This refund summary stays short. Recent refund request cards are sent below.'
+          : input.locale === 'my'
+            ? 'Refund summary ကို အတိုချုံးပြထားသည်။ Refund လုပ်နိုင်သော order card များကို အောက်တွင် ဆက်ပို့ပါမည်။'
+            : 'This refund summary stays short. Eligible order cards are sent below.',
     cards,
     footerLines: [
       ui.refundPolicySummary,
