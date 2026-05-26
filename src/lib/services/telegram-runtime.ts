@@ -1074,6 +1074,9 @@ export async function sendTelegramPhoto(
   chatId: number | string,
   photo: Buffer,
   caption?: string,
+  options?: {
+    replyMarkup?: Record<string, unknown>;
+  },
 ) {
   const preparedCaption =
     caption && caption.trim()
@@ -1095,6 +1098,10 @@ export async function sendTelegramPhoto(
     if (preparedCaption?.text) {
       formData.append('caption', preparedCaption.text);
       formData.append('parse_mode', 'HTML');
+    }
+
+    if (options?.replyMarkup) {
+      formData.append('reply_markup', JSON.stringify(options.replyMarkup));
     }
 
     const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
