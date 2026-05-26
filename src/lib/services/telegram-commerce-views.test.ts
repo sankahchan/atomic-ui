@@ -19,6 +19,7 @@ import {
   buildTelegramPremiumSupportStatusMessage,
 } from '@/lib/services/telegram-premium';
 import {
+  buildTelegramRefundStatusCardQueue,
   buildTelegramOrdersCommerceKeyboard,
   buildTelegramOrderStatusMessage,
   buildTelegramOrdersSummaryMessage,
@@ -505,6 +506,30 @@ test('refund summary stays compact and keeps the center view short', () => {
   assert.match(message, /Eligible now/);
   assert.doesNotMatch(message, /Request refund on one of the order cards below to submit a refund request\./);
   assert.ok(message.split('\n').length <= 16);
+});
+
+test('refund card queue sends recent request cards before eligible cards without duplicates', () => {
+  const queue = buildTelegramRefundStatusCardQueue({
+    recentRefundRequests: [
+      { id: 'ord_recent', orderCode: 'ORD-RECENT' },
+      { id: 'ord_shared', orderCode: 'ORD-SHARED' },
+    ] as any,
+    refundableOrders: [
+      {
+        order: { id: 'ord_shared', orderCode: 'ORD-SHARED' },
+        refundEligibility: { usedBytes: 1024 },
+      },
+      {
+        order: { id: 'ord_eligible', orderCode: 'ORD-ELIGIBLE' },
+        refundEligibility: { usedBytes: 2048 },
+      },
+    ] as any,
+  });
+
+  assert.deepEqual(
+    queue.map((order) => order.id),
+    ['ord_recent', 'ord_shared', 'ord_eligible'],
+  );
 });
 
 test('renew summary stays compact and removes repeated key-type copy', () => {

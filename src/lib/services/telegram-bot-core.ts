@@ -1041,12 +1041,20 @@ function buildTelegramServerChangeSelectionKeyboard(input: {
   };
 }
 
-function buildTelegramServerChangeSupportKeyboard(
+function buildTelegramServerChangeMyKeysButton(locale: SupportedLocale) {
+  return {
+    text: locale === 'my' ? '🗂 Key များ' : '🗂 My Keys',
+    callback_data: buildTelegramCommerceViewCallbackData('keys', 'home', '1'),
+  };
+}
+
+export function buildTelegramServerChangeSupportKeyboard(
   locale: SupportedLocale,
   supportLink?: string | null,
 ) {
   const ui = getTelegramUi(locale);
   const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [[
+    buildTelegramServerChangeMyKeysButton(locale),
     {
       text: ui.orderActionBuyNewKey,
       callback_data: buildTelegramOrderActionCallbackData('by', 'server-change'),
@@ -1067,27 +1075,75 @@ function buildTelegramServerChangeSupportKeyboard(
   };
 }
 
-function buildTelegramServerChangePendingKeyboard(
-  requestId: string,
-  locale: SupportedLocale,
-  supportLink?: string | null,
-) {
-  const ui = getTelegramUi(locale);
-  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [[
-    {
-      text: ui.orderActionCheckStatus,
-      callback_data: buildTelegramServerChangeActionCallbackData('st', requestId),
-    },
-  ]];
+export function buildTelegramServerChangeRequestKeyboard(input: {
+  requestId: string;
+  locale: SupportedLocale;
+  status: string;
+  accessKeyId?: string | null;
+  supportLink?: string | null;
+  canRetry?: boolean;
+}) {
+  const ui = getTelegramUi(input.locale);
+  const myKeysButton = buildTelegramServerChangeMyKeysButton(input.locale);
+  const supportButton = input.supportLink
+    ? {
+        text: ui.getSupport,
+        url: input.supportLink,
+      }
+    : null;
+  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
-  if (supportLink) {
+  if (input.status === 'PENDING_REVIEW' || input.status === 'APPROVED') {
     rows.push([
       {
-        text: ui.getSupport,
-        url: supportLink,
+        text: ui.orderActionCheckStatus,
+        callback_data: buildTelegramServerChangeActionCallbackData('st', input.requestId),
       },
+      ...(supportButton ? [supportButton] : []),
     ]);
+    rows.push([myKeysButton]);
+    return {
+      inline_keyboard: rows,
+    };
   }
+
+  if (input.status === 'REJECTED') {
+    if (input.accessKeyId && input.canRetry) {
+      rows.push([
+        {
+          text: input.locale === 'my' ? '🔁 ဆာဗာကို ပြန်ရွေးမည်' : '🔁 Try another server',
+          callback_data: buildTelegramServerChangeActionCallbackData('ky', input.accessKeyId),
+        },
+        ...(supportButton ? [supportButton] : []),
+      ]);
+      rows.push([
+        myKeysButton,
+        {
+          text: ui.orderActionBuyNewKey,
+          callback_data: buildTelegramOrderActionCallbackData('by', 'server-change'),
+        },
+      ]);
+    } else {
+      rows.push([
+        myKeysButton,
+        {
+          text: ui.orderActionBuyNewKey,
+          callback_data: buildTelegramOrderActionCallbackData('by', 'server-change'),
+        },
+      ]);
+      if (supportButton) {
+        rows.push([supportButton]);
+      }
+    }
+    return {
+      inline_keyboard: rows,
+    };
+  }
+
+  rows.push([
+    myKeysButton,
+    ...(supportButton ? [supportButton] : []),
+  ]);
 
   return {
     inline_keyboard: rows,
@@ -2020,8 +2076,12 @@ function buildTelegramServerChangeStatusMessage(input: {
     requestedServerName: string;
     requestedServerCountryCode?: string | null;
     createdAt: Date;
+    reviewedAt?: Date | null;
+    fulfilledAt?: Date | null;
+    rejectedAt?: Date | null;
     customerMessage?: string | null;
     accessKey: {
+      id: string;
       name: string;
       serverChangeCount: number;
       serverChangeLimit: number;
@@ -2036,6 +2096,48 @@ function buildTelegramServerChangeStatusMessage(input: {
     0,
     request.accessKey.serverChangeLimit - request.accessKey.serverChangeCount,
   );
+  const statusLabel =
+    request.status === 'PENDING_REVIEW'
+      ? input.locale === 'my'
+        ? 'စစ်ဆေးမှု စောင့်ဆိုင်းနေ'
+        : 'Pending review'
+      : request.status === 'APPROVED'
+        ? input.locale === 'my'
+          ? 'အတည်ပြုပြီး အကောင်အထည်ဖော်နေ'
+          : 'Approved and processing'
+        : request.status === 'FULFILLED'
+          ? input.locale === 'my'
+            ? 'ပြောင်းလဲပြီး'
+            : 'Completed'
+          : request.status === 'REJECTED'
+            ? input.locale === 'my'
+              ? 'ငြင်းပယ်ထားသည်'
+              : 'Rejected'
+            : request.status === 'CANCELLED'
+              ? input.locale === 'my'
+                ? 'ပယ်ဖျက်ပြီး'
+                : 'Cancelled'
+              : request.status;
+  const nextStepText =
+    request.status === 'PENDING_REVIEW'
+      ? input.locale === 'my'
+        ? 'Admin စစ်ဆေးမှုကို စောင့်နေပါသည်။ အောက်က Check status နှင့် Support shortcut ကို ဆက်သုံးနိုင်ပါသည်။'
+        : 'Admin review is still pending. Keep using the Check status and Support shortcuts below.'
+      : request.status === 'APPROVED'
+        ? input.locale === 'my'
+          ? 'Request ကို အတည်ပြုပြီးပြောင်းလဲမှု လုပ်ဆောင်နေပါသည်။ Access update ကို ဆက်စောင့်ပါ။'
+          : 'The request is approved and the change is being applied. Wait for the updated access delivery.'
+        : request.status === 'FULFILLED'
+          ? input.locale === 'my'
+            ? 'ပြောင်းလဲမှု ပြီးစီးပါပြီ။ အပ်ဒိတ် access ကို အသုံးပြုရန် My Keys သို့ ပြန်သွားနိုင်ပါသည်။'
+            : 'The change is complete. Go back to My Keys to use the updated access.'
+          : request.status === 'REJECTED'
+            ? input.locale === 'my'
+              ? 'ပြန်လည်တင်လိုပါက ဆာဗာကို ပြန်ရွေးနိုင်ပြီး အသေးစိတ်လိုပါက Support ကို ဆက်သွယ်နိုင်ပါသည်။'
+              : 'You can try another server again, or use Support if you need more detail.'
+            : input.locale === 'my'
+              ? 'အသစ်တောင်းဆိုလိုပါက My Keys မှ ပြန်စနိုင်ပါသည်။'
+              : 'You can start a new request again from My Keys.';
 
   const lines = [
     ui.serverChangeStatusTitle,
@@ -2044,14 +2146,26 @@ function buildTelegramServerChangeStatusMessage(input: {
     `${ui.keyLabel}: <b>${escapeHtml(request.accessKey.name)}</b>`,
     `${ui.currentServerLabel}: <b>${escapeHtml(currentServer)}</b>`,
     `${ui.requestedServerLabel}: <b>${escapeHtml(requestedServer)}</b>`,
-    `${ui.statusLineLabel}: <b>${escapeHtml(request.status)}</b>`,
+    `${ui.statusLineLabel}: <b>${escapeHtml(statusLabel)}</b>`,
     `${ui.remainingChangesLabel}: <b>${remainingChanges}</b>`,
-    `${ui.createdAtLabel}: ${escapeHtml(formatDateTime(request.createdAt))}`,
+    `${ui.createdAtLabel}: ${escapeHtml(formatTelegramDateTime(request.createdAt, input.locale))}`,
   ];
 
-  if (request.customerMessage) {
-    lines.push('', escapeHtml(request.customerMessage));
+  if (request.reviewedAt && request.status !== 'PENDING_REVIEW') {
+    lines.push(`${ui.reviewedAtLabel}: ${escapeHtml(formatTelegramDateTime(request.reviewedAt, input.locale))}`);
   }
+
+  if (request.fulfilledAt) {
+    lines.push(`${ui.fulfilledAtLabel}: ${escapeHtml(formatTelegramDateTime(request.fulfilledAt, input.locale))}`);
+  } else if (request.rejectedAt) {
+    lines.push(`${ui.rejectedAtLabel}: ${escapeHtml(formatTelegramDateTime(request.rejectedAt, input.locale))}`);
+  }
+
+  if (request.customerMessage) {
+    lines.push('', `${input.locale === 'my' ? 'မှတ်ချက်' : 'Note'}: ${escapeHtml(request.customerMessage)}`);
+  }
+
+  lines.push('', `${ui.orderNextStepLabel}: ${escapeHtml(nextStepText)}`);
 
   return lines.join('\n');
 }
@@ -4674,6 +4788,15 @@ export async function rejectTelegramServerChangeRequest(input: {
 }) {
   const request = await db.telegramServerChangeRequest.findUnique({
     where: { id: input.requestId },
+    include: {
+      accessKey: {
+        select: {
+          id: true,
+          serverChangeCount: true,
+          serverChangeLimit: true,
+        },
+      },
+    },
   });
 
   if (!request) {
@@ -4713,7 +4836,14 @@ export async function rejectTelegramServerChangeRequest(input: {
           supportLink,
         ),
         {
-          replyMarkup: getCommandKeyboard(false, locale),
+          replyMarkup: buildTelegramServerChangeRequestKeyboard({
+            requestId: request.id,
+            locale,
+            status: 'REJECTED',
+            accessKeyId: request.accessKey.id,
+            supportLink,
+            canRetry: request.accessKey.serverChangeCount < request.accessKey.serverChangeLimit,
+          }),
         },
       );
     }
@@ -8499,11 +8629,13 @@ export async function handleTelegramCallbackQuery(
                 chatId,
                 ui.serverChangeRequestPending(existingPending.requestCode),
                 {
-                  replyMarkup: buildTelegramServerChangePendingKeyboard(
-                    existingPending.id,
+                  replyMarkup: buildTelegramServerChangeRequestKeyboard({
+                    requestId: existingPending.id,
                     locale,
+                    status: 'PENDING_REVIEW',
+                    accessKeyId: accessKey.id,
                     supportLink,
-                  ),
+                  }),
                 },
               );
               await answerTelegramCallbackQuery(
@@ -8622,11 +8754,13 @@ export async function handleTelegramCallbackQuery(
                 chatId,
                 ui.serverChangeRequestPending(existingPending.requestCode),
                 {
-                  replyMarkup: buildTelegramServerChangePendingKeyboard(
-                    existingPending.id,
+                  replyMarkup: buildTelegramServerChangeRequestKeyboard({
+                    requestId: existingPending.id,
                     locale,
+                    status: 'PENDING_REVIEW',
+                    accessKeyId: accessKey.id,
                     supportLink,
-                  ),
+                  }),
                 },
               );
               await answerTelegramCallbackQuery(
@@ -8656,11 +8790,13 @@ export async function handleTelegramCallbackQuery(
                 `${requestedServer.name}${requestedServer.countryCode ? ` ${getFlagEmoji(requestedServer.countryCode)}` : ''}`,
               ),
               {
-                replyMarkup: buildTelegramServerChangePendingKeyboard(
-                  request.id,
+                replyMarkup: buildTelegramServerChangeRequestKeyboard({
+                  requestId: request.id,
                   locale,
+                  status: 'PENDING_REVIEW',
+                  accessKeyId: accessKey.id,
                   supportLink,
-                ),
+                }),
               },
             );
 
@@ -8694,10 +8830,17 @@ export async function handleTelegramCallbackQuery(
                 request,
               }),
               {
-                replyMarkup:
-                  request.status === 'PENDING_REVIEW'
-                    ? buildTelegramServerChangePendingKeyboard(request.id, locale, supportLink)
-                    : buildTelegramServerChangeSupportKeyboard(locale, supportLink),
+                replyMarkup: buildTelegramServerChangeRequestKeyboard({
+                  requestId: request.id,
+                  locale,
+                  status: request.status,
+                  accessKeyId: request.accessKey.id,
+                  supportLink,
+                  canRetry:
+                    request.status === 'REJECTED'
+                      ? request.accessKey.serverChangeCount < request.accessKey.serverChangeLimit
+                      : false,
+                }),
               },
             );
             await answerTelegramCallbackQuery(
