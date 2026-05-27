@@ -1,3 +1,4 @@
+import { withAbsoluteBasePath } from '@/lib/base-path';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
 import {
@@ -42,61 +43,26 @@ export async function sendTelegramSupportThreadAlertToAdmins(input: {
   }
 
   const latestReply = thread.replies[thread.replies.length - 1] || null;
-  const state = getTelegramSupportThreadState({
-    status: thread.status,
-    waitingOn: thread.waitingOn,
+  const { buildTelegramSupportThreadQueueDetailMessage, buildTelegramSupportThreadQueueReplyKeyboard } =
+    await import('@/lib/services/telegram-support-console');
+  const panelUrl = withAbsoluteBasePath(`/dashboard/support/threads/${encodeURIComponent(thread.id)}`);
+  const message = buildTelegramSupportThreadQueueDetailMessage({
     locale: input.locale,
+    thread,
   });
-  const supportLink = await getTelegramSupportLink();
-  const message = [
-    input.locale === 'my'
-      ? '🛟 <b>Customer support thread ကို အရေးယူရန် လိုအပ်ပါသည်</b>'
-      : '🛟 <b>Customer support thread needs attention</b>',
-    '',
-    `🧵 <b>${escapeHtml(thread.threadCode)}</b>`,
-    `${input.locale === 'my' ? 'အမျိုးအစား' : 'Category'}: <b>${escapeHtml(resolveTelegramSupportIssueLabel(thread.issueCategory, input.locale))}</b>`,
-    `${input.locale === 'my' ? 'အခြေအနေ' : 'State'}: <b>${escapeHtml(state.label)}</b>`,
-    `${input.locale === 'my' ? 'အသုံးပြုသူ' : 'User'}: <b>${escapeHtml(thread.telegramUsername || thread.telegramUserId)}</b>`,
-    ...buildTelegramLatestReplyPreviewLines({
-      reply: latestReply,
-      locale: input.locale,
-      maxLength: 140,
-    }).map((line) => escapeHtml(line)),
-    '',
-    input.locale === 'my'
-      ? 'Reply ပို့ရန် /supportqueue ကို ဖွင့်ပါ။'
-      : 'Open /supportqueue to reply.',
-  ]
-    .filter(Boolean)
-    .join('\n');
 
   for (const adminChatId of config.adminChatIds) {
     await sendTelegramMessage(config.botToken, adminChatId, message, {
-      replyMarkup: {
-        inline_keyboard: [
-          [
-            {
-              text: input.locale === 'my' ? '🛟 Support စာရင်း' : '🛟 Support queue',
-              callback_data: buildTelegramMenuCallbackData('admin', 'supportqueue'),
-            },
-            supportLink
-              ? {
-                  text: input.locale === 'my' ? '🔗 အကူအညီ လင့်ခ်' : '🔗 Support link',
-                  url: supportLink,
-                }
-              : {
-                  text: input.locale === 'my' ? '📋 စစ်ဆေးရန်စာရင်း' : '📋 Review queue',
-                  callback_data: buildTelegramMenuCallbackData('admin', 'reviewqueue'),
-                },
-          ],
-          ...(latestReply?.mediaUrl
-            ? [[{
-                text: input.locale === 'my' ? '🖼 တွဲဖိုင်ဖွင့်မည်' : '🖼 Open attachment',
-                url: latestReply.mediaUrl,
-              }]]
-            : []),
-        ],
-      },
+      replyMarkup: buildTelegramSupportThreadQueueReplyKeyboard({
+        threadId: thread.id,
+        locale: input.locale,
+        panelUrl,
+        mode: 'admin',
+        claimedByMe: false,
+        isClaimed: Boolean(thread.assignedAdminUserId),
+        attachmentUrl: latestReply?.mediaUrl || null,
+        includeDetail: false,
+      }),
     });
   }
 }
