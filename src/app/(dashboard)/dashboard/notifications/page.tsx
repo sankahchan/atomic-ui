@@ -42,6 +42,10 @@ import {
   normalizeTelegramSupportLink,
   type TelegramSalesPlanCode,
 } from '@/lib/services/telegram-sales';
+import {
+  buildTelegramBotProfileUrl,
+  formatTelegramBotUsername,
+} from '@/lib/services/telegram-bot-identity';
 import { trpc } from '@/lib/trpc';
 import { cn, formatBytes, formatDateTime, formatRelativeTime } from '@/lib/utils';
 import {
@@ -156,7 +160,7 @@ type Channel = {
 };
 
 type NotificationWorkspaceId = 'overview' | 'telegram' | 'workflow' | 'channels';
-type TelegramBotSubtabId = 'setup' | 'broadcasts' | 'templates' | 'analytics' | 'history';
+type TelegramBotSubtabId = 'setup' | 'migration' | 'broadcasts' | 'templates' | 'analytics' | 'history';
 type WorkflowSubtabId = 'settings' | 'coupons' | 'guardrails' | 'review' | 'premium';
 
 type DeliveryStatusFilter = 'ALL' | 'SUCCESS' | 'FAILED' | 'SKIPPED';
@@ -200,6 +204,34 @@ type TelegramSettings = {
   digestLookbackHours: number;
   defaultLanguage: 'en' | 'my';
   showLanguageSelectorOnStart: boolean;
+  migrationPlan: TelegramMigrationPlan;
+};
+
+type TelegramMigrationPlan = {
+  enabled: boolean;
+  botToken: string;
+  botUsername: string;
+  announcementMessage: string;
+  cutoverAt: string | null;
+  backupConfirmed: boolean;
+  userNoticeConfirmed: boolean;
+};
+
+type TelegramMigrationReadiness = {
+  currentBotUsername: string | null;
+  migrationBotUsername: string | null;
+  hardCutover: boolean;
+  linkedUsersCount: number;
+  linkedAccessKeysCount: number;
+  linkedDynamicKeysCount: number;
+  reachableIdentityCount: number;
+  activeOrderCount: number;
+  openSupportThreadCount: number;
+  openPremiumRequestCount: number;
+  pendingLinkTokenCount: number;
+  adminChatIdsConfigured: number;
+  adminUsersMissingChatId: number;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
 };
 
 type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM_USERS' | 'TRIAL_USERS' | 'DIRECT_USER';
@@ -597,7 +629,47 @@ const DEFAULT_TELEGRAM_SETTINGS: TelegramSettings = {
   digestLookbackHours: 24,
   defaultLanguage: 'en',
   showLanguageSelectorOnStart: true,
+  migrationPlan: {
+    enabled: false,
+    botToken: '',
+    botUsername: '',
+    announcementMessage: '',
+    cutoverAt: null,
+    backupConfirmed: false,
+    userNoticeConfirmed: false,
+  },
 };
+
+function buildSuggestedTelegramMigrationAnnouncement(input: {
+  isMyanmar: boolean;
+  currentBotUsername?: string | null;
+  nextBotUsername?: string | null;
+  cutoverAt?: string | null;
+}) {
+  const currentBot = input.currentBotUsername?.trim() || '@current_bot';
+  const nextBot = input.nextBotUsername?.trim() || '@new_bot';
+  const cutover = input.cutoverAt?.trim()
+    ? new Date(input.cutoverAt).toLocaleString()
+    : input.isMyanmar
+      ? 'သတ်မှတ်ထားသော cutover အချိန်မတိုင်မီ'
+      : 'before the planned cutover';
+
+  if (input.isMyanmar) {
+    return [
+      `Atomic-UI Telegram bot ကို ${currentBot} မှ ${nextBot} သို့ ပြောင်းရွှေ့နေပါသည်။`,
+      '',
+      `${cutover} မတိုင်မီ ${nextBot} ကို ဖွင့်ပြီး Start နှိပ်ပေးပါ။`,
+      'လက်ရှိ key/link data မပျောက်ပါ၊ သို့သော် bot အသစ်ကို Start မလုပ်မချင်း update များ မရနိုင်ပါ။',
+    ].join('\n');
+  }
+
+  return [
+    `Atomic-UI is moving Telegram support from ${currentBot} to ${nextBot}.`,
+    '',
+    `Please open ${nextBot} and press Start ${cutover}.`,
+    'Your existing keys and linked data stay in place, but the new bot cannot message you until you start it.',
+  ].join('\n');
+}
 
 type TelegramSalesPlanForm = {
   code: TelegramSalesPlanCode;
@@ -1432,6 +1504,45 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     pendingUpdates: isMyanmar ? 'စောင့်ဆိုင်းနေသော အပ်ဒိတ်များ' : 'Pending updates',
     lastError: isMyanmar ? 'နောက်ဆုံးအမှား' : 'Last error',
     commandSurface: isMyanmar ? 'ဘော့အမိန့် မျက်နှာပြင်' : 'Bot command surface',
+    migrationTab: isMyanmar ? 'ဘော့ ပြောင်းရွှေ့မှု' : 'Migration',
+    migrationTitle: isMyanmar ? 'Telegram ဘော့ ပြောင်းရွှေ့မှု' : 'Telegram bot migration',
+    migrationDesc: isMyanmar
+      ? 'ဘော့အသစ် သတ်မှတ်ခြင်း၊ အသုံးပြုသူ ထိခိုက်မှုကို စစ်ဆေးခြင်းနှင့် hard cutover မတိုင်မီ စစ်ဆေးရန် လိုသည့် အရာများကို စုစည်းထားသည်။'
+      : 'Stage a new bot, inspect migration impact, and verify the hard-cutover checklist before switching tokens.',
+    migrationHardCutover: isMyanmar ? 'လက်ရှိ runtime သည် hard cutover တစ်ခုတည်းကိုသာ ပံ့ပိုးသည်' : 'The current runtime supports hard cutover only',
+    migrationHardCutoverDesc: isMyanmar
+      ? 'Atomic-UI သည် တစ်ချိန်တည်းတွင် ဘော့တစ်ခုသာ အလုပ်လုပ်စေသည်။ Bot အသစ်ကို Start မလုပ်ရသေးသော အသုံးပြုသူများသည် update မရနိုင်ပါ။'
+      : 'Atomic-UI only runs one active Telegram bot at a time. Users who have not started the new bot yet may stop receiving updates after cutover.',
+    migrationEnable: isMyanmar ? 'ပြောင်းရွှေ့မှု အစီအစဉ်ကို သိမ်းမည်' : 'Track a migration plan',
+    migrationEnableDesc: isMyanmar ? 'ဘော့အသစ် အချက်အလက်၊ ကြေညာချက် စာသားနှင့် cutover checklist ကို သိမ်းထားမည်။' : 'Persist the new bot details, announcement copy, and cutover checklist in this workspace.',
+    migrationNextToken: isMyanmar ? 'ဘော့အသစ် token' : 'New bot token',
+    migrationNextUsername: isMyanmar ? 'ဘော့အသစ် username' : 'New bot username',
+    migrationCutoverAt: isMyanmar ? 'စီစဉ်ထားသော cutover အချိန်' : 'Planned cutover time',
+    migrationAnnouncement: isMyanmar ? 'အသုံးပြုသူ ကြေညာချက် စာသား' : 'User announcement copy',
+    migrationUseSuggestedCopy: isMyanmar ? 'အကြံပြုစာသား သုံးမည်' : 'Use suggested copy',
+    migrationCopyAnnouncement: isMyanmar ? 'ကြေညာချက်ကို ကူးမည်' : 'Copy announcement',
+    migrationAnnouncementCopied: isMyanmar ? 'ပြောင်းရွှေ့မှု ကြေညာချက်ကို ကူးပြီးပါပြီ' : 'Migration announcement copied',
+    migrationLinkPreview: isMyanmar ? 'ဘော့အသစ် link' : 'New bot link',
+    migrationBackupConfirmed: isMyanmar ? 'backup နှင့် rollback checkpoint ကို ပြီးစီးပြီးဟု အတည်ပြုသည်' : 'I confirmed the backup and rollback checkpoint',
+    migrationUserNoticeConfirmed: isMyanmar ? 'အသုံးပြုသူများကို bot အသစ် Start လုပ်ရန် ကြိုတင် အသိပေးပြီးဟု အတည်ပြုသည်' : 'I confirmed users were notified to start the new bot',
+    migrationPromote: isMyanmar ? 'ဘော့အသစ်ကို active bot အဖြစ် ပြောင်းမည်' : 'Promote new bot to active bot',
+    migrationPromoted: isMyanmar ? 'ဘော့ ပြောင်းရွှေ့မှု ပြီးစီးပါပြီ' : 'Bot migration promoted',
+    migrationPromotedDesc: (botName: string) => isMyanmar ? `${botName} ကို active bot အဖြစ် ပြောင်းပြီး webhook အသစ်ကို သတ်မှတ်နိုင်ပါပြီ။` : `${botName} is now the active bot. You can register the new webhook now.`,
+    migrationPromoteFailed: isMyanmar ? 'ဘော့ ပြောင်းရွှေ့မှု မအောင်မြင်ပါ' : 'Bot migration failed',
+    migrationRiskTitle: isMyanmar ? 'Cutover ထိခိုက်မှု' : 'Cutover impact',
+    migrationReachableUsers: isMyanmar ? 'Telegram identifiers' : 'Telegram identities',
+    migrationLinkedUsers: isMyanmar ? 'chat ချိတ်ထားသော users' : 'Users with chat link',
+    migrationLinkedAccessKeys: isMyanmar ? 'Telegram ချိတ်ထားသော access keys' : 'Access keys linked to Telegram',
+    migrationLinkedDynamicKeys: isMyanmar ? 'Telegram ချိတ်ထားသော dynamic keys' : 'Dynamic keys linked to Telegram',
+    migrationActiveOrders: isMyanmar ? 'လုပ်ဆောင်နေသော Telegram orders' : 'Active Telegram orders',
+    migrationSupportThreads: isMyanmar ? 'ဖွင့်ထားသော support threads' : 'Open support threads',
+    migrationPremiumRequests: isMyanmar ? 'ပရီမီယမ် support requests' : 'Premium support requests',
+    migrationPendingLinks: isMyanmar ? 'မသုံးရသေးသော link tokens' : 'Unused link tokens',
+    migrationAdminChatIds: isMyanmar ? 'configured admin chats' : 'Configured admin chats',
+    migrationAdminMissing: isMyanmar ? 'Telegram chat မချိတ်ထားသော admins' : 'Admins missing Telegram chat link',
+    migrationRiskLow: isMyanmar ? 'နိမ့်' : 'Low',
+    migrationRiskMedium: isMyanmar ? 'အလယ်အလတ်' : 'Medium',
+    migrationRiskHigh: isMyanmar ? 'မြင့်' : 'High',
     userCommands: isMyanmar ? 'အသုံးပြုသူ အမိန့်များ' : 'User commands',
     adminCommands: isMyanmar ? 'စီမံခန့်ခွဲရေး အမိန့်များ' : 'Admin commands',
     sendDigestNow: isMyanmar ? 'အနှစ်ချုပ်ကို ယခုချက်ချင်း ပို့မည်' : 'Send digest now',
@@ -1530,6 +1641,10 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     enabled: canManageAnnouncements,
     refetchOnWindowFocus: false,
   });
+  const migrationReadinessQuery = trpc.telegramBot.getMigrationReadiness.useQuery(undefined, {
+    enabled: canManageAnnouncements,
+    refetchOnWindowFocus: false,
+  });
   const webhookInfoQuery = trpc.telegramBot.getWebhookInfo.useQuery(undefined, {
     enabled: canManageAnnouncements,
     refetchInterval: canManageAnnouncements ? 30_000 : false,
@@ -1540,6 +1655,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   const announcementIdParam = searchParams.get('announcementId')?.trim() || '';
   const [activeBotTab, setActiveBotTab] = useState<TelegramBotSubtabId>(
     botTabParam === 'broadcasts' ||
+      botTabParam === 'migration' ||
       botTabParam === 'templates' ||
       botTabParam === 'analytics' ||
       botTabParam === 'history'
@@ -1636,6 +1752,15 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       digestLookbackHours: settingsQuery.data.digestLookbackHours ?? 24,
       defaultLanguage: settingsQuery.data.defaultLanguage === 'my' ? 'my' : 'en',
       showLanguageSelectorOnStart: settingsQuery.data.showLanguageSelectorOnStart ?? true,
+      migrationPlan: {
+        enabled: settingsQuery.data.migrationPlan?.enabled ?? false,
+        botToken: settingsQuery.data.migrationPlan?.botToken || '',
+        botUsername: settingsQuery.data.migrationPlan?.botUsername || '',
+        announcementMessage: settingsQuery.data.migrationPlan?.announcementMessage || '',
+        cutoverAt: settingsQuery.data.migrationPlan?.cutoverAt || null,
+        backupConfirmed: settingsQuery.data.migrationPlan?.backupConfirmed ?? false,
+        userNoticeConfirmed: settingsQuery.data.migrationPlan?.userNoticeConfirmed ?? false,
+      },
     };
     const nextAdminChatIdsInput = (settingsQuery.data.adminChatIds || []).join(', ');
     setForm(nextForm);
@@ -1649,6 +1774,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (
       botTabParam === 'setup' ||
+      botTabParam === 'migration' ||
       botTabParam === 'broadcasts' ||
       botTabParam === 'templates' ||
       botTabParam === 'analytics' ||
@@ -1674,6 +1800,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     onSuccess: async (_, variables) => {
       await Promise.all([
         utils.telegramBot.getSettings.invalidate(),
+        utils.telegramBot.getMigrationReadiness.invalidate(),
         utils.telegramBot.getWebhookInfo.invalidate(),
       ]);
 
@@ -1708,6 +1835,29 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     onError: (error) => {
       toast({
         title: 'Telegram connection failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const testMigrationBotMutation = trpc.telegramBot.testConnection.useMutation({
+    onSuccess: (result) => {
+      setForm((prev) => ({
+        ...prev,
+        migrationPlan: {
+          ...prev.migrationPlan,
+          botUsername: result.botUsername ? `@${result.botUsername}` : prev.migrationPlan.botUsername,
+        },
+      }));
+      toast({
+        title: telegramUi.connected,
+        description: telegramUi.connectedDesc(result.botUsername || result.botName),
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.migrationPromoteFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -1758,6 +1908,32 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     onError: (error) => {
       toast({
         title: telegramUi.digestFailed,
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+  const promoteMigrationBotMutation = trpc.telegramBot.promoteMigrationBot.useMutation({
+    onSuccess: async (result) => {
+      await Promise.all([
+        utils.telegramBot.getSettings.invalidate(),
+        utils.telegramBot.getMigrationReadiness.invalidate(),
+        utils.telegramBot.getWebhookInfo.invalidate(),
+      ]);
+
+      if (typeof window !== 'undefined') {
+        const nextWebhookUrl = `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
+        setWebhookMutation.mutate({ webhookUrl: nextWebhookUrl });
+      }
+
+      toast({
+        title: telegramUi.migrationPromoted,
+        description: telegramUi.migrationPromotedDesc(result.botUsername || '@new_bot'),
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: telegramUi.migrationPromoteFailed,
         description: error.message,
         variant: 'destructive',
       });
@@ -2146,9 +2322,37 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     typeof window === 'undefined'
       ? ''
       : `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
+  const migrationReadiness = migrationReadinessQuery.data as TelegramMigrationReadiness | undefined;
+  const migrationAnnouncementPreview = useMemo(
+    () =>
+      buildSuggestedTelegramMigrationAnnouncement({
+        isMyanmar,
+        currentBotUsername: formatTelegramBotUsername(form.botUsername) || migrationReadiness?.currentBotUsername,
+        nextBotUsername: formatTelegramBotUsername(form.migrationPlan.botUsername),
+        cutoverAt: form.migrationPlan.cutoverAt,
+      }),
+    [
+      form.botUsername,
+      form.migrationPlan.botUsername,
+      form.migrationPlan.cutoverAt,
+      isMyanmar,
+      migrationReadiness?.currentBotUsername,
+    ],
+  );
+  const migrationBotProfileUrl = buildTelegramBotProfileUrl(form.migrationPlan.botUsername);
+  const migrationRiskLabel =
+    migrationReadiness?.riskLevel === 'HIGH'
+      ? telegramUi.migrationRiskHigh
+      : migrationReadiness?.riskLevel === 'MEDIUM'
+        ? telegramUi.migrationRiskMedium
+        : telegramUi.migrationRiskLow;
 
   const copyAnnouncementCommand = async (command: string) => {
     await copyToClipboard(command, telegramUi.announcementCommandCopied, telegramUi.announcementCommandPreview);
+  };
+  const copyMigrationAnnouncement = async () => {
+    const message = form.migrationPlan.announcementMessage.trim() || migrationAnnouncementPreview;
+    await copyToClipboard(message, telegramUi.migrationAnnouncementCopied, telegramUi.migrationAnnouncement);
   };
 
   useEffect(() => {
@@ -2217,7 +2421,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
 
     saveSettingsMutation.mutate({
       botToken: form.botToken.trim(),
-      botUsername: form.botUsername?.trim() || undefined,
+      botUsername: formatTelegramBotUsername(form.botUsername) || undefined,
       welcomeMessage: form.welcomeMessage?.trim() || undefined,
       keyNotFoundMessage: form.keyNotFoundMessage?.trim() || undefined,
       localizedWelcomeMessages: Object.fromEntries(
@@ -2238,6 +2442,15 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       digestLookbackHours: form.digestLookbackHours,
       defaultLanguage: form.defaultLanguage,
       showLanguageSelectorOnStart: form.showLanguageSelectorOnStart,
+      migrationPlan: {
+        enabled: form.migrationPlan.enabled,
+        botToken: form.migrationPlan.botToken.trim(),
+        botUsername: formatTelegramBotUsername(form.migrationPlan.botUsername),
+        announcementMessage: form.migrationPlan.announcementMessage.trim(),
+        cutoverAt: form.migrationPlan.cutoverAt?.trim() || null,
+        backupConfirmed: form.migrationPlan.backupConfirmed,
+        userNoticeConfirmed: form.migrationPlan.userNoticeConfirmed,
+      },
     });
   };
 
@@ -2301,8 +2514,9 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
           }}
           className="space-y-5"
         >
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.82),rgba(5,12,24,0.74))] lg:grid-cols-5">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-[1.35rem] border border-border/60 bg-background/50 p-2 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(4,11,24,0.82),rgba(5,12,24,0.74))] lg:grid-cols-6">
             <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="setup">Bot setup</TabsTrigger>
+            <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="migration">{telegramUi.migrationTab}</TabsTrigger>
             <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="broadcasts">Broadcasts</TabsTrigger>
             <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="templates">Templates</TabsTrigger>
             <TabsTrigger className="dark:text-slate-300 dark:data-[state=active]:bg-[linear-gradient(180deg,rgba(7,32,48,0.96),rgba(7,63,88,0.92))] dark:data-[state=active]:text-cyan-50 dark:data-[state=active]:shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_12px_24px_rgba(6,182,212,0.14)]" value="analytics">Analytics</TabsTrigger>
@@ -2651,6 +2865,303 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                 </div>
               </CollapsibleContent>
             </Collapsible>
+          </TabsContent>
+
+          <TabsContent value="migration" className="space-y-5">
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{telegramUi.migrationHardCutover}</p>
+                  <p className="text-xs text-muted-foreground">{telegramUi.migrationHardCutoverDesc}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <Card className="border-border/60">
+                <CardHeader>
+                  <CardTitle>{telegramUi.migrationTitle}</CardTitle>
+                  <CardDescription>{telegramUi.migrationDesc}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{telegramUi.migrationEnable}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{telegramUi.migrationEnableDesc}</p>
+                      </div>
+                      <Switch
+                        checked={form.migrationPlan.enabled}
+                        onCheckedChange={(checked) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            migrationPlan: { ...prev.migrationPlan, enabled: checked },
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="telegram-migration-bot-token">{telegramUi.migrationNextToken}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="telegram-migration-bot-token"
+                          type="password"
+                          placeholder={t('settings.telegram.token_placeholder')}
+                          value={form.migrationPlan.botToken}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              migrationPlan: { ...prev.migrationPlan, botToken: event.target.value },
+                            }))
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="shrink-0"
+                          onClick={() => testMigrationBotMutation.mutate({ botToken: form.migrationPlan.botToken.trim() })}
+                          disabled={!form.migrationPlan.botToken.trim() || testMigrationBotMutation.isPending}
+                        >
+                          {testMigrationBotMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube className="mr-2 h-4 w-4" />}
+                          {t('settings.telegram.test')}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="telegram-migration-bot-username">{telegramUi.migrationNextUsername}</Label>
+                      <Input
+                        id="telegram-migration-bot-username"
+                        placeholder={telegramUi.botUsernamePlaceholder}
+                        value={form.migrationPlan.botUsername}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            migrationPlan: { ...prev.migrationPlan, botUsername: event.target.value },
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="telegram-migration-cutover-at">{telegramUi.migrationCutoverAt}</Label>
+                      <Input
+                        id="telegram-migration-cutover-at"
+                        type="datetime-local"
+                        value={form.migrationPlan.cutoverAt || ''}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            migrationPlan: {
+                              ...prev.migrationPlan,
+                              cutoverAt: event.target.value || null,
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Label htmlFor="telegram-migration-announcement">{telegramUi.migrationAnnouncement}</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                migrationPlan: {
+                                  ...prev.migrationPlan,
+                                  announcementMessage: migrationAnnouncementPreview,
+                                },
+                              }))
+                            }
+                          >
+                            {telegramUi.migrationUseSuggestedCopy}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void copyMigrationAnnouncement()}
+                          >
+                            <Copy className="mr-2 h-4 w-4" />
+                            {telegramUi.migrationCopyAnnouncement}
+                          </Button>
+                        </div>
+                      </div>
+                      <Textarea
+                        id="telegram-migration-announcement"
+                        rows={5}
+                        value={form.migrationPlan.announcementMessage}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            migrationPlan: {
+                              ...prev.migrationPlan,
+                              announcementMessage: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">{migrationAnnouncementPreview}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        {isMyanmar ? 'Current bot' : 'Current bot'}
+                      </p>
+                      <p className="mt-2 text-lg font-semibold">
+                        {formatTelegramBotUsername(form.botUsername) || migrationReadiness?.currentBotUsername || '@not-configured'}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        {isMyanmar ? 'Next bot' : 'Next bot'}
+                      </p>
+                      <p className="mt-2 text-lg font-semibold">
+                        {formatTelegramBotUsername(form.migrationPlan.botUsername) || '@pending'}
+                      </p>
+                      {migrationBotProfileUrl ? (
+                        <Link
+                          href={migrationBotProfileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex items-center text-sm text-primary underline-offset-4 hover:underline"
+                        >
+                          {telegramUi.migrationLinkPreview}
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </Link>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4">
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-border"
+                        checked={form.migrationPlan.backupConfirmed}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            migrationPlan: {
+                              ...prev.migrationPlan,
+                              backupConfirmed: event.target.checked,
+                            },
+                          }))
+                        }
+                      />
+                      <span className="text-sm">{telegramUi.migrationBackupConfirmed}</span>
+                    </label>
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-border"
+                        checked={form.migrationPlan.userNoticeConfirmed}
+                        onChange={(event) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            migrationPlan: {
+                              ...prev.migrationPlan,
+                              userNoticeConfirmed: event.target.checked,
+                            },
+                          }))
+                        }
+                      />
+                      <span className="text-sm">{telegramUi.migrationUserNoticeConfirmed}</span>
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => promoteMigrationBotMutation.mutate()}
+                      disabled={
+                        promoteMigrationBotMutation.isPending
+                        || !form.migrationPlan.enabled
+                        || !form.migrationPlan.botToken.trim()
+                        || !form.migrationPlan.backupConfirmed
+                        || !form.migrationPlan.userNoticeConfirmed
+                      }
+                    >
+                      {promoteMigrationBotMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                      {telegramUi.migrationPromote}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={handleSave} disabled={isSaving || !botSettingsDirty}>
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {t('settings.telegram.save')}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/60">
+                <CardHeader>
+                  <CardTitle>{telegramUi.migrationRiskTitle}</CardTitle>
+                  <CardDescription>
+                    {isMyanmar ? 'Bot အဟောင်းကို ဖယ်ရှားမီ ထိခိုက်မည့် user/workload ကို စစ်ဆေးပါ။' : 'Review the live Telegram workload before removing the old bot.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/55 p-4">
+                    <div>
+                      <p className="text-sm font-medium">{isMyanmar ? 'Migration risk' : 'Migration risk'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {migrationReadiness?.hardCutover ? telegramUi.migrationHardCutoverDesc : ''}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        migrationReadiness?.riskLevel === 'HIGH'
+                          ? 'border-red-500/50 text-red-600'
+                          : migrationReadiness?.riskLevel === 'MEDIUM'
+                            ? 'border-amber-500/50 text-amber-600'
+                            : 'border-emerald-500/50 text-emerald-600',
+                      )}
+                    >
+                      {migrationRiskLabel}
+                    </Badge>
+                  </div>
+
+                  {migrationReadinessQuery.isLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {isMyanmar ? 'Migration impact ကို တွက်ချက်နေသည်…' : 'Calculating migration impact…'}
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        [telegramUi.migrationReachableUsers, migrationReadiness?.reachableIdentityCount ?? 0],
+                        [telegramUi.migrationLinkedUsers, migrationReadiness?.linkedUsersCount ?? 0],
+                        [telegramUi.migrationLinkedAccessKeys, migrationReadiness?.linkedAccessKeysCount ?? 0],
+                        [telegramUi.migrationLinkedDynamicKeys, migrationReadiness?.linkedDynamicKeysCount ?? 0],
+                        [telegramUi.migrationActiveOrders, migrationReadiness?.activeOrderCount ?? 0],
+                        [telegramUi.migrationSupportThreads, migrationReadiness?.openSupportThreadCount ?? 0],
+                        [telegramUi.migrationPremiumRequests, migrationReadiness?.openPremiumRequestCount ?? 0],
+                        [telegramUi.migrationPendingLinks, migrationReadiness?.pendingLinkTokenCount ?? 0],
+                        [telegramUi.migrationAdminChatIds, migrationReadiness?.adminChatIdsConfigured ?? 0],
+                        [telegramUi.migrationAdminMissing, migrationReadiness?.adminUsersMissingChatId ?? 0],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                          <p className="text-xs text-muted-foreground">{label}</p>
+                          <p className="mt-2 text-2xl font-semibold">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <AnnouncementBroadcastsTab
