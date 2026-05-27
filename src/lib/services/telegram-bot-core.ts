@@ -377,6 +377,7 @@ import {
   handleTelegramSupportQueueCommand,
   sendTelegramNextSupportQueueCard,
   sendTelegramSupportQueueCardToChat,
+  sendTelegramSupportQueueDetailToChat,
   sendTelegramSupportQueueDetailById,
   buildTelegramSupportQueueSummaryKeyboard,
 } from '@/lib/services/telegram-premium-support-queue';
@@ -3123,11 +3124,6 @@ export async function runTelegramSalesOrderCycle() {
         );
       } else {
         const selectedMethod = resolveTelegramSalesPaymentMethod(settings, order.paymentMethodCode);
-        await sendTelegramMessage(
-          config.botToken,
-          order.telegramChatId,
-          ui.orderPaymentProofReminder(order.orderCode),
-        );
         await sendTelegramOrderPaymentPromptCard({
           botToken: config.botToken,
           chatId: order.telegramChatId,
@@ -3463,6 +3459,51 @@ async function sendTelegramPremiumSupportAlert(input: {
     return;
   }
 
+  if (input.requestPanelId) {
+    const request = await db.telegramPremiumSupportRequest.findUnique({
+      where: { id: input.requestPanelId },
+      include: {
+        dynamicAccessKey: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        replies: {
+          orderBy: [{ createdAt: 'asc' }],
+          take: 8,
+        },
+      },
+    });
+
+    if (request) {
+      for (const adminChatId of config.adminChatIds) {
+        await sendTelegramSupportQueueDetailToChat({
+          botToken: config.botToken,
+          chatId: adminChatId,
+          locale: input.locale,
+          request,
+          mode: 'admin',
+        });
+      }
+
+      await writeAuditLog({
+        action: 'TELEGRAM_PREMIUM_SUPPORT_REQUESTED',
+        entity: 'DYNAMIC_ACCESS_KEY',
+        entityId: request.dynamicAccessKey.id,
+        details: {
+          requestType: input.requestType,
+          telegramChatId: input.telegramChatId,
+          telegramUserId: input.telegramUserId,
+          telegramUsername: input.telegramUsername ?? null,
+          requestedRegionCode: input.requestedRegionCode ?? null,
+          panelUrl: await buildTelegramPremiumSupportPanelUrl(request.id),
+        },
+      });
+      return;
+    }
+  }
+
   const key = await loadDynamicAccessKeyForMessaging(input.dynamicAccessKeyId);
   if (!key) {
     return;
@@ -3472,31 +3513,32 @@ async function sendTelegramPremiumSupportAlert(input: {
   const panelUrl = input.requestPanelId
     ? await buildTelegramPremiumSupportPanelUrl(input.requestPanelId)
     : await buildTelegramDynamicKeyPanelUrl(key.id);
-  const poolSummary = formatTelegramDynamicPoolSummary(key, ui);
-  const lines = [
-    ui.premiumReviewAlertTitle,
-    '',
-    `${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
-    `${ui.requesterLabel}: <b>${escapeHtml(input.telegramUsername || input.telegramUserId)}</b>`,
-    `${ui.telegramIdLabel}: <code>${escapeHtml(input.telegramUserId)}</code>`,
-    `${ui.planLabel}: <b>${escapeHtml(ui.premiumLabel)}</b>`,
-    `${ui.statusLineLabel}: <b>${escapeHtml(key.status)}</b>`,
-    `${ui.premiumCurrentPoolLabel}: <b>${escapeHtml(poolSummary)}</b>`,
-    `${ui.customerMessage}: <b>${escapeHtml(input.requestType === 'REGION_CHANGE' ? ui.premiumIssueTypeRegion : ui.premiumIssueTypeRoute)}</b>`,
-    input.requestedRegionCode
-      ? `${ui.premiumRequestedRegionLabel}: <b>${escapeHtml(input.requestedRegionCode)}</b>`
-      : '',
-    input.requestCode
-      ? `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(input.requestCode)}</b>`
-      : '',
-    '',
-    `${ui.premiumReviewPanelLabel}: ${panelUrl}`,
-  ]
-    .filter(Boolean)
-    .join('\n');
 
-  for (const adminChatId of config.adminChatIds) {
-    await sendTelegramMessage(config.botToken, adminChatId, lines, {
+  await sendTelegramMessage(
+    config.botToken,
+    config.adminChatIds[0],
+    [
+      ui.premiumReviewAlertTitle,
+      '',
+      `${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+      `${ui.requesterLabel}: <b>${escapeHtml(input.telegramUsername || input.telegramUserId)}</b>`,
+      `${ui.premiumReviewPanelLabel}: ${panelUrl}`,
+    ].join('\n'),
+    {
+      replyMarkup: {
+        inline_keyboard: [[{ text: ui.premiumReviewPanelLabel, url: panelUrl }]],
+      },
+    },
+  );
+
+  for (const adminChatId of config.adminChatIds.slice(1)) {
+    await sendTelegramMessage(config.botToken, adminChatId, [
+      ui.premiumReviewAlertTitle,
+      '',
+      `${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
+      `${ui.requesterLabel}: <b>${escapeHtml(input.telegramUsername || input.telegramUserId)}</b>`,
+      `${ui.premiumReviewPanelLabel}: ${panelUrl}`,
+    ].join('\n'), {
       replyMarkup: {
         inline_keyboard: [[{ text: ui.premiumReviewPanelLabel, url: panelUrl }]],
       },
@@ -3533,30 +3575,33 @@ export async function sendTelegramPremiumSupportFollowUpAlert(input: {
     return;
   }
 
-  const key = await loadDynamicAccessKeyForMessaging(input.dynamicAccessKeyId);
-  if (!key) {
+  const request = await db.telegramPremiumSupportRequest.findUnique({
+    where: { id: input.requestId },
+    include: {
+      dynamicAccessKey: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      replies: {
+        orderBy: [{ createdAt: 'asc' }],
+        take: 8,
+      },
+    },
+  });
+
+  if (!request) {
     return;
   }
 
-  const ui = getTelegramUi(input.locale);
-  const panelUrl = await buildTelegramPremiumSupportPanelUrl(input.requestId);
-  const lines = [
-    ui.premiumReviewAlertTitle,
-    '',
-    `${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
-    `${ui.requesterLabel}: <b>${escapeHtml(input.telegramUsername || input.telegramUserId)}</b>`,
-    `${ui.telegramIdLabel}: <code>${escapeHtml(input.telegramUserId)}</code>`,
-    `${ui.premiumRequestCodeLabel}: <b>${escapeHtml(input.requestCode)}</b>`,
-    `${ui.premiumFollowUpNeedsReview}: <b>${escapeHtml(input.message)}</b>`,
-    '',
-    `${ui.premiumReviewPanelLabel}: ${panelUrl}`,
-  ].join('\n');
-
   for (const adminChatId of config.adminChatIds) {
-    await sendTelegramMessage(config.botToken, adminChatId, lines, {
-      replyMarkup: {
-        inline_keyboard: [[{ text: ui.premiumReviewPanelLabel, url: panelUrl }]],
-      },
+    await sendTelegramSupportQueueDetailToChat({
+      botToken: config.botToken,
+      chatId: adminChatId,
+      locale: input.locale,
+      request,
+      mode: 'admin',
     });
   }
 }
