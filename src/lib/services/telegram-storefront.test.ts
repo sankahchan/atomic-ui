@@ -226,23 +226,21 @@ test('store main menu matches the paid storefront button layout', () => {
   assert.deepEqual(
     view.replyMarkup.inline_keyboard.map((row) => row[0]?.text),
     [
-      '⚡ Flash Plans    ·  30 Days  ·  🔄 3×',
-      '🌙 Season Plans   ·  90 Days  ·  🔄 5×',
-      '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞',
-      '👤 My Account',
+      '🛒 Buy a Plan',
+      '🔑 My Keys',
     ],
   );
   assert.equal(
     view.replyMarkup.inline_keyboard[0]?.[0]?.callback_data,
-    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'flash' }),
+    buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
   );
   assert.equal(
     view.replyMarkup.inline_keyboard[1]?.[0]?.callback_data,
-    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'season' }),
+    buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }),
   );
   assert.equal(
-    view.replyMarkup.inline_keyboard[2]?.[0]?.callback_data,
-    buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }),
+    view.replyMarkup.inline_keyboard[1]?.[1]?.text,
+    '💬 Support',
   );
 });
 
@@ -256,8 +254,8 @@ test('storefront views localize Burmese copy for the main menu and setup flow', 
 
   assert.match(menu.text, /ပြန်လည်ကြိုဆိုပါတယ်/);
   assert.match(menu.text, /နောက်ဆုံးသက်တမ်း/);
-  assert.equal(menu.replyMarkup.inline_keyboard[0]?.[0]?.text, '⚡ အမြန်အစီအစဉ်များ  ·  30 ရက်  ·  🔄 3 ကြိမ်');
-  assert.equal(menu.replyMarkup.inline_keyboard[3]?.[1]?.text, '💬 အကူအညီ');
+  assert.equal(menu.replyMarkup.inline_keyboard[0]?.[0]?.text, '🛒 အစီအစဉ်များ ဝယ်မည်');
+  assert.equal(menu.replyMarkup.inline_keyboard[1]?.[1]?.text, '💬 အကူအညီ');
 
   const setup = buildTelegramStorePlatformSelectView({
     keyId: 'key_123',

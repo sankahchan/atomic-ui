@@ -1989,18 +1989,16 @@ export function buildTelegramStoreMainMenuView(input: {
     `${isMyanmar ? '🔑 အသုံးပြုနေသော သော့များ : ' : '🔑 Active keys     :  '}${escapeTelegramMarkdownV2(String(input.activeKeyCount))}`,
     `${isMyanmar ? '📅 နောက်ဆုံးသက်တမ်း : ' : '📅 Next expiry     :  '}${escapeTelegramMarkdownV2(input.nextExpiryLabel)}`,
     '',
-    isMyanmar ? 'အောက်မှ အစီအစဉ်အမျိုးအစားကို ရွေးပါ 👇' : 'Choose a plan type below 👇',
+    isMyanmar ? 'အောက်မှ သင်လုပ်ဆောင်လိုသည်ကို ရွေးချယ်ပါ 👇' : 'Choose an action below 👇',
   ].join('\n');
 
   return {
     text,
     replyMarkup: {
       inline_keyboard: [
-        [{ text: isMyanmar ? '⚡ အမြန်အစီအစဉ်များ  ·  30 ရက်  ·  🔄 3 ကြိမ်' : '⚡ Flash Plans    ·  30 Days  ·  🔄 3×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'flash' }) }],
-        [{ text: isMyanmar ? '🌙 ရာသီအစီအစဉ်များ ·  90 ရက်  ·  🔄 5 ကြိမ်' : '🌙 Season Plans   ·  90 Days  ·  🔄 5×', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'season' }) }],
-        [{ text: isMyanmar ? '🔑 ဒိုင်နမစ်အစီအစဉ်များ · ပြောင်းလွယ်ပြင်လွယ် · 🔄 ∞' : '🔑 Dynamic Plans  ·  Flexible ·  🔄 ∞', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans', category: 'dynamic' }) }],
+        [{ text: isMyanmar ? '🛒 အစီအစဉ်များ ဝယ်မည်' : '🛒 Buy a Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
         [
-          { text: isMyanmar ? '👤 အကောင့်' : '👤 My Account', callback_data: buildTelegramStorefrontCallbackData({ action: 'my_account' }) },
+          { text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
           { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
         ],
       ],
