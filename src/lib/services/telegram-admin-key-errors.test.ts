@@ -30,6 +30,6 @@ test('telegram admin key error notice localizes server connection failures', () 
     'my',
   );
 
-  assert.equal(notice.callbackText, 'Server connection failed.');
+  assert.equal(notice.callbackText, 'ဆာဗာချိတ်ဆက်မှု မအောင်မြင်ပါ။');
   assert.match(notice.chatText, /Outline server/u);
 });
