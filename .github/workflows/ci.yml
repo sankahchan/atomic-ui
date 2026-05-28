@@ -193,7 +193,19 @@ jobs:
           done
 
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5; do
+            npx playwright install --with-deps chromium && exit 0
+
+            if [ "$attempt" -eq 5 ]; then
+              echo "playwright install failed after $attempt attempts"
+              exit 1
+            fi
+
+            echo "playwright install failed on attempt $attempt; retrying..."
+            sleep $((attempt * 10))
+          done
 
       - name: Run Playwright smoke suite
         run: npm run smoke:e2e
