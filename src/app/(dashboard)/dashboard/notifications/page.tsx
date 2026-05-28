@@ -3017,7 +3017,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
                       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                        {isMyanmar ? 'Current bot' : 'Current bot'}
+                        {isMyanmar ? 'လက်ရှိ bot' : 'Current bot'}
                       </p>
                       <p className="mt-2 text-lg font-semibold">
                         {formatTelegramBotUsername(form.botUsername) || migrationReadiness?.currentBotUsername || '@not-configured'}
@@ -3025,7 +3025,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                     </div>
                     <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
                       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                        {isMyanmar ? 'Next bot' : 'Next bot'}
+                        {isMyanmar ? 'နောက်လာမည့် bot' : 'Next bot'}
                       </p>
                       <p className="mt-2 text-lg font-semibold">
                         {formatTelegramBotUsername(form.migrationPlan.botUsername) || '@pending'}
@@ -3045,34 +3045,30 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                   </div>
 
                   <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4">
-                    <label className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 rounded border-border"
+                    <label className="flex items-center gap-3">
+                      <Switch
                         checked={form.migrationPlan.backupConfirmed}
-                        onChange={(event) =>
+                        onCheckedChange={(checked) =>
                           setForm((prev) => ({
                             ...prev,
                             migrationPlan: {
                               ...prev.migrationPlan,
-                              backupConfirmed: event.target.checked,
+                              backupConfirmed: checked,
                             },
                           }))
                         }
                       />
                       <span className="text-sm">{telegramUi.migrationBackupConfirmed}</span>
                     </label>
-                    <label className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 rounded border-border"
+                    <label className="flex items-center gap-3">
+                      <Switch
                         checked={form.migrationPlan.userNoticeConfirmed}
-                        onChange={(event) =>
+                        onCheckedChange={(checked) =>
                           setForm((prev) => ({
                             ...prev,
                             migrationPlan: {
                               ...prev.migrationPlan,
-                              userNoticeConfirmed: event.target.checked,
+                              userNoticeConfirmed: checked,
                             },
                           }))
                         }
@@ -3114,7 +3110,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/55 p-4">
                     <div>
-                      <p className="text-sm font-medium">{isMyanmar ? 'Migration risk' : 'Migration risk'}</p>
+                      <p className="text-sm font-medium">{isMyanmar ? 'Migration ပြောင်းရွှေ့မှု အန္တရာယ်' : 'Migration risk'}</p>
                       <p className="text-xs text-muted-foreground">
                         {migrationReadiness?.hardCutover ? telegramUi.migrationHardCutoverDesc : ''}
                       </p>
