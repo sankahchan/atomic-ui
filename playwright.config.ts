@@ -19,6 +19,6 @@ export default defineConfig({
     command: 'tsx scripts/playwright-web-server.ts',
     url: `${baseURL}/login`,
     reuseExistingServer: false,
-    timeout: 180_000,
+    timeout: 600_000,
   },
 });

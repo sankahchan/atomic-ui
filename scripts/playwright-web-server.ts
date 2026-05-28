@@ -616,6 +616,27 @@ async function resetAndSeedDatabase(outlineCertSha256: string) {
 }
 
 function startNextServer(): ChildProcess {
+  const isCI = process.env.CI === 'true' || process.env.PLAYWRIGHT_SMOKE === '1';
+
+  if (isCI) {
+    console.log('[smoke] CI detected – building production bundle before starting server…');
+    execFileSync('npx', ['next', 'build'], {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: 'inherit',
+    });
+    console.log('[smoke] Build complete – starting production server…');
+    return spawn(
+      'npx',
+      ['next', 'start', '-p', String(appPort), '--hostname', '127.0.0.1'],
+      {
+        cwd: repoRoot,
+        env: process.env,
+        stdio: 'inherit',
+      },
+    );
+  }
+
   return spawn(
     'npx',
     ['next', 'dev', '-p', String(appPort), '--hostname', '127.0.0.1'],
