@@ -36,7 +36,6 @@ function setSmokeEnv() {
   process.env.JWT_SECRET = 'playwright-smoke-secret';
   process.env.DISABLE_SCHEDULER = '1';
   process.env.PLAYWRIGHT_SMOKE = '1';
-  (process.env as any).NODE_ENV = 'development';
 }
 
 type GeneratedSelfSignedCertificate = {
@@ -616,13 +615,14 @@ async function resetAndSeedDatabase(outlineCertSha256: string) {
 }
 
 function startNextServer(): ChildProcess {
-  const isCI = process.env.CI === 'true' || process.env.PLAYWRIGHT_SMOKE === '1';
+  const isCI = process.env.CI === 'true';
 
   if (isCI) {
     console.log('[smoke] CI detected – building production bundle before starting server…');
+    const buildEnv = { ...process.env, NODE_ENV: 'production' };
     execFileSync('npx', ['next', 'build'], {
       cwd: repoRoot,
-      env: process.env,
+      env: buildEnv,
       stdio: 'inherit',
     });
     console.log('[smoke] Build complete – starting production server…');
@@ -631,12 +631,13 @@ function startNextServer(): ChildProcess {
       ['next', 'start', '-p', String(appPort), '--hostname', '127.0.0.1'],
       {
         cwd: repoRoot,
-        env: process.env,
+        env: buildEnv,
         stdio: 'inherit',
       },
     );
   }
 
+  (process.env as any).NODE_ENV = 'development';
   return spawn(
     'npx',
     ['next', 'dev', '-p', String(appPort), '--hostname', '127.0.0.1'],
