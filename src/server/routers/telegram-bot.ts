@@ -68,6 +68,11 @@ import {
   shouldRetainMaskedTelegramSecret,
   telegramBotSettingsNeedSecretMigration,
 } from '@/lib/telegram-bot-settings';
+import {
+  buildTelegramBotProfileUrl,
+  formatTelegramBotUsername,
+  normalizeTelegramBotUsernameHandle,
+} from '@/lib/services/telegram-bot-identity';
 
 const TELEGRAM_ORDER_ACTIVE_WORKFLOW_STATUSES = new Set([
   'AWAITING_KEY_SELECTION',
@@ -311,7 +316,54 @@ const telegramSettingsSchema = z.object({
   digestLookbackHours: z.number().int().min(1).max(168).default(24),
   defaultLanguage: z.enum(['en', 'my']).default('en'),
   showLanguageSelectorOnStart: z.boolean().default(true),
+  migrationPlan: z.object({
+    enabled: z.boolean().default(false),
+    botToken: z.string().optional().default(''),
+    botUsername: z.string().optional().default(''),
+    announcementMessage: z.string().optional().default(''),
+    cutoverAt: z.string().trim().nullable().optional().default(null),
+    backupConfirmed: z.boolean().default(false),
+    userNoticeConfirmed: z.boolean().default(false),
+  }).default({
+    enabled: false,
+    botToken: '',
+    botUsername: '',
+    announcementMessage: '',
+    cutoverAt: null,
+    backupConfirmed: false,
+    userNoticeConfirmed: false,
+  }),
 });
+
+const EMPTY_TELEGRAM_MIGRATION_PLAN = {
+  enabled: false,
+  botToken: '',
+  botUsername: '',
+  announcementMessage: '',
+  cutoverAt: null as string | null,
+  backupConfirmed: false,
+  userNoticeConfirmed: false,
+};
+
+function normalizeTelegramMigrationPlan(input: unknown) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { ...EMPTY_TELEGRAM_MIGRATION_PLAN };
+  }
+
+  const value = input as Record<string, unknown>;
+  return {
+    enabled: Boolean(value.enabled),
+    botToken: typeof value.botToken === 'string' ? value.botToken : '',
+    botUsername: typeof value.botUsername === 'string' ? value.botUsername : '',
+    announcementMessage: typeof value.announcementMessage === 'string' ? value.announcementMessage : '',
+    cutoverAt:
+      typeof value.cutoverAt === 'string' && value.cutoverAt.trim().length > 0
+        ? value.cutoverAt.trim()
+        : null,
+    backupConfirmed: Boolean(value.backupConfirmed),
+    userNoticeConfirmed: Boolean(value.userNoticeConfirmed),
+  };
+}
 
 export const telegramBotRouter = router({
   /**
@@ -341,6 +393,7 @@ export const telegramBotRouter = router({
         digestLookbackHours: 24,
         defaultLanguage: 'en',
         showLanguageSelectorOnStart: true,
+        migrationPlan: { ...EMPTY_TELEGRAM_MIGRATION_PLAN },
       };
     }
 
@@ -383,6 +436,7 @@ export const telegramBotRouter = router({
         digestLookbackHours: parsed.digestLookbackHours ?? 24,
         defaultLanguage: coerceSupportedLocale(parsed.defaultLanguage) || 'en',
         showLanguageSelectorOnStart: parsed.showLanguageSelectorOnStart ?? true,
+        migrationPlan: normalizeTelegramMigrationPlan(masked.migrationPlan),
       };
     } catch {
       return {
@@ -402,6 +456,7 @@ export const telegramBotRouter = router({
         digestLookbackHours: 24,
         defaultLanguage: 'en',
         showLanguageSelectorOnStart: true,
+        migrationPlan: { ...EMPTY_TELEGRAM_MIGRATION_PLAN },
       };
     }
   }),
@@ -418,11 +473,23 @@ export const telegramBotRouter = router({
         select: { value: true },
       });
       const existingConfig = parseTelegramBotSettingsValue(existingSettings?.value);
+      const existingMigrationPlan = normalizeTelegramMigrationPlan(existingConfig?.migrationPlan);
       const botToken = shouldRetainMaskedTelegramSecret(input.botToken)
         ? typeof existingConfig?.botToken === 'string'
           ? existingConfig.botToken
           : ''
         : input.botToken;
+      const nextMigrationPlanInput = normalizeTelegramMigrationPlan(input.migrationPlan);
+      const migrationBotToken = shouldRetainMaskedTelegramSecret(nextMigrationPlanInput.botToken)
+        ? existingMigrationPlan.botToken
+        : nextMigrationPlanInput.botToken;
+      const normalizedActiveBotUsername = formatTelegramBotUsername(input.botUsername);
+      const normalizedMigrationBotUsername = formatTelegramBotUsername(nextMigrationPlanInput.botUsername);
+      const nextMigrationPlan = normalizeTelegramMigrationPlan({
+        ...nextMigrationPlanInput,
+        botToken: migrationBotToken,
+        botUsername: normalizedMigrationBotUsername,
+      });
       const nextValue = {
         ...input,
         webhookSecretToken: getTelegramWebhookSecret(
@@ -430,6 +497,8 @@ export const telegramBotRouter = router({
           existingConfig?.webhookSecretToken,
         ),
         botToken,
+        botUsername: normalizedActiveBotUsername,
+        migrationPlan: nextMigrationPlan,
       } satisfies Record<string, unknown>;
 
       await db.settings.upsert({
@@ -445,6 +514,269 @@ export const telegramBotRouter = router({
 
       return { success: true };
     }),
+
+  getMigrationReadiness: adminProcedure.query(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
+
+    const settings = await db.settings.findUnique({
+      where: { key: 'telegram_bot' },
+      select: { value: true },
+    });
+    const parsed = parseTelegramBotSettingsValue(settings?.value);
+    const migrationPlan = normalizeTelegramMigrationPlan(parsed?.migrationPlan);
+
+    const [
+      accessKeyTelegramIds,
+      dynamicAccessKeyTelegramIds,
+      userTelegramChatIds,
+      telegramProfiles,
+      linkedUsersCount,
+      linkedAccessKeysCount,
+      linkedDynamicKeysCount,
+      activeOrderCount,
+      openSupportThreadCount,
+      openPremiumRequestCount,
+      pendingLinkTokenCount,
+      adminUsersMissingChatId,
+    ] = await Promise.all([
+      db.accessKey.findMany({
+        where: { telegramId: { not: null } },
+        select: { telegramId: true },
+      }),
+      db.dynamicAccessKey.findMany({
+        where: { telegramId: { not: null } },
+        select: { telegramId: true },
+      }),
+      db.user.findMany({
+        where: { telegramChatId: { not: null } },
+        select: { telegramChatId: true },
+      }),
+      db.telegramUserProfile.findMany({
+        where: {
+          OR: [
+            { telegramUserId: { not: '' } },
+            { telegramChatId: { not: null } },
+          ],
+        },
+        select: {
+          telegramUserId: true,
+          telegramChatId: true,
+        },
+      }),
+      db.user.count({
+        where: { telegramChatId: { not: null } },
+      }),
+      db.accessKey.count({
+        where: { telegramId: { not: null } },
+      }),
+      db.dynamicAccessKey.count({
+        where: { telegramId: { not: null } },
+      }),
+      db.telegramOrder.count({
+        where: {
+          status: {
+            in: Array.from(TELEGRAM_ORDER_ACTIVE_WORKFLOW_STATUSES),
+          },
+        },
+      }),
+      db.telegramSupportThread.count({
+        where: {
+          status: { in: ['OPEN', 'ESCALATED'] },
+        },
+      }),
+      db.telegramPremiumSupportRequest.count({
+        where: {
+          status: { not: 'DISMISSED' },
+        },
+      }),
+      db.telegramLinkToken.count({
+        where: {
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      }),
+      db.user.count({
+        where: {
+          role: 'ADMIN',
+          telegramChatId: null,
+        },
+      }),
+    ]);
+
+    const reachableIdentitySet = new Set<string>();
+    for (const record of accessKeyTelegramIds) {
+      if (record.telegramId) {
+        reachableIdentitySet.add(`user:${record.telegramId}`);
+      }
+    }
+    for (const record of dynamicAccessKeyTelegramIds) {
+      if (record.telegramId) {
+        reachableIdentitySet.add(`user:${record.telegramId}`);
+      }
+    }
+    for (const record of userTelegramChatIds) {
+      if (record.telegramChatId) {
+        reachableIdentitySet.add(`chat:${record.telegramChatId}`);
+      }
+    }
+    for (const record of telegramProfiles) {
+      if (record.telegramUserId) {
+        reachableIdentitySet.add(`user:${record.telegramUserId}`);
+      }
+      if (record.telegramChatId) {
+        reachableIdentitySet.add(`chat:${record.telegramChatId}`);
+      }
+    }
+
+    const operationalLoadCount =
+      activeOrderCount + openSupportThreadCount + openPremiumRequestCount;
+    const riskLevel =
+      operationalLoadCount > 0 || reachableIdentitySet.size >= 250
+        ? 'HIGH'
+        : reachableIdentitySet.size >= 50 || pendingLinkTokenCount > 0 || adminUsersMissingChatId > 0
+          ? 'MEDIUM'
+          : 'LOW';
+
+    return {
+      currentBotUsername:
+        typeof parsed?.botUsername === 'string' && parsed.botUsername.trim().length > 0
+          ? parsed.botUsername.trim()
+          : null,
+      migrationBotUsername:
+        migrationPlan.botUsername.trim().length > 0 ? migrationPlan.botUsername.trim() : null,
+      hardCutover: true,
+      linkedUsersCount,
+      linkedAccessKeysCount,
+      linkedDynamicKeysCount,
+      reachableIdentityCount: reachableIdentitySet.size,
+      activeOrderCount,
+      openSupportThreadCount,
+      openPremiumRequestCount,
+      pendingLinkTokenCount,
+      adminChatIdsConfigured: Array.isArray(parsed?.adminChatIds) ? parsed.adminChatIds.length : 0,
+      adminUsersMissingChatId,
+      riskLevel,
+    };
+  }),
+
+  promoteMigrationBot: adminProcedure.mutation(async ({ ctx }) => {
+    assertTelegramAnnouncementScope(ctx.user.adminScope);
+
+    const settings = await db.settings.findUnique({
+      where: { key: 'telegram_bot' },
+      select: { value: true },
+    });
+    const parsed = parseTelegramBotSettingsValue(settings?.value);
+
+    if (!parsed) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Telegram bot settings are not configured.',
+      });
+    }
+
+    const migrationPlan = normalizeTelegramMigrationPlan(parsed.migrationPlan);
+    if (!migrationPlan.backupConfirmed) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Confirm the backup checkpoint before promoting the new bot.',
+      });
+    }
+    if (!migrationPlan.userNoticeConfirmed) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Confirm that users were notified before promoting the new bot.',
+      });
+    }
+
+    const nextBotToken = migrationPlan.botToken.trim();
+    if (!nextBotToken) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Add the new bot token in the migration plan first.',
+      });
+    }
+
+    let resolvedBotUsername = normalizeTelegramBotUsernameHandle(migrationPlan.botUsername);
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${nextBotToken}/getMe`);
+      const data = await response.json();
+
+      if (!response.ok || !data?.ok) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: data?.description || 'Invalid migration bot token',
+        });
+      }
+
+      if (typeof data.result?.username === 'string' && data.result.username.trim()) {
+        resolvedBotUsername = normalizeTelegramBotUsernameHandle(data.result.username);
+      }
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: `Failed to verify the new bot token: ${(error as Error).message}`,
+      });
+    }
+
+    const previousBotToken =
+      typeof parsed.botToken === 'string' && parsed.botToken.trim().length > 0
+        ? parsed.botToken.trim()
+        : null;
+    const previousBotUsername =
+      typeof parsed.botUsername === 'string' && parsed.botUsername.trim().length > 0
+        ? parsed.botUsername.trim()
+        : null;
+
+    if (previousBotToken && previousBotToken !== nextBotToken) {
+      try {
+        await fetch(`https://api.telegram.org/bot${previousBotToken}/deleteWebhook`);
+      } catch (error) {
+        console.error('Failed to delete old Telegram webhook during bot promotion:', error);
+      }
+    }
+
+    const nextValue = {
+      ...parsed,
+      botToken: nextBotToken,
+      botUsername: formatTelegramBotUsername(resolvedBotUsername),
+      webhookSecretToken: getTelegramWebhookSecret(nextBotToken),
+      migrationPlan: { ...EMPTY_TELEGRAM_MIGRATION_PLAN },
+    } satisfies Record<string, unknown>;
+
+    await db.settings.upsert({
+      where: { key: 'telegram_bot' },
+      create: {
+        key: 'telegram_bot',
+        value: serializeTelegramBotSettingsValue(nextValue),
+      },
+      update: {
+        value: serializeTelegramBotSettingsValue(nextValue),
+      },
+    });
+
+    await writeAuditLog({
+      action: 'TELEGRAM_BOT_MIGRATION_PROMOTED',
+      entity: 'SETTINGS',
+      entityId: 'telegram_bot',
+      details: {
+        previousBotUsername,
+        nextBotUsername: formatTelegramBotUsername(resolvedBotUsername) || null,
+        nextBotUrl: buildTelegramBotProfileUrl(resolvedBotUsername),
+        cutoverAt: new Date().toISOString(),
+      },
+      userId: ctx.user.id,
+    });
+
+    return {
+      success: true,
+      previousBotUsername,
+      botUsername: formatTelegramBotUsername(resolvedBotUsername) || null,
+    };
+  }),
 
   getSalesConfig: adminProcedure.query(async () => {
     const settings = await db.settings.findUnique({
