@@ -14,7 +14,7 @@ export const archivedKeysRouter = router({
   /**
    * List all archived keys with filtering and pagination.
    */
-  list: protectedProcedure
+  list: adminProcedure
     .input(
       z.object({
         page: z.number().min(1).default(1),
@@ -66,7 +66,7 @@ export const archivedKeysRouter = router({
   /**
    * Get statistics for archived keys.
    */
-  getStats: protectedProcedure.query(async () => {
+  getStats: adminProcedure.query(async () => {
     const [total, expired, depleted, deleted, disabled] = await Promise.all([
       db.archivedKey.count(),
       db.archivedKey.count({ where: { archiveReason: 'EXPIRED' } }),
@@ -146,7 +146,7 @@ export const archivedKeysRouter = router({
   /**
    * Export archived keys data for CSV/Excel.
    */
-  exportData: protectedProcedure
+  exportData: adminProcedure
     .input(
       z.object({
         reason: z.enum(['ALL', 'EXPIRED', 'DEPLETED', 'DELETED', 'DISABLED']).default('ALL'),

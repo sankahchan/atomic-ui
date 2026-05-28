@@ -716,9 +716,10 @@ export const telegramBotRouter = router({
       if (error instanceof TRPCError) {
         throw error;
       }
+      console.error('Failed to verify the new bot token:', error);
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: `Failed to verify the new bot token: ${(error as Error).message}`,
+        message: 'Failed to verify the new bot token. Check server logs for details.',
       });
     }
 
@@ -2086,9 +2087,10 @@ export const telegramBotRouter = router({
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
+        console.error('Failed to connect to Telegram:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to connect to Telegram: ${(error as Error).message}`,
+          message: 'Failed to connect to Telegram. Check server logs for details.',
         });
       }
     }),

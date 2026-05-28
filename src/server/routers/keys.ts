@@ -1172,9 +1172,10 @@ export const keysRouter = router({
 
         return accessKey;
       } catch (error) {
+        logger.error('Failed to create access key:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to create access key: ${(error as Error).message}`,
+          message: 'Failed to create access key. Check server logs for details.',
         });
       }
     }),
@@ -1461,9 +1462,10 @@ export const keysRouter = router({
 
         return accessKey;
       } catch (error) {
+        logger.error('Failed to update access key:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to update access key: ${(error as Error).message}`,
+          message: 'Failed to update access key. Check server logs for details.',
         });
       }
     }),
@@ -1547,7 +1549,7 @@ export const keysRouter = router({
    */
   generateQRCode: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const key = await db.accessKey.findUnique({
         where: { id: input.id },
       });
@@ -1558,6 +1560,13 @@ export const keysRouter = router({
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Access key not found or has no access URL',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this key',
         });
       }
 
@@ -1574,9 +1583,10 @@ export const keysRouter = router({
 
         return { qrCode };
       } catch (error) {
+        logger.error('Failed to generate QR code:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to generate QR code: ${(error as Error).message}`,
+          message: 'Failed to generate QR code. Check server logs for details.',
         });
       }
     }),

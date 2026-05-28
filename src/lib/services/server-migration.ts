@@ -363,10 +363,12 @@ export async function replaceAccessKeyServer(
     try {
       await sourceClient.deleteAccessKey(key.outlineKeyId);
     } catch (error) {
-      logger.warn(
-        `Failed to delete old Outline key ${key.outlineKeyId} after server replacement: ${
-          (error as Error).message
-        }`,
+      logger.error(
+        `Failed to delete old Outline key after server replacement — requires manual cleanup: ` +
+          `keyId=${key.outlineKeyId} ` +
+          `sourceServerId=${key.serverId} ` +
+          `sourceServerName="${key.server.name}" ` +
+          `error=${(error as Error).message}`,
       );
     }
 

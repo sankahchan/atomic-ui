@@ -68,14 +68,20 @@ export function SessionProvider({
         if (isLoggingOutRef.current) return;
         isLoggingOutRef.current = true;
 
-        fetch(withBasePath('/api/auth/logout'), { method: 'POST' }).finally(() => {
-            router.push('/login?reason=timeout');
-            toast({
-                title: "Session Expired",
-                description: "You have been logged out due to inactivity.",
-                variant: "destructive",
-            });
-        });
+        const doLogout = async () => {
+          try {
+            await fetch(withBasePath('/api/auth/logout'), { method: 'POST' });
+          } catch {
+            // Failed to reach server; redirect anyway
+          }
+          router.push('/login?reason=timeout');
+          toast({
+            title: "Session Expired",
+            description: "You have been logged out due to inactivity.",
+            variant: "destructive",
+          });
+        };
+        doLogout();
     }, [router, toast]);
 
     useEffect(() => {

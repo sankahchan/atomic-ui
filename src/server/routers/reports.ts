@@ -289,9 +289,10 @@ export const reportsRouter = router({
           },
         });
 
+        console.error('Failed to generate report:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to generate report: ${(error as Error).message}`,
+          message: 'Failed to generate report. Check server logs for details.',
         });
       }
     }),

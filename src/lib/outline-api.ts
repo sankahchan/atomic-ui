@@ -11,6 +11,27 @@
 
 import https from 'https';
 import type { TLSSocket } from 'tls';
+import { isIP } from 'node:net';
+
+function isBlockedHostname(hostname: string): boolean {
+  if (isIP(hostname)) {
+    return (
+      hostname === '0.0.0.0' ||
+      hostname === '0.0.0.0' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('10.') ||
+      hostname === '169.254.' ||
+      hostname.startsWith('192.168.') ||
+      (hostname.startsWith('172.') && parseInt(hostname.split('.')[1], 10) >= 16 && parseInt(hostname.split('.')[1], 10) <= 31) ||
+      hostname === '::1' ||
+      hostname.startsWith('fe80:') ||
+      hostname.startsWith('fc') ||
+      hostname.startsWith('fd')
+    );
+  }
+
+  return false;
+}
 
 // Type definitions for Outline API responses
 export interface OutlineServer {
@@ -108,6 +129,13 @@ export class OutlineClient {
     body?: unknown
   ): Promise<T> {
     const url = new URL(`${this.apiUrl}${path}`);
+
+    if (isBlockedHostname(url.hostname)) {
+      throw new OutlineApiError(
+        `Outline API hostname is not allowed: ${url.hostname}`,
+        0,
+      );
+    }
 
     return new Promise((resolve, reject) => {
       const requestBody = body ? JSON.stringify(body) : undefined;
