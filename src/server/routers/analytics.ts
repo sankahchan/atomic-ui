@@ -1047,7 +1047,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => {
       const cutoff = getDateCutoff(input.range);
 
-      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials, couponRedemptions, premiumRoutingEvents] = await Promise.all([
+      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials, couponRedemptions, premiumRoutingEvents, totalNewUsers] = await Promise.all([
         db.telegramOrder.findMany({
           where: {
             createdAt: { gte: cutoff },
@@ -1191,6 +1191,11 @@ export const analyticsRouter = router({
             createdAt: true,
           },
         }),
+        db.telegramUserProfile.count({
+          where: {
+            createdAt: { gte: cutoff },
+          },
+        }),
       ]);
 
       const summary = {
@@ -1204,6 +1209,7 @@ export const analyticsRouter = router({
         awaitingPayment: 0,
       };
       const funnel = {
+        botStarted: totalNewUsers,
         created: orders.length,
         paymentMethodSelected: 0,
         proofUploaded: 0,

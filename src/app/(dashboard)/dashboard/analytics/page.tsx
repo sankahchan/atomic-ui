@@ -327,12 +327,17 @@ export default function AnalyticsPage() {
   };
 
   const telegramFunnelSteps = useMemo(() => {
-    const created = telegramSalesDashboard?.funnel.created || 0;
+    const started = telegramSalesDashboard?.funnel.botStarted || 0;
     const rawSteps = [
+      {
+        key: 'started',
+        label: isMyanmar ? 'ဘော့စတင်ခဲ့သည်' : 'Bot started',
+        value: started,
+      },
       {
         key: 'created',
         label: isMyanmar ? 'အမှာစာ ဖန်တီးထားသည်' : 'Orders created',
-        value: created,
+        value: telegramSalesDashboard?.funnel.created || 0,
       },
       {
         key: 'method',
@@ -357,10 +362,10 @@ export default function AnalyticsPage() {
     ];
 
     return rawSteps.map((step, index) => {
-      const previousValue = index === 0 ? created : rawSteps[index - 1]?.value || 0;
+      const previousValue = index === 0 ? started : rawSteps[index - 1]?.value || 0;
       return {
         ...step,
-        cumulativeRate: created > 0 ? (step.value / created) * 100 : 0,
+        cumulativeRate: started > 0 ? (step.value / started) * 100 : 0,
         stepRate: index === 0 ? 100 : previousValue > 0 ? (step.value / previousValue) * 100 : 0,
         dropOff: index === 0 ? 0 : Math.max(previousValue - step.value, 0),
       };
@@ -1629,7 +1634,7 @@ export default function AnalyticsPage() {
                               </p>
                             </div>
                             <Badge variant="outline" className="border-cyan-400/30 bg-cyan-500/10 text-cyan-100">
-                              {step.key === 'created'
+                              {step.key === 'started'
                                 ? isMyanmar ? '100% စတင်' : '100% start'
                                 : isMyanmar
                                   ? `ယခင်အဆင့်မှ ${Math.round(step.stepRate)}%`
@@ -1643,14 +1648,37 @@ export default function AnalyticsPage() {
                             />
                           </div>
                           <p className="mt-2 text-xs text-muted-foreground">
-                            {step.key === 'created'
+                            {step.key === 'started'
                               ? isMyanmar
                                 ? 'ဝယ်ယူမှု လမ်းကြောင်းအတွက် စတင်အခြေခံ'
                                 : 'Baseline for the storefront funnel'
                               : isMyanmar
-                                ? `ဤအဆင့်မရောက်မီ ${step.dropOff} ခု ကျဆင်းခဲ့သည် • စတင်ခဲ့သော အော်ဒါများ၏ ${Math.round(step.cumulativeRate)}% သည် ဤနေရာသို့ ရောက်သည်`
-                                : `${step.dropOff} dropped before this step • ${Math.round(step.cumulativeRate)}% of created orders reached here`}
+                                ? `ဤအဆင့်မရောက်မီ ${step.dropOff} ခု ကျဆင်းခဲ့သည် • စတင်ခဲ့သော အသုံးပြုသူများ၏ ${Math.round(step.cumulativeRate)}% သည် ဤနေရာသို့ ရောက်သည်`
+                                : `${step.dropOff} dropped before this step • ${Math.round(step.cumulativeRate)}% of bot starters reached here`}
                           </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'အစီအစဉ်အလိုက် ပြောင်းလဲမှု' : 'Plan conversion'}</p>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'အစီအစဉ်အလိုက် ရောင်းချမှု စွမ်းဆောင်ရည်' : 'Sales performance by plan'}</h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {telegramSalesDashboard?.topPlans.map((plan) => (
+                        <div key={plan.planCode || plan.planName} className="ops-mini-tile">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{plan.planName}</p>
+                          <p className="mt-2 text-2xl font-semibold">
+                            {Math.round(plan.conversionRate)}%
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {plan.fulfilled} / {plan.orders} {isMyanmar ? 'အော်ဒါ ပြီးမြောက်သည်' : 'orders fulfilled'}
+                          </p>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
+                            <div
+                              className="h-full rounded-full bg-cyan-400 transition-[width]"
+                              style={{ width: `${Math.max(plan.conversionRate, plan.fulfilled > 0 ? 6 : 0)}%` }}
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
