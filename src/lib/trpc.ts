@@ -70,6 +70,10 @@ export function getTRPCClientConfig() {
           return fetch(url, {
             ...options,
             credentials: 'include',
+            headers: {
+              ...options?.headers,
+              'x-csrf': '1',
+            },
           });
         },
       }),

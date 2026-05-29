@@ -305,7 +305,7 @@ export default function LoginPage() {
                     'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300',
                     'transition-colors duration-150'
                   )}
-                  tabIndex={-1}
+                  tabIndex={0}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>

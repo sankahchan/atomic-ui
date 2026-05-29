@@ -21,8 +21,9 @@ export async function copyToClipboard(text: string, title: string = "Copied", de
     }
 
     // Fallback for HTTP / Older Browsers
+    let textArea: HTMLTextAreaElement | null = null;
     try {
-        const textArea = document.createElement("textarea");
+        textArea = document.createElement("textarea");
         textArea.value = text;
 
         // Ensure it's not visible but part of DOM
@@ -35,7 +36,6 @@ export async function copyToClipboard(text: string, title: string = "Copied", de
         textArea.select();
 
         const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
 
         if (successful) {
             toast({ title, description });
@@ -43,6 +43,10 @@ export async function copyToClipboard(text: string, title: string = "Copied", de
         }
     } catch (err) {
         console.error("Fallback clipboard failed", err);
+    } finally {
+        if (textArea?.parentNode) {
+            textArea.parentNode.removeChild(textArea);
+        }
     }
 
     toast({

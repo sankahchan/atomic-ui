@@ -64,6 +64,13 @@ export async function createContext(opts?: FetchCreateContextFnOptions): Promise
     })();
     userAgent = opts.req.headers.get('user-agent');
 
+    if (opts.req.method === 'POST' && opts.req.headers.get('x-csrf') !== '1') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'CSRF check failed',
+      });
+    }
+
     const forwardedFor = opts.req.headers.get('x-forwarded-for');
     const { normalizeIpAddress } = await import('@/lib/security');
     if (forwardedFor) {
