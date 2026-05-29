@@ -13,6 +13,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { TRPCClientError } from '@trpc/client';
 import { trpc, getTRPCClientConfig } from '@/lib/trpc';
 
 /**
@@ -49,9 +50,10 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
             
             // Retry once for transient errors, but don't retry auth/forbidden failures.
             retry: (failureCount, error) => {
-              const maybeData = (error as { data?: { code?: string } } | undefined)?.data;
-              const code = maybeData?.code;
-              if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN') return false;
+              if (error instanceof TRPCClientError) {
+                const code = error.data?.code;
+                if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN') return false;
+              }
               return failureCount < 1;
             },
             

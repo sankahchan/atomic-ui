@@ -58,23 +58,23 @@ export async function snapshotTraffic(): Promise<TrafficSnapshot> {
                         delta = effectiveUsedBytes;
                     }
 
-                    // 5. Create new log
-                    await db.trafficLog.create({
+                    // 5. Create new log and update key in a transaction
+                    await db.$transaction([
+                      db.trafficLog.create({
                         data: {
-                            accessKeyId: key.id,
-                            bytesUsed: effectiveUsedBytes,
-                            deltaBytes: delta,
+                          accessKeyId: key.id,
+                          bytesUsed: effectiveUsedBytes,
+                          deltaBytes: delta,
                         },
-                    });
-
-                    // 6. Keep the key record aligned with the effective cumulative usage.
-                    await db.accessKey.update({
+                      }),
+                      db.accessKey.update({
                         where: { id: key.id },
                         data: {
-                            usedBytes: effectiveUsedBytes,
-                            ...(rawBigInt < offset ? { usageOffset: BigInt(0) } : {}),
+                          usedBytes: effectiveUsedBytes,
+                          ...(rawBigInt < offset ? { usageOffset: BigInt(0) } : {}),
                         },
-                    });
+                      }),
+                    ]);
 
                     result.success++;
                 }

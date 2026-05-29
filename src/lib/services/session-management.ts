@@ -22,34 +22,41 @@ export function getConnectionSessionDurationMinutes(session: {
 }
 
 export async function refreshAccessKeySessionCounts(accessKeyId: string) {
-  const [activeSessionCount, accessKey] = await Promise.all([
-    db.connectionSession.count({
-      where: {
-        accessKeyId,
-        isActive: true,
-      },
-    }),
-    db.accessKey.findUnique({
+  const activeSessionCount = await db.connectionSession.count({
+    where: {
+      accessKeyId,
+      isActive: true,
+    },
+  });
+
+  const peakDevices = await db.$transaction(async (tx) => {
+    const accessKey = await tx.accessKey.findUnique({
       where: { id: accessKeyId },
       select: {
         peakDevices: true,
       },
-    }),
-  ]);
+    });
 
-  if (!accessKey) {
+    if (!accessKey) {
+      return null;
+    }
+
+    const newPeak = Math.max(accessKey.peakDevices ?? 0, activeSessionCount);
+
+    await tx.accessKey.update({
+      where: { id: accessKeyId },
+      data: {
+        estimatedDevices: activeSessionCount,
+        peakDevices: newPeak,
+      },
+    });
+
+    return newPeak;
+  });
+
+  if (peakDevices === null) {
     return null;
   }
-
-  const peakDevices = Math.max(accessKey.peakDevices ?? 0, activeSessionCount);
-
-  await db.accessKey.update({
-    where: { id: accessKeyId },
-    data: {
-      estimatedDevices: activeSessionCount,
-      peakDevices,
-    },
-  });
 
   return {
     estimatedDevices: activeSessionCount,
