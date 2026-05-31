@@ -34,6 +34,10 @@ function looksLikeHtml(value: string) {
   return /<\/?[a-z][^>]*>/i.test(value);
 }
 
+function sanitizeRecipient(value: string): string {
+  return value.replace(/[\r\n]/g, '').trim();
+}
+
 function getSmtpConfig(): SmtpConfig {
   const host = process.env.SMTP_HOST?.trim();
   if (!host) {
@@ -124,9 +128,13 @@ export async function sendNotificationEmail({
   const config = getSmtpConfig();
   const transporter = await getTransporter();
 
+  const recipient = Array.isArray(to)
+    ? to.map((addr) => sanitizeRecipient(addr))
+    : sanitizeRecipient(to);
+
   await transporter.sendMail({
     from: config.from,
-    to,
+    to: recipient,
     subject: `[Atomic-UI] ${formatEventLabel(event)}`,
     text: stripHtml(message) || message,
     html: buildHtmlBody(message),

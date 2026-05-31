@@ -303,11 +303,21 @@ export async function clearSessionCookie(): Promise<void> {
  * Invalidate a session by removing it from the database
  */
 export async function invalidateSession(token: string): Promise<void> {
-  await db.session.delete({
-    where: { token },
-  }).catch(() => {
-    // Session may already be deleted, ignore error
-  });
+  try {
+    await db.session.delete({
+      where: { token },
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as Record<string, unknown>).code === 'P2025'
+    ) {
+      return;
+    }
+
+    console.error('[Auth] Failed to invalidate session:', error);
+  }
 }
 
 /**

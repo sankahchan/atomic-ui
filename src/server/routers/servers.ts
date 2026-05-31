@@ -377,9 +377,10 @@ export const serversRouter = router({
       try {
         serverInfo = await client.getServerInfo();
       } catch (error) {
+        logger.error('Failed to connect to Outline server:', error);
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Failed to connect to Outline server: ${(error as Error).message}`,
+          message: 'Failed to connect to Outline server. Check the API URL and certificate are correct.',
         });
       }
 
@@ -1151,9 +1152,10 @@ export const serversRouter = router({
 
         return result;
       } catch (error) {
+        logger.error('Failed to sync server:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: `Failed to sync server: ${(error as Error).message}`,
+          message: 'Failed to sync server. Check server logs for details.',
         });
       }
     }),

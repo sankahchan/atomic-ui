@@ -10,7 +10,81 @@
  */
 
 import https from 'https';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import type { LookupAddress, LookupOptions } from 'node:dns';
 import type { TLSSocket } from 'tls';
+import { isIP } from 'node:net';
+import { isPlaywrightSmokeEnv } from './playwright-smoke';
+
+export function isBlockedIpAddress(hostname: string): boolean {
+  const normalizedHostname = hostname.trim().toLowerCase();
+  const family = isIP(normalizedHostname);
+
+  if (family === 4) {
+    const parts = normalizedHostname.split('.');
+    const firstOctet = Number.parseInt(parts[0] ?? '', 10);
+    const secondOctet = Number.parseInt(parts[1] ?? '', 10);
+
+    return (
+      normalizedHostname === '0.0.0.0' ||
+      firstOctet === 127 ||
+      firstOctet === 10 ||
+      (firstOctet === 169 && secondOctet === 254) ||
+      (firstOctet === 192 && secondOctet === 168) ||
+      (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31)
+    );
+  }
+
+  if (family === 6) {
+    if (normalizedHostname.startsWith('::ffff:')) {
+      return isBlockedIpAddress(normalizedHostname.slice('::ffff:'.length));
+    }
+
+    return (
+      normalizedHostname === '::' ||
+      normalizedHostname === '::1' ||
+      normalizedHostname.startsWith('fe80:') ||
+      normalizedHostname.startsWith('fc') ||
+      normalizedHostname.startsWith('fd')
+    );
+  }
+
+  return false;
+}
+
+export function isBlockedHostname(hostname: string): boolean {
+  const normalizedHostname = hostname.trim().toLowerCase().replace(/\.$/, '');
+
+  if (
+    normalizedHostname === 'localhost' ||
+    normalizedHostname.endsWith('.localhost') ||
+    normalizedHostname === 'localhost.localdomain' ||
+    normalizedHostname.endsWith('.localdomain') ||
+    normalizedHostname.endsWith('.local')
+  ) {
+    return true;
+  }
+
+  if (isBlockedIpAddress(normalizedHostname)) {
+    return true;
+  }
+
+  return false;
+}
+
+async function resolvePublicAddresses(hostname: string): Promise<LookupAddress[]> {
+  const addresses = await dnsLookup(hostname, { all: true, verbatim: true });
+  const blockedAddress = addresses.find((address) => isBlockedIpAddress(address.address));
+
+  if (blockedAddress) {
+    throw new OutlineApiError(
+      `Outline API hostname resolves to a blocked address: ${blockedAddress.address}`,
+      0,
+    );
+  }
+
+  return addresses;
+}
 
 // Type definitions for Outline API responses
 export interface OutlineServer {
@@ -108,9 +182,54 @@ export class OutlineClient {
     body?: unknown
   ): Promise<T> {
     const url = new URL(`${this.apiUrl}${path}`);
+    const allowPrivateOutlineTargets = isPlaywrightSmokeEnv();
+
+    if (!allowPrivateOutlineTargets && isBlockedHostname(url.hostname)) {
+      throw new OutlineApiError(
+        `Outline API hostname is not allowed: ${url.hostname}`,
+        0,
+      );
+    }
+
+    const resolvedAddresses = allowPrivateOutlineTargets
+      ? null
+      : await resolvePublicAddresses(url.hostname);
 
     return new Promise((resolve, reject) => {
       const requestBody = body ? JSON.stringify(body) : undefined;
+      const pinnedLookup: NonNullable<https.RequestOptions['lookup']> | undefined = resolvedAddresses
+        ? (
+            _hostname: string,
+            lookupOptions: LookupOptions,
+            callback: (
+              err: NodeJS.ErrnoException | null,
+              address: string | LookupAddress[],
+              family?: number,
+            ) => void,
+          ) => {
+            const requestedFamily = lookupOptions.family ?? 0;
+            const matches = requestedFamily
+              ? resolvedAddresses.filter((address) => address.family === requestedFamily)
+              : resolvedAddresses;
+
+            if (matches.length === 0) {
+              callback(
+                new Error('Outline API hostname did not resolve to a compatible address family'),
+                '',
+                4,
+              );
+              return;
+            }
+
+            if (lookupOptions.all) {
+              callback(null, matches);
+              return;
+            }
+
+            const [match] = matches;
+            callback(null, match.address, match.family);
+          }
+        : undefined;
 
       const options: https.RequestOptions = {
         hostname: url.hostname,
@@ -118,6 +237,7 @@ export class OutlineClient {
         path: url.pathname + url.search,
         method,
         agent: this.httpsAgent,
+        ...(pinnedLookup ? { lookup: pinnedLookup } : {}),
         headers: {
           'Content-Type': 'application/json',
           ...(requestBody ? { 'Content-Length': Buffer.byteLength(requestBody) } : {}),

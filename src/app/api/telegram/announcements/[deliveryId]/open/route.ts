@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { withAbsoluteBasePath } from '@/lib/base-path';
 import { getTelegramSupportLink } from '@/lib/services/telegram-runtime';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 function escapeHtml(value: string) {
   return value
@@ -13,10 +14,24 @@ function escapeHtml(value: string) {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ deliveryId: string }> },
 ) {
   const { deliveryId } = await context.params;
+
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip')
+    || 'unknown';
+  const budget = consumeRateLimit(`announce-open:${clientIp}`, {
+    limit: 60,
+    windowMs: 60_000,
+    blockMs: 60_000,
+  });
+
+  if (!budget.allowed) {
+    return new NextResponse('Too many requests', { status: 429 });
+  }
+
   const delivery = await db.telegramAnnouncementDelivery.findUnique({
     where: { id: deliveryId },
     include: {

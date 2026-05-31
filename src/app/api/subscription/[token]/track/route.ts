@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestIpFromHeaders } from '@/lib/audit';
+import { consumeRateLimit } from '@/lib/rate-limit';
 import { recordSubscriptionPageEventByToken } from '@/lib/services/subscription-events';
 import {
   isDeviceLimitEvidenceEventType,
@@ -15,6 +16,26 @@ export async function POST(
 
   if (!token) {
     return NextResponse.json({ error: 'Token is required' }, { status: 400 });
+  }
+
+  const clientIp = getRequestIpFromHeaders(request.headers) || 'unknown';
+  const budget = consumeRateLimit(`sub-track:${clientIp}`, {
+    limit: 60,
+    windowMs: 60_000,
+    blockMs: 60_000,
+  });
+
+  if (!budget.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      {
+        status: 429,
+        headers: {
+          'Cache-Control': 'no-store',
+          'Retry-After': String(Math.max(1, Math.ceil(budget.retryAfterMs / 1000))),
+        },
+      },
+    );
   }
 
   try {

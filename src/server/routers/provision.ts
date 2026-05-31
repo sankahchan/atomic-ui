@@ -413,9 +413,10 @@ export const provisionRouter = router({
                     sizes: r.sizes,
                 }));
         } catch (error) {
+            console.error('Failed to fetch regions:', error);
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
-                message: 'Failed to fetch regions: ' + (error as Error).message,
+                message: 'Failed to fetch regions. Check server logs for details.',
             });
         }
     }),
@@ -438,9 +439,10 @@ export const provisionRouter = router({
                     description: s.description, // e.g. "Basic"
                 }));
         } catch (error) {
+            console.error('Failed to fetch sizes:', error);
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
-                message: 'Failed to fetch sizes: ' + (error as Error).message,
+                message: 'Failed to fetch sizes. Check server logs for details.',
             });
         }
     }),
@@ -541,9 +543,10 @@ runcmd:
                     },
                 });
 
+                console.error('Failed to create droplet:', error);
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
-                    message: 'Failed to create droplet: ' + (error as Error).message,
+                    message: 'Failed to create droplet. Check server logs for details.',
                 });
             }
         }),
@@ -629,9 +632,10 @@ runcmd:
                     message: (error as Error).message,
                 });
                 await updateProvisioningRun(failedRun);
+                console.error('Failed to retry provisioning:', error);
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
-                    message: 'Failed to retry provisioning: ' + (error as Error).message,
+                    message: 'Failed to retry provisioning. Check server logs for details.',
                 });
             }
         }),
@@ -677,9 +681,10 @@ runcmd:
                     ip: getDropletPublicIp(droplet),
                 };
             } catch (error) {
+                console.error('Failed to get droplet:', error);
                 throw new TRPCError({
                     code: 'INTERNAL_SERVER_ERROR',
-                    message: 'Failed to get droplet: ' + (error as Error).message,
+                    message: 'Failed to get droplet. Check server logs for details.',
                 });
             }
         }),

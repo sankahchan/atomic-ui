@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { getJwtSecretString } from './session-secret';
 
 let warnedFallback = false;

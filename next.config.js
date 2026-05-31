@@ -36,7 +36,19 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 't.me',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.t.me',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.telegram.org',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.githubusercontent.com',
       },
     ],
   },
@@ -108,7 +120,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https:",
               "font-src 'self' data: https:",
               "style-src 'self' 'unsafe-inline' https:",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+              "script-src 'self' 'unsafe-inline' blob:",
               "connect-src 'self' https: wss: ws:",
               "media-src 'self' data: blob: https:",
             ].join('; '),
