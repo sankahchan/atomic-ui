@@ -33,7 +33,7 @@ function setSmokeEnv() {
   process.env.NEXT_PUBLIC_APP_URL = baseUrl;
   process.env.NEXTAUTH_URL = baseUrl;
   process.env.NEXT_PUBLIC_BASE_PATH = '';
-  process.env.JWT_SECRET = 'playwright-smoke-secret';
+  process.env.JWT_SECRET = 'playwright-smoke-secret-1234567890';
   process.env.DISABLE_SCHEDULER = '1';
   process.env.PLAYWRIGHT_SMOKE = '1';
 }
@@ -626,6 +626,51 @@ function startNextServer(): ChildProcess {
       stdio: 'inherit',
     });
     console.log('[smoke] Build complete – starting production server…');
+    const standaloneServerPath = path.join(repoRoot, '.next', 'standalone', 'server.js');
+    if (fs.existsSync(standaloneServerPath)) {
+      const standaloneRoot = path.dirname(standaloneServerPath);
+      const standaloneNextDir = path.join(standaloneRoot, '.next');
+      const standaloneStaticPath = path.join(standaloneNextDir, 'static');
+      const builtStaticPath = path.join(repoRoot, '.next', 'static');
+      const standalonePublicPath = path.join(standaloneRoot, 'public');
+      const publicPath = path.join(repoRoot, 'public');
+      const standaloneGeoIpNodeModulesPath = path.join(
+        standaloneRoot,
+        'node_modules',
+        'geoip-lite',
+        'data',
+      );
+      const standaloneGeoIpServerPath = path.join(standaloneNextDir, 'server', 'data');
+      const builtGeoIpDataPath = path.join(repoRoot, 'node_modules', 'geoip-lite', 'data');
+
+      fs.mkdirSync(standaloneNextDir, { recursive: true });
+      fs.rmSync(standaloneStaticPath, { recursive: true, force: true });
+      fs.cpSync(builtStaticPath, standaloneStaticPath, { recursive: true });
+
+      if (fs.existsSync(publicPath)) {
+        fs.rmSync(standalonePublicPath, { recursive: true, force: true });
+        fs.cpSync(publicPath, standalonePublicPath, { recursive: true });
+      }
+
+      if (fs.existsSync(builtGeoIpDataPath)) {
+        fs.rmSync(standaloneGeoIpNodeModulesPath, { recursive: true, force: true });
+        fs.rmSync(standaloneGeoIpServerPath, { recursive: true, force: true });
+        fs.mkdirSync(path.dirname(standaloneGeoIpNodeModulesPath), { recursive: true });
+        fs.mkdirSync(path.dirname(standaloneGeoIpServerPath), { recursive: true });
+        fs.cpSync(builtGeoIpDataPath, standaloneGeoIpNodeModulesPath, { recursive: true });
+        fs.cpSync(builtGeoIpDataPath, standaloneGeoIpServerPath, { recursive: true });
+      }
+
+      return spawn('node', [standaloneServerPath], {
+        cwd: repoRoot,
+        env: {
+          ...buildEnv,
+          HOSTNAME: '127.0.0.1',
+          PORT: String(appPort),
+        },
+        stdio: 'inherit',
+      });
+    }
     return spawn(
       'npx',
       ['next', 'start', '-p', String(appPort), '--hostname', '127.0.0.1'],
