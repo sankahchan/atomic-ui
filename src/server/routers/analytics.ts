@@ -12,6 +12,7 @@ import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { SUBSCRIPTION_EVENT_TYPES } from '@/lib/services/subscription-events';
 import { resolveTelegramRejectionReasonLabel } from '@/lib/services/telegram-sales';
+import { buildTelegramSalesFunnel } from '@/lib/services/telegram-sales-analytics';
 
 // Time range options
 const timeRangeSchema = z.enum(['24h', '7d', '30d']);
@@ -1047,7 +1048,7 @@ export const analyticsRouter = router({
     .query(async ({ input }) => {
       const cutoff = getDateCutoff(input.range);
 
-      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials, couponRedemptions, premiumRoutingEvents, totalNewUsers] = await Promise.all([
+      const [orders, recentOrders, premiumSupportRequests, openSupportRequests, fulfilledTrials, couponRedemptions, premiumRoutingEvents, newUserProfiles] = await Promise.all([
         db.telegramOrder.findMany({
           where: {
             createdAt: { gte: cutoff },
@@ -1191,9 +1192,13 @@ export const analyticsRouter = router({
             createdAt: true,
           },
         }),
-        db.telegramUserProfile.count({
+        db.telegramUserProfile.findMany({
           where: {
             createdAt: { gte: cutoff },
+          },
+          select: {
+            telegramUserId: true,
+            telegramChatId: true,
           },
         }),
       ]);
@@ -1208,14 +1213,7 @@ export const analyticsRouter = router({
         renewalOrders: 0,
         awaitingPayment: 0,
       };
-      const funnel = {
-        botStarted: totalNewUsers,
-        created: orders.length,
-        paymentMethodSelected: 0,
-        proofUploaded: 0,
-        reviewed: 0,
-        fulfilled: 0,
-      };
+      const funnel = buildTelegramSalesFunnel(newUserProfiles, orders);
       const reminders = {
         paymentReminderSent: 0,
         paymentReminderConverted: 0,
@@ -1527,18 +1525,6 @@ export const analyticsRouter = router({
           couponCampaigns.set(campaignType, currentCampaign);
         }
 
-        if (order.paymentMethodCode || order.paymentMethodLabel) {
-          funnel.paymentMethodSelected += 1;
-        }
-        if (order.paymentSubmittedAt || order.status === 'PENDING_REVIEW' || order.reviewedAt || order.fulfilledAt) {
-          funnel.proofUploaded += 1;
-        }
-        if (order.reviewedAt || order.status === 'FULFILLED' || order.status === 'REJECTED') {
-          funnel.reviewed += 1;
-        }
-        if (order.status === 'FULFILLED' || order.fulfilledAt) {
-          funnel.fulfilled += 1;
-        }
         if (order.paymentReminderSentAt) {
           reminders.paymentReminderSent += 1;
           if (order.status === 'FULFILLED' || order.paymentSubmittedAt || order.reviewedAt) {

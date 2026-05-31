@@ -336,7 +336,7 @@ export default function AnalyticsPage() {
       },
       {
         key: 'created',
-        label: isMyanmar ? 'အမှာစာ ဖန်တီးထားသည်' : 'Orders created',
+        label: isMyanmar ? 'အော်ဒါ စတင်ခဲ့သည်' : 'Started order',
         value: telegramSalesDashboard?.funnel.created || 0,
       },
       {
@@ -1566,7 +1566,7 @@ export default function AnalyticsPage() {
                 <div className="space-y-4">
                   <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-4 dark:bg-white/[0.03]">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{isMyanmar ? 'ပြောင်းလဲမှု လမ်းကြောင်း' : 'Conversion funnel'}</p>
-                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'တယ်လီဂရမ် ဝယ်ယူမှု လုပ်ငန်းစဉ်' : 'Telegram storefront flow'}</h3>
+                    <h3 className="mt-2 text-lg font-semibold">{isMyanmar ? 'ဘော့အသုံးပြုသူအသစ် ဝယ်ယူမှု လုပ်ငန်းစဉ်' : 'New bot-user storefront flow'}</h3>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="ops-mini-tile">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -1604,7 +1604,7 @@ export default function AnalyticsPage() {
                             : `${Math.round(telegramFunnelSteps[telegramFunnelSteps.length - 1]?.cumulativeRate || 0)}%`}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {isMyanmar ? 'စတင်ဖန်တီးခဲ့သော အော်ဒါများအနက် ပြီးမြောက်သွားသော အချိုး' : 'Created orders that became fulfilled'}
+                          {isMyanmar ? 'ဘော့စတင်သူအသစ်များထဲမှ ပေးပို့ပြီးမြောက်သည့် အသုံးပြုသူအချိုး' : 'New bot starters who reached fulfillment'}
                         </p>
                       </div>
                       <div className="ops-mini-tile">
@@ -1617,7 +1617,7 @@ export default function AnalyticsPage() {
                             : `${Math.max(...telegramFunnelSteps.map((step) => step.dropOff))}`}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {isMyanmar ? 'အဆင့်တစ်ခုနှင့် နောက်အဆင့်ကြား လက်လွတ်သွားသော အသုံးပြုသူများ' : 'Users lost between one step and the next'}
+                          {isMyanmar ? 'အသုံးပြုသူအဆင့်တစ်ခုနှင့် နောက်အဆင့်ကြား လက်လွတ်သွားသော အသစ်စတင်သူများ' : 'New starters lost between one user step and the next'}
                         </p>
                       </div>
                     </div>
@@ -1650,8 +1650,8 @@ export default function AnalyticsPage() {
                           <p className="mt-2 text-xs text-muted-foreground">
                             {step.key === 'started'
                               ? isMyanmar
-                                ? 'ဝယ်ယူမှု လမ်းကြောင်းအတွက် စတင်အခြေခံ'
-                                : 'Baseline for the storefront funnel'
+                                ? 'ဝယ်ယူမှု လမ်းကြောင်းအတွက် အသုံးပြုသူအခြေခံ'
+                                : 'User cohort baseline for the storefront funnel'
                               : isMyanmar
                                 ? `ဤအဆင့်မရောက်မီ ${step.dropOff} ခု ကျဆင်းခဲ့သည် • စတင်ခဲ့သော အသုံးပြုသူများ၏ ${Math.round(step.cumulativeRate)}% သည် ဤနေရာသို့ ရောက်သည်`
                                 : `${step.dropOff} dropped before this step • ${Math.round(step.cumulativeRate)}% of bot starters reached here`}
