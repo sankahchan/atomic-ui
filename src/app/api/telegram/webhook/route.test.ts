@@ -24,6 +24,20 @@ const baseWebhookDeps: TelegramWebhookRouteDeps = {
     defaultLanguage: 'en' as const,
     showLanguageSelectorOnStart: true,
   }),
+  getTelegramBotConfigs: async () => ({
+    active: {
+      botToken: 'bot-token',
+      webhookSecretToken: 'expected-secret',
+      adminChatIds: [],
+      dailyDigestEnabled: false,
+      dailyDigestHour: 9,
+      dailyDigestMinute: 0,
+      digestLookbackHours: 24,
+      defaultLanguage: 'en' as const,
+      showLanguageSelectorOnStart: true,
+    },
+    migration: null,
+  }),
   handleTelegramUpdate: async () => null,
   sendTelegramMessage: async () => true,
   requireAdminRouteScope: async () => ({
@@ -93,6 +107,54 @@ test('telegram webhook accepts requests with the correct webhook secret header',
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true });
   assert.deepEqual(handledUpdate, { update_id: 42 });
+});
+
+test('telegram webhook accepts requests for the staged migration bot secret header', async () => {
+  let handledWithBot: string | null = null;
+  const request = new NextRequest('https://example.com/api/telegram/webhook', {
+    method: 'POST',
+    body: JSON.stringify({ update_id: 99 }),
+    headers: {
+      'content-type': 'application/json',
+      [TELEGRAM_WEBHOOK_SECRET_HEADER]: 'migration-secret',
+    },
+  });
+
+  const response = await handleTelegramWebhookPost(request, {
+    ...baseWebhookDeps,
+    getTelegramBotConfigs: async () => ({
+      active: {
+        botToken: 'bot-token',
+        webhookSecretToken: 'expected-secret',
+        adminChatIds: [],
+        dailyDigestEnabled: false,
+        dailyDigestHour: 9,
+        dailyDigestMinute: 0,
+        digestLookbackHours: 24,
+        defaultLanguage: 'en',
+        showLanguageSelectorOnStart: true,
+      },
+      migration: {
+        botToken: 'migration-token',
+        webhookSecretToken: 'migration-secret',
+        adminChatIds: [],
+        dailyDigestEnabled: false,
+        dailyDigestHour: 9,
+        dailyDigestMinute: 0,
+        digestLookbackHours: 24,
+        defaultLanguage: 'en',
+        showLanguageSelectorOnStart: true,
+      },
+    }),
+    handleTelegramUpdate: async (_update, config) => {
+      handledWithBot = config?.botToken || null;
+      return null;
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.equal(handledWithBot, 'migration-token');
 });
 
 test('telegram webhook setup must use POST instead of GET', async () => {

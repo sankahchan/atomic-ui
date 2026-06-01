@@ -519,6 +519,9 @@ model TelegramUserProfile {
   username       String?
   displayName    String?
   locale         String?
+  startedBotUsernamesJson String @default("[]")
+  lastSeenBotUsername String?
+  lastSeenBotAt   DateTime?
   referralCode   String?  @unique
   referredByCode String?
   pendingReferralCode String?

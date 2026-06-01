@@ -1,5 +1,6 @@
 export { handleTelegramUpdate } from '@/lib/services/telegram-bot-dispatch';
 export type { TelegramUpdate } from '@/lib/services/telegram-domain-types';
+export type { TelegramConfig } from '@/lib/services/telegram-runtime';
 
 export {
   approveTelegramOrder,
@@ -28,3 +29,5 @@ export {
   handleTelegramPremiumSupportRequest,
   getTelegramConfig,
 } from '@/lib/services/telegram-bot-core';
+
+export { getTelegramBotConfigs } from '@/lib/services/telegram-runtime';

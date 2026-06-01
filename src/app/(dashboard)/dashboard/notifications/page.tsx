@@ -220,18 +220,37 @@ type TelegramMigrationPlan = {
 type TelegramMigrationReadiness = {
   currentBotUsername: string | null;
   migrationBotUsername: string | null;
-  hardCutover: boolean;
+  overlapEnabled: boolean;
+  finalCutoverRequired: boolean;
   linkedUsersCount: number;
   linkedAccessKeysCount: number;
   linkedDynamicKeysCount: number;
   reachableIdentityCount: number;
+  startedMigrationIdentityCount: number;
+  startedMigrationProfileCount: number;
   activeOrderCount: number;
   openSupportThreadCount: number;
   openPremiumRequestCount: number;
   pendingLinkTokenCount: number;
   adminChatIdsConfigured: number;
   adminUsersMissingChatId: number;
+  adminStartedMigrationCount: number;
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+};
+
+type TelegramWebhookInfo = {
+  webhookSet: boolean;
+  webhookUrl?: string | null;
+  pendingUpdateCount?: number;
+  lastErrorDate?: number | null;
+  lastErrorMessage?: string | null;
+  migration?: {
+    webhookSet: boolean;
+    webhookUrl?: string | null;
+    pendingUpdateCount?: number;
+    lastErrorDate?: number | null;
+    lastErrorMessage?: string | null;
+  } | null;
 };
 
 type TelegramAnnouncementAudience = 'ACTIVE_USERS' | 'STANDARD_USERS' | 'PREMIUM_USERS' | 'TRIAL_USERS' | 'DIRECT_USER';
@@ -1507,12 +1526,12 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     migrationTab: isMyanmar ? 'ဘော့ ပြောင်းရွှေ့မှု' : 'Migration',
     migrationTitle: isMyanmar ? 'Telegram ဘော့ ပြောင်းရွှေ့မှု' : 'Telegram bot migration',
     migrationDesc: isMyanmar
-      ? 'ဘော့အသစ် သတ်မှတ်ခြင်း၊ အသုံးပြုသူ ထိခိုက်မှုကို စစ်ဆေးခြင်းနှင့် hard cutover မတိုင်မီ စစ်ဆေးရန် လိုသည့် အရာများကို စုစည်းထားသည်။'
-      : 'Stage a new bot, inspect migration impact, and verify the hard-cutover checklist before switching tokens.',
-    migrationHardCutover: isMyanmar ? 'လက်ရှိ runtime သည် hard cutover တစ်ခုတည်းကိုသာ ပံ့ပိုးသည်' : 'The current runtime supports hard cutover only',
+      ? 'ဘော့အသစ်ကို overlap mode ဖြင့် ဖွင့်ထားပြီး adoption ကို စောင့်ကြည့်နိုင်သည်။ Promote လုပ်သောအခါ final cutover ပြုလုပ်မည်။'
+      : 'Keep the new bot live in overlap mode, monitor adoption, and use Promote for the final cutover.',
+    migrationHardCutover: isMyanmar ? 'Overlap mode သုံးနိုင်ပြီး Promote သည် final cutover ဖြစ်သည်' : 'Overlap mode is available; Promote is the final cutover',
     migrationHardCutoverDesc: isMyanmar
-      ? 'Atomic-UI သည် တစ်ချိန်တည်းတွင် ဘော့တစ်ခုသာ အလုပ်လုပ်စေသည်။ Bot အသစ်ကို Start မလုပ်ရသေးသော အသုံးပြုသူများသည် update မရနိုင်ပါ။'
-      : 'Atomic-UI only runs one active Telegram bot at a time. Users who have not started the new bot yet may stop receiving updates after cutover.',
+      ? 'အသုံးပြုသူက bot အသစ်ကို Start လုပ်ပြီးလျှင် overlap ကာလအတွင်း update များကို bot အသစ်မှ ပို့နိုင်သည်။ Promote လုပ်ပါက bot အဟောင်း webhook ကို ရပ်မည်။'
+      : 'Once a user starts the new bot, overlap delivery can prefer it before cutover. Promote retires the old webhook.',
     migrationEnable: isMyanmar ? 'ပြောင်းရွှေ့မှု အစီအစဉ်ကို သိမ်းမည်' : 'Track a migration plan',
     migrationEnableDesc: isMyanmar ? 'ဘော့အသစ် အချက်အလက်၊ ကြေညာချက် စာသားနှင့် cutover checklist ကို သိမ်းထားမည်။' : 'Persist the new bot details, announcement copy, and cutover checklist in this workspace.',
     migrationNextToken: isMyanmar ? 'ဘော့အသစ် token' : 'New bot token',
@@ -1523,6 +1542,12 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     migrationCopyAnnouncement: isMyanmar ? 'ကြေညာချက်ကို ကူးမည်' : 'Copy announcement',
     migrationAnnouncementCopied: isMyanmar ? 'ပြောင်းရွှေ့မှု ကြေညာချက်ကို ကူးပြီးပါပြီ' : 'Migration announcement copied',
     migrationLinkPreview: isMyanmar ? 'ဘော့အသစ် link' : 'New bot link',
+    migrationWebhookTitle: isMyanmar ? 'ဘော့အသစ် webhook' : 'New bot webhook',
+    migrationWebhookDesc: isMyanmar ? 'Overlap mode စတင်ရန် bot အသစ် webhook ကို ဖွင့်ထားရမည်။' : 'Activate the new bot webhook so overlap traffic can start before promote.',
+    migrationWebhookReady: isMyanmar ? 'Webhook active' : 'Webhook active',
+    migrationWebhookMissing: isMyanmar ? 'Webhook မဖွင့်ရသေးပါ' : 'Webhook not active yet',
+    migrationSetWebhook: isMyanmar ? 'ဘော့အသစ် webhook ကို ဖွင့်မည်' : 'Activate new bot webhook',
+    migrationRemoveWebhook: isMyanmar ? 'ဘော့အသစ် webhook ကို ဖယ်မည်' : 'Remove new bot webhook',
     migrationBackupConfirmed: isMyanmar ? 'backup နှင့် rollback checkpoint ကို ပြီးစီးပြီးဟု အတည်ပြုသည်' : 'I confirmed the backup and rollback checkpoint',
     migrationUserNoticeConfirmed: isMyanmar ? 'အသုံးပြုသူများကို bot အသစ် Start လုပ်ရန် ကြိုတင် အသိပေးပြီးဟု အတည်ပြုသည်' : 'I confirmed users were notified to start the new bot',
     migrationPromote: isMyanmar ? 'ဘော့အသစ်ကို active bot အဖြစ် ပြောင်းမည်' : 'Promote new bot to active bot',
@@ -1531,6 +1556,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     migrationPromoteFailed: isMyanmar ? 'ဘော့ ပြောင်းရွှေ့မှု မအောင်မြင်ပါ' : 'Bot migration failed',
     migrationRiskTitle: isMyanmar ? 'Cutover ထိခိုက်မှု' : 'Cutover impact',
     migrationReachableUsers: isMyanmar ? 'Telegram identifiers' : 'Telegram identities',
+    migrationStartedUsers: isMyanmar ? 'ဘော့အသစ် Start လုပ်ပြီးသူများ' : 'Started new bot',
     migrationLinkedUsers: isMyanmar ? 'chat ချိတ်ထားသော users' : 'Users with chat link',
     migrationLinkedAccessKeys: isMyanmar ? 'Telegram ချိတ်ထားသော access keys' : 'Access keys linked to Telegram',
     migrationLinkedDynamicKeys: isMyanmar ? 'Telegram ချိတ်ထားသော dynamic keys' : 'Dynamic keys linked to Telegram',
@@ -1540,6 +1566,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
     migrationPendingLinks: isMyanmar ? 'မသုံးရသေးသော link tokens' : 'Unused link tokens',
     migrationAdminChatIds: isMyanmar ? 'configured admin chats' : 'Configured admin chats',
     migrationAdminMissing: isMyanmar ? 'Telegram chat မချိတ်ထားသော admins' : 'Admins missing Telegram chat link',
+    migrationAdminStarted: isMyanmar ? 'ဘော့အသစ် Start လုပ်ပြီးသော admins' : 'Admins started new bot',
     migrationRiskLow: isMyanmar ? 'နိမ့်' : 'Low',
     migrationRiskMedium: isMyanmar ? 'အလယ်အလတ်' : 'Medium',
     migrationRiskHigh: isMyanmar ? 'မြင့်' : 'High',
@@ -1807,7 +1834,10 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       // Automatically register the webhook if a token is present
       if (variables.botToken?.trim() && typeof window !== 'undefined') {
         const webhookUrl = `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
-        setWebhookMutation.mutate({ webhookUrl });
+        setWebhookMutation.mutate({ webhookUrl, target: 'ACTIVE' });
+        if (variables.migrationPlan?.enabled && variables.migrationPlan.botToken?.trim()) {
+          setWebhookMutation.mutate({ webhookUrl, target: 'MIGRATION' });
+        }
       }
 
       toast({
@@ -1923,7 +1953,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
 
       if (typeof window !== 'undefined') {
         const nextWebhookUrl = `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
-        setWebhookMutation.mutate({ webhookUrl: nextWebhookUrl });
+        setWebhookMutation.mutate({ webhookUrl: nextWebhookUrl, target: 'ACTIVE' });
       }
 
       toast({
@@ -2323,6 +2353,8 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
       ? ''
       : `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/api/telegram/webhook`;
   const migrationReadiness = migrationReadinessQuery.data as TelegramMigrationReadiness | undefined;
+  const webhookInfo = webhookInfoQuery.data as TelegramWebhookInfo | undefined;
+  const migrationWebhookInfo = webhookInfo?.migration;
   const migrationAnnouncementPreview = useMemo(
     () =>
       buildSuggestedTelegramMigrationAnnouncement({
@@ -2833,15 +2865,15 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                     {webhookUrl || telegramUi.webhookUnavailable}
                   </div>
                   <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
-                    <p>{telegramUi.pendingUpdates}: <span className="font-medium text-foreground">{webhookInfoQuery.data?.pendingUpdateCount ?? 0}</span></p>
-                    {webhookInfoQuery.data?.lastErrorMessage ? <p className="text-destructive">{telegramUi.lastError}: {webhookInfoQuery.data.lastErrorMessage}</p> : null}
+                    <p>{telegramUi.pendingUpdates}: <span className="font-medium text-foreground">{webhookInfo?.pendingUpdateCount ?? 0}</span></p>
+                    {webhookInfo?.lastErrorMessage ? <p className="text-destructive">{telegramUi.lastError}: {webhookInfo.lastErrorMessage}</p> : null}
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <Button type="button" className="rounded-full" onClick={() => setWebhookMutation.mutate({ webhookUrl })} disabled={!hasToken || !webhookUrl || setWebhookMutation.isPending}>
+                    <Button type="button" className="rounded-full" onClick={() => setWebhookMutation.mutate({ webhookUrl, target: 'ACTIVE' })} disabled={!hasToken || !webhookUrl || setWebhookMutation.isPending}>
                       {setWebhookMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
                       {t('settings.telegram.set_webhook')}
                     </Button>
-                    <Button type="button" variant="outline" className="rounded-full" onClick={() => deleteWebhookMutation.mutate()} disabled={!hasToken || deleteWebhookMutation.isPending}>
+                    <Button type="button" variant="outline" className="rounded-full" onClick={() => deleteWebhookMutation.mutate({ target: 'ACTIVE' })} disabled={!hasToken || deleteWebhookMutation.isPending}>
                       {deleteWebhookMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
                       {t('settings.telegram.remove_webhook')}
                     </Button>
@@ -3044,6 +3076,50 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                     </div>
                   </div>
 
+                  <div className="rounded-2xl border border-border/60 bg-background/55 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{telegramUi.migrationWebhookTitle}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{telegramUi.migrationWebhookDesc}</p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          migrationWebhookInfo?.webhookSet
+                            ? 'border-emerald-500/50 text-emerald-600'
+                            : 'border-amber-500/50 text-amber-600',
+                        )}
+                      >
+                        {migrationWebhookInfo?.webhookSet ? telegramUi.migrationWebhookReady : telegramUi.migrationWebhookMissing}
+                      </Badge>
+                    </div>
+                    <div className="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3 text-xs break-all">
+                      {migrationWebhookInfo?.webhookUrl || webhookUrl || telegramUi.webhookUnavailable}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => setWebhookMutation.mutate({ webhookUrl, target: 'MIGRATION' })}
+                        disabled={!form.migrationPlan.botToken.trim() || !webhookUrl || setWebhookMutation.isPending}
+                      >
+                        {setWebhookMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                        {telegramUi.migrationSetWebhook}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => deleteWebhookMutation.mutate({ target: 'MIGRATION' })}
+                        disabled={!form.migrationPlan.botToken.trim() || deleteWebhookMutation.isPending}
+                      >
+                        {deleteWebhookMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                        {telegramUi.migrationRemoveWebhook}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="space-y-3 rounded-2xl border border-border/60 bg-background/55 p-4">
                     <label className="flex items-center gap-3">
                       <Switch
@@ -3085,6 +3161,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                         promoteMigrationBotMutation.isPending
                         || !form.migrationPlan.enabled
                         || !form.migrationPlan.botToken.trim()
+                        || !migrationWebhookInfo?.webhookSet
                         || !form.migrationPlan.backupConfirmed
                         || !form.migrationPlan.userNoticeConfirmed
                       }
@@ -3104,7 +3181,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                 <CardHeader>
                   <CardTitle>{telegramUi.migrationRiskTitle}</CardTitle>
                   <CardDescription>
-                    {isMyanmar ? 'Bot အဟောင်းကို ဖယ်ရှားမီ ထိခိုက်မည့် user/workload ကို စစ်ဆေးပါ။' : 'Review the live Telegram workload before removing the old bot.'}
+                    {isMyanmar ? 'Overlap adoption နှင့် live workload ကို စစ်ဆေးပြီး Promote မလုပ်မီ အန္တရာယ်ကို ချိန်ဆပါ။' : 'Inspect overlap adoption and live Telegram workload before the final promote.'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -3112,7 +3189,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                     <div>
                       <p className="text-sm font-medium">{isMyanmar ? 'Migration ပြောင်းရွှေ့မှု အန္တရာယ်' : 'Migration risk'}</p>
                       <p className="text-xs text-muted-foreground">
-                        {migrationReadiness?.hardCutover ? telegramUi.migrationHardCutoverDesc : ''}
+                        {telegramUi.migrationHardCutoverDesc}
                       </p>
                     </div>
                     <Badge
@@ -3138,6 +3215,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                     <div className="grid gap-3 sm:grid-cols-2">
                       {[
                         [telegramUi.migrationReachableUsers, migrationReadiness?.reachableIdentityCount ?? 0],
+                        [telegramUi.migrationStartedUsers, migrationReadiness?.startedMigrationIdentityCount ?? 0],
                         [telegramUi.migrationLinkedUsers, migrationReadiness?.linkedUsersCount ?? 0],
                         [telegramUi.migrationLinkedAccessKeys, migrationReadiness?.linkedAccessKeysCount ?? 0],
                         [telegramUi.migrationLinkedDynamicKeys, migrationReadiness?.linkedDynamicKeysCount ?? 0],
@@ -3147,6 +3225,7 @@ function TelegramBotSetupCard({ isActive }: { isActive: boolean }) {
                         [telegramUi.migrationPendingLinks, migrationReadiness?.pendingLinkTokenCount ?? 0],
                         [telegramUi.migrationAdminChatIds, migrationReadiness?.adminChatIdsConfigured ?? 0],
                         [telegramUi.migrationAdminMissing, migrationReadiness?.adminUsersMissingChatId ?? 0],
+                        [telegramUi.migrationAdminStarted, migrationReadiness?.adminStartedMigrationCount ?? 0],
                       ].map(([label, value]) => (
                         <div key={String(label)} className="rounded-2xl border border-border/60 bg-background/55 p-4">
                           <p className="text-xs text-muted-foreground">{label}</p>

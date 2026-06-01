@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { db } from '@/lib/db';
 import { coerceSupportedLocale, type SupportedLocale } from '@/lib/i18n/config';
 import {
@@ -34,6 +35,7 @@ import {
   serializeTelegramBotSettingsValue,
   telegramBotSettingsNeedSecretMigration,
 } from '@/lib/telegram-bot-settings';
+import { normalizeTelegramBotUsernameHandle } from '@/lib/services/telegram-bot-identity';
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 const TELEGRAM_API_TIMEOUT_MS = 15_000;
@@ -52,6 +54,7 @@ const TELEGRAM_API_RETRYABLE_CODES = new Set([
 const TELEGRAM_COMMAND_SYNC_SIGNATURE = new Map<string, string>();
 const TELEGRAM_COMMAND_SYNC_FAILURE_SIGNATURE = new Set<string>();
 const TELEGRAM_MALFORMED_CHANNEL_WARNINGS = new Set<string>();
+const telegramRequestContext = new AsyncLocalStorage<TelegramConfig>();
 
 type TelegramCommandScope = {
   type: string;
@@ -173,6 +176,108 @@ export interface TelegramConfig {
   digestLookbackHours?: number;
   defaultLanguage?: SupportedLocale;
   showLanguageSelectorOnStart?: boolean;
+  role?: 'ACTIVE' | 'MIGRATION' | 'LEGACY_CHANNEL';
+}
+
+type TelegramBotConfigSet = {
+  active: TelegramConfig | null;
+  migration: TelegramConfig | null;
+};
+
+function normalizeTelegramStartedBotUsernames(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return [] as string[];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [] as string[];
+    }
+
+    return Array.from(
+      new Set(
+        parsed
+          .map((entry) => normalizeTelegramBotUsernameHandle(typeof entry === 'string' ? entry : ''))
+          .filter((entry) => entry.length > 0),
+      ),
+    );
+  } catch {
+    return [] as string[];
+  }
+}
+
+function serializeTelegramStartedBotUsernames(handles: string[]) {
+  return JSON.stringify(
+    Array.from(
+      new Set(
+        handles
+          .map((entry) => normalizeTelegramBotUsernameHandle(entry))
+          .filter((entry) => entry.length > 0),
+      ),
+    ),
+  );
+}
+
+function buildTelegramConfigFromSettingsRecord(
+  config: Record<string, unknown>,
+  options: {
+    botToken: string;
+    botUsername?: string | null;
+    webhookSecretToken?: string | null;
+    role: TelegramConfig['role'];
+  },
+): TelegramConfig {
+  const localizedWelcomeMessages = buildDefaultTelegramTemplateMap(
+    DEFAULT_TELEGRAM_WELCOME_MESSAGES,
+    config.localizedWelcomeMessages,
+  );
+  const localizedKeyNotFoundMessages = buildDefaultTelegramTemplateMap(
+    DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
+    config.localizedKeyNotFoundMessages,
+  );
+  const adminChatIds = Array.isArray(config.adminChatIds)
+    ? config.adminChatIds.filter(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+      )
+    : [];
+
+  return {
+    botToken: options.botToken,
+    botUsername:
+      typeof options.botUsername === 'string' && options.botUsername.trim()
+        ? options.botUsername
+        : undefined,
+    webhookSecretToken:
+      options.webhookSecretToken || getTelegramWebhookSecret(options.botToken),
+    adminChatIds,
+    welcomeMessage:
+      typeof config.welcomeMessage === 'string' && config.welcomeMessage.trim()
+        ? config.welcomeMessage
+        : DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
+    keyNotFoundMessage:
+      typeof config.keyNotFoundMessage === 'string' && config.keyNotFoundMessage.trim()
+        ? config.keyNotFoundMessage
+        : DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
+    localizedWelcomeMessages,
+    localizedKeyNotFoundMessages,
+    dailyDigestEnabled: Boolean(config.dailyDigestEnabled),
+    dailyDigestHour:
+      typeof config.dailyDigestHour === 'number' ? config.dailyDigestHour : 9,
+    dailyDigestMinute:
+      typeof config.dailyDigestMinute === 'number' ? config.dailyDigestMinute : 0,
+    digestLookbackHours:
+      typeof config.digestLookbackHours === 'number' ? config.digestLookbackHours : 24,
+    defaultLanguage:
+      coerceSupportedLocale(
+        typeof config.defaultLanguage === 'string' ? config.defaultLanguage : undefined,
+      ) || 'en',
+    showLanguageSelectorOnStart:
+      typeof config.showLanguageSelectorOnStart === 'boolean'
+        ? config.showLanguageSelectorOnStart
+        : true,
+    role: options.role,
+  };
 }
 
 async function setTelegramMyCommands(
@@ -324,17 +429,59 @@ export async function getTelegramUserProfile(
   });
 }
 
+async function getTelegramUserProfileByChatId(telegramChatId: string | null | undefined) {
+  if (!telegramChatId) {
+    return null;
+  }
+
+  return db.telegramUserProfile.findFirst({
+    where: {
+      telegramChatId,
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+  });
+}
+
 export async function upsertTelegramUserProfile(input: {
   telegramUserId: string;
   telegramChatId?: string | null;
   username?: string | null;
   displayName?: string | null;
   locale?: SupportedLocale | null;
+  startedBotUsername?: string | null;
 }) {
   const existing = await db.telegramUserProfile.findUnique({
     where: { telegramUserId: input.telegramUserId },
-    select: { telegramUserId: true },
+    select: {
+      telegramUserId: true,
+      startedBotUsernamesJson: true,
+    },
   });
+  const startedBotUsername = normalizeTelegramBotUsernameHandle(input.startedBotUsername);
+  const nextStartedBotUsernames = startedBotUsername
+    ? Array.from(
+        new Set([
+          ...(existing ? normalizeTelegramStartedBotUsernames(existing.startedBotUsernamesJson) : []),
+          startedBotUsername,
+        ]),
+      )
+    : existing
+      ? normalizeTelegramStartedBotUsernames(existing.startedBotUsernamesJson)
+      : [];
+  const nextStartedBotUsernamesJson = serializeTelegramStartedBotUsernames(nextStartedBotUsernames);
+  const botTrackingData = startedBotUsername
+    ? {
+        startedBotUsernamesJson: nextStartedBotUsernamesJson,
+        lastSeenBotUsername: startedBotUsername,
+        lastSeenBotAt: new Date(),
+      }
+    : existing
+      ? {}
+      : {
+          startedBotUsernamesJson: nextStartedBotUsernamesJson,
+        };
 
   if (!existing) {
     return db.telegramUserProfile.create({
@@ -344,6 +491,7 @@ export async function upsertTelegramUserProfile(input: {
         username: input.username || null,
         displayName: input.displayName || null,
         locale: input.locale || null,
+        ...botTrackingData,
       },
     });
   }
@@ -355,8 +503,30 @@ export async function upsertTelegramUserProfile(input: {
       username: input.username || null,
       displayName: input.displayName || null,
       ...(input.locale ? { locale: input.locale } : {}),
+      ...botTrackingData,
     },
   });
+}
+
+export async function hasTelegramUserStartedBot(input: {
+  telegramUserId?: string | null;
+  telegramChatId?: string | null;
+  botUsername?: string | null;
+}) {
+  const botUsername = normalizeTelegramBotUsernameHandle(input.botUsername);
+  if (!botUsername) {
+    return false;
+  }
+
+  const profile = input.telegramUserId
+    ? await getTelegramUserProfile(input.telegramUserId, input.telegramChatId || null)
+    : await getTelegramUserProfileByChatId(input.telegramChatId || null);
+
+  if (!profile) {
+    return false;
+  }
+
+  return normalizeTelegramStartedBotUsernames(profile.startedBotUsernamesJson).includes(botUsername);
 }
 
 export type { TelegramNotificationPreferenceKey };
@@ -723,74 +893,80 @@ async function ensurePersistedTelegramWebhookSecret(config: Record<string, unkno
   return webhookSecretToken;
 }
 
-export async function getTelegramConfig(): Promise<TelegramConfig | null> {
+async function getTelegramConfiguredSettingsBots(): Promise<TelegramBotConfigSet> {
   const settings = await db.settings.findUnique({ where: { key: 'telegram_bot' } });
-  if (settings) {
-    const config = parseTelegramBotSettingsValue(settings.value);
-    if (config?.isEnabled && typeof config.botToken === 'string' && config.botToken.trim()) {
-      if (telegramBotSettingsNeedSecretMigration(settings.value)) {
-        void db.settings
-          .update({
-            where: { key: 'telegram_bot' },
-            data: { value: serializeTelegramBotSettingsValue(config) },
-          })
-          .catch((error) => {
-            console.error('Failed to migrate Telegram bot secrets to encrypted storage:', error);
-          });
-      }
+  if (!settings) {
+    return {
+      active: null,
+      migration: null,
+    };
+  }
 
-      const localizedWelcomeMessages = buildDefaultTelegramTemplateMap(
-        DEFAULT_TELEGRAM_WELCOME_MESSAGES,
-        config.localizedWelcomeMessages,
-      );
-      const localizedKeyNotFoundMessages = buildDefaultTelegramTemplateMap(
-        DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES,
-        config.localizedKeyNotFoundMessages,
-      );
-      const adminChatIds = Array.isArray(config.adminChatIds)
-        ? config.adminChatIds.filter(
-            (value): value is string => typeof value === 'string' && value.trim().length > 0,
-          )
-        : [];
+  const config = parseTelegramBotSettingsValue(settings.value);
+  if (!config?.isEnabled || typeof config.botToken !== 'string' || !config.botToken.trim()) {
+    return {
+      active: null,
+      migration: null,
+    };
+  }
 
-      const webhookSecretToken = await ensurePersistedTelegramWebhookSecret(config);
-      await ensureTelegramMyCommandsSafely(config.botToken, adminChatIds);
+  if (telegramBotSettingsNeedSecretMigration(settings.value)) {
+    void db.settings
+      .update({
+        where: { key: 'telegram_bot' },
+        data: { value: serializeTelegramBotSettingsValue(config) },
+      })
+      .catch((error) => {
+        console.error('Failed to migrate Telegram bot secrets to encrypted storage:', error);
+      });
+  }
 
-      return {
-        botToken: config.botToken,
-        botUsername:
-          typeof config.botUsername === 'string' && config.botUsername.trim()
-            ? config.botUsername
-            : undefined,
-        webhookSecretToken: webhookSecretToken || getTelegramWebhookSecret(config.botToken),
-        adminChatIds,
-        welcomeMessage:
-          typeof config.welcomeMessage === 'string' && config.welcomeMessage.trim()
-            ? config.welcomeMessage
-            : DEFAULT_TELEGRAM_WELCOME_MESSAGES.en,
-        keyNotFoundMessage:
-          typeof config.keyNotFoundMessage === 'string' && config.keyNotFoundMessage.trim()
-            ? config.keyNotFoundMessage
-            : DEFAULT_TELEGRAM_KEY_NOT_FOUND_MESSAGES.en,
-        localizedWelcomeMessages,
-        localizedKeyNotFoundMessages,
-        dailyDigestEnabled: Boolean(config.dailyDigestEnabled),
-        dailyDigestHour:
-          typeof config.dailyDigestHour === 'number' ? config.dailyDigestHour : 9,
-        dailyDigestMinute:
-          typeof config.dailyDigestMinute === 'number' ? config.dailyDigestMinute : 0,
-        digestLookbackHours:
-          typeof config.digestLookbackHours === 'number' ? config.digestLookbackHours : 24,
-        defaultLanguage:
-          coerceSupportedLocale(
-            typeof config.defaultLanguage === 'string' ? config.defaultLanguage : undefined,
-          ) || (await getTelegramDefaultLocale()),
-        showLanguageSelectorOnStart:
-          typeof config.showLanguageSelectorOnStart === 'boolean'
-            ? config.showLanguageSelectorOnStart
-            : true,
-      };
-    }
+  const webhookSecretToken = await ensurePersistedTelegramWebhookSecret(config);
+  const active = buildTelegramConfigFromSettingsRecord(config, {
+    botToken: config.botToken,
+    botUsername:
+      typeof config.botUsername === 'string' && config.botUsername.trim()
+        ? config.botUsername
+        : null,
+    webhookSecretToken: webhookSecretToken || getTelegramWebhookSecret(config.botToken),
+    role: 'ACTIVE',
+  });
+  await ensureTelegramMyCommandsSafely(active.botToken, active.adminChatIds);
+
+  const migrationPlan =
+    config.migrationPlan && typeof config.migrationPlan === 'object' && !Array.isArray(config.migrationPlan)
+      ? config.migrationPlan
+      : null;
+  const migrationBotToken =
+    migrationPlan?.enabled && typeof migrationPlan.botToken === 'string' && migrationPlan.botToken.trim()
+      ? migrationPlan.botToken.trim()
+      : '';
+  const migrationBotUsername =
+    migrationPlan && typeof migrationPlan.botUsername === 'string'
+      ? migrationPlan.botUsername
+      : '';
+
+  const migration =
+    migrationBotToken
+      ? buildTelegramConfigFromSettingsRecord(config, {
+          botToken: migrationBotToken,
+          botUsername: migrationBotUsername,
+          webhookSecretToken: getTelegramWebhookSecret(migrationBotToken),
+          role: 'MIGRATION',
+        })
+      : null;
+
+  if (migration) {
+    await ensureTelegramMyCommandsSafely(migration.botToken, migration.adminChatIds);
+  }
+
+  return { active, migration };
+}
+
+export async function getTelegramBotConfigs(): Promise<TelegramBotConfigSet> {
+  const settingsBots = await getTelegramConfiguredSettingsBots();
+  if (settingsBots.active) {
+    return settingsBots;
   }
 
   const channels = await db.notificationChannel.findMany({
@@ -819,19 +995,23 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
       if (botToken && adminChatIds.length > 0) {
         await ensureTelegramMyCommandsSafely(botToken, adminChatIds);
         return {
-          botToken,
-          botUsername:
-            typeof config.botUsername === 'string' && config.botUsername.trim()
-              ? config.botUsername
-              : undefined,
-          webhookSecretToken: getTelegramWebhookSecret(botToken, config.webhookSecretToken),
-          adminChatIds,
-          dailyDigestEnabled: false,
-          dailyDigestHour: 9,
-          dailyDigestMinute: 0,
-          digestLookbackHours: 24,
-          defaultLanguage: await getTelegramDefaultLocale(),
-          showLanguageSelectorOnStart: true,
+          active: {
+            botToken,
+            botUsername:
+              typeof config.botUsername === 'string' && config.botUsername.trim()
+                ? config.botUsername
+                : undefined,
+            webhookSecretToken: getTelegramWebhookSecret(botToken, config.webhookSecretToken),
+            adminChatIds,
+            dailyDigestEnabled: false,
+            dailyDigestHour: 9,
+            dailyDigestMinute: 0,
+            digestLookbackHours: 24,
+            defaultLanguage: await getTelegramDefaultLocale(),
+            showLanguageSelectorOnStart: true,
+            role: 'LEGACY_CHANNEL',
+          },
+          migration: null,
         };
       }
     } catch (error) {
@@ -846,7 +1026,65 @@ export async function getTelegramConfig(): Promise<TelegramConfig | null> {
     }
   }
 
-  return null;
+  return {
+    active: null,
+    migration: null,
+  };
+}
+
+export async function getTelegramConfig(): Promise<TelegramConfig | null> {
+  const configs = await getTelegramBotConfigs();
+  return configs.active;
+}
+
+export async function getTelegramWebhookConfigBySecret(secretToken: string | null) {
+  const { active, migration } = await getTelegramBotConfigs();
+  const configs = [active, migration].filter((config): config is TelegramConfig => Boolean(config));
+  if (!secretToken) {
+    return {
+      configs,
+      matchedConfig: null as TelegramConfig | null,
+    };
+  }
+
+  const matchedConfig =
+    configs.find((config) => config.webhookSecretToken && config.webhookSecretToken === secretToken) || null;
+  return {
+    configs,
+    matchedConfig,
+  };
+}
+
+export function runWithTelegramRequestConfig<T>(
+  config: TelegramConfig,
+  callback: () => Promise<T>,
+) {
+  return telegramRequestContext.run(config, callback);
+}
+
+async function resolveBackgroundTelegramBotToken(
+  requestedBotToken: string,
+  chatId: number | string,
+) {
+  if (telegramRequestContext.getStore()) {
+    return requestedBotToken;
+  }
+
+  const { active, migration } = await getTelegramBotConfigs();
+  if (!active || !migration || requestedBotToken !== active.botToken) {
+    return requestedBotToken;
+  }
+
+  const migrationBotUsername = normalizeTelegramBotUsernameHandle(migration.botUsername);
+  if (!migrationBotUsername) {
+    return requestedBotToken;
+  }
+
+  const migrationStarted = await hasTelegramUserStartedBot({
+    telegramChatId: String(chatId),
+    botUsername: migrationBotUsername,
+  });
+  return migrationStarted ? migration.botToken : requestedBotToken;
 }
 
 export async function sendTelegramMessage(
@@ -865,6 +1103,7 @@ export async function sendTelegramMessageDetailed(
   text: string,
   options: SendMessageOptions = {},
 ): Promise<SendTelegramMessageResult> {
+  const resolvedBotToken = await resolveBackgroundTelegramBotToken(botToken, chatId);
   const parseMode = options.parseMode || 'HTML';
   const preparedMessage =
     parseMode === 'HTML'
@@ -878,7 +1117,7 @@ export async function sendTelegramMessageDetailed(
   }
 
   try {
-    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendMessage`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${resolvedBotToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1090,6 +1329,7 @@ export async function sendTelegramPhoto(
   }
 
   try {
+    const resolvedBotToken = await resolveBackgroundTelegramBotToken(botToken, chatId);
     const formData = new FormData();
     formData.append('chat_id', chatId.toString());
     const blob = new Blob([new Uint8Array(photo)], { type: 'image/png' });
@@ -1104,7 +1344,7 @@ export async function sendTelegramPhoto(
       formData.append('reply_markup', JSON.stringify(options.replyMarkup));
     }
 
-    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${resolvedBotToken}/sendPhoto`, {
       method: 'POST',
       body: formData,
     });
@@ -1144,7 +1384,8 @@ export async function sendTelegramPhotoUrl(
   }
 
   try {
-    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendPhoto`, {
+    const resolvedBotToken = await resolveBackgroundTelegramBotToken(botToken, chatId);
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${resolvedBotToken}/sendPhoto`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1192,6 +1433,7 @@ export async function sendTelegramDocument(
   }
 
   try {
+    const resolvedBotToken = await resolveBackgroundTelegramBotToken(botToken, chatId);
     const formData = new FormData();
     formData.append('chat_id', chatId.toString());
     const blob = new Blob([new Uint8Array(document)], { type: 'application/octet-stream' });
@@ -1205,7 +1447,7 @@ export async function sendTelegramDocument(
       formData.append('reply_markup', JSON.stringify(options.replyMarkup));
     }
 
-    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${botToken}/sendDocument`, {
+    const response = await fetchTelegramApi(`${TELEGRAM_API_BASE}${resolvedBotToken}/sendDocument`, {
       method: 'POST',
       body: formData,
     });

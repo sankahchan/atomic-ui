@@ -7,7 +7,9 @@ import { timingSafeEqual } from 'node:crypto';
 import {
   handleTelegramUpdate,
   getTelegramConfig,
+  getTelegramBotConfigs,
   sendTelegramMessage,
+  type TelegramConfig,
   TelegramUpdate,
 } from '@/lib/services/telegram-bot';
 import { TELEGRAM_WEBHOOK_SECRET_HEADER } from '@/lib/telegram-webhook-secret';
@@ -31,7 +33,8 @@ function hasMatchingSecretToken(actual: string | null, expected: string) {
 
 export type TelegramWebhookRouteDeps = {
   getTelegramConfig: () => ReturnType<typeof getTelegramConfig>;
-  handleTelegramUpdate: (update: TelegramUpdate) => Promise<string | null>;
+  getTelegramBotConfigs: () => ReturnType<typeof getTelegramBotConfigs>;
+  handleTelegramUpdate: (update: TelegramUpdate, config?: TelegramConfig | null) => Promise<string | null>;
   sendTelegramMessage: (
     botToken: string,
     chatId: number | string,
@@ -46,6 +49,7 @@ export type TelegramWebhookRouteDeps = {
 
 const defaultDeps: TelegramWebhookRouteDeps = {
   getTelegramConfig,
+  getTelegramBotConfigs,
   handleTelegramUpdate,
   sendTelegramMessage,
   requireAdminRouteScope,
@@ -140,17 +144,21 @@ export async function handleTelegramWebhookPost(
   deps: TelegramWebhookRouteDeps = defaultDeps,
 ) {
   try {
-    const config = await deps.getTelegramConfig();
-    if (!config?.botToken || !config.webhookSecretToken) {
+    const configSet = await deps.getTelegramBotConfigs();
+    const configuredBots = [configSet.active, configSet.migration].filter(
+      (config): config is TelegramConfig => Boolean(config?.botToken && config?.webhookSecretToken),
+    );
+    if (configuredBots.length === 0) {
       return NextResponse.json({ ok: false, error: 'Telegram bot is not configured' }, { status: 503 });
     }
 
-    if (
-      !hasMatchingSecretToken(
-        request.headers.get(TELEGRAM_WEBHOOK_SECRET_HEADER),
-        config.webhookSecretToken,
-      )
-    ) {
+    const requestSecret = request.headers.get(TELEGRAM_WEBHOOK_SECRET_HEADER);
+    const config = configuredBots.find((candidate) =>
+      candidate.webhookSecretToken
+        ? hasMatchingSecretToken(requestSecret, candidate.webhookSecretToken)
+        : false,
+    );
+    if (!config) {
       return NextResponse.json({ ok: false, error: 'Unauthorized webhook request' }, { status: 401 });
     }
 
@@ -171,7 +179,7 @@ export async function handleTelegramWebhookPost(
       );
     }
 
-    const responseText = await deps.handleTelegramUpdate(update);
+    const responseText = await deps.handleTelegramUpdate(update, config);
 
     if (responseText && update.message && config) {
       await deps.sendTelegramMessage(
