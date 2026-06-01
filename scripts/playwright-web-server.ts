@@ -273,6 +273,12 @@ async function resetAndSeedDatabase(outlineCertSha256: string) {
     );
   }
 
+  execFileSync('sh', ['scripts/prisma-command.sh', 'db', 'push', '--skip-generate', '--accept-data-loss'], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: 'inherit',
+  });
+
   const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient();
   const now = fixedNow;
