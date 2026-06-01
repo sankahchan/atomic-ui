@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
@@ -48,14 +47,22 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Database file not found' }, { status: 404 });
         }
 
-        const archive = archiver('zip', {
+        const { ZipArchive } = (await import('archiver')) as unknown as {
+            ZipArchive: new (options?: { zlib?: { level?: number } }) => Readable & {
+                file: (filename: string, data: { name: string }) => void;
+                finalize: () => Promise<void>;
+                on: (event: 'error' | 'warning', listener: (error: Error) => void) => void;
+            };
+        };
+
+        const archive = new ZipArchive({
             zlib: { level: 9 }, // Sets the compression level.
         });
 
         // Keep a stable filename for restore compatibility.
         archive.file(dbPath, { name: 'atomic-ui.db' });
 
-        archive.on('error', (error) => {
+        archive.on('error', (error: Error) => {
             console.error('Archive error:', error);
         });
         archive.finalize();
