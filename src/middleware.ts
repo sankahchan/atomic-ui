@@ -19,7 +19,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
+import { jwtVerify } from 'jose/jwt/verify';
 import {
   APP_BUILD_COOKIE_NAME,
   CLIENT_BUILD_QUERY_PARAM_NAME,

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose/jwt/sign';
+import { jwtVerify } from 'jose/jwt/verify';
 import { cookies, headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
