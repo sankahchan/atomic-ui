@@ -10476,14 +10476,27 @@ export async function handleTelegramCallbackQuery(
 /**
  * Handle incoming Telegram message.
  */
-export async function handleTelegramUpdate(update: TelegramUpdate): Promise<string | null> {
+export async function handleTelegramUpdate(
+  update: TelegramUpdate,
+  configOverride?: TelegramConfig | null,
+): Promise<string | null> {
   const callbackQuery = update.callback_query;
   if (callbackQuery) {
-    const config = await getTelegramConfig();
+    const config = configOverride || (await getTelegramConfig());
     if (!config) {
       return null;
     }
 
+    const callbackChatId =
+      callbackQuery.message?.chat?.id
+      ?? callbackQuery.from.id;
+    await upsertTelegramUserProfile({
+      telegramUserId: String(callbackQuery.from.id),
+      telegramChatId: String(callbackChatId),
+      username: callbackQuery.from.username || null,
+      displayName: callbackQuery.from.first_name || null,
+      startedBotUsername: config.botUsername || null,
+    });
     return handleTelegramCallbackQuery(callbackQuery, config);
   }
 
@@ -10495,13 +10508,14 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<stri
   const username = message.from.username || message.from.first_name;
   const text = message.text?.trim() || '';
 
-  const config = await getTelegramConfig();
+  const config = configOverride || (await getTelegramConfig());
   if (!config) return null;
   await upsertTelegramUserProfile({
     telegramUserId: String(telegramUserId),
     telegramChatId: String(chatId),
     username: message.from.username || null,
     displayName: message.from.first_name || null,
+    startedBotUsername: config.botUsername || null,
   });
   const locale = await getTelegramConversationLocale({
     telegramUserId,

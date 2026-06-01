@@ -345,6 +345,29 @@ const EMPTY_TELEGRAM_MIGRATION_PLAN = {
   userNoticeConfirmed: false,
 };
 
+function parseStartedBotUsernames(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return [] as string[];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [] as string[];
+    }
+
+    return Array.from(
+      new Set(
+        parsed
+          .map((entry) => normalizeTelegramBotUsernameHandle(typeof entry === 'string' ? entry : ''))
+          .filter((entry) => entry.length > 0),
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
 function normalizeTelegramMigrationPlan(input: unknown) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return { ...EMPTY_TELEGRAM_MIGRATION_PLAN };
@@ -524,6 +547,11 @@ export const telegramBotRouter = router({
     });
     const parsed = parseTelegramBotSettingsValue(settings?.value);
     const migrationPlan = normalizeTelegramMigrationPlan(parsed?.migrationPlan);
+    const migrationBotHandle = normalizeTelegramBotUsernameHandle(migrationPlan.botUsername);
+    const overlapEnabled =
+      migrationPlan.enabled
+      && migrationBotHandle.length > 0
+      && migrationPlan.botToken.trim().length > 0;
 
     const [
       accessKeyTelegramIds,
@@ -561,6 +589,7 @@ export const telegramBotRouter = router({
         select: {
           telegramUserId: true,
           telegramChatId: true,
+          startedBotUsernamesJson: true,
         },
       }),
       db.user.count({
@@ -628,6 +657,31 @@ export const telegramBotRouter = router({
       }
     }
 
+    const startedMigrationProfiles = overlapEnabled
+      ? telegramProfiles.filter((record) =>
+          parseStartedBotUsernames(record.startedBotUsernamesJson).includes(migrationBotHandle),
+        )
+      : [];
+    const startedMigrationIdentitySet = new Set<string>();
+    for (const record of startedMigrationProfiles) {
+      if (record.telegramUserId) {
+        startedMigrationIdentitySet.add(`user:${record.telegramUserId}`);
+      }
+      if (record.telegramChatId) {
+        startedMigrationIdentitySet.add(`chat:${record.telegramChatId}`);
+      }
+    }
+    const adminChatIdSet = new Set(
+      Array.isArray(parsed?.adminChatIds)
+        ? parsed.adminChatIds
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        : [],
+    );
+    const adminStartedMigrationCount = startedMigrationProfiles.filter(
+      (record) => record.telegramChatId && adminChatIdSet.has(record.telegramChatId),
+    ).length;
+
     const operationalLoadCount =
       activeOrderCount + openSupportThreadCount + openPremiumRequestCount;
     const riskLevel =
@@ -644,17 +698,21 @@ export const telegramBotRouter = router({
           : null,
       migrationBotUsername:
         migrationPlan.botUsername.trim().length > 0 ? migrationPlan.botUsername.trim() : null,
-      hardCutover: true,
+      overlapEnabled,
+      finalCutoverRequired: true,
       linkedUsersCount,
       linkedAccessKeysCount,
       linkedDynamicKeysCount,
       reachableIdentityCount: reachableIdentitySet.size,
+      startedMigrationIdentityCount: startedMigrationIdentitySet.size,
+      startedMigrationProfileCount: startedMigrationProfiles.length,
       activeOrderCount,
       openSupportThreadCount,
       openPremiumRequestCount,
       pendingLinkTokenCount,
       adminChatIdsConfigured: Array.isArray(parsed?.adminChatIds) ? parsed.adminChatIds.length : 0,
       adminUsersMissingChatId,
+      adminStartedMigrationCount,
       riskLevel,
     };
   }),
@@ -2114,28 +2172,46 @@ export const telegramBotRouter = router({
         return { webhookSet: false };
       }
 
-      const response = await fetch(`https://api.telegram.org/bot${parsed.botToken}/getWebhookInfo`);
-      const data = await response.json();
+      const loadWebhookInfo = async (botToken: string) => {
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`);
+        const data = await response.json();
 
-      if (!response.ok || !data?.ok) {
+        if (!response.ok || !data?.ok) {
+          return {
+            webhookSet: false,
+            webhookUrl: null,
+            pendingUpdateCount: 0,
+            lastErrorDate: null,
+            lastErrorMessage:
+              typeof data?.description === 'string' && data.description.trim()
+                ? data.description.trim()
+                : `Failed to fetch Telegram webhook info (${response.status})`,
+          };
+        }
+
         return {
-          webhookSet: false,
-          webhookUrl: null,
-          pendingUpdateCount: 0,
-          lastErrorDate: null,
-          lastErrorMessage:
-            typeof data?.description === 'string' && data.description.trim()
-              ? data.description.trim()
-              : `Failed to fetch Telegram webhook info (${response.status})`,
+          webhookSet: !!data.result?.url,
+          webhookUrl: data.result?.url || null,
+          pendingUpdateCount: data.result?.pending_update_count || 0,
+          lastErrorDate: data.result?.last_error_date || null,
+          lastErrorMessage: data.result?.last_error_message || null,
         };
-      }
+      };
+
+      const migrationPlan = normalizeTelegramMigrationPlan(parsed.migrationPlan);
+      const migrationBotToken =
+        migrationPlan.enabled && migrationPlan.botToken.trim().length > 0
+          ? migrationPlan.botToken.trim()
+          : null;
+
+      const activeWebhook = await loadWebhookInfo(parsed.botToken);
+      const migrationWebhook = migrationBotToken
+        ? await loadWebhookInfo(migrationBotToken)
+        : null;
 
       return {
-        webhookSet: !!data.result?.url,
-        webhookUrl: data.result?.url || null,
-        pendingUpdateCount: data.result?.pending_update_count || 0,
-        lastErrorDate: data.result?.last_error_date || null,
-        lastErrorMessage: data.result?.last_error_message || null,
+        ...activeWebhook,
+        migration: migrationWebhook,
       };
     } catch (error) {
       return {
@@ -2144,6 +2220,7 @@ export const telegramBotRouter = router({
         pendingUpdateCount: 0,
         lastErrorDate: null,
         lastErrorMessage: error instanceof Error ? error.message : 'Failed to fetch Telegram webhook info',
+        migration: null,
       };
     }
   }),
@@ -2152,7 +2229,10 @@ export const telegramBotRouter = router({
    * Set webhook URL for the bot.
    */
   setWebhook: adminProcedure
-    .input(z.object({ webhookUrl: z.string().url() }))
+    .input(z.object({
+      webhookUrl: z.string().url(),
+      target: z.enum(['ACTIVE', 'MIGRATION']).default('ACTIVE'),
+    }))
     .mutation(async ({ ctx, input }) => {
       assertTelegramAnnouncementScope(ctx.user.adminScope);
       const settings = await db.settings.findUnique({
@@ -2174,8 +2254,24 @@ export const telegramBotRouter = router({
         });
       }
 
+      const migrationPlan = normalizeTelegramMigrationPlan(parsed.migrationPlan);
+      const targetBotToken =
+        input.target === 'MIGRATION'
+          ? migrationPlan.enabled && migrationPlan.botToken.trim().length > 0
+            ? migrationPlan.botToken.trim()
+            : ''
+          : parsed.botToken;
+      if (!targetBotToken) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: input.target === 'MIGRATION'
+            ? 'Migration bot token not configured'
+            : 'Bot token not configured',
+        });
+      }
+
       const response = await fetch(
-        `https://api.telegram.org/bot${parsed.botToken}/setWebhook`,
+        `https://api.telegram.org/bot${targetBotToken}/setWebhook`,
         {
           method: 'POST',
           headers: {
@@ -2185,8 +2281,8 @@ export const telegramBotRouter = router({
             url: input.webhookUrl,
             allowed_updates: ['message', 'callback_query'],
             secret_token: getTelegramWebhookSecret(
-              parsed.botToken,
-              parsed.webhookSecretToken,
+              targetBotToken,
+              input.target === 'ACTIVE' ? parsed.webhookSecretToken : undefined,
             ),
           }),
         },
@@ -2203,10 +2299,11 @@ export const telegramBotRouter = router({
       return { success: true };
     }),
 
-  /**
-   * Delete webhook.
-   */
-  deleteWebhook: adminProcedure.mutation(async ({ ctx }) => {
+  deleteWebhook: adminProcedure
+    .input(z.object({
+      target: z.enum(['ACTIVE', 'MIGRATION']).default('ACTIVE'),
+    }).optional())
+    .mutation(async ({ ctx, input }) => {
     assertTelegramAnnouncementScope(ctx.user.adminScope);
     const settings = await db.settings.findUnique({
       where: { key: 'telegram_bot' },
@@ -2216,16 +2313,28 @@ export const telegramBotRouter = router({
       return { success: true };
     }
 
-    const parsed = parseTelegramBotSettingsValue(settings.value);
-    if (!parsed?.botToken) {
-      return { success: true };
-    }
+      const parsed = parseTelegramBotSettingsValue(settings.value);
+      if (!parsed?.botToken) {
+        return { success: true };
+      }
 
-    const response = await fetch(`https://api.telegram.org/bot${parsed.botToken}/deleteWebhook`);
-    const data = await response.json();
+      const target = input?.target ?? 'ACTIVE';
+      const migrationPlan = normalizeTelegramMigrationPlan(parsed.migrationPlan);
+      const targetBotToken =
+        target === 'MIGRATION'
+          ? migrationPlan.enabled && migrationPlan.botToken.trim().length > 0
+            ? migrationPlan.botToken.trim()
+            : ''
+          : parsed.botToken;
+      if (!targetBotToken) {
+        return { success: true };
+      }
 
-    return { success: data.ok };
-  }),
+      const response = await fetch(`https://api.telegram.org/bot${targetBotToken}/deleteWebhook`);
+      const data = await response.json();
+
+      return { success: data.ok };
+    }),
 
   runDigestNow: adminProcedure.mutation(async ({ ctx }) => {
     assertTelegramAnnouncementScope(ctx.user.adminScope);
