@@ -2192,11 +2192,11 @@ function DeleteKeyDialog({
 
 
 /**
- * BulkExtendDialog Component
+ * BulkRenewDialog Component
  *
- * A dialog for extending the expiration of multiple keys.
+ * A dialog for renewing multiple keys with the same duration and quota top-up.
  */
-function BulkExtendDialog({
+function BulkRenewDialog({
   open,
   onOpenChange,
   count,
@@ -2206,16 +2206,17 @@ function BulkExtendDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   count: number;
-  onConfirm: (days: number) => void;
+  onConfirm: (input: { months: number; addDataLimitGB: number | null }) => void;
   isPending: boolean;
 }) {
-  const [days, setDays] = useState('30');
-  const [customDays, setCustomDays] = useState('');
-  const [useCustom, setUseCustom] = useState(false);
-  const { t } = useLocale();
+  const [months, setMonths] = useState<1 | 2 | 3>(1);
+  const [addDataLimitGB, setAddDataLimitGB] = useState('');
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
   const selectedLabel = count === 1 ? t('keys.bulk.selected_singular') : t('keys.bulk.selected_plural');
-
-  const quickOptions = [7, 14, 30, 60, 90];
+  const parsedAddDataLimitGB = addDataLimitGB.trim() === '' ? null : Number(addDataLimitGB);
+  const addDataLimitInvalid = parsedAddDataLimitGB != null
+    && (!Number.isFinite(parsedAddDataLimitGB) || parsedAddDataLimitGB <= 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -2236,56 +2237,73 @@ function BulkExtendDialog({
         <DialogBody>
           <DialogSection>
             <DialogSectionHeader>
-              <DialogSectionTitle>Extension window</DialogSectionTitle>
+              <DialogSectionTitle>{isMyanmar ? 'Renewal preset' : 'Renewal preset'}</DialogSectionTitle>
               <DialogSectionDescription>
-                Pick a quick preset or enter a custom duration for the selected access keys.
+                {isMyanmar
+                  ? 'ရွေးထားသော သော့များအားလုံးအတွက် တူညီသော renewal period ကို ရွေးပါ။'
+                  : 'Apply the same renewal period to every selected access key.'}
               </DialogSectionDescription>
             </DialogSectionHeader>
             <div className="flex flex-wrap gap-2">
-            {quickOptions.map((d) => (
-              <Button
-                key={d}
-                variant={!useCustom && days === d.toString() ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  setDays(d.toString());
-                  setUseCustom(false);
-                }}
-              >
-                +{d}d
-              </Button>
-            ))}
-            <Button
-              variant={useCustom ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setUseCustom(true)}
-            >
-              {t('keys.bulk.custom')}
-            </Button>
+              {[1, 2, 3].map((option) => (
+                <Button
+                  key={option}
+                  variant={months === option ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMonths(option as 1 | 2 | 3)}
+                >
+                  {isMyanmar
+                    ? `${option} လ`
+                    : option === 1
+                      ? '1 month'
+                      : `${option} months`}
+                </Button>
+              ))}
             </div>
-
-            {useCustom && (
-              <div className="space-y-2">
-                <Label htmlFor="customDays">{t('keys.bulk.custom_days')}</Label>
-                <Input
-                  id="customDays"
-                  type="number"
-                  min="1"
-                  placeholder={t('keys.bulk.custom_days_placeholder')}
-                  value={customDays}
-                  onChange={(e) => setCustomDays(e.target.value)}
-                />
-              </div>
-            )}
           </DialogSection>
 
           <DialogSection>
             <DialogSectionHeader>
-              <DialogSectionTitle>Apply to selection</DialogSectionTitle>
+              <DialogSectionTitle>{isMyanmar ? 'Data top-up' : 'Data top-up'}</DialogSectionTitle>
+              <DialogSectionDescription>
+                {isMyanmar
+                  ? 'လိုအပ်လျှင် data quota ကို GB အလိုက် ထပ်တိုးနိုင်သည်။'
+                  : 'Optionally add the same extra quota to every selected key.'}
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+            <div className="space-y-2">
+              <Label htmlFor="bulk-renew-add-gb">{isMyanmar ? 'ထပ်တိုးမည့် data (GB)' : 'Add data (GB)'}</Label>
+              <Input
+                id="bulk-renew-add-gb"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={isMyanmar ? 'ဥပမာ - 10' : 'e.g. 10'}
+                value={addDataLimitGB}
+                onChange={(event) => setAddDataLimitGB(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {isMyanmar
+                  ? 'ဤပမာဏသည် လက်ရှိ quota ပေါ် ထပ်တိုးမည်ဖြစ်ပြီး total quota ကို မအစားထိုးပါ။'
+                  : 'This tops up the existing quota. It does not replace the current total.'}
+              </p>
+            </div>
+          </DialogSection>
+
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>{isMyanmar ? 'Apply to selection' : 'Apply to selection'}</DialogSectionTitle>
             </DialogSectionHeader>
             <div className="ops-modal-note">
-              {count} {selectedLabel} will be extended by {useCustom ? (customDays || '0') : days} days.
+              {isMyanmar
+                ? `${count} ${selectedLabel} ကို ${months} လ သက်တမ်းတိုးမည်${parsedAddDataLimitGB ? ` နှင့် data ${parsedAddDataLimitGB} GB ထပ်တိုးမည်` : ''}။`
+                : `Renew ${count} ${selectedLabel} by ${months === 1 ? '1 month' : `${months} months`}${parsedAddDataLimitGB ? ` and add ${parsedAddDataLimitGB} GB` : ''}.`}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {isMyanmar
+                ? 'Disabled သော့များ သို့မဟုတ် renewal မအောင်မြင်သော သော့များကို result ထဲတွင် သီးသန့်ပြသမည်။'
+                : 'Disabled keys or failed renewals will be listed separately in the results.'}
+            </p>
           </DialogSection>
         </DialogBody>
 
@@ -2294,12 +2312,20 @@ function BulkExtendDialog({
             {t('keys.cancel')}
           </Button>
           <Button
-            onClick={() => onConfirm(parseInt(useCustom ? customDays : days) || 30)}
-            disabled={isPending || (useCustom && !customDays)}
+            onClick={() => onConfirm({
+              months,
+              addDataLimitGB: parsedAddDataLimitGB,
+            })}
+            disabled={isPending || addDataLimitInvalid}
           >
-            {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {fillTemplate(t('keys.bulk.extend_confirm'), {
-              days: useCustom ? (customDays || '0') : days,
+            {isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {t('keys.bulk.progress.processing')}
+              </>
+            ) : fillTemplate(t('keys.bulk.extend_confirm'), {
+              count,
+              items: selectedLabel,
             })}
           </Button>
         </DialogFooter>
@@ -3928,7 +3954,7 @@ export default function KeysPage() {
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [bulkExtendDialogOpen, setBulkExtendDialogOpen] = useState(false);
+  const [bulkRenewDialogOpen, setBulkRenewDialogOpen] = useState(false);
   const [bulkTagsDialogOpen, setBulkTagsDialogOpen] = useState(false);
   const [bulkTagsMode, setBulkTagsMode] = useState<'add' | 'remove'>('add');
   const [bulkProgressDialogOpen, setBulkProgressDialogOpen] = useState(false);
@@ -3936,8 +3962,8 @@ export default function KeysPage() {
   const [bulkProgressResults, setBulkProgressResults] = useState<{ success: number; failed: number; errors?: { id: string; name: string; error: string }[] } | null>(null);
   const [keyToDelete, setKeyToDelete] = useState<{ id: string; name: string } | null>(null);
 
-  // Bulk extend mutation
-  const bulkExtendMutation = trpc.keys.bulkExtend.useMutation({
+  // Bulk renew mutation
+  const bulkRenewMutation = trpc.keys.bulkRenew.useMutation({
     onSuccess: (result) => {
       toast({
         title: t('keys.toast.extension_complete'),
@@ -3945,9 +3971,10 @@ export default function KeysPage() {
           t(result.success === 1 ? 'keys.toast.extension_complete_desc_single' : 'keys.toast.extension_complete_desc'),
           { success: result.success },
         ),
+        variant: result.failed > 0 ? 'destructive' : 'default',
       });
-      setBulkExtendDialogOpen(false);
       setSelectedKeys(new Set());
+      setBulkProgressResults(result);
       refetch();
       refetchStats();
     },
@@ -3957,6 +3984,7 @@ export default function KeysPage() {
         description: error.message,
         variant: 'destructive',
       });
+      setBulkProgressDialogOpen(false);
     },
   });
 
@@ -4082,11 +4110,16 @@ export default function KeysPage() {
     });
   };
 
-  const handleBulkExtend = (days: number) => {
+  const handleBulkRenew = (input: { months: number; addDataLimitGB: number | null }) => {
     if (selectedKeys.size === 0) return;
-    bulkExtendMutation.mutate({
+    setBulkProgressTitle(t('keys.bulk.progress_title.renewing'));
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    setBulkRenewDialogOpen(false);
+    bulkRenewMutation.mutate({
       ids: Array.from(selectedKeys),
-      days,
+      months: input.months,
+      addDataLimitGB: input.addDataLimitGB,
     });
   };
 
@@ -4255,7 +4288,7 @@ export default function KeysPage() {
   const hasAnyFilters = hasActiveFilters || hasPersistedFilters;
   const isBulkBusy =
     bulkDeleteMutation.isPending ||
-    bulkExtendMutation.isPending ||
+    bulkRenewMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
@@ -5245,13 +5278,13 @@ export default function KeysPage() {
           selectedCount={selectedKeys.size}
           isBulkBusy={isBulkBusy}
           bulkTogglePending={bulkToggleStatusMutation.isPending}
-          bulkExtendPending={bulkExtendMutation.isPending}
+          bulkRenewPending={bulkRenewMutation.isPending}
           bulkTagsPending={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
           bulkMovePending={bulkMoveMutation.isPending}
           bulkArchivePending={bulkArchiveMutation.isPending}
           bulkDeletePending={bulkDeleteMutation.isPending}
           onToggleStatus={handleBulkToggleStatus}
-          onOpenExtend={() => setBulkExtendDialogOpen(true)}
+          onOpenRenew={() => setBulkRenewDialogOpen(true)}
           onOpenAddTags={() => {
             setBulkTagsMode('add');
             setBulkTagsDialogOpen(true);
@@ -5680,12 +5713,12 @@ export default function KeysPage() {
         }}
       />
 
-      <BulkExtendDialog
-        open={bulkExtendDialogOpen}
-        onOpenChange={setBulkExtendDialogOpen}
+      <BulkRenewDialog
+        open={bulkRenewDialogOpen}
+        onOpenChange={setBulkRenewDialogOpen}
         count={selectedKeys.size}
-        onConfirm={handleBulkExtend}
-        isPending={bulkExtendMutation.isPending}
+        onConfirm={handleBulkRenew}
+        isPending={bulkRenewMutation.isPending}
       />
 
       <BulkTagsDialog

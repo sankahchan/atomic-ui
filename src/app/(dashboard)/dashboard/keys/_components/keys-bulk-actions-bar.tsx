@@ -29,13 +29,13 @@ export function KeysBulkActionsBar(props: {
   selectedCount: number;
   isBulkBusy: boolean;
   bulkTogglePending: boolean;
-  bulkExtendPending: boolean;
+  bulkRenewPending: boolean;
   bulkTagsPending: boolean;
   bulkMovePending: boolean;
   bulkArchivePending: boolean;
   bulkDeletePending: boolean;
   onToggleStatus: (enabled: boolean) => void;
-  onOpenExtend: () => void;
+  onOpenRenew: () => void;
   onOpenAddTags: () => void;
   onOpenRemoveTags: () => void;
   onOpenMove: () => void;
@@ -48,13 +48,13 @@ export function KeysBulkActionsBar(props: {
     selectedCount,
     isBulkBusy,
     bulkTogglePending,
-    bulkExtendPending,
+    bulkRenewPending,
     bulkTagsPending,
     bulkMovePending,
     bulkArchivePending,
     bulkDeletePending,
     onToggleStatus,
-    onOpenExtend,
+    onOpenRenew,
     onOpenAddTags,
     onOpenRemoveTags,
     onOpenMove,
@@ -101,10 +101,10 @@ export function KeysBulkActionsBar(props: {
           variant="outline"
           size="sm"
           className="h-8 rounded-full px-3 text-xs"
-          onClick={onOpenExtend}
+          onClick={onOpenRenew}
           disabled={isBulkBusy}
         >
-          {bulkExtendPending ? (
+          {bulkRenewPending ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Clock className="mr-2 h-4 w-4" />

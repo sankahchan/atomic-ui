@@ -24,6 +24,15 @@ test('getRenewalBaseDate uses the future expiry when it exists', () => {
   assert.equal(result.toISOString(), futureExpiry.toISOString());
 });
 
+test('getRenewalBaseDate uses now when the current expiry is already in the past', () => {
+  const now = new Date('2026-06-02T00:00:00Z');
+  const pastExpiry = new Date('2026-05-20T00:00:00Z');
+
+  const result = getRenewalBaseDate(pastExpiry, now);
+
+  assert.equal(result.toISOString(), now.toISOString());
+});
+
 test('resolveRenewedAccessKeyStatus marks exhausted limited keys as depleted', () => {
   assert.equal(
     resolveRenewedAccessKeyStatus({
