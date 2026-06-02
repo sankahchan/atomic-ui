@@ -11,6 +11,7 @@ import {
     Pencil,
     Trash2,
     Calendar,
+    RefreshCw,
     HardDrive,
     Smartphone
 } from 'lucide-react';
@@ -26,6 +27,7 @@ interface KeyItemProps {
     expiresAt: string | Date | null;
     onToggleStatus: (checked: boolean) => void;
     onEdit: () => void;
+    onRenew: () => void;
     onDelete: () => void;
     onCopy: () => void;
     onQr: () => void;
@@ -41,6 +43,7 @@ export function KeyRowItem({
     expiresAt,
     onToggleStatus,
     onEdit,
+    onRenew,
     onDelete,
     onCopy,
     onQr,
@@ -196,6 +199,9 @@ export function KeyRowItem({
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
                                 <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRenew}>
+                                <RefreshCw className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={onDelete}>
                                 <Trash2 className="h-4 w-4" />
