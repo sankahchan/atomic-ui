@@ -123,6 +123,7 @@ import { themeList, getTheme } from '@/lib/subscription-themes';
 import { TrafficHistoryChart } from '@/components/charts/TrafficHistoryChart';
 import { useLocale } from '@/hooks/use-locale';
 import { ClientEndpointTestCard } from '@/components/subscription/client-endpoint-test-card';
+import { RenewKeyDialog } from '@/components/keys/renew-key-dialog';
 import { ServerLifecycleBadge, getServerLifecycleMeta } from '@/components/servers/server-lifecycle-badge';
 import {
   TelegramBillingHistoryCard,
@@ -2534,6 +2535,7 @@ export default function KeyDetailPage() {
   const { t, locale } = useLocale();
   const params = useParams();
   const router = useRouter();
+  const utils = trpc.useUtils();
   const { toast } = useToast();
   const isMyanmar = locale === 'my';
   const keyId = params.id as string;
@@ -2687,6 +2689,7 @@ export default function KeyDetailPage() {
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
   const telegramDeliveryEnabled = Boolean(key?.telegramDeliveryEnabled);
   const rotationEnabled = Boolean((key as any)?.rotationEnabled);
   const rotationInterval =
@@ -2712,6 +2715,34 @@ export default function KeyDetailPage() {
       setDeleteDialogOpen(false);
     }
   };
+
+  const renewMutation = trpc.keys.renew.useMutation({
+    onSuccess: async (result) => {
+      const renewedExpiryLabel = result.expiresAt
+        ? formatDateTime(result.expiresAt)
+        : (isMyanmar ? 'မသတ်မှတ်ထား' : 'Not set');
+      toast({
+        title: isMyanmar ? 'Renew လုပ်ပြီးပါပြီ' : 'Key renewed',
+        description: isMyanmar
+          ? `${result.name} ကို ${renewedExpiryLabel} အထိ သက်တမ်းတိုးပြီးပါပြီ။`
+          : `${result.name} now expires on ${renewedExpiryLabel}.`,
+      });
+      setRenewDialogOpen(false);
+      await Promise.all([
+        refetch(),
+        utils.keys.getById.invalidate({ id: keyId }),
+        utils.keys.list.invalidate(),
+        utils.keys.stats.invalidate(),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: isMyanmar ? 'Renew မအောင်မြင်ပါ' : 'Renewal failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -2907,7 +2938,11 @@ export default function KeyDetailPage() {
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3 xl:flex xl:flex-wrap xl:justify-end">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:flex-wrap xl:justify-end">
+                <Button className="h-11 rounded-full px-5" onClick={() => setRenewDialogOpen(true)}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {isMyanmar ? 'Renew လုပ်မည်' : 'Renew'}
+                </Button>
                 <Button variant="outline" className="h-11 rounded-full px-5" onClick={() => setEditDialogOpen(true)}>
                   <Edit className="mr-2 h-4 w-4" />
                   {isMyanmar ? 'ပြင်ဆင်မည်' : 'Edit'}
@@ -3949,6 +3984,29 @@ export default function KeyDetailPage() {
           </div>
         </div>
       </Tabs>
+
+      {key && (
+        <RenewKeyDialog
+          open={renewDialogOpen}
+          onOpenChange={setRenewDialogOpen}
+          keyData={{
+            id: key.id,
+            name: key.name,
+            status: key.status,
+            expiresAt: key.expiresAt,
+            dataLimitBytes: key.dataLimitBytes,
+            usedBytes: key.usedBytes,
+          }}
+          isPending={renewMutation.isPending}
+          onConfirm={({ months, addDataLimitGB }) => {
+            renewMutation.mutate({
+              id: key.id,
+              months,
+              addDataLimitGB,
+            });
+          }}
+        />
+      )}
 
       {/* Edit dialog */}
       {key && (

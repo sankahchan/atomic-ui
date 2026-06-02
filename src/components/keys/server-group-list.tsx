@@ -25,6 +25,7 @@ interface ServerGroupListProps<T extends GroupableKey> {
     keys: T[];
     onToggleStatus: (key: T, checked: boolean) => void;
     onEdit: (key: T) => void;
+    onRenew: (key: T) => void;
     onDelete: (key: T) => void;
     onCopy: (key: T) => void;
     onQr: (key: T) => void;
@@ -35,6 +36,7 @@ export function ServerGroupList<T extends GroupableKey>({
     keys,
     onToggleStatus,
     onEdit,
+    onRenew,
     onDelete,
     onCopy,
     onQr,
@@ -98,6 +100,7 @@ export function ServerGroupList<T extends GroupableKey>({
                             expiresAt={key.expiresAt}
                             onToggleStatus={(checked) => onToggleStatus(key, checked)}
                             onEdit={() => onEdit(key)}
+                            onRenew={() => onRenew(key)}
                             onDelete={() => onDelete(key)}
                             onCopy={() => onCopy(key)}
                             onQr={() => onQr(key)}

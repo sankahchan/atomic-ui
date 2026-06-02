@@ -125,6 +125,7 @@ import {
 } from '@/lib/subscription-links';
 import { normalizePublicSlug, slugifyPublicName } from '@/lib/public-slug';
 import { KeysBulkActionsBar } from './_components/keys-bulk-actions-bar';
+import { RenewKeyDialog, type RenewKeyDialogKeyData } from '@/components/keys/renew-key-dialog';
 
 /**
  * Status badge configuration for visual consistency
@@ -2151,7 +2152,7 @@ function DeleteKeyDialog({
   onConfirm: () => void;
   isPending: boolean;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -2412,7 +2413,7 @@ function BulkProgressDialog({
   results: { success: number; failed: number; errors?: { id: string; name: string; error: string }[] } | null;
   isPending: boolean;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg overflow-hidden p-0">
@@ -3111,6 +3112,7 @@ function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
 function KeyRow({
   accessKey,
   onDelete,
+  onRenew,
   onShowQR,
   onToggleStatus,
   isSelected,
@@ -3155,6 +3157,7 @@ function KeyRow({
     createdAt: Date;
   };
   onDelete: () => void;
+  onRenew: () => void;
   onShowQR: () => void;
   onToggleStatus: () => void;
   isSelected: boolean;
@@ -3167,7 +3170,7 @@ function KeyRow({
   onTagClick?: (tag: string) => void;
   sparklineData?: { date: string; bytes: number }[];
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const config = statusConfig[accessKey.status as keyof typeof statusConfig] || statusConfig.ACTIVE;
   const StatusIcon = config.icon;
   const showTrafficState = accessKey.status === 'ACTIVE';
@@ -3409,6 +3412,10 @@ function KeyRow({
                 <Pencil className="w-4 h-4 mr-2" />
                 {t('keys.actions.edit')}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onRenew}>
+                <Calendar className="w-4 h-4 mr-2" />
+                {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
                 {t('keys.actions.show_qr')}
@@ -3457,6 +3464,7 @@ const AUTO_SYNC_OPTIONS = [
 
 export default function KeysPage() {
   const { toast } = useToast();
+  const utils = trpc.useUtils();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [serverFilter, setServerFilter] = useState<string>('');
@@ -3489,6 +3497,7 @@ export default function KeysPage() {
     autoRenewPolicy: string | null;
     autoRenewDurationDays: number | null;
   } | null>(null);
+  const [renewingKey, setRenewingKey] = useState<RenewKeyDialogKeyData | null>(null);
   const autoRefreshRef = useRef<(() => void) | null>(null);
   const { t, locale } = useLocale();
   const router = useRouter();
@@ -3682,6 +3691,10 @@ export default function KeysPage() {
                 <Pencil className="w-4 h-4 mr-2" />
                 {t('keys.actions.edit')}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleOpenRenew(key)}>
+                <Calendar className="w-4 h-4 mr-2" />
+                {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
                 <Power className="w-4 h-4 mr-2" />
                 {key.status === 'DISABLED' ? t('keys.actions.enable') : t('keys.actions.disable')}
@@ -3860,6 +3873,34 @@ export default function KeysPage() {
         variant: 'destructive',
       });
       setTogglingKeyId(null);
+    },
+  });
+
+  const renewMutation = trpc.keys.renew.useMutation({
+    onSuccess: async (result) => {
+      const renewedExpiryLabel = result.expiresAt
+        ? formatDateTime(result.expiresAt)
+        : (locale === 'my' ? 'မသတ်မှတ်ထား' : 'Not set');
+      toast({
+        title: locale === 'my' ? 'Renew လုပ်ပြီးပါပြီ' : 'Key renewed',
+        description: locale === 'my'
+          ? `${result.name} ကို ${renewedExpiryLabel} အထိ သက်တမ်းတိုးပြီးပါပြီ။`
+          : `${result.name} now expires on ${renewedExpiryLabel}.`,
+      });
+      setRenewingKey(null);
+      await Promise.all([
+        utils.keys.list.invalidate(),
+        utils.keys.stats.invalidate(),
+      ]);
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'Renew မအောင်မြင်ပါ' : 'Renewal failed',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -4098,6 +4139,24 @@ export default function KeysPage() {
     setDeleteDialogOpen(true);
   };
 
+  const handleOpenRenew = (key: {
+    id: string;
+    name: string;
+    status: string;
+    expiresAt: Date | null;
+    dataLimitBytes: bigint | null;
+    usedBytes: bigint;
+  }) => {
+    setRenewingKey({
+      id: key.id,
+      name: key.name,
+      status: key.status,
+      expiresAt: key.expiresAt,
+      dataLimitBytes: key.dataLimitBytes,
+      usedBytes: key.usedBytes,
+    });
+  };
+
   const confirmDelete = () => {
     if (keyToDelete) {
       deleteMutation.mutate({ id: keyToDelete.id });
@@ -4205,6 +4264,85 @@ export default function KeysPage() {
   const clearAllFilters = () => {
     clearFilters();
     clearPersistedFilters();
+  };
+  const hasPagination = !!data && data.totalPages > 1;
+  const paginationStart = data ? (page - 1) * pageSize + 1 : 0;
+  const paginationEnd = data ? Math.min(page * pageSize, data.total) : 0;
+
+  const renderPagination = (mode: 'desktop' | 'mobile') => {
+    if (!data || !hasPagination) {
+      return null;
+    }
+
+    if (mode === 'mobile') {
+      return (
+        <div className="ops-table-toolbar mb-4 gap-3 px-3 py-3 md:hidden">
+          <p className="text-center text-xs text-muted-foreground">
+            {t('keys.pagination.showing')} {paginationStart} {t('keys.pagination.to')}{' '}
+            {paginationEnd} {t('keys.pagination.of')} {data.total}
+          </p>
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 w-10 rounded-full p-0"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              aria-label={locale === 'my' ? 'ရှေ့စာမျက်နှာ' : 'Previous page'}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-0 text-center">
+              <p className="text-sm font-medium">
+                {t('keys.pagination.page')} {page} {t('keys.pagination.of_pages')} {data.totalPages}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 w-10 rounded-full p-0"
+              onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+              disabled={page === data.totalPages}
+              aria-label={locale === 'my' ? 'နောက်စာမျက်နှာ' : 'Next page'}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="ops-table-toolbar rounded-none border-x-0 border-b-0 px-3 py-2.5">
+        <p className="text-xs text-muted-foreground sm:text-sm">
+          {t('keys.pagination.showing')} {paginationStart} {t('keys.pagination.to')}{' '}
+          {paginationEnd} {t('keys.pagination.of')} {data.total}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 rounded-full p-0"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-xs sm:text-sm">
+            {t('keys.pagination.page')} {page} {t('keys.pagination.of_pages')} {data.totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 rounded-full p-0"
+            onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+            disabled={page === data.totalPages}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -5141,6 +5279,7 @@ export default function KeysPage() {
           keys={data?.items || []}
           onToggleStatus={(key, checked) => handleToggleStatus(key.id)}
           onEdit={(key) => setEditingKey(key)}
+          onRenew={(key) => handleOpenRenew(key)}
           onDelete={(key) => handleDelete(key.id, key.name)}
           onCopy={(key) => {
             if (key.accessUrl) {
@@ -5160,6 +5299,7 @@ export default function KeysPage() {
           className="md:hidden"
         />
       ) : null}
+      {renderPagination('mobile')}
 
       {/* Desktop Grid View */}
       {viewMode === 'grid' && (
@@ -5335,6 +5475,10 @@ export default function KeysPage() {
                             <Pencil className="w-4 h-4 mr-2" />
                             {t('keys.actions.edit')}
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenRenew(key)}>
+                            <Calendar className="w-4 h-4 mr-2" />
+                            {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
                             <Power className="w-4 h-4 mr-2" />
                             {key.status === 'DISABLED' ? t('keys.actions.enable') : t('keys.actions.disable')}
@@ -5411,6 +5555,7 @@ export default function KeysPage() {
                       recentTrafficDeltaBytes: liveMetricsById.get(key.id)?.recentTrafficDeltaBytes ?? BigInt(0),
                     }}
                     onDelete={() => handleDelete(key.id, key.name)}
+                    onRenew={() => handleOpenRenew(key)}
                     onShowQR={() => setQrDialogKey({ id: key.id, name: key.name })}
                     onToggleStatus={() => handleToggleStatus(key.id)}
                     isSelected={selectedKeys.has(key.id)}
@@ -5465,37 +5610,7 @@ export default function KeysPage() {
         </div>
 
         {/* Pagination */}
-        {data && data.totalPages > 1 && (
-          <div className="ops-table-toolbar rounded-none border-x-0 border-b-0 px-3 py-2.5">
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              {t('keys.pagination.showing')} {(page - 1) * pageSize + 1} {t('keys.pagination.to')}{' '}
-              {Math.min(page * pageSize, data.total)} {t('keys.pagination.of')} {data.total}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 rounded-full p-0"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-xs sm:text-sm">
-                {t('keys.pagination.page')} {page} {t('keys.pagination.of_pages')} {data.totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 rounded-full p-0"
-                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
-                disabled={page === data.totalPages}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        {renderPagination('desktop')}
       </Card>
 
       {/* Dialogs */}
@@ -5546,6 +5661,24 @@ export default function KeysPage() {
           isPending={deleteMutation.isPending}
         />
       )}
+
+      <RenewKeyDialog
+        open={!!renewingKey}
+        onOpenChange={(open) => !open && setRenewingKey(null)}
+        keyData={renewingKey}
+        isPending={renewMutation.isPending}
+        onConfirm={({ months, addDataLimitGB }) => {
+          if (!renewingKey) {
+            return;
+          }
+
+          renewMutation.mutate({
+            id: renewingKey.id,
+            months,
+            addDataLimitGB,
+          });
+        }}
+      />
 
       <BulkExtendDialog
         open={bulkExtendDialogOpen}
