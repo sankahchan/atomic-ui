@@ -235,6 +235,12 @@ const renewKeySchema = z.object({
   addDataLimitGB: z.number().positive().optional().nullable(),
 });
 
+const bulkRenewKeysSchema = z.object({
+  ids: z.array(z.string()).min(1),
+  months: z.number().int().min(1).max(3),
+  addDataLimitGB: z.number().positive().optional().nullable(),
+});
+
 const accessDistributionLinkSchema = z.object({
   id: z.string(),
   label: z.string().trim().max(80).optional().nullable(),
@@ -300,6 +306,137 @@ async function getLiveOutlineMetricBytesForKey(key: {
 
   const rawApproximation = currentRawMetricForAccessKey(key);
   return rawApproximation > BigInt(0) ? rawApproximation : BigInt(0);
+}
+
+type RenewableAccessKey = Prisma.AccessKeyGetPayload<{
+  include: {
+    server: {
+      select: {
+        apiUrl: true;
+        apiCertSha256: true;
+      };
+    };
+  };
+}>;
+
+async function applyAccessKeyRenewal(input: {
+  key: RenewableAccessKey;
+  months: number;
+  addDataLimitGB?: number | null;
+  actorUserId: string;
+  clientIp?: string | null;
+  auditAction?: string;
+  auditDetails?: Record<string, unknown>;
+}) {
+  const {
+    key,
+    months,
+    addDataLimitGB,
+    actorUserId,
+    clientIp,
+    auditAction = 'ACCESS_KEY_RENEWED',
+    auditDetails,
+  } = input;
+
+  if (key.status === 'DISABLED') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Disabled keys must be enabled before they can be renewed.',
+    });
+  }
+
+  if (!key.server) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'This access key is missing its server connection.',
+    });
+  }
+
+  const nextExpiresAt = addCalendarMonths(
+    getRenewalBaseDate(key.expiresAt),
+    months,
+  );
+
+  const addDataLimitBytes = addDataLimitGB == null
+    ? null
+    : gbToBytes(addDataLimitGB);
+  const nextDataLimitBytes = addDataLimitBytes == null
+    ? key.dataLimitBytes
+    : (key.dataLimitBytes ?? BigInt(0)) + addDataLimitBytes;
+  const quotaChanged = addDataLimitBytes != null;
+  const nextStatus = resolveRenewedAccessKeyStatus({
+    usedBytes: key.usedBytes,
+    dataLimitBytes: nextDataLimitBytes,
+  });
+
+  if (quotaChanged) {
+    const ensuredNextDataLimitBytes = nextDataLimitBytes ?? BigInt(0);
+    const client = createOutlineClient(
+      key.server.apiUrl,
+      key.server.apiCertSha256,
+    );
+    const rawMetricBytes = await getLiveOutlineMetricBytesForKey({
+      outlineKeyId: key.outlineKeyId,
+      server: key.server,
+      usedBytes: key.usedBytes,
+      usageOffset: key.usageOffset,
+    });
+    const serverLimit = rawMetricBytes + ensuredNextDataLimitBytes;
+
+    await client.setAccessKeyDataLimit(
+      key.outlineKeyId,
+      Number(serverLimit > BigInt(0) ? serverLimit : BigInt(0)),
+    );
+  }
+
+  const renewedKey = await db.accessKey.update({
+    where: { id: key.id },
+    data: {
+      expiresAt: nextExpiresAt,
+      expirationType: 'FIXED_DATE',
+      durationDays: null,
+      status: nextStatus,
+      expirationWarningStage: null,
+      lastWarningSentAt: null,
+      ...(quotaChanged
+        ? {
+            dataLimitBytes: nextDataLimitBytes,
+            bandwidthAlertAt80: false,
+            bandwidthAlertAt90: false,
+            quotaAlertsSent: '[]',
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      expiresAt: true,
+      dataLimitBytes: true,
+      status: true,
+    },
+  });
+
+  await writeAuditLog({
+    userId: actorUserId,
+    action: auditAction,
+    entity: 'ACCESS_KEY',
+    entityId: key.id,
+    ip: clientIp,
+    details: {
+      keyName: key.name,
+      months,
+      addedDataLimitGB: addDataLimitGB ?? null,
+      previousStatus: key.status,
+      nextStatus,
+      previousExpiresAt: key.expiresAt?.toISOString() ?? null,
+      nextExpiresAt: nextExpiresAt.toISOString(),
+      previousDataLimitBytes: key.dataLimitBytes?.toString() ?? null,
+      nextDataLimitBytes: nextDataLimitBytes?.toString() ?? null,
+      ...(auditDetails ?? {}),
+    },
+  });
+
+  return renewedKey;
 }
 
 async function generateUniqueAccessKeySlug(name: string, excludeId?: string) {
@@ -2151,112 +2288,94 @@ export const keysRouter = router({
         });
       }
 
-      if (existingKey.status === 'DISABLED') {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Disabled keys must be enabled before they can be renewed.',
-        });
-      }
-
-      if (!existingKey.server) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'This access key is missing its server connection.',
-        });
-      }
-
-      const nextExpiresAt = addCalendarMonths(
-        getRenewalBaseDate(existingKey.expiresAt),
-        input.months,
-      );
-
-      const addDataLimitBytes = input.addDataLimitGB == null
-        ? null
-        : gbToBytes(input.addDataLimitGB);
-      const nextDataLimitBytes = addDataLimitBytes == null
-        ? existingKey.dataLimitBytes
-        : (existingKey.dataLimitBytes ?? BigInt(0)) + addDataLimitBytes;
-      const quotaChanged = addDataLimitBytes != null;
-      const nextStatus = resolveRenewedAccessKeyStatus({
-        usedBytes: existingKey.usedBytes,
-        dataLimitBytes: nextDataLimitBytes,
-      });
-
       try {
-        if (quotaChanged) {
-          const ensuredNextDataLimitBytes = nextDataLimitBytes ?? BigInt(0);
-          const client = createOutlineClient(
-            existingKey.server.apiUrl,
-            existingKey.server.apiCertSha256,
-          );
-          const rawMetricBytes = await getLiveOutlineMetricBytesForKey({
-            outlineKeyId: existingKey.outlineKeyId,
-            server: existingKey.server,
-            usedBytes: existingKey.usedBytes,
-            usageOffset: existingKey.usageOffset,
-          });
-          const serverLimit = rawMetricBytes + ensuredNextDataLimitBytes;
-
-          await client.setAccessKeyDataLimit(
-            existingKey.outlineKeyId,
-            Number(serverLimit > BigInt(0) ? serverLimit : BigInt(0)),
-          );
-        }
-
-        const renewedKey = await db.accessKey.update({
-          where: { id: existingKey.id },
-          data: {
-            expiresAt: nextExpiresAt,
-            expirationType: 'FIXED_DATE',
-            durationDays: null,
-            status: nextStatus,
-            expirationWarningStage: null,
-            lastWarningSentAt: null,
-            ...(quotaChanged
-              ? {
-                  dataLimitBytes: nextDataLimitBytes,
-                  bandwidthAlertAt80: false,
-                  bandwidthAlertAt90: false,
-                  quotaAlertsSent: '[]',
-                }
-              : {}),
-          },
-          select: {
-            id: true,
-            name: true,
-            expiresAt: true,
-            dataLimitBytes: true,
-            status: true,
-          },
+        return await applyAccessKeyRenewal({
+          key: existingKey,
+          months: input.months,
+          addDataLimitGB: input.addDataLimitGB,
+          actorUserId: ctx.user.id,
+          clientIp: ctx.clientIp,
         });
-
-        await writeAuditLog({
-          userId: ctx.user.id,
-          action: 'ACCESS_KEY_RENEWED',
-          entity: 'ACCESS_KEY',
-          entityId: existingKey.id,
-          ip: ctx.clientIp,
-          details: {
-            keyName: existingKey.name,
-            months: input.months,
-            addedDataLimitGB: input.addDataLimitGB ?? null,
-            previousStatus: existingKey.status,
-            nextStatus,
-            previousExpiresAt: existingKey.expiresAt?.toISOString() ?? null,
-            nextExpiresAt: nextExpiresAt.toISOString(),
-            previousDataLimitBytes: existingKey.dataLimitBytes?.toString() ?? null,
-            nextDataLimitBytes: nextDataLimitBytes?.toString() ?? null,
-          },
-        });
-
-        return renewedKey;
       } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
         logger.error('Failed to renew access key:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to renew access key. Check server logs for details.',
         });
       }
+    }),
+
+  bulkRenew: adminProcedure
+    .input(bulkRenewKeysSchema)
+    .mutation(async ({ ctx, input }) => {
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: input.ids } },
+        include: {
+          server: {
+            select: {
+              apiUrl: true,
+              apiCertSha256: true,
+            },
+          },
+        },
+      });
+
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = {
+        success: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      for (const id of input.ids) {
+        const key = keysById.get(id);
+
+        if (!key) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: 'Unknown',
+            error: 'Access key not found',
+          });
+          continue;
+        }
+
+        try {
+          await applyAccessKeyRenewal({
+            key,
+            months: input.months,
+            addDataLimitGB: input.addDataLimitGB,
+            actorUserId: ctx.user.id,
+            clientIp: ctx.clientIp,
+            auditAction: 'ACCESS_KEY_RENEWED_BULK',
+            auditDetails: {
+              bulk: true,
+              batchSize: input.ids.length,
+            },
+          });
+          results.success += 1;
+        } catch (error) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: key.name,
+            error: error instanceof TRPCError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : 'Failed to renew access key',
+          });
+        }
+      }
+
+      return results;
     }),
 
   /**
