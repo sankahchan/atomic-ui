@@ -216,9 +216,12 @@ const listKeysSchema = z.object({
   userId: z.string().optional(),
   // New filters for quick segments
   online: z.boolean().optional(),
+  expiring3d: z.boolean().optional(),
   expiring7d: z.boolean().optional(),
+  expiring14d: z.boolean().optional(),
   overQuota: z.boolean().optional(),
   inactive30d: z.boolean().optional(),
+  telegramLinked: z.boolean().optional(),
   // Tag/owner filters
   tag: z.string().optional(),
   owner: z.string().optional(),
@@ -241,6 +244,10 @@ const bulkRenewKeysSchema = z.object({
   ids: z.array(z.string()).min(1),
   months: z.number().int().min(1).max(3),
   addDataLimitGB: z.number().positive().optional().nullable(),
+});
+
+const bulkRenewalReminderSchema = z.object({
+  ids: z.array(z.string()).min(1),
 });
 
 const renewalPresetListSchema = z.object({
@@ -693,9 +700,12 @@ export const keysRouter = router({
         pageSize,
         unattachedOnly,
         online,
+        expiring3d,
         expiring7d,
+        expiring14d,
         overQuota,
         inactive30d,
+        telegramLinked,
         tag,
         owner,
         overDeviceLimit,
@@ -722,11 +732,13 @@ export const keysRouter = router({
       }
 
       if (search) {
-        where.OR = [
+        andConditions.push({
+          OR: [
           { name: { contains: search } },
           { email: { contains: search } },
           { telegramId: { contains: search } },
-        ];
+          ],
+        });
       }
 
       if (unattachedOnly) {
@@ -742,23 +754,48 @@ export const keysRouter = router({
         };
       }
 
-      // Quick filter: Expiring within 7 days
-      if (expiring7d) {
+      const expiringWindowDays = expiring3d
+        ? 3
+        : expiring7d
+          ? 7
+          : expiring14d
+            ? 14
+            : null;
+
+      if (expiringWindowDays) {
         const now = new Date();
-        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const expiryThreshold = new Date(now.getTime() + expiringWindowDays * 24 * 60 * 60 * 1000);
         where.expiresAt = {
           gte: now,
-          lte: sevenDaysFromNow,
+          lte: expiryThreshold,
         };
       }
 
       // Quick filter: Inactive for 30 days (lastUsedAt older than 30 days OR null)
       if (inactive30d) {
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        where.OR = [
-          { lastUsedAt: null },
-          { lastUsedAt: { lt: thirtyDaysAgo } },
-        ];
+        andConditions.push({
+          OR: [
+            { lastUsedAt: null },
+            { lastUsedAt: { lt: thirtyDaysAgo } },
+          ],
+        });
+      }
+
+      if (telegramLinked) {
+        where.telegramDeliveryEnabled = true;
+        andConditions.push({
+          OR: [
+            { telegramId: { not: null } },
+            {
+              user: {
+                is: {
+                  telegramChatId: { not: null },
+                },
+              },
+            },
+          ],
+        });
       }
 
       // Tag filter (using contains with delimiters for safer matching)
@@ -813,6 +850,11 @@ export const keysRouter = router({
               name: true,
               countryCode: true,
               lifecycleMode: true,
+            },
+          },
+          user: {
+            select: {
+              telegramChatId: true,
             },
           },
         },
@@ -2384,6 +2426,107 @@ export const keysRouter = router({
               : error instanceof Error
                 ? error.message
                 : 'Failed to renew access key',
+          });
+        }
+      }
+
+      return results;
+    }),
+
+  bulkSendRenewalReminders: adminProcedure
+    .input(bulkRenewalReminderSchema)
+    .mutation(async ({ ctx, input }) => {
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: input.ids } },
+        select: {
+          id: true,
+          name: true,
+          telegramId: true,
+          telegramDeliveryEnabled: true,
+          user: {
+            select: {
+              telegramChatId: true,
+            },
+          },
+        },
+      });
+
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = {
+        success: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      for (const id of input.ids) {
+        const key = keysById.get(id);
+
+        if (!key) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: 'Unknown',
+            error: 'Access key not found',
+          });
+          continue;
+        }
+
+        if (!key.telegramDeliveryEnabled) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: key.name,
+            error: 'Telegram delivery is disabled for this key.',
+          });
+          continue;
+        }
+
+        const destinationChatId = key.telegramId || key.user?.telegramChatId || undefined;
+        if (!destinationChatId) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: key.name,
+            error: 'No Telegram chat is linked to this key.',
+          });
+          continue;
+        }
+
+        try {
+          const result = await sendAccessKeyRenewalReminder({
+            accessKeyId: key.id,
+            chatId: destinationChatId,
+            source: 'dashboard_support',
+          });
+
+          await writeAuditLog({
+            userId: ctx.user.id,
+            ip: ctx.clientIp,
+            action: 'ACCESS_KEY_RENEWAL_REMINDER_TRIGGERED',
+            entity: 'ACCESS_KEY',
+            entityId: key.id,
+            details: {
+              destinationChatId: result.destinationChatId,
+              bulk: true,
+              batchSize: input.ids.length,
+            },
+          });
+
+          results.success += 1;
+        } catch (error) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: key.name,
+            error: error instanceof TRPCError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : 'Failed to send renewal reminder',
           });
         }
       }

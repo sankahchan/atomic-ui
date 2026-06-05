@@ -3167,6 +3167,8 @@ function KeyRow({
   accessKey,
   onDelete,
   onRenew,
+  onSendRenewalReminder,
+  canSendRenewalReminder,
   onShowQR,
   onToggleStatus,
   isSelected,
@@ -3212,6 +3214,8 @@ function KeyRow({
   };
   onDelete: () => void;
   onRenew: () => void;
+  onSendRenewalReminder: () => void;
+  canSendRenewalReminder: boolean;
   onShowQR: () => void;
   onToggleStatus: () => void;
   isSelected: boolean;
@@ -3470,6 +3474,10 @@ function KeyRow({
                 <Calendar className="w-4 h-4 mr-2" />
                 {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={onSendRenewalReminder} disabled={!canSendRenewalReminder}>
+                <MessageSquare className="w-4 h-4 mr-2" />
+                {locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့မည်' : 'Send renewal reminder'}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={onShowQR}>
                 <QrCode className="w-4 h-4 mr-2" />
                 {t('keys.actions.show_qr')}
@@ -3552,6 +3560,7 @@ export default function KeysPage() {
     autoRenewDurationDays: number | null;
   } | null>(null);
   const [renewingKey, setRenewingKey] = useState<RenewKeyDialogKeyData | null>(null);
+  const [selectedRenewalQueuePresetCode, setSelectedRenewalQueuePresetCode] = useState<string | null>(null);
   const autoRefreshRef = useRef<(() => void) | null>(null);
   const { t, locale } = useLocale();
   const router = useRouter();
@@ -3565,11 +3574,44 @@ export default function KeysPage() {
   );
 
   const { filters, setQuickFilter, setTagFilter, setOwnerFilter, clearFilters: clearPersistedFilters } = usePersistedFilters('access-keys');
+  const activeRenewalWindow = filters.quickFilters.expiring3d
+    ? 3
+    : filters.quickFilters.expiring7d
+      ? 7
+      : filters.quickFilters.expiring14d
+        ? 14
+        : null;
+  const isRenewalQueueDepleted = statusFilter === 'DEPLETED';
+  const hasRenewalQueueFilters = Boolean(activeRenewalWindow || filters.quickFilters.telegramLinked || isRenewalQueueDepleted);
   const applyTagFilter = useCallback((tag: string) => {
     const normalizedTag = tag.trim().toLowerCase();
     setTagFilter(filters.tagFilter === normalizedTag ? undefined : normalizedTag);
     setPage(1);
   }, [filters.tagFilter, setTagFilter]);
+
+  const setRenewalWindow = useCallback((days: 3 | 7 | 14 | null) => {
+    setQuickFilter('expiring3d', days === 3);
+    setQuickFilter('expiring7d', days === 7);
+    setQuickFilter('expiring14d', days === 14);
+    setPage(1);
+  }, [setQuickFilter]);
+
+  const toggleRenewalDepletedFilter = useCallback(() => {
+    setStatusFilter((current) => (current === 'DEPLETED' ? '' : 'DEPLETED'));
+    setPage(1);
+  }, []);
+
+  const toggleRenewalTelegramLinkedFilter = useCallback(() => {
+    setQuickFilter('telegramLinked', !filters.quickFilters.telegramLinked);
+    setPage(1);
+  }, [filters.quickFilters.telegramLinked, setQuickFilter]);
+
+  const clearRenewalQueueFilters = useCallback(() => {
+    setRenewalWindow(null);
+    setQuickFilter('telegramLinked', false);
+    setStatusFilter((current) => (current === 'DEPLETED' ? '' : current));
+    setPage(1);
+  }, [setQuickFilter, setRenewalWindow]);
 
   const pageSize = 20;
 
@@ -3749,6 +3791,13 @@ export default function KeysPage() {
                 <Calendar className="w-4 h-4 mr-2" />
                 {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleSendRenewalReminder(key)}
+                disabled={!canSendRenewalReminderForKey(key) || sendRenewalReminderMutation.isPending}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                {locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့မည်' : 'Send renewal reminder'}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
                 <Power className="w-4 h-4 mr-2" />
                 {key.status === 'DISABLED' ? t('keys.actions.enable') : t('keys.actions.disable')}
@@ -3779,9 +3828,12 @@ export default function KeysPage() {
     page,
     pageSize,
     online: filters.quickFilters.online || undefined,
+    expiring3d: filters.quickFilters.expiring3d || undefined,
     expiring7d: filters.quickFilters.expiring7d || undefined,
+    expiring14d: filters.quickFilters.expiring14d || undefined,
     overQuota: filters.quickFilters.overQuota || undefined,
     inactive30d: filters.quickFilters.inactive30d || undefined,
+    telegramLinked: filters.quickFilters.telegramLinked || undefined,
     overDeviceLimit: filters.quickFilters.overDeviceLimit || undefined,
     deviceLimitWarned: filters.quickFilters.deviceLimitWarned || undefined,
     tag: filters.tagFilter || undefined,
@@ -3801,6 +3853,21 @@ export default function KeysPage() {
       staleTime: 60_000,
       refetchOnWindowFocus: false,
     },
+  );
+  useEffect(() => {
+    if (renewalPresets.length === 0) {
+      setSelectedRenewalQueuePresetCode(null);
+      return;
+    }
+
+    if (!selectedRenewalQueuePresetCode || !renewalPresets.some((preset) => preset.code === selectedRenewalQueuePresetCode)) {
+      setSelectedRenewalQueuePresetCode(renewalPresets[0]?.code ?? null);
+    }
+  }, [renewalPresets, selectedRenewalQueuePresetCode]);
+
+  const selectedRenewalQueuePreset = useMemo(
+    () => renewalPresets.find((preset) => preset.code === selectedRenewalQueuePresetCode) ?? renewalPresets[0] ?? null,
+    [renewalPresets, selectedRenewalQueuePresetCode],
   );
   const sourceTagChips = useMemo(
     () =>
@@ -3866,11 +3933,41 @@ export default function KeysPage() {
     [liveMetricsById],
   );
   const onlineCount = onlineKeyIds.size;
+  const visibleRenewalQueueItems = useMemo(
+    () => data?.items ?? [],
+    [data?.items],
+  );
+  const visibleRenewalQueueIds = useMemo(
+    () => visibleRenewalQueueItems.map((key) => key.id),
+    [visibleRenewalQueueItems],
+  );
+  const visibleRenewalQueueIdSet = useMemo(
+    () => new Set(visibleRenewalQueueIds),
+    [visibleRenewalQueueIds],
+  );
+  const visibleRenewalQueueSelectedCount = useMemo(
+    () => Array.from(selectedKeys).filter((id) => visibleRenewalQueueIdSet.has(id)).length,
+    [selectedKeys, visibleRenewalQueueIdSet],
+  );
+  const visibleRenewalReminderEligibleCount = useMemo(
+    () =>
+      visibleRenewalQueueItems.filter((key) =>
+        Boolean(
+          key.telegramDeliveryEnabled
+          && ((key as any).telegramId || (key as any).user?.telegramChatId),
+        )).length,
+    [visibleRenewalQueueItems],
+  );
 
   // Helper to check if a key is online using recent server-side session activity.
   const checkIsOnline = useCallback(
     (keyId: string, status?: string) => status === 'ACTIVE' && onlineKeyIds.has(keyId),
     [onlineKeyIds],
+  );
+  const canSendRenewalReminderForKey = useCallback(
+    (key: { telegramDeliveryEnabled?: boolean | null; telegramId?: string | null; user?: { telegramChatId?: string | null } | null }) =>
+      Boolean(key.telegramDeliveryEnabled && (key.telegramId || key.user?.telegramChatId)),
+    [],
   );
 
   // Sync all servers mutation
@@ -3965,6 +4062,24 @@ export default function KeysPage() {
     },
   });
 
+  const sendRenewalReminderMutation = trpc.keys.sendRenewalReminder.useMutation({
+    onSuccess: () => {
+      toast({
+        title: locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့ပြီးပါပြီ' : 'Renewal reminder sent',
+        description: locale === 'my'
+          ? 'Telegram သတိပေးချက်ကို ပို့ပြီးပါပြီ။'
+          : 'Telegram renewal reminder sent.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'သတိပေးချက် ပို့မရပါ' : 'Reminder failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Bulk delete mutation
   const bulkDeleteMutation = trpc.keys.bulkDelete.useMutation({
     onSuccess: (result) => {
@@ -4016,6 +4131,28 @@ export default function KeysPage() {
     onError: (error) => {
       toast({
         title: t('keys.toast.extension_failed'),
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
+  const bulkRenewalReminderMutation = trpc.keys.bulkSendRenewalReminders.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက်များ ပို့ပြီးပါပြီ' : 'Renewal reminders sent',
+        description: locale === 'my'
+          ? `${result.success} ခု ပို့ပြီးပါပြီ။`
+          : `Sent ${result.success} renewal reminders.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      setSelectedKeys(new Set());
+      setBulkProgressResults(result);
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'သတိပေးချက်များ ပို့မရပါ' : 'Reminder batch failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -4158,6 +4295,37 @@ export default function KeysPage() {
     });
   };
 
+  const handleApplyRenewalQueuePreset = () => {
+    if (selectedKeys.size === 0 || !selectedRenewalQueuePreset) return;
+
+    const confirmMessage = locale === 'my'
+      ? `${selectedKeys.size} ${getSelectedLabel(selectedKeys.size)} အတွက် ${selectedRenewalQueuePreset.label} package ကို အသုံးပြုပြီး renew လုပ်မည်။`
+      : `Apply ${selectedRenewalQueuePreset.label} to ${selectedKeys.size} ${getSelectedLabel(selectedKeys.size)}?`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setBulkProgressTitle(t('keys.bulk.progress_title.renewing'));
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    bulkRenewMutation.mutate({
+      ids: Array.from(selectedKeys),
+      months: selectedRenewalQueuePreset.months,
+      addDataLimitGB: selectedRenewalQueuePreset.dataLimitGB,
+    });
+  };
+
+  const handleBulkRenewalReminder = () => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက်များ ပို့နေသည်' : 'Sending renewal reminders');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    bulkRenewalReminderMutation.mutate({
+      ids: Array.from(selectedKeys),
+    });
+  };
+
   const handleBulkToggleStatus = (enable: boolean) => {
     if (selectedKeys.size === 0) return;
     setBulkProgressTitle(
@@ -4225,6 +4393,10 @@ export default function KeysPage() {
     });
   };
 
+  const handleSendRenewalReminder = (key: { id: string; name: string }) => {
+    sendRenewalReminderMutation.mutate({ id: key.id });
+  };
+
   const confirmDelete = () => {
     if (keyToDelete) {
       deleteMutation.mutate({ id: keyToDelete.id });
@@ -4251,6 +4423,10 @@ export default function KeysPage() {
     } else {
       setSelectedKeys(new Set(data.items.map((k) => k.id)));
     }
+  };
+
+  const handleSelectVisibleRenewalQueue = () => {
+    setSelectedKeys(new Set(visibleRenewalQueueIds));
   };
 
   const handleSelectKey = (keyId: string) => {
@@ -4311,9 +4487,12 @@ export default function KeysPage() {
 
   const hasPersistedFilters = Boolean(
     filters.quickFilters.online ||
+    filters.quickFilters.expiring3d ||
     filters.quickFilters.expiring7d ||
+    filters.quickFilters.expiring14d ||
     filters.quickFilters.overQuota ||
     filters.quickFilters.inactive30d ||
+    filters.quickFilters.telegramLinked ||
     filters.quickFilters.overDeviceLimit ||
     filters.quickFilters.deviceLimitWarned ||
     filters.tagFilter ||
@@ -4324,6 +4503,7 @@ export default function KeysPage() {
   const isBulkBusy =
     bulkDeleteMutation.isPending ||
     bulkRenewMutation.isPending ||
+    bulkRenewalReminderMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
@@ -4870,13 +5050,49 @@ export default function KeysPage() {
           {t('keys.quick_filters.online')}
         </Button>
         <Button
+          variant={filters.quickFilters.expiring3d ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.expiring3d && 'bg-orange-600 hover:bg-orange-700')}
+          onClick={() => setRenewalWindow(filters.quickFilters.expiring3d ? null : 3)}
+        >
+          <Clock className="w-3 h-3 mr-1" />
+          {locale === 'my' ? '၃ ရက်အတွင်း' : 'Expires in 3d'}
+        </Button>
+        <Button
           variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
           size="sm"
           className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
-          onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
+          onClick={() => setRenewalWindow(filters.quickFilters.expiring7d ? null : 7)}
         >
           <Clock className="w-3 h-3 mr-1" />
           {t('keys.quick_filters.expiring7d')}
+        </Button>
+        <Button
+          variant={filters.quickFilters.expiring14d ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.expiring14d && 'bg-orange-600 hover:bg-orange-700')}
+          onClick={() => setRenewalWindow(filters.quickFilters.expiring14d ? null : 14)}
+        >
+          <Clock className="w-3 h-3 mr-1" />
+          {locale === 'my' ? '၁၄ ရက်အတွင်း' : 'Expires in 14d'}
+        </Button>
+        <Button
+          variant={filters.quickFilters.telegramLinked ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.telegramLinked && 'bg-sky-600 hover:bg-sky-700')}
+          onClick={toggleRenewalTelegramLinkedFilter}
+        >
+          <MessageSquare className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
+        </Button>
+        <Button
+          variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
+          onClick={toggleRenewalDepletedFilter}
+        >
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Data ကုန်နေသည်' : 'Depleted'}
         </Button>
         <Button
           variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
@@ -4937,12 +5153,12 @@ export default function KeysPage() {
           />
         </div>
 
-        {(filters.quickFilters.online || filters.quickFilters.expiring7d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter) && (
+        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
           <Button
             variant="ghost"
             size="sm"
             className="h-8 rounded-full px-2.5 text-[11px]"
-            onClick={clearPersistedFilters}
+            onClick={clearAllFilters}
           >
             <X className="w-3 h-3 mr-1" />
             {t('keys.clear_filters')}
@@ -5189,13 +5405,49 @@ export default function KeysPage() {
                   {t('keys.quick_filters.online')}
                 </Button>
                 <Button
+                  variant={filters.quickFilters.expiring3d ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.expiring3d && 'bg-orange-600 hover:bg-orange-700')}
+                  onClick={() => setRenewalWindow(filters.quickFilters.expiring3d ? null : 3)}
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? '၃ ရက်အတွင်း' : 'Expires in 3d'}
+                </Button>
+                <Button
                   variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
                   size="sm"
                   className={cn(filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
-                  onClick={() => setQuickFilter('expiring7d', !filters.quickFilters.expiring7d)}
+                  onClick={() => setRenewalWindow(filters.quickFilters.expiring7d ? null : 7)}
                 >
                   <Clock className="w-3 h-3 mr-1" />
                   {t('keys.quick_filters.expiring7d')}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.expiring14d ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.expiring14d && 'bg-orange-600 hover:bg-orange-700')}
+                  onClick={() => setRenewalWindow(filters.quickFilters.expiring14d ? null : 14)}
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? '၁၄ ရက်အတွင်း' : 'Expires in 14d'}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.telegramLinked ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.telegramLinked && 'bg-sky-600 hover:bg-sky-700')}
+                  onClick={toggleRenewalTelegramLinkedFilter}
+                >
+                  <MessageSquare className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
+                </Button>
+                <Button
+                  variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
+                  onClick={toggleRenewalDepletedFilter}
+                >
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Data ကုန်နေသည်' : 'Depleted'}
                 </Button>
                 <Button
                   variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
@@ -5305,6 +5557,172 @@ export default function KeysPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Card className="mb-6 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-background to-background shadow-[0_20px_45px_rgba(12,18,38,0.12)]">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-1.5">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="h-5 w-5 text-primary" />
+                {locale === 'my' ? 'သက်တမ်းတိုး အလုပ်စာရင်း' : 'Renewal queue'}
+              </CardTitle>
+              <CardDescription>
+                {locale === 'my'
+                  ? 'Expire နီးနေသော သို့မဟုတ် data ကုန်နေသော key များကို စစ်ပြီး package ဖြင့် renew လုပ်ကာ Telegram reminder ပို့နိုင်သည်။'
+                  : 'Filter expiring or depleted keys, select the current queue, then renew with a package or send Telegram reminders.'}
+              </CardDescription>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Queue စုစုပေါင်း' : 'Queue total'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? data?.total ?? 0 : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'မြင်နေသောစာမျက်နှာ' : 'Visible page'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{visibleRenewalQueueItems.length}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'ရွေးထားပြီး' : 'Selected'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{selectedKeys.size}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Reminder ရနိုင်' : 'Reminder-ready'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{visibleRenewalReminderEligibleCount}</p>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={activeRenewalWindow === 3 ? 'default' : 'outline'}
+              size="sm"
+              className={cn(activeRenewalWindow === 3 && 'bg-orange-600 hover:bg-orange-700')}
+              onClick={() => setRenewalWindow(activeRenewalWindow === 3 ? null : 3)}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? '၃ ရက်အတွင်း' : 'Expires in 3d'}
+            </Button>
+            <Button
+              variant={activeRenewalWindow === 7 ? 'default' : 'outline'}
+              size="sm"
+              className={cn(activeRenewalWindow === 7 && 'bg-orange-600 hover:bg-orange-700')}
+              onClick={() => setRenewalWindow(activeRenewalWindow === 7 ? null : 7)}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? '၇ ရက်အတွင်း' : 'Expires in 7d'}
+            </Button>
+            <Button
+              variant={activeRenewalWindow === 14 ? 'default' : 'outline'}
+              size="sm"
+              className={cn(activeRenewalWindow === 14 && 'bg-orange-600 hover:bg-orange-700')}
+              onClick={() => setRenewalWindow(activeRenewalWindow === 14 ? null : 14)}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? '၁၄ ရက်အတွင်း' : 'Expires in 14d'}
+            </Button>
+            <Button
+              variant={isRenewalQueueDepleted ? 'default' : 'outline'}
+              size="sm"
+              className={cn(isRenewalQueueDepleted && 'bg-red-600 hover:bg-red-700')}
+              onClick={toggleRenewalDepletedFilter}
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Data ကုန်နေသည်' : 'Depleted'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.telegramLinked ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.telegramLinked && 'bg-sky-600 hover:bg-sky-700')}
+              onClick={toggleRenewalTelegramLinkedFilter}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
+            </Button>
+            {hasRenewalQueueFilters ? (
+              <Button variant="ghost" size="sm" onClick={clearRenewalQueueFilters}>
+                <X className="mr-2 h-4 w-4" />
+                {locale === 'my' ? 'Queue filter များ ဖြုတ်မည်' : 'Clear queue filters'}
+              </Button>
+            ) : null}
+          </div>
+
+          {renewalPresets.length > 0 ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {locale === 'my' ? 'Renewal package ကို ရွေးပါ' : 'Choose a renewal package'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {locale === 'my'
+                    ? 'Visible queue ကို ရွေးပြီးနောက် preset ကို တစ်ချက်နှိပ်ဖြင့် အစုလိုက် renew လုပ်နိုင်သည်။'
+                    : 'Select the visible queue, then apply one preset to the current batch in a single action.'}
+                </p>
+              </div>
+              <RenewalPackagePicker
+                presets={renewalPresets}
+                selectedCode={selectedRenewalQueuePreset?.code ?? null}
+                isMyanmar={locale === 'my'}
+                onSelect={(preset) => setSelectedRenewalQueuePresetCode(preset.code)}
+              />
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectVisibleRenewalQueue}
+              disabled={visibleRenewalQueueIds.length === 0}
+            >
+              <CheckSquare className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'မြင်နေသောစာမျက်နှာကို ရွေးမည်' : 'Select visible page'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBulkRenewDialogOpen(true)}
+              disabled={selectedKeys.size === 0}
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'လနှင့် GB ကို ကိုယ်တိုင်ရွေးမည်' : 'Manual renew'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleApplyRenewalQueuePreset}
+              disabled={selectedKeys.size === 0 || !selectedRenewalQueuePreset || bulkRenewMutation.isPending}
+            >
+              {bulkRenewMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {locale === 'my'
+                ? `${selectedRenewalQueuePreset?.label ?? 'Package'} ဖြင့် renew`
+                : `Apply ${selectedRenewalQueuePreset?.label ?? 'package'}`}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkRenewalReminder}
+              disabled={selectedKeys.size === 0 || bulkRenewalReminderMutation.isPending}
+            >
+              {bulkRenewalReminderMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+              {locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့မည်' : 'Send renewal reminders'}
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {locale === 'my'
+              ? `Renew နှင့် reminder action များ၏ result ကို bulk progress dialog နှင့် audit trail ထဲတွင် ဆက်လက်မြင်နိုင်မည်။ Visible selection ${visibleRenewalQueueSelectedCount} ခု ရွေးထားသည်။`
+              : `Renew and reminder actions feed the existing bulk progress dialog and audit trail. ${visibleRenewalQueueSelectedCount} visible queue items are currently selected.`}
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Bulk actions bar */}
       {selectedKeys.size > 0 && (
@@ -5547,6 +5965,13 @@ export default function KeysPage() {
                             <Calendar className="w-4 h-4 mr-2" />
                             {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleSendRenewalReminder(key)}
+                            disabled={!canSendRenewalReminderForKey(key) || sendRenewalReminderMutation.isPending}
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            {locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့မည်' : 'Send renewal reminder'}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleToggleStatus(key.id)}>
                             <Power className="w-4 h-4 mr-2" />
                             {key.status === 'DISABLED' ? t('keys.actions.enable') : t('keys.actions.disable')}
@@ -5624,6 +6049,8 @@ export default function KeysPage() {
                     }}
                     onDelete={() => handleDelete(key.id, key.name)}
                     onRenew={() => handleOpenRenew(key)}
+                    onSendRenewalReminder={() => handleSendRenewalReminder(key)}
+                    canSendRenewalReminder={canSendRenewalReminderForKey(key) && !sendRenewalReminderMutation.isPending}
                     onShowQR={() => setQrDialogKey({ id: key.id, name: key.name })}
                     onToggleStatus={() => handleToggleStatus(key.id)}
                     isSelected={selectedKeys.has(key.id)}
