@@ -8,9 +8,12 @@ const DEBOUNCE_MS = 300;
 
 const quickFiltersSchema = z.object({
   online: z.boolean().optional(),
+  expiring3d: z.boolean().optional(),
   expiring7d: z.boolean().optional(),
+  expiring14d: z.boolean().optional(),
   overQuota: z.boolean().optional(),
   inactive30d: z.boolean().optional(),
+  telegramLinked: z.boolean().optional(),
   overDeviceLimit: z.boolean().optional(),
   deviceLimitWarned: z.boolean().optional(),
 });
