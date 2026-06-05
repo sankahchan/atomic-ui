@@ -23,6 +23,7 @@ const auditLogFiltersSchema = z.object({
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
   action: z.string().optional(),
+  actions: z.array(z.string()).max(50).optional(),
   entity: z.string().optional(),
   userId: z.string().optional(),
   dateFrom: z.coerce.date().optional(),
@@ -54,8 +55,11 @@ function buildAuditLogWhere(
   input?: z.infer<typeof listAuditLogsSchema> | z.infer<typeof exportAuditLogsSchema>,
 ): Prisma.AuditLogWhereInput {
   const where: Prisma.AuditLogWhereInput = {};
+  const actions = input?.actions?.filter((action) => action.trim().length > 0);
 
-  if (input?.action) {
+  if (actions?.length) {
+    where.action = { in: actions };
+  } else if (input?.action) {
     where.action = input.action;
   }
 

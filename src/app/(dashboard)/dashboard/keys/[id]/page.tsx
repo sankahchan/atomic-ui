@@ -84,6 +84,14 @@ import {
 import { normalizePublicSlug } from '@/lib/public-slug';
 import { getQuotaAlertState } from '@/lib/access-key-policies';
 import {
+  formatAuditAddedData,
+  formatAuditBytes,
+  formatAuditDateTimeValue,
+  formatAuditMonths,
+  formatAuditTransition,
+  isRenewalAuditAction,
+} from '@/lib/audit-log-format';
+import {
   ArrowLeft,
   Key,
   Copy,
@@ -1704,8 +1712,18 @@ function AccessDistributionSecurityCard({
     inviteRevoked: isMyanmar ? 'ဖိတ်ခေါ်လင့်ခ်ကို ရုပ်သိမ်းပြီးပါပြီ။' : 'Invite link revoked.',
     actionFailed: isMyanmar ? 'လုပ်ဆောင်မှု မအောင်မြင်ပါ' : 'Action failed',
     auditTitle: isMyanmar ? 'စစ်ဆေးမှတ်တမ်း' : 'Audit trail',
-    auditDesc: isMyanmar ? 'ဤသော့အတွက် မျှဝေခြင်း၊ လုံခြုံရေးနှင့် အကူအညီ လုပ်ဆောင်ချက်များ၏ လတ်တလော မှတ်တမ်း' : 'Recent share, protection, and support actions for this key.',
+    auditDesc: isMyanmar ? 'ဤသော့အတွက် သက်တမ်းတိုးခြင်း၊ မျှဝေခြင်း၊ လုံခြုံရေးနှင့် အကူအညီ လုပ်ဆောင်ချက်များ၏ လတ်တလော မှတ်တမ်း' : 'Recent renewal, share, protection, and support actions for this key.',
     noAudit: isMyanmar ? 'စစ်ဆေးမှတ်တမ်း မရှိသေးပါ' : 'No audit entries yet',
+    renewed: isMyanmar ? 'Key သက်တမ်းတိုးခဲ့သည်' : 'Renewed key',
+    bulkRenewed: isMyanmar ? 'Key ကို အစုလိုက် သက်တမ်းတိုးမှုမှ တိုးခဲ့သည်' : 'Renewed in bulk batch',
+    renewalExtension: isMyanmar ? 'တိုးထားသောကာလ' : 'Extension',
+    renewalDataAdded: isMyanmar ? 'ထည့်ထားသော data' : 'Data added',
+    renewalExpiry: isMyanmar ? 'သက်တမ်းကုန်ချိန်' : 'Expiry',
+    renewalQuota: isMyanmar ? 'Quota' : 'Quota',
+    renewalStatus: isMyanmar ? 'အခြေအနေ' : 'Status',
+    renewalBatch: isMyanmar ? 'အစုလိုက် အရေအတွက်' : 'Batch',
+    noDataAdded: isMyanmar ? 'Data မထည့်ထားပါ' : 'No data added',
+    unknown: isMyanmar ? 'မသိရှိပါ' : 'Unknown',
   };
 
   const toDateTimeLocalValue = (value?: string | Date | null) => {
@@ -1831,6 +1849,10 @@ function AccessDistributionSecurityCard({
 
   const formatAuditAction = (action: string) => {
     switch (action) {
+      case 'ACCESS_KEY_RENEWED':
+        return ui.renewed;
+      case 'ACCESS_KEY_RENEWED_BULK':
+        return ui.bulkRenewed;
       case 'ACCESS_KEY_SHARE_PROTECTION_UPDATED':
         return isMyanmar ? 'မျှဝေကာကွယ်မှုကို အပ်ဒိတ်လုပ်ခဲ့သည်' : 'Updated share protection';
       case 'ACCESS_KEY_DISTRIBUTION_LINK_CREATED':
@@ -1863,9 +1885,43 @@ function AccessDistributionSecurityCard({
       lang: locale,
     });
 
-  const formatAuditDetails = (details: Record<string, unknown> | null) => {
+  const formatStatus = (value: unknown) => (
+    typeof value === 'string' && value.trim()
+      ? value.replaceAll('_', ' ').toLowerCase()
+      : ui.unknown
+  );
+
+  const formatAuditDetails = (details: Record<string, unknown> | null, action?: string) => {
     if (!details) {
       return [];
+    }
+
+    if (action && isRenewalAuditAction(action)) {
+      const renewalLines = [
+        `${ui.renewalExtension}: ${formatAuditMonths(details.months, ui.unknown)}`,
+        `${ui.renewalDataAdded}: ${formatAuditAddedData(details.addedDataLimitGB, ui.noDataAdded)}`,
+        `${ui.renewalExpiry}: ${formatAuditTransition(
+          details.previousExpiresAt,
+          details.nextExpiresAt,
+          (value) => formatAuditDateTimeValue(value, ui.unknown),
+        )}`,
+        `${ui.renewalQuota}: ${formatAuditTransition(
+          details.previousDataLimitBytes,
+          details.nextDataLimitBytes,
+          (value) => formatAuditBytes(value, ui.unlimited),
+        )}`,
+        `${ui.renewalStatus}: ${formatAuditTransition(
+          details.previousStatus,
+          details.nextStatus,
+          formatStatus,
+        )}`,
+      ];
+
+      if (action === 'ACCESS_KEY_RENEWED_BULK' && details.batchSize) {
+        renewalLines.push(`${ui.renewalBatch}: ${String(details.batchSize)}`);
+      }
+
+      return renewalLines;
     }
 
     const preferredOrder = [
@@ -2086,7 +2142,7 @@ function AccessDistributionSecurityCard({
                     <p className="font-medium">{formatAuditAction(entry.action)}</p>
                     {entry.details ? (
                       <div className="space-y-1 text-sm text-muted-foreground">
-                        {formatAuditDetails(entry.details).map((line) => (
+                        {formatAuditDetails(entry.details, entry.action).map((line) => (
                           <p key={line} className="break-all leading-5">
                             {line}
                           </p>
