@@ -81,6 +81,8 @@ import {
   getRenewalBaseDate,
   resolveRenewedAccessKeyStatus,
 } from '@/lib/access-key-renewal';
+import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
+import { resolveAccessKeyRenewalPresets } from '@/lib/renewal-package-presets';
 
 /**
  * Validation schema for creating a new access key.
@@ -240,6 +242,10 @@ const bulkRenewKeysSchema = z.object({
   months: z.number().int().min(1).max(3),
   addDataLimitGB: z.number().positive().optional().nullable(),
 });
+
+const renewalPresetListSchema = z.object({
+  locale: z.string().optional().nullable(),
+}).optional();
 
 const accessDistributionLinkSchema = z.object({
   id: z.string(),
@@ -616,6 +622,13 @@ async function resolveAccessKeySlug(requestedSlug: string | null | undefined, na
 }
 
 export const keysRouter = router({
+  listRenewalPresets: adminProcedure
+    .input(renewalPresetListSchema)
+    .query(async ({ input }) => {
+      const salesSettings = await getTelegramSalesSettings();
+      return resolveAccessKeyRenewalPresets(salesSettings, input?.locale);
+    }),
+
   checkPublicSlugAvailability: adminProcedure
     .input(
       z.object({

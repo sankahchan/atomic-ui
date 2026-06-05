@@ -126,6 +126,8 @@ import {
 import { normalizePublicSlug, slugifyPublicName } from '@/lib/public-slug';
 import { KeysBulkActionsBar } from './_components/keys-bulk-actions-bar';
 import { RenewKeyDialog, type RenewKeyDialogKeyData } from '@/components/keys/renew-key-dialog';
+import { RenewalPackagePicker } from '@/components/keys/renewal-package-picker';
+import type { RenewalPackagePreset } from '@/lib/renewal-package-presets';
 
 /**
  * Status badge configuration for visual consistency
@@ -2200,12 +2202,14 @@ function BulkRenewDialog({
   open,
   onOpenChange,
   count,
+  presets,
   onConfirm,
   isPending,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   count: number;
+  presets: RenewalPackagePreset[];
   onConfirm: (input: { months: number; addDataLimitGB: number | null }) => void;
   isPending: boolean;
 }) {
@@ -2217,6 +2221,8 @@ function BulkRenewDialog({
   const parsedAddDataLimitGB = addDataLimitGB.trim() === '' ? null : Number(addDataLimitGB);
   const addDataLimitInvalid = parsedAddDataLimitGB != null
     && (!Number.isFinite(parsedAddDataLimitGB) || parsedAddDataLimitGB <= 0);
+  const selectedPresetCode =
+    presets.find((preset) => preset.months === months && preset.dataLimitGB === parsedAddDataLimitGB)?.code ?? null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -2235,13 +2241,35 @@ function BulkRenewDialog({
         </DialogHeader>
 
         <DialogBody>
+          {presets.length > 0 ? (
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>{isMyanmar ? 'Package presets' : 'Package presets'}</DialogSectionTitle>
+                <DialogSectionDescription>
+                  {isMyanmar
+                    ? 'Telegram sales settings မှ access-key plan များကို အသုံးပြုပြီး renewal လနှင့် GB ကို တစ်ချက်နှိပ်ဖြင့် ဖြည့်မည်။'
+                    : 'Reuse access-key plans from Telegram sales settings to fill the renewal months and GB in one tap.'}
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <RenewalPackagePicker
+                presets={presets}
+                selectedCode={selectedPresetCode}
+                isMyanmar={isMyanmar}
+                onSelect={(preset) => {
+                  setMonths(preset.months);
+                  setAddDataLimitGB(String(preset.dataLimitGB));
+                }}
+              />
+            </DialogSection>
+          ) : null}
+
           <DialogSection>
             <DialogSectionHeader>
-              <DialogSectionTitle>{isMyanmar ? 'Renewal preset' : 'Renewal preset'}</DialogSectionTitle>
+              <DialogSectionTitle>{isMyanmar ? 'Manual adjustment' : 'Manual adjustment'}</DialogSectionTitle>
               <DialogSectionDescription>
                 {isMyanmar
-                  ? 'ရွေးထားသော သော့များအားလုံးအတွက် တူညီသော renewal period ကို ရွေးပါ။'
-                  : 'Apply the same renewal period to every selected access key.'}
+                  ? 'Preset ကို ရွေးပြီးနောက် လပိုင်း သို့မဟုတ် top-up data ကို ကိုယ်တိုင် ပြင်နိုင်သည်။'
+                  : 'After choosing a preset, you can still fine-tune the months or quota top-up.'}
               </DialogSectionDescription>
             </DialogSectionHeader>
             <div className="flex flex-wrap gap-2">
@@ -3767,6 +3795,13 @@ export default function KeysPage() {
 
   // Fetch key stats; interval refresh is handled by the shared read-only page refresher.
   const { data: stats, refetch: refetchStats } = trpc.keys.stats.useQuery();
+  const { data: renewalPresets = [] } = trpc.keys.listRenewalPresets.useQuery(
+    { locale },
+    {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
+  );
   const sourceTagChips = useMemo(
     () =>
       KEY_SOURCE_TAGS.map((tag) => ({
@@ -5699,6 +5734,7 @@ export default function KeysPage() {
         open={!!renewingKey}
         onOpenChange={(open) => !open && setRenewingKey(null)}
         keyData={renewingKey}
+        presets={renewalPresets}
         isPending={renewMutation.isPending}
         onConfirm={({ months, addDataLimitGB }) => {
           if (!renewingKey) {
@@ -5717,6 +5753,7 @@ export default function KeysPage() {
         open={bulkRenewDialogOpen}
         onOpenChange={setBulkRenewDialogOpen}
         count={selectedKeys.size}
+        presets={renewalPresets}
         onConfirm={handleBulkRenew}
         isPending={bulkRenewMutation.isPending}
       />

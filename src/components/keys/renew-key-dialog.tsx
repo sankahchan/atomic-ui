@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RenewalPackagePicker } from '@/components/keys/renewal-package-picker';
+import type { RenewalPackagePreset } from '@/lib/renewal-package-presets';
 
 const MONTH_OPTIONS = [1, 2, 3] as const;
 const GB = 1024 * 1024 * 1024;
@@ -45,12 +47,14 @@ export function RenewKeyDialog({
   open,
   onOpenChange,
   keyData,
+  presets = [],
   isPending,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   keyData: RenewKeyDialogKeyData | null;
+  presets?: RenewalPackagePreset[];
   isPending: boolean;
   onConfirm: (input: RenewKeyDialogSubmit) => void;
 }) {
@@ -104,6 +108,7 @@ export function RenewKeyDialog({
   }, [keyData?.dataLimitBytes, parsedAddGb]);
 
   const renewalBlocked = keyData?.status === 'DISABLED';
+  const selectedPresetCode = presets.find((preset) => preset.months === months && preset.dataLimitGB === parsedAddGb)?.code ?? null;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -142,14 +147,37 @@ export function RenewKeyDialog({
           <DialogTitle>{isMyanmar ? 'သော့ သက်တမ်းတိုးမည်' : 'Renew key'}</DialogTitle>
           <DialogDescription>
             {isMyanmar
-              ? 'လက်ရှိ သော့အတွက် သက်တမ်းကို လစဉ်ဖြင့် တိုးပြီး လိုအပ်သလို data quota ကို ထပ်ထည့်ပါ။'
-              : 'Extend this key by calendar months and optionally top up its data quota.'}
+              ? 'Sales package preset ကို ရွေးနိုင်ပြီး လိုအပ်သလို လနှင့် data quota ကို ကိုယ်တိုင် ပြင်နိုင်သည်။'
+              : 'Pick a sales package preset, then adjust the months or data top-up manually if needed.'}
           </DialogDescription>
         </DialogHeader>
 
         {keyData ? (
           <form onSubmit={handleSubmit}>
             <DialogBody>
+              {presets.length > 0 ? (
+                <DialogSection>
+                  <DialogSectionHeader>
+                    <DialogSectionTitle>{isMyanmar ? 'Package presets' : 'Package presets'}</DialogSectionTitle>
+                    <DialogSectionDescription>
+                      {isMyanmar
+                        ? 'Telegram sales settings မှ access-key plan များကို အသုံးပြုပြီး renewal လနှင့် GB ကို တစ်ချက်နှိပ်ဖြင့် ဖြည့်မည်။'
+                        : 'Reuse access-key plans from Telegram sales settings to fill the renewal months and GB in one tap.'}
+                    </DialogSectionDescription>
+                  </DialogSectionHeader>
+                  <RenewalPackagePicker
+                    presets={presets}
+                    selectedCode={selectedPresetCode}
+                    isMyanmar={isMyanmar}
+                    onSelect={(preset) => {
+                      setMonths(preset.months);
+                      setAddDataLimitGB(String(preset.dataLimitGB));
+                      setValidationMessage(null);
+                    }}
+                  />
+                </DialogSection>
+              ) : null}
+
               <DialogSection>
                 <DialogSectionHeader>
                   <DialogSectionTitle>{keyData.name}</DialogSectionTitle>
@@ -166,6 +194,14 @@ export function RenewKeyDialog({
               </DialogSection>
 
               <DialogSection>
+                <DialogSectionHeader>
+                  <DialogSectionTitle>{isMyanmar ? 'Manual adjustment' : 'Manual adjustment'}</DialogSectionTitle>
+                  <DialogSectionDescription>
+                    {isMyanmar
+                      ? 'Preset ကို ရွေးပြီးနောက် လပိုင်း သို့မဟုတ် top-up data ကို ကိုယ်တိုင် ပြင်နိုင်သည်။'
+                      : 'After choosing a preset, you can still fine-tune the months or quota top-up.'}
+                  </DialogSectionDescription>
+                </DialogSectionHeader>
                 <Label className="mb-3 block">{isMyanmar ? 'သက်တမ်းတိုးမည့် လရွေးချယ်ပါ' : 'Choose renewal length'}</Label>
                 <div className="grid grid-cols-3 gap-2">
                   {MONTH_OPTIONS.map((option) => (
