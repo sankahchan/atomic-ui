@@ -83,6 +83,16 @@ import {
 } from '@/lib/access-key-renewal';
 import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
 import { resolveAccessKeyRenewalPresets } from '@/lib/renewal-package-presets';
+import {
+  deriveRenewalReminderState,
+  buildRenewalReminderSnapshotMap,
+  matchesRenewalReminderQuickFilter,
+  RENEWAL_AUDIT_ACTIONS,
+  RENEWAL_REMINDER_AUDIT_ACTIONS,
+  RENEWAL_REMINDER_COOLDOWN_MS,
+  summarizeRenewalReminderStates,
+  type RenewalReminderQuickFilter,
+} from '@/lib/renewal-reminder-tracking';
 
 /**
  * Validation schema for creating a new access key.
@@ -222,6 +232,10 @@ const listKeysSchema = z.object({
   overQuota: z.boolean().optional(),
   inactive30d: z.boolean().optional(),
   telegramLinked: z.boolean().optional(),
+  neverReminded: z.boolean().optional(),
+  remindedToday: z.boolean().optional(),
+  reminded24hAgo: z.boolean().optional(),
+  renewedAfterReminder: z.boolean().optional(),
   // Tag/owner filters
   tag: z.string().optional(),
   owner: z.string().optional(),
@@ -591,6 +605,54 @@ async function recordAccessKeySlugHistory(
   });
 }
 
+async function getAccessKeyRenewalReminderStateMap(accessKeyIds: string[]) {
+  const orderedUniqueIds = Array.from(new Set(accessKeyIds));
+  const now = new Date();
+
+  if (orderedUniqueIds.length === 0) {
+    return new Map<string, ReturnType<typeof deriveRenewalReminderState>>();
+  }
+
+  const auditRows = await db.auditLog.groupBy({
+    by: ['entityId', 'action'],
+    where: {
+      entity: 'ACCESS_KEY',
+      entityId: { in: orderedUniqueIds },
+      action: {
+        in: [...RENEWAL_REMINDER_AUDIT_ACTIONS, ...RENEWAL_AUDIT_ACTIONS],
+      },
+    },
+    _max: {
+      createdAt: true,
+    },
+  });
+
+  const snapshotMap = buildRenewalReminderSnapshotMap(auditRows);
+
+  return new Map(
+    orderedUniqueIds.map((accessKeyId) => [
+      accessKeyId,
+      deriveRenewalReminderState(snapshotMap.get(accessKeyId), now),
+    ]),
+  );
+}
+
+async function getLatestRenewalReminderState(accessKeyId: string) {
+  const stateMap = await getAccessKeyRenewalReminderStateMap([accessKeyId]);
+  return stateMap.get(accessKeyId) ?? deriveRenewalReminderState(null);
+}
+
+function getRenewalReminderCooldownMessage(cooldownUntil: Date) {
+  return `A renewal reminder was already sent recently. Wait until ${cooldownUntil.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })} before sending another one.`;
+}
+
 async function resolveAccessKeySlug(requestedSlug: string | null | undefined, name: string, excludeId?: string) {
   if (!requestedSlug) {
     return generateUniqueAccessKeySlug(name, excludeId);
@@ -706,6 +768,10 @@ export const keysRouter = router({
         overQuota,
         inactive30d,
         telegramLinked,
+        neverReminded,
+        remindedToday,
+        reminded24hAgo,
+        renewedAfterReminder,
         tag,
         owner,
         overDeviceLimit,
@@ -837,31 +903,108 @@ export const keysRouter = router({
         where.AND = andConditions;
       }
 
-      // Get total count for pagination
-      const total = await db.accessKey.count({ where });
+      const reminderQuickFilter: RenewalReminderQuickFilter | null = neverReminded
+        ? 'neverReminded'
+        : remindedToday
+          ? 'remindedToday'
+          : reminded24hAgo
+            ? 'reminded24hAgo'
+            : renewedAfterReminder
+              ? 'renewedAfterReminder'
+              : null;
 
-      // Fetch keys with server info
-      const keys = await db.accessKey.findMany({
-        where,
-        include: {
-          server: {
-            select: {
-              id: true,
-              name: true,
-              countryCode: true,
-              lifecycleMode: true,
-            },
-          },
-          user: {
-            select: {
-              telegramChatId: true,
-            },
+      const shouldBuildOrderedMatchSet = Boolean(
+        reminderQuickFilter
+        || expiringWindowDays
+        || status === 'DEPLETED'
+        || telegramLinked
+        || overQuota,
+      );
+
+      const listInclude = {
+        server: {
+          select: {
+            id: true,
+            name: true,
+            countryCode: true,
+            lifecycleMode: true,
           },
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      });
+        user: {
+          select: {
+            telegramChatId: true,
+          },
+        },
+      } as const;
+      type ListedAccessKey = Prisma.AccessKeyGetPayload<{ include: typeof listInclude }>;
+
+      let total = 0;
+      let keys: ListedAccessKey[] = [];
+      let reminderStateById = new Map<string, ReturnType<typeof deriveRenewalReminderState>>();
+      let renewalReminderSummary = summarizeRenewalReminderStates([]);
+
+      if (shouldBuildOrderedMatchSet) {
+        const orderedMatchingKeys = await db.accessKey.findMany({
+          where,
+          select: {
+            id: true,
+            usedBytes: true,
+            dataLimitBytes: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        const orderedMatchingIds = orderedMatchingKeys
+          .filter((key) => (
+            !overQuota
+            || (key.dataLimitBytes && Math.round((Number(key.usedBytes) / Number(key.dataLimitBytes)) * 100) >= 80)
+          ))
+          .map((key) => key.id);
+
+        const fullReminderStateById = await getAccessKeyRenewalReminderStateMap(orderedMatchingIds);
+        const filteredOrderedIds = reminderQuickFilter
+          ? orderedMatchingIds.filter((accessKeyId) => matchesRenewalReminderQuickFilter(
+            fullReminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null),
+            reminderQuickFilter,
+          ))
+          : orderedMatchingIds;
+
+        total = filteredOrderedIds.length;
+        renewalReminderSummary = summarizeRenewalReminderStates(
+          filteredOrderedIds.map((accessKeyId) => fullReminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null)),
+        );
+
+        const pagedIds = filteredOrderedIds.slice((page - 1) * pageSize, page * pageSize);
+        reminderStateById = new Map(
+          pagedIds.map((accessKeyId) => [
+            accessKeyId,
+            fullReminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null),
+          ]),
+        );
+
+        if (pagedIds.length > 0) {
+          keys = await db.accessKey.findMany({
+            where: {
+              ...where,
+              id: { in: pagedIds },
+            },
+            include: listInclude,
+          });
+
+          const orderIndex = new Map(pagedIds.map((accessKeyId, index) => [accessKeyId, index]));
+          keys.sort((left, right) => (orderIndex.get(left.id) ?? 0) - (orderIndex.get(right.id) ?? 0));
+        }
+      } else {
+        total = await db.accessKey.count({ where });
+        keys = await db.accessKey.findMany({
+          where,
+          include: listInclude,
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        });
+        reminderStateById = await getAccessKeyRenewalReminderStateMap(keys.map((key) => key.id));
+      }
 
       // Calculate usage percentages and remaining time
       let keysWithStats = keys.map((key) => {
@@ -882,6 +1025,7 @@ export const keysRouter = router({
           daysRemaining,
           isExpiringSoon: daysRemaining !== null && daysRemaining <= 3 && daysRemaining > 0,
           isTrafficWarning: usagePercent >= 80 && usagePercent < 100,
+          renewalReminder: reminderStateById.get(key.id) ?? deriveRenewalReminderState(null),
         };
       });
 
@@ -928,6 +1072,7 @@ export const keysRouter = router({
         pageSize,
         totalPages: Math.ceil(total / pageSize),
         hasMore: page * pageSize < total,
+        renewalReminderSummary,
       };
     }),
 
@@ -2450,6 +2595,7 @@ export const keysRouter = router({
           },
         },
       });
+      const reminderStateById = await getAccessKeyRenewalReminderStateMap(input.ids);
 
       const keysById = new Map(keys.map((key) => [key.id, key]));
       const results: {
@@ -2492,6 +2638,17 @@ export const keysRouter = router({
             id,
             name: key.name,
             error: 'No Telegram chat is linked to this key.',
+          });
+          continue;
+        }
+
+        const reminderState = reminderStateById.get(id) ?? deriveRenewalReminderState(null);
+        if (reminderState.cooldownActive && reminderState.cooldownUntil) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: key.name,
+            error: getRenewalReminderCooldownMessage(reminderState.cooldownUntil),
           });
           continue;
         }
@@ -3464,6 +3621,14 @@ export const keysRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        const reminderState = await getLatestRenewalReminderState(input.id);
+        if (reminderState.cooldownActive && reminderState.cooldownUntil) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: getRenewalReminderCooldownMessage(reminderState.cooldownUntil),
+          });
+        }
+
         const result = await sendAccessKeyRenewalReminder({
           accessKeyId: input.id,
           chatId: input.chatId,

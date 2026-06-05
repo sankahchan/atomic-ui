@@ -14,6 +14,10 @@ const quickFiltersSchema = z.object({
   overQuota: z.boolean().optional(),
   inactive30d: z.boolean().optional(),
   telegramLinked: z.boolean().optional(),
+  neverReminded: z.boolean().optional(),
+  remindedToday: z.boolean().optional(),
+  reminded24hAgo: z.boolean().optional(),
+  renewedAfterReminder: z.boolean().optional(),
   overDeviceLimit: z.boolean().optional(),
   deviceLimitWarned: z.boolean().optional(),
 });
