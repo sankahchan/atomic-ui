@@ -29,6 +29,15 @@ import { useLocale } from '@/hooks/use-locale';
 import { useToast } from '@/hooks/use-toast';
 import { cn, formatDateTime } from '@/lib/utils';
 import {
+  RENEWAL_AUDIT_ACTIONS,
+  formatAuditAddedData,
+  formatAuditBytes,
+  formatAuditDateTimeValue,
+  formatAuditMonths,
+  formatAuditTransition,
+  isRenewalAuditAction,
+} from '@/lib/audit-log-format';
+import {
   ChevronLeft,
   ChevronRight,
   Download,
@@ -52,8 +61,9 @@ type AuditLogItem = {
   createdAt: Date | string;
 };
 
-const ENTITY_OPTIONS = ['ALL', 'SERVER', 'BACKUP', 'USER', 'REPORT', 'TASK', 'AUDIT_LOG', 'NOTIFICATION_CHANNEL'] as const;
+const ENTITY_OPTIONS = ['ALL', 'SERVER', 'BACKUP', 'USER', 'ACCESS_KEY', 'REPORT', 'TASK', 'AUDIT_LOG', 'NOTIFICATION_CHANNEL'] as const;
 const PAGE_SIZE_OPTIONS = ['10', '20', '50'] as const;
+type AuditActionPreset = 'ALL' | 'RENEWALS';
 
 function prettifyLabel(value: string) {
   return value
@@ -71,6 +81,8 @@ function getEntityBadgeClass(entity: string) {
       return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     case 'USER':
       return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    case 'ACCESS_KEY':
+      return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
     case 'REPORT':
       return 'bg-violet-500/10 text-violet-400 border-violet-500/20';
     case 'TASK':
@@ -142,6 +154,118 @@ function formatAuditDetailValue(value: unknown) {
   return String(value);
 }
 
+function getAuditActionLabel(action: string, t: (key: string) => string) {
+  if (action === 'ACCESS_KEY_RENEWED') {
+    return t('audit.renewal.single');
+  }
+
+  if (action === 'ACCESS_KEY_RENEWED_BULK') {
+    return t('audit.renewal.bulk');
+  }
+
+  return prettifyLabel(action);
+}
+
+function formatAuditStatus(value: unknown, fallback: string) {
+  return typeof value === 'string' && value.trim() ? prettifyLabel(value) : fallback;
+}
+
+function getRenewalAuditSummary(log: AuditLogItem, t: (key: string) => string) {
+  if (!isRenewalAuditAction(log.action) || !log.details) {
+    return null;
+  }
+
+  const details = log.details;
+  const summary = [
+    formatAuditMonths(details.months),
+    formatAuditAddedData(details.addedDataLimitGB, t('audit.renewal.no_data_added')),
+  ];
+
+  if (log.action === 'ACCESS_KEY_RENEWED_BULK' && details.batchSize) {
+    summary.push(`${t('audit.renewal.batch')}: ${String(details.batchSize)}`);
+  }
+
+  return summary.filter((entry) => entry !== '-').join(' / ');
+}
+
+function RenewalDetailSummary({
+  log,
+}: {
+  log: AuditLogItem;
+}) {
+  const { t } = useLocale();
+
+  if (!isRenewalAuditAction(log.action) || !log.details) {
+    return null;
+  }
+
+  const details = log.details;
+  const unknown = t('audit.renewal.unknown');
+  const unlimited = t('audit.renewal.unlimited');
+  const items = [
+    {
+      label: t('audit.renewal.key'),
+      value: typeof details.keyName === 'string' && details.keyName.trim() ? details.keyName : log.entityId || unknown,
+    },
+    {
+      label: t('audit.renewal.extension'),
+      value: formatAuditMonths(details.months, unknown),
+    },
+    {
+      label: t('audit.renewal.data_added'),
+      value: formatAuditAddedData(details.addedDataLimitGB, t('audit.renewal.no_data_added')),
+    },
+    {
+      label: t('audit.renewal.expiry'),
+      value: formatAuditTransition(
+        details.previousExpiresAt,
+        details.nextExpiresAt,
+        (value) => formatAuditDateTimeValue(value, unknown),
+      ),
+    },
+    {
+      label: t('audit.renewal.quota'),
+      value: formatAuditTransition(
+        details.previousDataLimitBytes,
+        details.nextDataLimitBytes,
+        (value) => formatAuditBytes(value, unlimited),
+      ),
+    },
+    {
+      label: t('audit.renewal.status'),
+      value: formatAuditTransition(
+        details.previousStatus,
+        details.nextStatus,
+        (value) => formatAuditStatus(value, unknown),
+      ),
+    },
+  ];
+
+  if (log.action === 'ACCESS_KEY_RENEWED_BULK' && details.batchSize) {
+    items.push({
+      label: t('audit.renewal.batch'),
+      value: String(details.batchSize),
+    });
+  }
+
+  return (
+    <div className="rounded-[1.1rem] border border-blue-500/20 bg-blue-500/5 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Shield className="h-4 w-4 text-blue-500" />
+        <p className="text-sm font-semibold">{t('audit.renewal.summary')}</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-lg bg-background/70 p-3 dark:bg-white/[0.03]">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
+            <p className="mt-1 break-words text-sm font-medium">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function formatTemplate(template: string, values: Record<string, string | number>) {
   return Object.entries(values).reduce(
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
@@ -173,7 +297,7 @@ function AuditDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ScrollText className="w-5 h-5 text-primary" />
-            {prettifyLabel(log.action)}
+            {getAuditActionLabel(log.action, t)}
           </DialogTitle>
           <DialogDescription>
             {formatDateTime(log.createdAt)}
@@ -233,6 +357,8 @@ function AuditDetailDialog({
             <CardTitle className="text-sm">{t('audit.detail.details')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <RenewalDetailSummary log={log} />
+
             {detailEntries.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 {detailEntries.map(([key, value]) => (
@@ -271,6 +397,7 @@ export default function AuditPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [actionFilter, setActionFilter] = useState('');
+  const [actionPreset, setActionPreset] = useState<AuditActionPreset>('ALL');
   const [entityFilter, setEntityFilter] = useState<(typeof ENTITY_OPTIONS)[number]>('ALL');
   const [userFilter, setUserFilter] = useState('ALL');
   const [dateFromFilter, setDateFromFilter] = useState('');
@@ -285,24 +412,26 @@ export default function AuditPage() {
     () => ({
       page,
       pageSize,
-      action: actionFilter.trim() || undefined,
+      action: actionPreset === 'ALL' ? actionFilter.trim() || undefined : undefined,
+      actions: actionPreset === 'RENEWALS' ? [...RENEWAL_AUDIT_ACTIONS] : undefined,
       entity: entityFilter === 'ALL' ? undefined : entityFilter,
       userId: userFilter === 'ALL' ? undefined : userFilter,
       dateFrom,
       dateTo,
     }),
-    [actionFilter, dateFrom, dateTo, entityFilter, page, pageSize, userFilter],
+    [actionFilter, actionPreset, dateFrom, dateTo, entityFilter, page, pageSize, userFilter],
   );
 
   const auditExportQueryInput = useMemo(
     () => ({
-      action: actionFilter.trim() || undefined,
+      action: actionPreset === 'ALL' ? actionFilter.trim() || undefined : undefined,
+      actions: actionPreset === 'RENEWALS' ? [...RENEWAL_AUDIT_ACTIONS] : undefined,
       entity: entityFilter === 'ALL' ? undefined : entityFilter,
       userId: userFilter === 'ALL' ? undefined : userFilter,
       dateFrom,
       dateTo,
     }),
-    [actionFilter, dateFrom, dateTo, entityFilter, userFilter],
+    [actionFilter, actionPreset, dateFrom, dateTo, entityFilter, userFilter],
   );
 
   const { data: auditLogs, isLoading } = trpc.audit.list.useQuery(auditQueryInput, {
@@ -322,7 +451,15 @@ export default function AuditPage() {
 
   const handleActionChange = (value: string) => {
     setPage(1);
+    setActionPreset('ALL');
     setActionFilter(value);
+  };
+
+  const handleRenewalQuickFilter = () => {
+    setPage(1);
+    setActionFilter('');
+    setActionPreset('RENEWALS');
+    setEntityFilter('ACCESS_KEY');
   };
 
   const handleEntityChange = (value: (typeof ENTITY_OPTIONS)[number]) => {
@@ -388,6 +525,7 @@ export default function AuditPage() {
   const clearFilters = () => {
     setPage(1);
     setActionFilter('');
+    setActionPreset('ALL');
     setEntityFilter('ALL');
     setUserFilter('ALL');
     setDateFromFilter('');
@@ -540,6 +678,21 @@ export default function AuditPage() {
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {t('audit.filters.quick')}
+            </span>
+            <Button
+              type="button"
+              variant={actionPreset === 'RENEWALS' ? 'default' : 'outline'}
+              size="sm"
+              className="rounded-full"
+              onClick={handleRenewalQuickFilter}
+            >
+              {t('audit.filters.quick_renewals')}
+            </Button>
+          </div>
+
           <div className="ops-table-meta flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -607,8 +760,11 @@ export default function AuditPage() {
                 <TableRow key={log.id}>
                   <TableCell className="text-sm">{formatDateTime(log.createdAt)}</TableCell>
                   <TableCell>
-                    <div className="font-medium">{prettifyLabel(log.action)}</div>
+                    <div className="font-medium">{getAuditActionLabel(log.action, t)}</div>
                     <div className="text-xs text-muted-foreground font-mono">{log.action}</div>
+                    {getRenewalAuditSummary(log, t) ? (
+                      <div className="mt-1 text-xs text-muted-foreground">{getRenewalAuditSummary(log, t)}</div>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <Badge className={cn('border', getEntityBadgeClass(log.entity))}>
@@ -650,8 +806,11 @@ export default function AuditPage() {
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-medium break-words">{prettifyLabel(log.action)}</p>
+                <p className="font-medium break-words">{getAuditActionLabel(log.action, t)}</p>
                 <p className="break-all font-mono text-xs text-muted-foreground">{log.action}</p>
+                {getRenewalAuditSummary(log, t) ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{getRenewalAuditSummary(log, t)}</p>
+                ) : null}
               </div>
               <Badge className={cn('border', getEntityBadgeClass(log.entity))}>
                 {log.entity}
