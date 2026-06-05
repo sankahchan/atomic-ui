@@ -2628,6 +2628,13 @@ export default function KeyDetailPage() {
       refetchIntervalInBackground: false,
     },
   );
+  const { data: renewalPresets = [] } = trpc.keys.listRenewalPresets.useQuery(
+    { locale },
+    {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
+  );
   const isAdmin = currentUser?.role === 'ADMIN';
   const { data: assignableServers } = trpc.servers.list.useQuery(
     { includeInactive: false },
@@ -4053,6 +4060,7 @@ export default function KeyDetailPage() {
             dataLimitBytes: key.dataLimitBytes,
             usedBytes: key.usedBytes,
           }}
+          presets={renewalPresets}
           isPending={renewMutation.isPending}
           onConfirm={({ months, addDataLimitGB }) => {
             renewMutation.mutate({
