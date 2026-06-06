@@ -269,6 +269,7 @@ import {
   sendDynamicKeyExpiryTelegramNotification,
   sendDynamicKeyRenewalReminder,
 } from '@/lib/services/telegram-reminders';
+import { runTelegramRenewalReminderAutomation } from '@/lib/services/telegram-renewal-automation';
 import { resolveRefundReasonPresetLabel } from '@/lib/finance';
 import {
   buildTelegramCommerceViewCallbackData,
@@ -2893,6 +2894,12 @@ export async function runTelegramSalesOrderCycle() {
       winbackCouponReminded: 0,
       expiredCoupons: 0,
       trialReminded: 0,
+      renewalAutomationCandidates: 0,
+      renewalAutomationEligible: 0,
+      renewalAutomationReminded: 0,
+      renewalAutomation3dReminded: 0,
+      renewalAutomation1dReminded: 0,
+      renewalAutomationDepletedReminded: 0,
       premiumRenewalReminded: 0,
       premiumExpired: 0,
       expired: 0,
@@ -3006,6 +3013,12 @@ export async function runTelegramSalesOrderCycle() {
   let premiumUpsellReminded = 0;
   let winbackCouponReminded = 0;
   let trialReminded = 0;
+  let renewalAutomationCandidates = 0;
+  let renewalAutomationEligible = 0;
+  let renewalAutomationReminded = 0;
+  let renewalAutomation3dReminded = 0;
+  let renewalAutomation1dReminded = 0;
+  let renewalAutomationDepletedReminded = 0;
   let premiumRenewalReminded = 0;
   let premiumExpired = 0;
   let expired = 0;
@@ -3335,6 +3348,20 @@ export async function runTelegramSalesOrderCycle() {
   winbackCouponReminded += couponCampaignResult.winbackCouponReminded;
   errors.push(...couponCampaignResult.errors);
 
+  const renewalAutomationResult = await runTelegramRenewalReminderAutomation({
+    settings,
+    now,
+  });
+  if (!renewalAutomationResult.skipped) {
+    renewalAutomationCandidates += renewalAutomationResult.totalCandidates;
+    renewalAutomationEligible += renewalAutomationResult.eligibleCount;
+    renewalAutomationReminded += renewalAutomationResult.sentCount;
+    renewalAutomation3dReminded += renewalAutomationResult.sentByWave.EXPIRING_3D;
+    renewalAutomation1dReminded += renewalAutomationResult.sentByWave.EXPIRING_1D;
+    renewalAutomationDepletedReminded += renewalAutomationResult.sentByWave.DEPLETED;
+    errors.push(...renewalAutomationResult.errors);
+  }
+
   const premiumRenewalCandidates = await db.dynamicAccessKey.findMany({
     where: {
       status: { in: ['ACTIVE', 'PENDING'] },
@@ -3433,6 +3460,12 @@ export async function runTelegramSalesOrderCycle() {
     winbackCouponReminded,
     expiredCoupons,
     trialReminded,
+    renewalAutomationCandidates,
+    renewalAutomationEligible,
+    renewalAutomationReminded,
+    renewalAutomation3dReminded,
+    renewalAutomation1dReminded,
+    renewalAutomationDepletedReminded,
     premiumRenewalReminded,
     premiumExpired,
     expired,

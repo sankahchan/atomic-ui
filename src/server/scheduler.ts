@@ -559,7 +559,7 @@ export function initScheduler() {
                         status: result.skipped ? 'SKIPPED' : 'SUCCESS',
                         summary: result.skipped
                             ? getSkippedSummary(result)
-                            : `${result.reminded} payment reminders, ${result.expired} expired`,
+                            : `${result.reminded} payment reminders, ${result.renewalAutomationReminded} renewal reminders, ${result.expired} expired`,
                         resultPreview: result,
                     };
                 },
@@ -577,6 +577,7 @@ export function initScheduler() {
                     result.winbackCouponReminded > 0 ||
                     result.expiredCoupons > 0 ||
                     result.trialReminded > 0 ||
+                    result.renewalAutomationReminded > 0 ||
                     result.premiumRenewalReminded > 0 ||
                     result.premiumExpired > 0 ||
                     result.salesDigestSent ||
@@ -585,7 +586,7 @@ export function initScheduler() {
                 )
             ) {
                 logger.info(
-                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialCouponReminded} trial coupon reminded, ${result.renewalCouponReminded} renewal coupon reminded, ${result.premiumUpsellReminded} premium upsell reminded, ${result.winbackCouponReminded} winback coupon reminded, ${result.expiredCoupons} coupons expired, ${result.trialReminded} trial reminded, ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.salesDigestSent ? `${result.salesDigestAdminChats} sales digest chat(s)` : '0 sales digest chat(s)'}, ${result.errors.length} errors`,
+                    `Telegram sales orders: ${result.reminded} payment reminded, ${result.pendingReviewReminded} review reminded, ${result.rejectedFollowUpReminded} rejected follow-up reminded, ${result.retryReminded} retry reminded, ${result.trialCouponReminded} trial coupon reminded, ${result.renewalCouponReminded} renewal coupon reminded, ${result.premiumUpsellReminded} premium upsell reminded, ${result.winbackCouponReminded} winback coupon reminded, ${result.expiredCoupons} coupons expired, ${result.trialReminded} trial reminded, ${result.renewalAutomationReminded} renewal automation reminded (${result.renewalAutomationDepletedReminded} depleted, ${result.renewalAutomation1dReminded} 1d, ${result.renewalAutomation3dReminded} 3d), ${result.premiumRenewalReminded} premium renewal reminded, ${result.premiumExpired} premium expired, ${result.expired} expired, ${result.salesDigestSent ? `${result.salesDigestAdminChats} sales digest chat(s)` : '0 sales digest chat(s)'}, ${result.errors.length} errors`,
                 );
             }
     });

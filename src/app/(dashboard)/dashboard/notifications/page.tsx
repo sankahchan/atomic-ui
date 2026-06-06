@@ -744,6 +744,11 @@ type TelegramSalesSettingsForm = {
   dailySalesDigestEnabled: boolean;
   dailySalesDigestHour: number;
   dailySalesDigestMinute: number;
+  renewalReminderAutomationEnabled: boolean;
+  renewalReminderExpiring3dEnabled: boolean;
+  renewalReminderExpiring1dEnabled: boolean;
+  renewalReminderDepletedEnabled: boolean;
+  renewalReminderMaxRecipientsPerRun: string;
   trialCouponEnabled: boolean;
   trialCouponPaused: boolean;
   trialCouponLeadHours: string;
@@ -1205,6 +1210,11 @@ const DEFAULT_TELEGRAM_SALES_SETTINGS: TelegramSalesSettingsForm = {
   dailySalesDigestEnabled: false,
   dailySalesDigestHour: 20,
   dailySalesDigestMinute: 0,
+  renewalReminderAutomationEnabled: false,
+  renewalReminderExpiring3dEnabled: true,
+  renewalReminderExpiring1dEnabled: true,
+  renewalReminderDepletedEnabled: true,
+  renewalReminderMaxRecipientsPerRun: '30',
   trialCouponEnabled: true,
   trialCouponPaused: false,
   trialCouponLeadHours: '12',
@@ -4507,6 +4517,34 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     supportLinkPreviewFallback: isMyanmar
       ? 'Telegram အကူအညီ အကောင့် မသတ်မှတ်ရသေးပါ။ စာရင်းသွင်းမှု စာမျက်နှာရှိ အကူအညီလင့်ခ်ကို အစားထိုးအသုံးပြုမည်။'
       : 'No Telegram support account set yet. The bot will fall back to the Subscription Page support link.',
+    renewalReminderAutomation: isMyanmar ? 'Renewal reminder automation' : 'Renewal reminder automation',
+    renewalReminderAutomationDesc: isMyanmar
+      ? 'သက်တမ်းကုန်ရန် 3 ရက်၊ 1 ရက် ကျန်သော key များနှင့် depleted key များကို Telegram မှ အလိုအလျောက် renewal reminder ပို့ပါ။'
+      : 'Automatically send Telegram renewal reminders to keys that are 3 days out, 1 day out, or already depleted.',
+    renewalReminderMaxRecipientsPerRun: isMyanmar ? 'တစ်ကြိမ်လည်ပတ်တိုင်း အများဆုံးပို့မည့် အရေအတွက်' : 'Max sends per run',
+    renewalReminderPreview: isMyanmar ? 'Renewal reminder preview' : 'Renewal reminder preview',
+    renewalReminderPreviewDesc: isMyanmar
+      ? 'Automation ကို ဖွင့်မီ မည်သည့် key များကို reminder ပို့မည်၊ ဘာကြောင့်ပိတ်ထားသည်ကို ကြိုကြည့်ပါ။'
+      : 'Preview who would receive automated renewal reminders and why other keys are blocked before enabling the scheduler.',
+    renewalReminderPreviewRun: isMyanmar ? 'Preview reminders' : 'Preview reminders',
+    renewalReminderCandidates: isMyanmar ? 'Candidates' : 'Candidates',
+    renewalReminderEligible: isMyanmar ? 'Eligible' : 'Eligible',
+    renewalReminderWouldSend: isMyanmar ? 'Would send' : 'Would send',
+    renewalReminderDeferredByCap: isMyanmar ? 'Held by cap' : 'Held by cap',
+    renewalReminderBlocked: isMyanmar ? 'Blocked' : 'Blocked',
+    renewalReminderAuto24h: isMyanmar ? 'Auto sent (24h)' : 'Auto sent (24h)',
+    renewalReminderManual24h: isMyanmar ? 'Manual sent (24h)' : 'Manual sent (24h)',
+    renewalReminderPreviewEmpty: isMyanmar
+      ? 'Preview ကို လည်ပတ်ပြီး နောက် automation မှ reminder ပို့မည့် key များကို ဒီနေရာမှာ ကြည့်နိုင်ပါသည်။'
+      : 'Run the preview to inspect which keys the scheduler would remind next.',
+    renewalReminderWave3d: isMyanmar ? '3 days left' : '3 days left',
+    renewalReminderWave1d: isMyanmar ? '1 day left' : '1 day left',
+    renewalReminderWaveDepleted: isMyanmar ? 'Depleted' : 'Depleted',
+    renewalReminderBlockedWaveDisabled: isMyanmar ? 'Wave ပိတ်ထားသည်' : 'Wave disabled',
+    renewalReminderBlockedTelegramDisabled: isMyanmar ? 'Telegram delivery ပိတ်ထားသည်' : 'Telegram delivery disabled',
+    renewalReminderBlockedNoTelegram: isMyanmar ? 'Telegram link မရှိပါ' : 'No Telegram link',
+    renewalReminderBlockedCooldown: isMyanmar ? '24 နာရီ cooldown အတွင်း' : 'Within 24-hour cooldown',
+    renewalReminderBlockedAlreadySent: isMyanmar ? 'ဤ wave အတွက် reminder ပို့ပြီးဖြစ်သည်' : 'Already sent for this wave',
     paymentAutomation: isMyanmar ? 'မပေးချေရသေးသော အော်ဒါ automation' : 'Unpaid order automation',
     paymentAutomationDesc: isMyanmar
       ? 'ငွေပေးချေမှု နည်းလမ်း မရွေးသေးသော သို့မဟုတ် စကရင်ရှော့ မပို့ရသေးသော အော်ဒါများကို သတိပေးပြီး အချိန်ကျော်လျှင် အလိုအလျောက် ပယ်ဖျက်မည်။'
@@ -5017,6 +5055,22 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
         settingsQuery.data.dailySalesDigestHour ?? DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestHour,
       dailySalesDigestMinute:
         settingsQuery.data.dailySalesDigestMinute ?? DEFAULT_TELEGRAM_SALES_SETTINGS.dailySalesDigestMinute,
+      renewalReminderAutomationEnabled:
+        settingsQuery.data.renewalReminderAutomationEnabled ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.renewalReminderAutomationEnabled,
+      renewalReminderExpiring3dEnabled:
+        settingsQuery.data.renewalReminderExpiring3dEnabled ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.renewalReminderExpiring3dEnabled,
+      renewalReminderExpiring1dEnabled:
+        settingsQuery.data.renewalReminderExpiring1dEnabled ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.renewalReminderExpiring1dEnabled,
+      renewalReminderDepletedEnabled:
+        settingsQuery.data.renewalReminderDepletedEnabled ??
+        DEFAULT_TELEGRAM_SALES_SETTINGS.renewalReminderDepletedEnabled,
+      renewalReminderMaxRecipientsPerRun: String(
+        settingsQuery.data.renewalReminderMaxRecipientsPerRun ??
+          DEFAULT_TELEGRAM_SALES_SETTINGS.renewalReminderMaxRecipientsPerRun,
+      ),
       trialCouponEnabled:
         settingsQuery.data.trialCouponEnabled ?? DEFAULT_TELEGRAM_SALES_SETTINGS.trialCouponEnabled,
       trialCouponPaused:
@@ -5240,6 +5294,16 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
       });
     },
   });
+  const simulateRenewalReminderAudienceMutation =
+    trpc.telegramBot.simulateRenewalReminderAudience.useMutation({
+      onError: (error) => {
+        toast({
+          title: 'Renewal reminder preview failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      },
+    });
 
   const approveOrderMutation = trpc.telegramBot.approveOrder.useMutation({
     onSuccess: async (result) => {
@@ -5548,6 +5612,14 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
       dailySalesDigestEnabled: form.dailySalesDigestEnabled,
       dailySalesDigestHour: form.dailySalesDigestHour,
       dailySalesDigestMinute: form.dailySalesDigestMinute,
+      renewalReminderAutomationEnabled: form.renewalReminderAutomationEnabled,
+      renewalReminderExpiring3dEnabled: form.renewalReminderExpiring3dEnabled,
+      renewalReminderExpiring1dEnabled: form.renewalReminderExpiring1dEnabled,
+      renewalReminderDepletedEnabled: form.renewalReminderDepletedEnabled,
+      renewalReminderMaxRecipientsPerRun: (() => {
+        const parsed = Number.parseInt(form.renewalReminderMaxRecipientsPerRun.trim(), 10);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30;
+      })(),
       trialCouponEnabled: form.trialCouponEnabled,
       trialCouponPaused: form.trialCouponPaused,
       trialCouponLeadHours: (() => {
@@ -5988,6 +6060,7 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     activeWorkflowTab === 'coupons' ||
     activeWorkflowTab === 'guardrails';
   const campaignSimulation = simulateCampaignAudienceMutation.data;
+  const renewalReminderSimulation = simulateRenewalReminderAudienceMutation.data;
   const campaignTypeLabels: Record<string, string> = {
     TRIAL_TO_PAID: isMyanmar ? 'Trial မှ paid သို့ ပြောင်းလဲမှု' : 'Trial to paid',
     RENEWAL_SOON: isMyanmar ? 'Renewal အချိန်နီး' : 'Renewal',
@@ -6005,6 +6078,18 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
     ACTIVE_COUPON: isMyanmar ? 'အသုံးပြုနေသော coupon ရှိပြီး' : 'Already has active coupon',
     LIMIT_REACHED: isMyanmar ? 'အသုံးပြုသူအလိုက် ကန့်သတ်ချက်ပြည့်သွားသည်' : 'Per-user limit reached',
     CONVERTED: isMyanmar ? 'ပြီးသား ပြောင်းလဲပြီး' : 'Already converted',
+  };
+  const renewalReminderWaveLabels: Record<string, string> = {
+    EXPIRING_3D: isMyanmar ? '3 ရက် ကျန်' : '3 days left',
+    EXPIRING_1D: isMyanmar ? '1 ရက် ကျန်' : '1 day left',
+    DEPLETED: isMyanmar ? 'ကုန်သွားပြီး' : 'Depleted',
+  };
+  const renewalReminderBlockedReasonLabels: Record<string, string> = {
+    WAVE_DISABLED: isMyanmar ? 'Wave ပိတ်ထားသည်' : 'Wave disabled',
+    TELEGRAM_DELIVERY_DISABLED: isMyanmar ? 'Telegram delivery ပိတ်ထားသည်' : 'Telegram delivery disabled',
+    NO_TELEGRAM_LINK: isMyanmar ? 'Telegram link မရှိပါ' : 'No Telegram link',
+    COOLDOWN: isMyanmar ? '24 နာရီ cooldown အတွင်း' : 'Within 24-hour cooldown',
+    ALREADY_SENT_FOR_WAVE: isMyanmar ? 'ဤ wave အတွက် reminder ပို့ပြီးဖြစ်သည်' : 'Already sent for this wave',
   };
   const enabledLabel = isMyanmar ? 'ဖွင့်ထားသည်' : 'Enabled';
   const disabledLabel = isMyanmar ? 'ပိတ်ထားသည်' : 'Disabled';
@@ -6255,6 +6340,207 @@ function TelegramSalesWorkflowCard({ isActive }: { isActive: boolean }) {
                   }
                 />
               </div>
+            </div>
+          </div>
+
+          <div className={cn('space-y-4 rounded-2xl border border-border/60 bg-background/50 p-4', activeWorkflowTab !== 'settings' && 'hidden')}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{salesUi.renewalReminderAutomation}</p>
+                <p className="text-xs text-muted-foreground">{salesUi.renewalReminderAutomationDesc}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.renewalReminderAutomationEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, renewalReminderAutomationEnabled: checked }))
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => simulateRenewalReminderAudienceMutation.mutate(buildSalesConfigPayload())}
+                  disabled={!canManageSalesSettings || simulateRenewalReminderAudienceMutation.isPending}
+                >
+                  {simulateRenewalReminderAudienceMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Eye className="mr-2 h-4 w-4" />
+                  )}
+                  {salesUi.renewalReminderPreviewRun}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{salesUi.renewalReminderWave3d}</p>
+                  <p className="text-xs text-muted-foreground">{isMyanmar ? 'သက်တမ်းကုန်ရန် ၃ ရက် ကျန်သော key များ' : 'Keys with 3 days remaining'}</p>
+                </div>
+                <Switch
+                  checked={form.renewalReminderExpiring3dEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, renewalReminderExpiring3dEnabled: checked }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{salesUi.renewalReminderWave1d}</p>
+                  <p className="text-xs text-muted-foreground">{isMyanmar ? 'သက်တမ်းကုန်ရန် ၁ ရက် ကျန်သော key များ' : 'Keys with 1 day remaining'}</p>
+                </div>
+                <Switch
+                  checked={form.renewalReminderExpiring1dEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, renewalReminderExpiring1dEnabled: checked }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{salesUi.renewalReminderWaveDepleted}</p>
+                  <p className="text-xs text-muted-foreground">{isMyanmar ? 'Data limit ကုန်သွားသော key များ' : 'Keys that already hit their data limit'}</p>
+                </div>
+                <Switch
+                  checked={form.renewalReminderDepletedEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, renewalReminderDepletedEnabled: checked }))
+                  }
+                />
+              </div>
+              <div className="space-y-2 xl:col-span-2">
+                <Label>{salesUi.renewalReminderMaxRecipientsPerRun}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={form.renewalReminderMaxRecipientsPerRun}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      renewalReminderMaxRecipientsPerRun: event.target.value,
+                    }))
+                  }
+                  placeholder="30"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {isMyanmar ? '0 ဆိုပါက တစ်ကြိမ်လည်ပတ်ရာတွင် eligible ဖြစ်သော key အားလုံးကို ပို့ပါမည်။' : 'Set 0 to remove the per-run cap and send to every eligible key.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-dashed border-border/60 bg-background/40 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{salesUi.renewalReminderPreview}</p>
+                <p className="text-xs text-muted-foreground">{salesUi.renewalReminderPreviewDesc}</p>
+              </div>
+
+              {renewalReminderSimulation ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderCandidates}</p>
+                      <p className="mt-2 text-xl font-semibold">{renewalReminderSimulation.totalCandidates}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderEligible}</p>
+                      <p className="mt-2 text-xl font-semibold">{renewalReminderSimulation.eligibleCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderWouldSend}</p>
+                      <p className="mt-2 text-xl font-semibold">{renewalReminderSimulation.wouldSendCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderDeferredByCap}</p>
+                      <p className="mt-2 text-xl font-semibold">{renewalReminderSimulation.deferredByCapCount}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderAuto24h}</p>
+                      <p className="mt-2 text-xl font-semibold">{renewalReminderSimulation.recentMetrics.automatedReminders24h}</p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 p-3">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderManual24h}</p>
+                      <p className="mt-2 text-xl font-semibold">{renewalReminderSimulation.recentMetrics.manualReminders24h}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 xl:grid-cols-3">
+                    {renewalReminderSimulation.waves.map((wave) => (
+                      <div
+                        key={wave.wave}
+                        className="rounded-xl border border-border/50 bg-background/55 p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold">
+                            {renewalReminderWaveLabels[wave.wave] || wave.wave}
+                          </p>
+                          <Badge variant={wave.enabled ? 'default' : 'secondary'}>
+                            {wave.enabled ? enabledLabel : disabledLabel}
+                          </Badge>
+                        </div>
+                        <div className="mt-4 grid gap-3 grid-cols-2">
+                          <div className="rounded-lg border border-border/40 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderCandidates}</p>
+                            <p className="mt-2 text-lg font-semibold">{wave.totalCandidates}</p>
+                          </div>
+                          <div className="rounded-lg border border-border/40 p-3">
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{salesUi.renewalReminderWouldSend}</p>
+                            <p className="mt-2 text-lg font-semibold">{wave.wouldSendCount}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Badge variant="outline">{salesUi.renewalReminderEligible} · {wave.eligibleCount}</Badge>
+                          <Badge variant="outline">{salesUi.renewalReminderBlocked} · {wave.blockedCount}</Badge>
+                          <Badge variant="outline">{salesUi.renewalReminderDeferredByCap} · {wave.deferredByCapCount}</Badge>
+                        </div>
+                        {wave.blockedReasons.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {wave.blockedReasons.map((reason) => (
+                              <Badge key={`${wave.wave}-${reason.reason}`} variant="outline">
+                                {renewalReminderBlockedReasonLabels[reason.reason] || reason.reason} · {reason.count}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+
+                  {renewalReminderSimulation.previewRecipients.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {isMyanmar ? 'နောက်တစ်ကြိမ် scheduler လည်ပတ်လျှင် reminder ပို့မည့် key များ' : 'Keys queued for the next scheduler run'}
+                      </p>
+                      <div className="space-y-2">
+                        {renewalReminderSimulation.previewRecipients.map((candidate) => (
+                          <div
+                            key={`${candidate.accessKeyId}-${candidate.wave}`}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 bg-background/55 px-3 py-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">{candidate.keyName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {renewalReminderWaveLabels[candidate.wave] || candidate.wave}
+                                {candidate.daysLeft != null ? ` · ${candidate.daysLeft}d` : ''}
+                                {candidate.expiresAt ? ` · ${formatDateTime(candidate.expiresAt)}` : ''}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="outline">{candidate.status}</Badge>
+                              {candidate.destinationChatId ? (
+                                <Badge variant="secondary">{candidate.destinationChatId}</Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/50 px-4 py-5 text-sm text-muted-foreground">
+                  {salesUi.renewalReminderPreviewEmpty}
+                </div>
+              )}
             </div>
           </div>
 
