@@ -1,9 +1,7 @@
 import { formatBytes, formatDateTime } from './utils';
+import { RENEWAL_AUDIT_ACTIONS } from './renewal-reminder-tracking';
 
-export const RENEWAL_AUDIT_ACTIONS = [
-  'ACCESS_KEY_RENEWED',
-  'ACCESS_KEY_RENEWED_BULK',
-] as const;
+export { RENEWAL_AUDIT_ACTIONS } from './renewal-reminder-tracking';
 
 export function isRenewalAuditAction(action: string) {
   return RENEWAL_AUDIT_ACTIONS.includes(action as (typeof RENEWAL_AUDIT_ACTIONS)[number]);

@@ -276,6 +276,83 @@ function getKeySubscriptionPageUrl(
   return buildSharePageUrl(subscriptionToken, { origin: window.location.origin, lang: locale });
 }
 
+function getRenewalReminderMeta(
+  reminder: {
+    lastReminderAt?: Date | string | null;
+    cooldownUntil?: Date | string | null;
+    neverReminded?: boolean;
+    remindedToday?: boolean;
+    reminded24hAgo?: boolean;
+    renewedAfterReminder?: boolean;
+    pendingFollowUp?: boolean;
+    cooldownActive?: boolean;
+  } | null | undefined,
+  isMyanmar: boolean,
+) {
+  const lastReminderAt = reminder?.lastReminderAt ? new Date(reminder.lastReminderAt) : null;
+  const cooldownUntil = reminder?.cooldownUntil ? new Date(reminder.cooldownUntil) : null;
+
+  if (!lastReminderAt || reminder?.neverReminded) {
+    return {
+      label: isMyanmar ? 'သတိပေးချက် မပို့ရသေး' : 'Never reminded',
+      detail: isMyanmar ? 'Renewal reminder မပို့ရသေးပါ။' : 'No renewal reminder has been sent yet.',
+      badgeClassName: 'border-border/60 text-muted-foreground',
+    };
+  }
+
+  if (reminder?.renewedAfterReminder) {
+    return {
+      label: isMyanmar ? 'သတိပေးပြီး Renew လုပ်ပြီး' : 'Renewed after reminder',
+      detail: isMyanmar
+        ? `${formatRelativeTime(lastReminderAt)} တွင် reminder ပို့ပြီးနောက် renew လုပ်ထားသည်။`
+        : `Renewed after a reminder sent ${formatRelativeTime(lastReminderAt)}.`,
+      badgeClassName: 'border-emerald-500/40 text-emerald-500',
+    };
+  }
+
+  if (reminder?.pendingFollowUp) {
+    return {
+      label: isMyanmar ? 'Follow-up လိုအပ်' : 'Follow-up due',
+      detail: isMyanmar
+        ? `နောက်ဆုံး reminder ကို ${formatRelativeTime(lastReminderAt)} ပို့ခဲ့သည်။`
+        : `Last reminder was sent ${formatRelativeTime(lastReminderAt)}.`,
+      badgeClassName: 'border-orange-500/40 text-orange-500',
+    };
+  }
+
+  if (reminder?.cooldownActive) {
+    return {
+      label: isMyanmar ? 'Cooldown အတွင်း' : 'Cooldown active',
+      detail: cooldownUntil
+        ? (isMyanmar
+          ? `${formatRelativeTime(lastReminderAt)} ပို့ခဲ့သည်။ နောက်တစ်ကြိမ် ${formatDateTime(cooldownUntil)} ပြီးမှ ပို့နိုင်သည်။`
+          : `Sent ${formatRelativeTime(lastReminderAt)}. Retry after ${formatDateTime(cooldownUntil)}.`)
+        : (isMyanmar
+          ? `${formatRelativeTime(lastReminderAt)} ပို့ခဲ့သည်။`
+          : `Sent ${formatRelativeTime(lastReminderAt)}.`),
+      badgeClassName: 'border-amber-500/40 text-amber-500',
+    };
+  }
+
+  if (reminder?.remindedToday) {
+    return {
+      label: isMyanmar ? 'ဒီနေ့ reminder ပို့ပြီး' : 'Reminded today',
+      detail: isMyanmar
+        ? `${formatRelativeTime(lastReminderAt)} reminder ပို့ခဲ့သည်။`
+        : `Reminder sent ${formatRelativeTime(lastReminderAt)}.`,
+      badgeClassName: 'border-sky-500/40 text-sky-500',
+    };
+  }
+
+  return {
+    label: isMyanmar ? 'Reminder ပို့ပြီး' : 'Reminder sent',
+    detail: isMyanmar
+      ? `${formatRelativeTime(lastReminderAt)} reminder ပို့ခဲ့သည်။`
+      : `Reminder sent ${formatRelativeTime(lastReminderAt)}.`,
+    badgeClassName: 'border-sky-500/40 text-sky-500',
+  };
+}
+
 function KeyTagChip({
   tag,
   count,
@@ -3204,6 +3281,16 @@ function KeyRow({
     lastTrafficAt?: Date | null;
     recentTrafficDeltaBytes?: bigint;
     tags?: string | null;
+    renewalReminder?: {
+      lastReminderAt?: Date | null;
+      cooldownUntil?: Date | null;
+      neverReminded?: boolean;
+      remindedToday?: boolean;
+      reminded24hAgo?: boolean;
+      renewedAfterReminder?: boolean;
+      pendingFollowUp?: boolean;
+      cooldownActive?: boolean;
+    } | null;
     server?: {
       id: string;
       name: string;
@@ -3233,6 +3320,7 @@ function KeyRow({
   const StatusIcon = config.icon;
   const showTrafficState = accessKey.status === 'ACTIVE';
   const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(accessKey);
+  const renewalReminderMeta = getRenewalReminderMeta(accessKey.renewalReminder, locale === 'my');
 
   return (
     <tr
@@ -3276,6 +3364,7 @@ function KeyRow({
               {t('keys.activity.last_traffic_short')}{' '}
               {accessKey.lastTrafficAt ? formatRelativeTime(accessKey.lastTrafficAt) : t('keys.activity.none')}
             </p>
+            <p className="text-xs text-muted-foreground">{renewalReminderMeta.detail}</p>
             {accessKey.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {stringToTags(accessKey.tags).map((tag) => (
@@ -3334,6 +3423,12 @@ function KeyRow({
               {accessKey.lastTrafficAt ? formatRelativeTime(accessKey.lastTrafficAt) : t('keys.activity.none')}
             </p>
           ) : null}
+          <Badge
+            variant="outline"
+            className={cn('border text-[11px]', renewalReminderMeta.badgeClassName)}
+          >
+            {renewalReminderMeta.label}
+          </Badge>
           {accessKey.maxDevices ? (
             <div className="space-y-1">
               <Badge
@@ -3581,8 +3676,22 @@ export default function KeysPage() {
       : filters.quickFilters.expiring14d
         ? 14
         : null;
+  const activeReminderStateFilter = filters.quickFilters.neverReminded
+    ? 'neverReminded'
+    : filters.quickFilters.remindedToday
+      ? 'remindedToday'
+      : filters.quickFilters.reminded24hAgo
+        ? 'reminded24hAgo'
+        : filters.quickFilters.renewedAfterReminder
+          ? 'renewedAfterReminder'
+          : null;
   const isRenewalQueueDepleted = statusFilter === 'DEPLETED';
-  const hasRenewalQueueFilters = Boolean(activeRenewalWindow || filters.quickFilters.telegramLinked || isRenewalQueueDepleted);
+  const hasRenewalQueueFilters = Boolean(
+    activeRenewalWindow
+    || filters.quickFilters.telegramLinked
+    || activeReminderStateFilter
+    || isRenewalQueueDepleted,
+  );
   const applyTagFilter = useCallback((tag: string) => {
     const normalizedTag = tag.trim().toLowerCase();
     setTagFilter(filters.tagFilter === normalizedTag ? undefined : normalizedTag);
@@ -3606,12 +3715,23 @@ export default function KeysPage() {
     setPage(1);
   }, [filters.quickFilters.telegramLinked, setQuickFilter]);
 
+  const setReminderStateFilter = useCallback((
+    filter: 'neverReminded' | 'remindedToday' | 'reminded24hAgo' | 'renewedAfterReminder' | null,
+  ) => {
+    setQuickFilter('neverReminded', filter === 'neverReminded');
+    setQuickFilter('remindedToday', filter === 'remindedToday');
+    setQuickFilter('reminded24hAgo', filter === 'reminded24hAgo');
+    setQuickFilter('renewedAfterReminder', filter === 'renewedAfterReminder');
+    setPage(1);
+  }, [setQuickFilter]);
+
   const clearRenewalQueueFilters = useCallback(() => {
     setRenewalWindow(null);
     setQuickFilter('telegramLinked', false);
+    setReminderStateFilter(null);
     setStatusFilter((current) => (current === 'DEPLETED' ? '' : current));
     setPage(1);
-  }, [setQuickFilter, setRenewalWindow]);
+  }, [setQuickFilter, setReminderStateFilter, setRenewalWindow]);
 
   const pageSize = 20;
 
@@ -3627,6 +3747,7 @@ export default function KeysPage() {
     const limitBytes = key.dataLimitBytes ? formatBytes(BigInt(key.dataLimitBytes)) : null;
     const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
     const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
+    const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
 
     return (
       <div className="space-y-4">
@@ -3656,6 +3777,7 @@ export default function KeysPage() {
                 {t('keys.activity.last_traffic_short')}{' '}
                 {lastTrafficAt ? formatRelativeTime(lastTrafficAt) : t('keys.activity.none')}
               </p>
+              <p className="mt-1 text-xs text-muted-foreground">{renewalReminderMeta.detail}</p>
             </div>
           </div>
           <div className="ml-3 flex flex-col items-end gap-2">
@@ -3685,6 +3807,12 @@ export default function KeysPage() {
                 {isOnline ? t('keys.status.online') : t('keys.status.no_recent_traffic')}
               </Badge>
             ) : null}
+            <Badge
+              variant="outline"
+              className={cn('text-[11px]', renewalReminderMeta.badgeClassName)}
+            >
+              {renewalReminderMeta.label}
+            </Badge>
             {key.maxDevices ? (
               <div className="flex flex-col items-end gap-1">
                 <Badge
@@ -3834,6 +3962,10 @@ export default function KeysPage() {
     overQuota: filters.quickFilters.overQuota || undefined,
     inactive30d: filters.quickFilters.inactive30d || undefined,
     telegramLinked: filters.quickFilters.telegramLinked || undefined,
+    neverReminded: filters.quickFilters.neverReminded || undefined,
+    remindedToday: filters.quickFilters.remindedToday || undefined,
+    reminded24hAgo: filters.quickFilters.reminded24hAgo || undefined,
+    renewedAfterReminder: filters.quickFilters.renewedAfterReminder || undefined,
     overDeviceLimit: filters.quickFilters.overDeviceLimit || undefined,
     deviceLimitWarned: filters.quickFilters.deviceLimitWarned || undefined,
     tag: filters.tagFilter || undefined,
@@ -3949,25 +4081,37 @@ export default function KeysPage() {
     () => Array.from(selectedKeys).filter((id) => visibleRenewalQueueIdSet.has(id)).length,
     [selectedKeys, visibleRenewalQueueIdSet],
   );
+  const canSendRenewalReminderForKey = useCallback(
+    (key: {
+      telegramDeliveryEnabled?: boolean | null;
+      telegramId?: string | null;
+      user?: { telegramChatId?: string | null } | null;
+      renewalReminder?: { cooldownActive?: boolean | null } | null;
+    }) =>
+      Boolean(
+        key.telegramDeliveryEnabled
+        && (key.telegramId || key.user?.telegramChatId)
+        && !key.renewalReminder?.cooldownActive,
+      ),
+    [],
+  );
   const visibleRenewalReminderEligibleCount = useMemo(
     () =>
-      visibleRenewalQueueItems.filter((key) =>
-        Boolean(
-          key.telegramDeliveryEnabled
-          && ((key as any).telegramId || (key as any).user?.telegramChatId),
-        )).length,
-    [visibleRenewalQueueItems],
+      visibleRenewalQueueItems.filter((key) => canSendRenewalReminderForKey(key)).length,
+    [canSendRenewalReminderForKey, visibleRenewalQueueItems],
   );
+  const renewalReminderSummary = data?.renewalReminderSummary ?? {
+    reminded: 0,
+    neverReminded: 0,
+    remindedToday: 0,
+    renewedAfterReminder: 0,
+    pendingFollowUp: 0,
+  };
 
   // Helper to check if a key is online using recent server-side session activity.
   const checkIsOnline = useCallback(
     (keyId: string, status?: string) => status === 'ACTIVE' && onlineKeyIds.has(keyId),
     [onlineKeyIds],
-  );
-  const canSendRenewalReminderForKey = useCallback(
-    (key: { telegramDeliveryEnabled?: boolean | null; telegramId?: string | null; user?: { telegramChatId?: string | null } | null }) =>
-      Boolean(key.telegramDeliveryEnabled && (key.telegramId || key.user?.telegramChatId)),
-    [],
   );
 
   // Sync all servers mutation
@@ -4063,13 +4207,19 @@ export default function KeysPage() {
   });
 
   const sendRenewalReminderMutation = trpc.keys.sendRenewalReminder.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့ပြီးပါပြီ' : 'Renewal reminder sent',
         description: locale === 'my'
           ? 'Telegram သတိပေးချက်ကို ပို့ပြီးပါပြီ။'
           : 'Telegram renewal reminder sent.',
       });
+      await Promise.all([
+        utils.keys.list.invalidate(),
+        utils.keys.stats.invalidate(),
+      ]);
+      refetch();
+      refetchStats();
     },
     onError: (error) => {
       toast({
@@ -4139,7 +4289,7 @@ export default function KeysPage() {
   });
 
   const bulkRenewalReminderMutation = trpc.keys.bulkSendRenewalReminders.useMutation({
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       toast({
         title: locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက်များ ပို့ပြီးပါပြီ' : 'Renewal reminders sent',
         description: locale === 'my'
@@ -4149,6 +4299,12 @@ export default function KeysPage() {
       });
       setSelectedKeys(new Set());
       setBulkProgressResults(result);
+      await Promise.all([
+        utils.keys.list.invalidate(),
+        utils.keys.stats.invalidate(),
+      ]);
+      refetch();
+      refetchStats();
     },
     onError: (error) => {
       toast({
@@ -4493,6 +4649,10 @@ export default function KeysPage() {
     filters.quickFilters.overQuota ||
     filters.quickFilters.inactive30d ||
     filters.quickFilters.telegramLinked ||
+    filters.quickFilters.neverReminded ||
+    filters.quickFilters.remindedToday ||
+    filters.quickFilters.reminded24hAgo ||
+    filters.quickFilters.renewedAfterReminder ||
     filters.quickFilters.overDeviceLimit ||
     filters.quickFilters.deviceLimitWarned ||
     filters.tagFilter ||
@@ -5086,6 +5246,42 @@ export default function KeysPage() {
           {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
         </Button>
         <Button
+          variant={filters.quickFilters.neverReminded ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.neverReminded && 'bg-slate-600 hover:bg-slate-700')}
+          onClick={() => setReminderStateFilter(filters.quickFilters.neverReminded ? null : 'neverReminded')}
+        >
+          <MessageSquare className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
+        </Button>
+        <Button
+          variant={filters.quickFilters.remindedToday ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.remindedToday && 'bg-sky-600 hover:bg-sky-700')}
+          onClick={() => setReminderStateFilter(filters.quickFilters.remindedToday ? null : 'remindedToday')}
+        >
+          <Clock className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'ဒီနေ့ reminder ပို့ပြီး' : 'Reminded today'}
+        </Button>
+        <Button
+          variant={filters.quickFilters.reminded24hAgo ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.reminded24hAgo && 'bg-orange-600 hover:bg-orange-700')}
+          onClick={() => setReminderStateFilter(filters.quickFilters.reminded24hAgo ? null : 'reminded24hAgo')}
+        >
+          <Clock className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
+        </Button>
+        <Button
+          variant={filters.quickFilters.renewedAfterReminder ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.renewedAfterReminder && 'bg-emerald-600 hover:bg-emerald-700')}
+          onClick={() => setReminderStateFilter(filters.quickFilters.renewedAfterReminder ? null : 'renewedAfterReminder')}
+        >
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
+        </Button>
+        <Button
           variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
           size="sm"
           className={cn('h-8 rounded-full px-2.5 text-[11px]', statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
@@ -5153,7 +5349,7 @@ export default function KeysPage() {
           />
         </div>
 
-        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
+        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.neverReminded || filters.quickFilters.remindedToday || filters.quickFilters.reminded24hAgo || filters.quickFilters.renewedAfterReminder || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
           <Button
             variant="ghost"
             size="sm"
@@ -5441,6 +5637,42 @@ export default function KeysPage() {
                   {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
                 </Button>
                 <Button
+                  variant={filters.quickFilters.neverReminded ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.neverReminded && 'bg-slate-600 hover:bg-slate-700')}
+                  onClick={() => setReminderStateFilter(filters.quickFilters.neverReminded ? null : 'neverReminded')}
+                >
+                  <MessageSquare className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.remindedToday ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.remindedToday && 'bg-sky-600 hover:bg-sky-700')}
+                  onClick={() => setReminderStateFilter(filters.quickFilters.remindedToday ? null : 'remindedToday')}
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'ဒီနေ့ reminder ပို့ပြီး' : 'Reminded today'}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.reminded24hAgo ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.reminded24hAgo && 'bg-orange-600 hover:bg-orange-700')}
+                  onClick={() => setReminderStateFilter(filters.quickFilters.reminded24hAgo ? null : 'reminded24hAgo')}
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.renewedAfterReminder ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.renewedAfterReminder && 'bg-emerald-600 hover:bg-emerald-700')}
+                  onClick={() => setReminderStateFilter(filters.quickFilters.renewedAfterReminder ? null : 'renewedAfterReminder')}
+                >
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
+                </Button>
+                <Button
                   variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
                   size="sm"
                   className={cn(statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
@@ -5598,6 +5830,32 @@ export default function KeysPage() {
                 <p className="mt-2 text-2xl font-semibold">{visibleRenewalReminderEligibleCount}</p>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Reminder ပို့ပြီး' : 'Reminded'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.reminded : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.neverReminded : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.renewedAfterReminder : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.pendingFollowUp : 0}</p>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -5646,6 +5904,42 @@ export default function KeysPage() {
             >
               <MessageSquare className="mr-2 h-4 w-4" />
               {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.neverReminded ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.neverReminded && 'bg-slate-600 hover:bg-slate-700')}
+              onClick={() => setReminderStateFilter(filters.quickFilters.neverReminded ? null : 'neverReminded')}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.remindedToday ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.remindedToday && 'bg-sky-600 hover:bg-sky-700')}
+              onClick={() => setReminderStateFilter(filters.quickFilters.remindedToday ? null : 'remindedToday')}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'ဒီနေ့ reminder ပို့ပြီး' : 'Reminded today'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.reminded24hAgo ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.reminded24hAgo && 'bg-orange-600 hover:bg-orange-700')}
+              onClick={() => setReminderStateFilter(filters.quickFilters.reminded24hAgo ? null : 'reminded24hAgo')}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.renewedAfterReminder ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.renewedAfterReminder && 'bg-emerald-600 hover:bg-emerald-700')}
+              onClick={() => setReminderStateFilter(filters.quickFilters.renewedAfterReminder ? null : 'renewedAfterReminder')}
+            >
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
             </Button>
             {hasRenewalQueueFilters ? (
               <Button variant="ghost" size="sm" onClick={clearRenewalQueueFilters}>
@@ -5803,6 +6097,7 @@ export default function KeysPage() {
               const lastTrafficAt = trafficMeta?.lastTrafficAt ?? (key.lastTrafficAt ? new Date(key.lastTrafficAt) : null);
               const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
               const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
+              const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -5868,6 +6163,15 @@ export default function KeysPage() {
                         </span>
                       </div>
                     ) : null}
+                    <div className="space-y-1 text-xs">
+                      <Badge
+                        variant="outline"
+                        className={cn('border w-fit', renewalReminderMeta.badgeClassName)}
+                      >
+                        {renewalReminderMeta.label}
+                      </Badge>
+                      <p className="text-muted-foreground">{renewalReminderMeta.detail}</p>
+                    </div>
                     {key.maxDevices ? (
                       <div className="flex items-center justify-between text-xs">
                         <Badge
@@ -5992,7 +6296,7 @@ export default function KeysPage() {
             <div className="col-span-full py-12 text-center">
               <Key className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">
-                {hasActiveFilters ? t('keys.empty.no_match') : t('keys.empty.no_keys')}
+                {hasAnyFilters ? t('keys.empty.no_match') : t('keys.empty.no_keys')}
               </p>
             </div>
           )}
@@ -6083,11 +6387,11 @@ export default function KeysPage() {
                     <div className="ops-chart-empty">
                       <Key className="mb-3 h-10 w-10 text-muted-foreground/50" />
                       <p className="text-muted-foreground">
-                        {hasActiveFilters
+                        {hasAnyFilters
                           ? t('keys.empty.no_match')
                           : t('keys.empty.no_keys')}
                       </p>
-                      {!hasActiveFilters && (
+                      {!hasAnyFilters && (
                         <Button
                           className="mt-4 rounded-full"
                           onClick={() => setCreateDialogOpen(true)}
