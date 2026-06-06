@@ -81,7 +81,7 @@ import {
   getRenewalBaseDate,
   resolveRenewedAccessKeyStatus,
 } from '@/lib/access-key-renewal';
-import { getTelegramSalesSettings } from '@/lib/services/telegram-sales';
+import { getTelegramSalesSettings, type TelegramSalesSettings } from '@/lib/services/telegram-sales';
 import { resolveAccessKeyRenewalPresets } from '@/lib/renewal-package-presets';
 import {
   deriveRenewalReminderState,
@@ -93,6 +93,15 @@ import {
   summarizeRenewalReminderStates,
   type RenewalReminderQuickFilter,
 } from '@/lib/renewal-reminder-tracking';
+import {
+  buildTelegramRenewalAutomationSnapshotMap,
+  deriveTelegramRenewalReminderExceptionState,
+  matchesTelegramRenewalReminderExceptionQuickFilter,
+  summarizeTelegramRenewalReminderExceptionStates,
+  TELEGRAM_RENEWAL_REMINDER_EXCEPTION_AUDIT_ACTIONS,
+  type TelegramRenewalReminderCandidate,
+  type TelegramRenewalReminderExceptionQuickFilter,
+} from '@/lib/services/telegram-renewal-automation';
 
 /**
  * Validation schema for creating a new access key.
@@ -236,6 +245,10 @@ const listKeysSchema = z.object({
   remindedToday: z.boolean().optional(),
   reminded24hAgo: z.boolean().optional(),
   renewedAfterReminder: z.boolean().optional(),
+  needsTelegramLink: z.boolean().optional(),
+  deliveryDisabled: z.boolean().optional(),
+  reminderFailed: z.boolean().optional(),
+  automationBlocked: z.boolean().optional(),
   // Tag/owner filters
   tag: z.string().optional(),
   owner: z.string().optional(),
@@ -261,6 +274,10 @@ const bulkRenewKeysSchema = z.object({
 });
 
 const bulkRenewalReminderSchema = z.object({
+  ids: z.array(z.string()).min(1),
+});
+
+const bulkTelegramDeliverySchema = z.object({
   ids: z.array(z.string()).min(1),
 });
 
@@ -637,6 +654,94 @@ async function getAccessKeyRenewalReminderStateMap(accessKeyIds: string[]) {
   );
 }
 
+type RenewalQueueAccessKeyCandidate = {
+  id: string;
+  status: string;
+  expiresAt: Date | null;
+  dataLimitBytes: bigint | null;
+  usedBytes: bigint;
+  telegramDeliveryEnabled: boolean;
+  telegramId: string | null;
+  user?: {
+    telegramChatId: string | null;
+  } | null;
+};
+
+async function getAccessKeyRenewalQueueStateMaps(
+  accessKeys: RenewalQueueAccessKeyCandidate[],
+  settings: TelegramSalesSettings,
+  now = new Date(),
+) {
+  const orderedUniqueIds = Array.from(new Set(accessKeys.map((key) => key.id)));
+
+  if (orderedUniqueIds.length === 0) {
+    return {
+      reminderStateById: new Map<string, ReturnType<typeof deriveRenewalReminderState>>(),
+      exceptionStateById: new Map<
+        string,
+        ReturnType<typeof deriveTelegramRenewalReminderExceptionState>
+      >(),
+    };
+  }
+
+  const auditRows = await db.auditLog.findMany({
+    where: {
+      entity: 'ACCESS_KEY',
+      entityId: { in: orderedUniqueIds },
+      action: {
+        in: [
+          ...RENEWAL_REMINDER_AUDIT_ACTIONS,
+          ...RENEWAL_AUDIT_ACTIONS,
+          ...TELEGRAM_RENEWAL_REMINDER_EXCEPTION_AUDIT_ACTIONS,
+        ],
+      },
+    },
+    select: {
+      entityId: true,
+      action: true,
+      details: true,
+      createdAt: true,
+    },
+  });
+
+  const snapshotMap = buildTelegramRenewalAutomationSnapshotMap(auditRows);
+  const reminderStateById = new Map<string, ReturnType<typeof deriveRenewalReminderState>>();
+  const exceptionStateById = new Map<
+    string,
+    ReturnType<typeof deriveTelegramRenewalReminderExceptionState>
+  >();
+
+  for (const key of accessKeys) {
+    const snapshot = snapshotMap.get(key.id);
+    const candidate: TelegramRenewalReminderCandidate = {
+      accessKeyId: key.id,
+      keyName: key.id,
+      status: key.status,
+      expiresAt: key.expiresAt,
+      dataLimitBytes: key.dataLimitBytes,
+      usedBytes: key.usedBytes,
+      telegramDeliveryEnabled: key.telegramDeliveryEnabled,
+      destinationChatId: key.telegramId || key.user?.telegramChatId || null,
+    };
+
+    reminderStateById.set(key.id, deriveRenewalReminderState(snapshot, now));
+    exceptionStateById.set(
+      key.id,
+      deriveTelegramRenewalReminderExceptionState({
+        candidate,
+        snapshot,
+        settings,
+        now,
+      }),
+    );
+  }
+
+  return {
+    reminderStateById,
+    exceptionStateById,
+  };
+}
+
 async function getLatestRenewalReminderState(accessKeyId: string) {
   const stateMap = await getAccessKeyRenewalReminderStateMap([accessKeyId]);
   return stateMap.get(accessKeyId) ?? deriveRenewalReminderState(null);
@@ -772,6 +877,10 @@ export const keysRouter = router({
         remindedToday,
         reminded24hAgo,
         renewedAfterReminder,
+        needsTelegramLink,
+        deliveryDisabled,
+        reminderFailed,
+        automationBlocked,
         tag,
         owner,
         overDeviceLimit,
@@ -912,14 +1021,25 @@ export const keysRouter = router({
             : renewedAfterReminder
               ? 'renewedAfterReminder'
               : null;
+      const exceptionQuickFilter: TelegramRenewalReminderExceptionQuickFilter | null = needsTelegramLink
+        ? 'needsTelegramLink'
+        : deliveryDisabled
+          ? 'deliveryDisabled'
+          : reminderFailed
+            ? 'reminderFailed'
+            : automationBlocked
+              ? 'automationBlocked'
+              : null;
 
       const shouldBuildOrderedMatchSet = Boolean(
         reminderQuickFilter
+        || exceptionQuickFilter
         || expiringWindowDays
         || status === 'DEPLETED'
         || telegramLinked
         || overQuota,
       );
+      const salesSettings = await getTelegramSalesSettings();
 
       const listInclude = {
         server: {
@@ -941,15 +1061,26 @@ export const keysRouter = router({
       let total = 0;
       let keys: ListedAccessKey[] = [];
       let reminderStateById = new Map<string, ReturnType<typeof deriveRenewalReminderState>>();
+      let exceptionStateById = new Map<string, ReturnType<typeof deriveTelegramRenewalReminderExceptionState>>();
       let renewalReminderSummary = summarizeRenewalReminderStates([]);
+      let renewalExceptionSummary = summarizeTelegramRenewalReminderExceptionStates([]);
 
       if (shouldBuildOrderedMatchSet) {
         const orderedMatchingKeys = await db.accessKey.findMany({
           where,
           select: {
             id: true,
+            status: true,
+            expiresAt: true,
             usedBytes: true,
             dataLimitBytes: true,
+            telegramDeliveryEnabled: true,
+            telegramId: true,
+            user: {
+              select: {
+                telegramChatId: true,
+              },
+            },
           },
           orderBy: { createdAt: 'desc' },
         });
@@ -961,24 +1092,102 @@ export const keysRouter = router({
           ))
           .map((key) => key.id);
 
-        const fullReminderStateById = await getAccessKeyRenewalReminderStateMap(orderedMatchingIds);
-        const filteredOrderedIds = reminderQuickFilter
-          ? orderedMatchingIds.filter((accessKeyId) => matchesRenewalReminderQuickFilter(
-            fullReminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null),
-            reminderQuickFilter,
-          ))
-          : orderedMatchingIds;
+        const orderedMatchingKeysById = new Map(orderedMatchingKeys.map((key) => [key.id, key]));
+        const renewalQueueStateMaps = await getAccessKeyRenewalQueueStateMaps(
+          orderedMatchingIds
+            .map((accessKeyId) => orderedMatchingKeysById.get(accessKeyId))
+            .filter((key): key is NonNullable<typeof key> => Boolean(key)),
+          salesSettings,
+          now,
+        );
+        const filteredOrderedIds = orderedMatchingIds.filter((accessKeyId) => {
+          const reminderState =
+            renewalQueueStateMaps.reminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null);
+          const exceptionState =
+            renewalQueueStateMaps.exceptionStateById.get(accessKeyId)
+            ?? deriveTelegramRenewalReminderExceptionState({
+              candidate: {
+                accessKeyId,
+                keyName: accessKeyId,
+                status: 'ACTIVE',
+                expiresAt: null,
+                dataLimitBytes: null,
+                usedBytes: BigInt(0),
+                telegramDeliveryEnabled: false,
+                destinationChatId: null,
+              },
+              snapshot: null,
+              settings: salesSettings,
+              now,
+            });
+
+          if (reminderQuickFilter && !matchesRenewalReminderQuickFilter(reminderState, reminderQuickFilter)) {
+            return false;
+          }
+
+          if (
+            exceptionQuickFilter
+            && !matchesTelegramRenewalReminderExceptionQuickFilter(exceptionState, exceptionQuickFilter)
+          ) {
+            return false;
+          }
+
+          return true;
+        });
 
         total = filteredOrderedIds.length;
         renewalReminderSummary = summarizeRenewalReminderStates(
-          filteredOrderedIds.map((accessKeyId) => fullReminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null)),
+          filteredOrderedIds.map((accessKeyId) => (
+            renewalQueueStateMaps.reminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null)
+          )),
+        );
+        renewalExceptionSummary = summarizeTelegramRenewalReminderExceptionStates(
+          filteredOrderedIds.map((accessKeyId) => (
+            renewalQueueStateMaps.exceptionStateById.get(accessKeyId)
+            ?? deriveTelegramRenewalReminderExceptionState({
+              candidate: {
+                accessKeyId,
+                keyName: accessKeyId,
+                status: 'ACTIVE',
+                expiresAt: null,
+                dataLimitBytes: null,
+                usedBytes: BigInt(0),
+                telegramDeliveryEnabled: false,
+                destinationChatId: null,
+              },
+              snapshot: null,
+              settings: salesSettings,
+              now,
+            })
+          )),
         );
 
         const pagedIds = filteredOrderedIds.slice((page - 1) * pageSize, page * pageSize);
         reminderStateById = new Map(
           pagedIds.map((accessKeyId) => [
             accessKeyId,
-            fullReminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null),
+            renewalQueueStateMaps.reminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null),
+          ]),
+        );
+        exceptionStateById = new Map(
+          pagedIds.map((accessKeyId) => [
+            accessKeyId,
+            renewalQueueStateMaps.exceptionStateById.get(accessKeyId)
+            ?? deriveTelegramRenewalReminderExceptionState({
+              candidate: {
+                accessKeyId,
+                keyName: accessKeyId,
+                status: 'ACTIVE',
+                expiresAt: null,
+                dataLimitBytes: null,
+                usedBytes: BigInt(0),
+                telegramDeliveryEnabled: false,
+                destinationChatId: null,
+              },
+              snapshot: null,
+              settings: salesSettings,
+              now,
+            }),
           ]),
         );
 
@@ -1003,7 +1212,9 @@ export const keysRouter = router({
           skip: (page - 1) * pageSize,
           take: pageSize,
         });
-        reminderStateById = await getAccessKeyRenewalReminderStateMap(keys.map((key) => key.id));
+        const renewalQueueStateMaps = await getAccessKeyRenewalQueueStateMaps(keys, salesSettings, now);
+        reminderStateById = renewalQueueStateMaps.reminderStateById;
+        exceptionStateById = renewalQueueStateMaps.exceptionStateById;
       }
 
       // Calculate usage percentages and remaining time
@@ -1026,6 +1237,22 @@ export const keysRouter = router({
           isExpiringSoon: daysRemaining !== null && daysRemaining <= 3 && daysRemaining > 0,
           isTrafficWarning: usagePercent >= 80 && usagePercent < 100,
           renewalReminder: reminderStateById.get(key.id) ?? deriveRenewalReminderState(null),
+          renewalException: exceptionStateById.get(key.id)
+            ?? deriveTelegramRenewalReminderExceptionState({
+              candidate: {
+                accessKeyId: key.id,
+                keyName: key.id,
+                status: key.status,
+                expiresAt: key.expiresAt,
+                dataLimitBytes: key.dataLimitBytes,
+                usedBytes: key.usedBytes,
+                telegramDeliveryEnabled: key.telegramDeliveryEnabled,
+                destinationChatId: key.telegramId || key.user?.telegramChatId || null,
+              },
+              snapshot: null,
+              settings: salesSettings,
+              now,
+            }),
         };
       });
 
@@ -1073,6 +1300,7 @@ export const keysRouter = router({
         totalPages: Math.ceil(total / pageSize),
         hasMore: page * pageSize < total,
         renewalReminderSummary,
+        renewalExceptionSummary,
       };
     }),
 
@@ -2675,6 +2903,20 @@ export const keysRouter = router({
 
           results.success += 1;
         } catch (error) {
+          await writeAuditLog({
+            userId: ctx.user.id,
+            ip: ctx.clientIp,
+            action: 'ACCESS_KEY_RENEWAL_REMINDER_FAILED',
+            entity: 'ACCESS_KEY',
+            entityId: key.id,
+            details: {
+              destinationChatId,
+              bulk: true,
+              batchSize: input.ids.length,
+              error: error instanceof Error ? error.message : 'Failed to send renewal reminder',
+              source: 'dashboard_support',
+            },
+          });
           results.failed += 1;
           results.errors.push({
             id,
@@ -2686,6 +2928,76 @@ export const keysRouter = router({
                 : 'Failed to send renewal reminder',
           });
         }
+      }
+
+      return results;
+    }),
+
+  bulkEnableTelegramDelivery: adminProcedure
+    .input(bulkTelegramDeliverySchema)
+    .mutation(async ({ ctx, input }) => {
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: input.ids } },
+        select: {
+          id: true,
+          name: true,
+          telegramDeliveryEnabled: true,
+        },
+      });
+
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = {
+        success: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      for (const id of input.ids) {
+        const key = keysById.get(id);
+
+        if (!key) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: 'Unknown',
+            error: 'Access key not found',
+          });
+          continue;
+        }
+
+        if (key.telegramDeliveryEnabled) {
+          results.success += 1;
+          continue;
+        }
+
+        await db.accessKey.update({
+          where: { id },
+          data: { telegramDeliveryEnabled: true },
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_UPDATED',
+          entity: 'ACCESS_KEY',
+          entityId: key.id,
+          details: {
+            changes: {
+              telegramDeliveryEnabled: {
+                from: false,
+                to: true,
+              },
+            },
+            bulk: true,
+            batchSize: input.ids.length,
+          },
+        });
+
+        results.success += 1;
       }
 
       return results;
@@ -3620,15 +3932,15 @@ export const keysRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      try {
-        const reminderState = await getLatestRenewalReminderState(input.id);
-        if (reminderState.cooldownActive && reminderState.cooldownUntil) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: getRenewalReminderCooldownMessage(reminderState.cooldownUntil),
-          });
-        }
+      const reminderState = await getLatestRenewalReminderState(input.id);
+      if (reminderState.cooldownActive && reminderState.cooldownUntil) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: getRenewalReminderCooldownMessage(reminderState.cooldownUntil),
+        });
+      }
 
+      try {
         const result = await sendAccessKeyRenewalReminder({
           accessKeyId: input.id,
           chatId: input.chatId,
@@ -3648,6 +3960,18 @@ export const keysRouter = router({
 
         return result;
       } catch (error) {
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_RENEWAL_REMINDER_FAILED',
+          entity: 'ACCESS_KEY',
+          entityId: input.id,
+          details: {
+            destinationChatId: input.chatId ?? null,
+            error: error instanceof Error ? error.message : 'Failed to send renewal reminder',
+            source: 'dashboard_support',
+          },
+        });
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: (error as Error).message,
