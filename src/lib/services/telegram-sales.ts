@@ -79,6 +79,11 @@ export const telegramSalesSettingsSchema = z.object({
   dailySalesDigestEnabled: z.boolean().default(false),
   dailySalesDigestHour: z.number().int().min(0).max(23).default(20),
   dailySalesDigestMinute: z.number().int().min(0).max(59).default(0),
+  renewalReminderAutomationEnabled: z.boolean().default(false),
+  renewalReminderExpiring3dEnabled: z.boolean().default(true),
+  renewalReminderExpiring1dEnabled: z.boolean().default(true),
+  renewalReminderDepletedEnabled: z.boolean().default(true),
+  renewalReminderMaxRecipientsPerRun: z.number().int().min(0).max(500).default(30),
   trialCouponEnabled: z.boolean().default(true),
   trialCouponPaused: z.boolean().default(false),
   trialCouponLeadHours: z.number().int().min(1).max(168).default(12),
@@ -671,6 +676,11 @@ export function getDefaultTelegramSalesSettings(): TelegramSalesSettings {
     dailySalesDigestEnabled: false,
     dailySalesDigestHour: 20,
     dailySalesDigestMinute: 0,
+    renewalReminderAutomationEnabled: false,
+    renewalReminderExpiring3dEnabled: true,
+    renewalReminderExpiring1dEnabled: true,
+    renewalReminderDepletedEnabled: true,
+    renewalReminderMaxRecipientsPerRun: 30,
     trialCouponEnabled: true,
     trialCouponPaused: false,
     trialCouponLeadHours: 12,
@@ -767,6 +777,15 @@ export function normalizeTelegramSalesSettings(value: unknown): TelegramSalesSet
       typeof next.dailySalesDigestMinute === 'number' && Number.isFinite(next.dailySalesDigestMinute)
         ? Math.min(59, Math.max(0, next.dailySalesDigestMinute))
         : defaults.dailySalesDigestMinute,
+    renewalReminderAutomationEnabled: Boolean(next.renewalReminderAutomationEnabled),
+    renewalReminderExpiring3dEnabled: Boolean(next.renewalReminderExpiring3dEnabled),
+    renewalReminderExpiring1dEnabled: Boolean(next.renewalReminderExpiring1dEnabled),
+    renewalReminderDepletedEnabled: Boolean(next.renewalReminderDepletedEnabled),
+    renewalReminderMaxRecipientsPerRun:
+      typeof next.renewalReminderMaxRecipientsPerRun === 'number' &&
+      Number.isFinite(next.renewalReminderMaxRecipientsPerRun)
+        ? Math.min(500, Math.max(0, Math.floor(next.renewalReminderMaxRecipientsPerRun)))
+        : defaults.renewalReminderMaxRecipientsPerRun,
     trialCouponEnabled: Boolean(next.trialCouponEnabled),
     trialCouponPaused: Boolean(next.trialCouponPaused),
     trialCouponLeadHours:

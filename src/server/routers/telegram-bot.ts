@@ -47,6 +47,7 @@ import {
 } from '@/lib/services/telegram-attribution';
 import { countTelegramAnnouncementExperimentAssignments } from '@/lib/services/telegram-announcement-experiments';
 import { simulateTelegramCouponCampaignAudience } from '@/lib/services/telegram-campaigns';
+import { simulateTelegramRenewalReminderAudience } from '@/lib/services/telegram-renewal-automation';
 import {
   approveTelegramOrder,
   approveTelegramPremiumSupportRequest,
@@ -879,6 +880,15 @@ export const telegramBotRouter = router({
     .mutation(async ({ ctx, input }) => {
       assertTelegramAnnouncementScope(ctx.user.adminScope);
       return simulateTelegramCouponCampaignAudience({
+        settings: normalizeTelegramSalesSettings(input),
+      });
+    }),
+
+  simulateRenewalReminderAudience: adminProcedure
+    .input(telegramSalesSettingsSchema)
+    .mutation(async ({ ctx, input }) => {
+      assertTelegramAnnouncementScope(ctx.user.adminScope);
+      return simulateTelegramRenewalReminderAudience({
         settings: normalizeTelegramSalesSettings(input),
       });
     }),
