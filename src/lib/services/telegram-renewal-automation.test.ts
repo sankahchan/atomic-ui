@@ -4,7 +4,10 @@ import test from 'node:test';
 import { getDefaultTelegramSalesSettings } from '@/lib/services/telegram-sales';
 import {
   buildTelegramRenewalAutomationSnapshotMap,
+  deriveTelegramRenewalReminderExceptionState,
   evaluateTelegramRenewalReminderCandidate,
+  matchesTelegramRenewalReminderExceptionQuickFilter,
+  summarizeTelegramRenewalReminderExceptionStates,
 } from '@/lib/services/telegram-renewal-automation';
 
 test('renewal automation blocks repeated sends for the same wave until a renewal happens', () => {
@@ -134,4 +137,119 @@ test('renewal automation respects cooldowns and depleted wave toggles', () => {
   assert.equal(coolingDown.eligible, false);
   assert.equal(coolingDown.blockedReason, 'COOLDOWN');
   assert.ok(coolingDown.cooldownUntil);
+});
+
+test('renewal automation snapshot keeps the latest reminder failure state', () => {
+  const snapshots = buildTelegramRenewalAutomationSnapshotMap([
+    {
+      entityId: 'key_4',
+      action: 'ACCESS_KEY_RENEWAL_REMINDER_FAILED',
+      details: JSON.stringify({ error: 'Telegram chat not found' }),
+      createdAt: new Date('2026-06-06T08:00:00.000Z'),
+    },
+    {
+      entityId: 'key_4',
+      action: 'ACCESS_KEY_RENEWAL_REMINDER_FAILED',
+      details: JSON.stringify({ error: 'Too Many Requests' }),
+      createdAt: new Date('2026-06-06T09:00:00.000Z'),
+    },
+  ]);
+
+  assert.equal(snapshots.get('key_4')?.lastFailedReason, 'Too Many Requests');
+  assert.deepEqual(snapshots.get('key_4')?.lastFailedAt, new Date('2026-06-06T09:00:00.000Z'));
+});
+
+test('renewal exception helpers expose actionable filters and summary counts', () => {
+  const settings = getDefaultTelegramSalesSettings();
+  const now = new Date('2026-06-06T12:00:00.000Z');
+
+  const states = [
+    deriveTelegramRenewalReminderExceptionState({
+      candidate: {
+        accessKeyId: 'key_delivery_off',
+        keyName: 'Delivery off',
+        status: 'ACTIVE',
+        expiresAt: new Date('2026-06-07T12:00:00.000Z'),
+        dataLimitBytes: null,
+        usedBytes: BigInt(0),
+        telegramDeliveryEnabled: false,
+        destinationChatId: null,
+      },
+      snapshot: null,
+      settings,
+      now,
+    }),
+    deriveTelegramRenewalReminderExceptionState({
+      candidate: {
+        accessKeyId: 'key_needs_link',
+        keyName: 'Needs link',
+        status: 'ACTIVE',
+        expiresAt: new Date('2026-06-07T12:00:00.000Z'),
+        dataLimitBytes: null,
+        usedBytes: BigInt(0),
+        telegramDeliveryEnabled: true,
+        destinationChatId: null,
+      },
+      snapshot: null,
+      settings,
+      now,
+    }),
+    deriveTelegramRenewalReminderExceptionState({
+      candidate: {
+        accessKeyId: 'key_cooldown',
+        keyName: 'Cooldown',
+        status: 'ACTIVE',
+        expiresAt: new Date('2026-06-07T12:00:00.000Z'),
+        dataLimitBytes: null,
+        usedBytes: BigInt(0),
+        telegramDeliveryEnabled: true,
+        destinationChatId: '12345',
+      },
+      snapshot: {
+        lastReminderAt: new Date('2026-06-06T08:30:00.000Z'),
+        lastRenewedAt: null,
+        lastReminderByWave: {},
+        lastFailedAt: null,
+        lastFailedReason: null,
+      },
+      settings,
+      now,
+    }),
+    deriveTelegramRenewalReminderExceptionState({
+      candidate: {
+        accessKeyId: 'key_failed',
+        keyName: 'Failed send',
+        status: 'ACTIVE',
+        expiresAt: new Date('2026-06-07T12:00:00.000Z'),
+        dataLimitBytes: null,
+        usedBytes: BigInt(0),
+        telegramDeliveryEnabled: true,
+        destinationChatId: '12345',
+      },
+      snapshot: {
+        lastReminderAt: null,
+        lastRenewedAt: null,
+        lastReminderByWave: {},
+        lastFailedAt: new Date('2026-06-06T07:30:00.000Z'),
+        lastFailedReason: 'Telegram blocked the bot',
+      },
+      settings,
+      now,
+    }),
+  ];
+
+  assert.equal(matchesTelegramRenewalReminderExceptionQuickFilter(states[0], 'deliveryDisabled'), true);
+  assert.equal(matchesTelegramRenewalReminderExceptionQuickFilter(states[1], 'needsTelegramLink'), true);
+  assert.equal(matchesTelegramRenewalReminderExceptionQuickFilter(states[2], 'automationBlocked'), true);
+  assert.equal(matchesTelegramRenewalReminderExceptionQuickFilter(states[3], 'reminderFailed'), true);
+
+  assert.deepEqual(summarizeTelegramRenewalReminderExceptionStates(states), {
+    eligible: 4,
+    reachable: 2,
+    blocked: 3,
+    failed: 1,
+    needsTelegramLink: 1,
+    deliveryDisabled: 1,
+    automationBlocked: 1,
+  });
 });

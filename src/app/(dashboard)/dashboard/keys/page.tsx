@@ -353,6 +353,95 @@ function getRenewalReminderMeta(
   };
 }
 
+function getRenewalExceptionMeta(
+  exception: {
+    blockedReason?: string | null;
+    cooldownUntil?: Date | string | null;
+    needsTelegramLink?: boolean;
+    deliveryDisabled?: boolean;
+    automationBlocked?: boolean;
+    reminderFailed?: boolean;
+    lastFailedAt?: Date | string | null;
+    lastFailedReason?: string | null;
+  } | null | undefined,
+  isMyanmar: boolean,
+) {
+  if (!exception) {
+    return null;
+  }
+
+  const lastFailedAt = exception.lastFailedAt ? new Date(exception.lastFailedAt) : null;
+  const cooldownUntil = exception.cooldownUntil ? new Date(exception.cooldownUntil) : null;
+
+  if (exception.reminderFailed) {
+    return {
+      label: isMyanmar ? 'Reminder ပို့မအောင်မြင်' : 'Reminder failed',
+      detail: isMyanmar
+        ? `${lastFailedAt ? `${formatRelativeTime(lastFailedAt)} တွင် ` : ''}${exception.lastFailedReason || 'Telegram reminder ပို့မရပါ။'}`
+        : `${lastFailedAt ? `Last failure ${formatRelativeTime(lastFailedAt)}. ` : ''}${exception.lastFailedReason || 'Telegram reminder delivery failed.'}`,
+      badgeClassName: 'border-red-500/40 text-red-500',
+    };
+  }
+
+  if (exception.deliveryDisabled) {
+    return {
+      label: isMyanmar ? 'Telegram ပို့ဆောင်မှု ပိတ်ထားသည်' : 'Telegram delivery off',
+      detail: isMyanmar
+        ? 'ဒီ key အတွက် Telegram delivery ပိတ်ထားသည်။ ဖွင့်ပြီးမှ reminder ပို့နိုင်သည်။'
+        : 'Telegram delivery is disabled for this key. Enable it before sending reminders.',
+      badgeClassName: 'border-amber-500/40 text-amber-500',
+    };
+  }
+
+  if (exception.needsTelegramLink) {
+    return {
+      label: isMyanmar ? 'Telegram chat မချိတ်ရသေး' : 'No Telegram link',
+      detail: isMyanmar
+        ? 'Telegram chat ချိတ်ဆက်ထားခြင်းမရှိသေးပါ။ Connect link ကိုပို့ပြီး ချိတ်ဆက်ရန်လိုအပ်သည်။'
+        : 'No Telegram chat is linked yet. Send the connect link before retrying reminders.',
+      badgeClassName: 'border-violet-500/40 text-violet-400',
+    };
+  }
+
+  if (exception.automationBlocked) {
+    if (exception.blockedReason === 'COOLDOWN') {
+      return {
+        label: isMyanmar ? 'Automation cooldown' : 'Automation cooldown',
+        detail: cooldownUntil
+          ? (isMyanmar
+            ? `Cooldown ပြီးသည့် ${formatDateTime(cooldownUntil)} နောက်မှ automation က reminder ပို့နိုင်မည်။`
+            : `Automation can retry after ${formatDateTime(cooldownUntil)}.`)
+          : (isMyanmar
+            ? 'Cooldown ကာလအတွင်း ရှိနေသည်။'
+            : 'This key is still inside the reminder cooldown window.'),
+        badgeClassName: 'border-orange-500/40 text-orange-500',
+      };
+    }
+
+    if (exception.blockedReason === 'ALREADY_SENT_FOR_WAVE') {
+      return {
+        label: isMyanmar ? 'ဒီ cycle အတွက် ပို့ပြီး' : 'Already reminded',
+        detail: isMyanmar
+          ? 'လက်ရှိ renewal cycle အတွက် reminder ပို့ပြီးသားဖြစ်သည်။ Renew ပြီးမှ automation wave အသစ်ရမည်။'
+          : 'This renewal cycle already received a reminder. Renew first, then the next cycle becomes eligible.',
+        badgeClassName: 'border-sky-500/40 text-sky-500',
+      };
+    }
+
+    if (exception.blockedReason === 'WAVE_DISABLED') {
+      return {
+        label: isMyanmar ? 'Automation wave ပိတ်ထားသည်' : 'Automation wave off',
+        detail: isMyanmar
+          ? 'ဒီ renewal wave ကို Telegram automation settings မှာ ပိတ်ထားသည်။'
+          : 'This renewal wave is disabled in Telegram automation settings.',
+        badgeClassName: 'border-muted-foreground/40 text-muted-foreground',
+      };
+    }
+  }
+
+  return null;
+}
+
 function KeyTagChip({
   tag,
   count,
@@ -3246,6 +3335,9 @@ function KeyRow({
   onRenew,
   onSendRenewalReminder,
   canSendRenewalReminder,
+  onEnableTelegramDelivery,
+  onCopyTelegramConnectLink,
+  isTelegramDeliveryMutationPending,
   onShowQR,
   onToggleStatus,
   isSelected,
@@ -3291,6 +3383,16 @@ function KeyRow({
       pendingFollowUp?: boolean;
       cooldownActive?: boolean;
     } | null;
+    renewalException?: {
+      blockedReason?: string | null;
+      cooldownUntil?: Date | null;
+      needsTelegramLink?: boolean;
+      deliveryDisabled?: boolean;
+      automationBlocked?: boolean;
+      reminderFailed?: boolean;
+      lastFailedAt?: Date | null;
+      lastFailedReason?: string | null;
+    } | null;
     server?: {
       id: string;
       name: string;
@@ -3303,6 +3405,9 @@ function KeyRow({
   onRenew: () => void;
   onSendRenewalReminder: () => void;
   canSendRenewalReminder: boolean;
+  onEnableTelegramDelivery: () => void;
+  onCopyTelegramConnectLink: () => void;
+  isTelegramDeliveryMutationPending: boolean;
   onShowQR: () => void;
   onToggleStatus: () => void;
   isSelected: boolean;
@@ -3321,6 +3426,7 @@ function KeyRow({
   const showTrafficState = accessKey.status === 'ACTIVE';
   const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(accessKey);
   const renewalReminderMeta = getRenewalReminderMeta(accessKey.renewalReminder, locale === 'my');
+  const renewalExceptionMeta = getRenewalExceptionMeta(accessKey.renewalException, locale === 'my');
 
   return (
     <tr
@@ -3365,6 +3471,9 @@ function KeyRow({
               {accessKey.lastTrafficAt ? formatRelativeTime(accessKey.lastTrafficAt) : t('keys.activity.none')}
             </p>
             <p className="text-xs text-muted-foreground">{renewalReminderMeta.detail}</p>
+            {renewalExceptionMeta ? (
+              <p className="text-xs text-muted-foreground">{renewalExceptionMeta.detail}</p>
+            ) : null}
             {accessKey.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {stringToTags(accessKey.tags).map((tag) => (
@@ -3429,6 +3538,14 @@ function KeyRow({
           >
             {renewalReminderMeta.label}
           </Badge>
+          {renewalExceptionMeta ? (
+            <Badge
+              variant="outline"
+              className={cn('border text-[11px]', renewalExceptionMeta.badgeClassName)}
+            >
+              {renewalExceptionMeta.label}
+            </Badge>
+          ) : null}
           {accessKey.maxDevices ? (
             <div className="space-y-1">
               <Badge
@@ -3569,6 +3686,24 @@ function KeyRow({
                 <Calendar className="w-4 h-4 mr-2" />
                 {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
               </DropdownMenuItem>
+              {accessKey.renewalException?.deliveryDisabled ? (
+                <DropdownMenuItem
+                  onClick={onEnableTelegramDelivery}
+                  disabled={isTelegramDeliveryMutationPending}
+                >
+                  <Power className="w-4 h-4 mr-2" />
+                  {locale === 'my' ? 'Telegram delivery ဖွင့်မည်' : 'Enable Telegram delivery'}
+                </DropdownMenuItem>
+              ) : null}
+              {accessKey.renewalException?.needsTelegramLink ? (
+                <DropdownMenuItem
+                  onClick={onCopyTelegramConnectLink}
+                  disabled={isTelegramDeliveryMutationPending}
+                >
+                  <LinkCopy className="w-4 h-4 mr-2" />
+                  {locale === 'my' ? 'Telegram connect link ကူးမည်' : 'Copy Telegram connect link'}
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onClick={onSendRenewalReminder} disabled={!canSendRenewalReminder}>
                 <MessageSquare className="w-4 h-4 mr-2" />
                 {locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့မည်' : 'Send renewal reminder'}
@@ -3685,11 +3820,21 @@ export default function KeysPage() {
         : filters.quickFilters.renewedAfterReminder
           ? 'renewedAfterReminder'
           : null;
+  const activeExceptionStateFilter = filters.quickFilters.needsTelegramLink
+    ? 'needsTelegramLink'
+    : filters.quickFilters.deliveryDisabled
+      ? 'deliveryDisabled'
+      : filters.quickFilters.reminderFailed
+        ? 'reminderFailed'
+        : filters.quickFilters.automationBlocked
+          ? 'automationBlocked'
+          : null;
   const isRenewalQueueDepleted = statusFilter === 'DEPLETED';
   const hasRenewalQueueFilters = Boolean(
     activeRenewalWindow
     || filters.quickFilters.telegramLinked
     || activeReminderStateFilter
+    || activeExceptionStateFilter
     || isRenewalQueueDepleted,
   );
   const applyTagFilter = useCallback((tag: string) => {
@@ -3725,13 +3870,24 @@ export default function KeysPage() {
     setPage(1);
   }, [setQuickFilter]);
 
+  const setExceptionStateFilter = useCallback((
+    filter: 'needsTelegramLink' | 'deliveryDisabled' | 'reminderFailed' | 'automationBlocked' | null,
+  ) => {
+    setQuickFilter('needsTelegramLink', filter === 'needsTelegramLink');
+    setQuickFilter('deliveryDisabled', filter === 'deliveryDisabled');
+    setQuickFilter('reminderFailed', filter === 'reminderFailed');
+    setQuickFilter('automationBlocked', filter === 'automationBlocked');
+    setPage(1);
+  }, [setQuickFilter]);
+
   const clearRenewalQueueFilters = useCallback(() => {
     setRenewalWindow(null);
     setQuickFilter('telegramLinked', false);
     setReminderStateFilter(null);
+    setExceptionStateFilter(null);
     setStatusFilter((current) => (current === 'DEPLETED' ? '' : current));
     setPage(1);
-  }, [setQuickFilter, setReminderStateFilter, setRenewalWindow]);
+  }, [setQuickFilter, setReminderStateFilter, setExceptionStateFilter, setRenewalWindow]);
 
   const pageSize = 20;
 
@@ -3748,6 +3904,7 @@ export default function KeysPage() {
     const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
     const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
     const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
+    const renewalExceptionMeta = getRenewalExceptionMeta((key as any).renewalException, locale === 'my');
 
     return (
       <div className="space-y-4">
@@ -3778,6 +3935,9 @@ export default function KeysPage() {
                 {lastTrafficAt ? formatRelativeTime(lastTrafficAt) : t('keys.activity.none')}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{renewalReminderMeta.detail}</p>
+              {renewalExceptionMeta ? (
+                <p className="mt-1 text-xs text-muted-foreground">{renewalExceptionMeta.detail}</p>
+              ) : null}
             </div>
           </div>
           <div className="ml-3 flex flex-col items-end gap-2">
@@ -3813,6 +3973,14 @@ export default function KeysPage() {
             >
               {renewalReminderMeta.label}
             </Badge>
+            {renewalExceptionMeta ? (
+              <Badge
+                variant="outline"
+                className={cn('text-[11px]', renewalExceptionMeta.badgeClassName)}
+              >
+                {renewalExceptionMeta.label}
+              </Badge>
+            ) : null}
             {key.maxDevices ? (
               <div className="flex flex-col items-end gap-1">
                 <Badge
@@ -3919,6 +4087,24 @@ export default function KeysPage() {
                 <Calendar className="w-4 h-4 mr-2" />
                 {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
               </DropdownMenuItem>
+              {(key as any).renewalException?.deliveryDisabled ? (
+                <DropdownMenuItem
+                  onClick={() => handleEnableTelegramDelivery(key)}
+                  disabled={bulkEnableTelegramDeliveryMutation.isPending}
+                >
+                  <Power className="w-4 h-4 mr-2" />
+                  {locale === 'my' ? 'Telegram delivery ဖွင့်မည်' : 'Enable Telegram delivery'}
+                </DropdownMenuItem>
+              ) : null}
+              {(key as any).renewalException?.needsTelegramLink ? (
+                <DropdownMenuItem
+                  onClick={() => handleCopyTelegramConnectLink(key)}
+                  disabled={generateTelegramConnectLinkMutation.isPending}
+                >
+                  <LinkCopy className="w-4 h-4 mr-2" />
+                  {locale === 'my' ? 'Telegram connect link ကူးမည်' : 'Copy Telegram connect link'}
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem
                 onClick={() => handleSendRenewalReminder(key)}
                 disabled={!canSendRenewalReminderForKey(key) || sendRenewalReminderMutation.isPending}
@@ -3966,6 +4152,10 @@ export default function KeysPage() {
     remindedToday: filters.quickFilters.remindedToday || undefined,
     reminded24hAgo: filters.quickFilters.reminded24hAgo || undefined,
     renewedAfterReminder: filters.quickFilters.renewedAfterReminder || undefined,
+    needsTelegramLink: filters.quickFilters.needsTelegramLink || undefined,
+    deliveryDisabled: filters.quickFilters.deliveryDisabled || undefined,
+    reminderFailed: filters.quickFilters.reminderFailed || undefined,
+    automationBlocked: filters.quickFilters.automationBlocked || undefined,
     overDeviceLimit: filters.quickFilters.overDeviceLimit || undefined,
     deviceLimitWarned: filters.quickFilters.deviceLimitWarned || undefined,
     tag: filters.tagFilter || undefined,
@@ -4107,6 +4297,15 @@ export default function KeysPage() {
     renewedAfterReminder: 0,
     pendingFollowUp: 0,
   };
+  const renewalExceptionSummary = data?.renewalExceptionSummary ?? {
+    eligible: 0,
+    reachable: 0,
+    blocked: 0,
+    failed: 0,
+    needsTelegramLink: 0,
+    deliveryDisabled: 0,
+    automationBlocked: 0,
+  };
 
   // Helper to check if a key is online using recent server-side session activity.
   const checkIsOnline = useCallback(
@@ -4230,6 +4429,25 @@ export default function KeysPage() {
     },
   });
 
+  const generateTelegramConnectLinkMutation = trpc.keys.generateTelegramConnectLink.useMutation({
+    onSuccess: async (result) => {
+      await copyToClipboard(
+        result.url,
+        locale === 'my' ? 'ကူးယူပြီးပါပြီ' : 'Copied',
+        locale === 'my'
+          ? 'Telegram connect link ကို clipboard သို့ ကူးယူပြီးပါပြီ။'
+          : 'Telegram connect link copied to clipboard.',
+      );
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'Connect link မရပါ' : 'Connect link failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Bulk delete mutation
   const bulkDeleteMutation = trpc.keys.bulkDelete.useMutation({
     onSuccess: (result) => {
@@ -4309,6 +4527,34 @@ export default function KeysPage() {
     onError: (error) => {
       toast({
         title: locale === 'my' ? 'သတိပေးချက်များ ပို့မရပါ' : 'Reminder batch failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
+  const bulkEnableTelegramDeliveryMutation = trpc.keys.bulkEnableTelegramDelivery.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: locale === 'my' ? 'Telegram delivery ဖွင့်ပြီးပါပြီ' : 'Telegram delivery enabled',
+        description: locale === 'my'
+          ? `${result.success} ခုအတွက် Telegram delivery ကို ဖွင့်ပြီးပါပြီ။`
+          : `Enabled Telegram delivery for ${result.success} keys.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      setSelectedKeys(new Set());
+      setBulkProgressResults(result);
+      await Promise.all([
+        utils.keys.list.invalidate(),
+        utils.keys.stats.invalidate(),
+      ]);
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'Telegram delivery မဖွင့်နိုင်ပါ' : 'Enable Telegram delivery failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -4482,6 +4728,16 @@ export default function KeysPage() {
     });
   };
 
+  const handleBulkEnableTelegramDelivery = () => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(locale === 'my' ? 'Telegram delivery ဖွင့်နေသည်' : 'Enabling Telegram delivery');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    bulkEnableTelegramDeliveryMutation.mutate({
+      ids: Array.from(selectedKeys),
+    });
+  };
+
   const handleBulkToggleStatus = (enable: boolean) => {
     if (selectedKeys.size === 0) return;
     setBulkProgressTitle(
@@ -4551,6 +4807,19 @@ export default function KeysPage() {
 
   const handleSendRenewalReminder = (key: { id: string; name: string }) => {
     sendRenewalReminderMutation.mutate({ id: key.id });
+  };
+
+  const handleEnableTelegramDelivery = (key: { id: string }) => {
+    setBulkProgressTitle(locale === 'my' ? 'Telegram delivery ဖွင့်နေသည်' : 'Enabling Telegram delivery');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    bulkEnableTelegramDeliveryMutation.mutate({
+      ids: [key.id],
+    });
+  };
+
+  const handleCopyTelegramConnectLink = (key: { id: string }) => {
+    generateTelegramConnectLinkMutation.mutate({ id: key.id });
   };
 
   const confirmDelete = () => {
@@ -4653,6 +4922,10 @@ export default function KeysPage() {
     filters.quickFilters.remindedToday ||
     filters.quickFilters.reminded24hAgo ||
     filters.quickFilters.renewedAfterReminder ||
+    filters.quickFilters.needsTelegramLink ||
+    filters.quickFilters.deliveryDisabled ||
+    filters.quickFilters.reminderFailed ||
+    filters.quickFilters.automationBlocked ||
     filters.quickFilters.overDeviceLimit ||
     filters.quickFilters.deviceLimitWarned ||
     filters.tagFilter ||
@@ -4664,6 +4937,7 @@ export default function KeysPage() {
     bulkDeleteMutation.isPending ||
     bulkRenewMutation.isPending ||
     bulkRenewalReminderMutation.isPending ||
+    bulkEnableTelegramDeliveryMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
@@ -5282,6 +5556,42 @@ export default function KeysPage() {
           {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
         </Button>
         <Button
+          variant={filters.quickFilters.needsTelegramLink ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.needsTelegramLink && 'bg-violet-600 hover:bg-violet-700')}
+          onClick={() => setExceptionStateFilter(filters.quickFilters.needsTelegramLink ? null : 'needsTelegramLink')}
+        >
+          <LinkCopy className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Telegram link မရှိ' : 'Needs Telegram link'}
+        </Button>
+        <Button
+          variant={filters.quickFilters.deliveryDisabled ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.deliveryDisabled && 'bg-amber-600 hover:bg-amber-700')}
+          onClick={() => setExceptionStateFilter(filters.quickFilters.deliveryDisabled ? null : 'deliveryDisabled')}
+        >
+          <Power className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Delivery ပိတ်ထား' : 'Delivery disabled'}
+        </Button>
+        <Button
+          variant={filters.quickFilters.reminderFailed ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.reminderFailed && 'bg-red-600 hover:bg-red-700')}
+          onClick={() => setExceptionStateFilter(filters.quickFilters.reminderFailed ? null : 'reminderFailed')}
+        >
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Reminder မအောင်မြင်' : 'Reminder failed'}
+        </Button>
+        <Button
+          variant={filters.quickFilters.automationBlocked ? 'default' : 'outline'}
+          size="sm"
+          className={cn('h-8 rounded-full px-2.5 text-[11px]', filters.quickFilters.automationBlocked && 'bg-orange-600 hover:bg-orange-700')}
+          onClick={() => setExceptionStateFilter(filters.quickFilters.automationBlocked ? null : 'automationBlocked')}
+        >
+          <Clock className="w-3 h-3 mr-1" />
+          {locale === 'my' ? 'Automation ပိတ်မိ' : 'Automation blocked'}
+        </Button>
+        <Button
           variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
           size="sm"
           className={cn('h-8 rounded-full px-2.5 text-[11px]', statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
@@ -5349,7 +5659,7 @@ export default function KeysPage() {
           />
         </div>
 
-        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.neverReminded || filters.quickFilters.remindedToday || filters.quickFilters.reminded24hAgo || filters.quickFilters.renewedAfterReminder || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
+        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.neverReminded || filters.quickFilters.remindedToday || filters.quickFilters.reminded24hAgo || filters.quickFilters.renewedAfterReminder || filters.quickFilters.needsTelegramLink || filters.quickFilters.deliveryDisabled || filters.quickFilters.reminderFailed || filters.quickFilters.automationBlocked || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
           <Button
             variant="ghost"
             size="sm"
@@ -5673,6 +5983,42 @@ export default function KeysPage() {
                   {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
                 </Button>
                 <Button
+                  variant={filters.quickFilters.needsTelegramLink ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.needsTelegramLink && 'bg-violet-600 hover:bg-violet-700')}
+                  onClick={() => setExceptionStateFilter(filters.quickFilters.needsTelegramLink ? null : 'needsTelegramLink')}
+                >
+                  <LinkCopy className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Telegram link မရှိ' : 'Needs Telegram link'}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.deliveryDisabled ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.deliveryDisabled && 'bg-amber-600 hover:bg-amber-700')}
+                  onClick={() => setExceptionStateFilter(filters.quickFilters.deliveryDisabled ? null : 'deliveryDisabled')}
+                >
+                  <Power className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Delivery ပိတ်ထား' : 'Delivery disabled'}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.reminderFailed ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.reminderFailed && 'bg-red-600 hover:bg-red-700')}
+                  onClick={() => setExceptionStateFilter(filters.quickFilters.reminderFailed ? null : 'reminderFailed')}
+                >
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Reminder မအောင်မြင်' : 'Reminder failed'}
+                </Button>
+                <Button
+                  variant={filters.quickFilters.automationBlocked ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(filters.quickFilters.automationBlocked && 'bg-orange-600 hover:bg-orange-700')}
+                  onClick={() => setExceptionStateFilter(filters.quickFilters.automationBlocked ? null : 'automationBlocked')}
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {locale === 'my' ? 'Automation ပိတ်မိ' : 'Automation blocked'}
+                </Button>
+                <Button
                   variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
                   size="sm"
                   className={cn(statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
@@ -5856,6 +6202,32 @@ export default function KeysPage() {
                 <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.pendingFollowUp : 0}</p>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Telegram ရောက်နိုင်' : 'Reachable'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.reachable : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Blocked' : 'Blocked'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.blocked : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Telegram link မရှိ' : 'No Telegram link'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.needsTelegramLink : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Failed sends' : 'Failed sends'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.failed : 0}</p>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -5941,6 +6313,42 @@ export default function KeysPage() {
               <CheckCircle2 className="mr-2 h-4 w-4" />
               {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
             </Button>
+            <Button
+              variant={filters.quickFilters.needsTelegramLink ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.needsTelegramLink && 'bg-violet-600 hover:bg-violet-700')}
+              onClick={() => setExceptionStateFilter(filters.quickFilters.needsTelegramLink ? null : 'needsTelegramLink')}
+            >
+              <LinkCopy className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Telegram link မရှိ' : 'Needs Telegram link'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.deliveryDisabled ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.deliveryDisabled && 'bg-amber-600 hover:bg-amber-700')}
+              onClick={() => setExceptionStateFilter(filters.quickFilters.deliveryDisabled ? null : 'deliveryDisabled')}
+            >
+              <Power className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Delivery ပိတ်ထား' : 'Delivery disabled'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.reminderFailed ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.reminderFailed && 'bg-red-600 hover:bg-red-700')}
+              onClick={() => setExceptionStateFilter(filters.quickFilters.reminderFailed ? null : 'reminderFailed')}
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Reminder မအောင်မြင်' : 'Reminder failed'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.automationBlocked ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.automationBlocked && 'bg-orange-600 hover:bg-orange-700')}
+              onClick={() => setExceptionStateFilter(filters.quickFilters.automationBlocked ? null : 'automationBlocked')}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Automation ပိတ်မိ' : 'Automation blocked'}
+            </Button>
             {hasRenewalQueueFilters ? (
               <Button variant="ghost" size="sm" onClick={clearRenewalQueueFilters}>
                 <X className="mr-2 h-4 w-4" />
@@ -6007,6 +6415,15 @@ export default function KeysPage() {
             >
               {bulkRenewalReminderMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
               {locale === 'my' ? 'သက်တမ်းတိုး သတိပေးချက် ပို့မည်' : 'Send renewal reminders'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkEnableTelegramDelivery}
+              disabled={selectedKeys.size === 0 || bulkEnableTelegramDeliveryMutation.isPending}
+            >
+              {bulkEnableTelegramDeliveryMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Power className="mr-2 h-4 w-4" />}
+              {locale === 'my' ? 'Telegram delivery ဖွင့်မည်' : 'Enable Telegram delivery'}
             </Button>
           </div>
 
@@ -6098,6 +6515,7 @@ export default function KeysPage() {
               const tags = typeof key.tags === 'string' ? stringToTags(key.tags) : [];
               const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
               const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
+              const renewalExceptionMeta = getRenewalExceptionMeta((key as any).renewalException, locale === 'my');
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -6171,6 +6589,17 @@ export default function KeysPage() {
                         {renewalReminderMeta.label}
                       </Badge>
                       <p className="text-muted-foreground">{renewalReminderMeta.detail}</p>
+                      {renewalExceptionMeta ? (
+                        <>
+                          <Badge
+                            variant="outline"
+                            className={cn('border w-fit', renewalExceptionMeta.badgeClassName)}
+                          >
+                            {renewalExceptionMeta.label}
+                          </Badge>
+                          <p className="text-muted-foreground">{renewalExceptionMeta.detail}</p>
+                        </>
+                      ) : null}
                     </div>
                     {key.maxDevices ? (
                       <div className="flex items-center justify-between text-xs">
@@ -6269,6 +6698,24 @@ export default function KeysPage() {
                             <Calendar className="w-4 h-4 mr-2" />
                             {locale === 'my' ? 'Renew လုပ်မည်' : 'Renew'}
                           </DropdownMenuItem>
+                          {(key as any).renewalException?.deliveryDisabled ? (
+                            <DropdownMenuItem
+                              onClick={() => handleEnableTelegramDelivery(key)}
+                              disabled={bulkEnableTelegramDeliveryMutation.isPending}
+                            >
+                              <Power className="w-4 h-4 mr-2" />
+                              {locale === 'my' ? 'Telegram delivery ဖွင့်မည်' : 'Enable Telegram delivery'}
+                            </DropdownMenuItem>
+                          ) : null}
+                          {(key as any).renewalException?.needsTelegramLink ? (
+                            <DropdownMenuItem
+                              onClick={() => handleCopyTelegramConnectLink(key)}
+                              disabled={generateTelegramConnectLinkMutation.isPending}
+                            >
+                              <LinkCopy className="w-4 h-4 mr-2" />
+                              {locale === 'my' ? 'Telegram connect link ကူးမည်' : 'Copy Telegram connect link'}
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem
                             onClick={() => handleSendRenewalReminder(key)}
                             disabled={!canSendRenewalReminderForKey(key) || sendRenewalReminderMutation.isPending}
@@ -6355,6 +6802,11 @@ export default function KeysPage() {
                     onRenew={() => handleOpenRenew(key)}
                     onSendRenewalReminder={() => handleSendRenewalReminder(key)}
                     canSendRenewalReminder={canSendRenewalReminderForKey(key) && !sendRenewalReminderMutation.isPending}
+                    onEnableTelegramDelivery={() => handleEnableTelegramDelivery(key)}
+                    onCopyTelegramConnectLink={() => handleCopyTelegramConnectLink(key)}
+                    isTelegramDeliveryMutationPending={
+                      bulkEnableTelegramDeliveryMutation.isPending || generateTelegramConnectLinkMutation.isPending
+                    }
                     onShowQR={() => setQrDialogKey({ id: key.id, name: key.name })}
                     onToggleStatus={() => handleToggleStatus(key.id)}
                     isSelected={selectedKeys.has(key.id)}

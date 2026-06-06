@@ -27,6 +27,20 @@ export const TELEGRAM_RENEWAL_REMINDER_BLOCK_REASONS = [
 export type TelegramRenewalReminderBlockReason =
   (typeof TELEGRAM_RENEWAL_REMINDER_BLOCK_REASONS)[number];
 
+export const TELEGRAM_RENEWAL_REMINDER_EXCEPTION_AUDIT_ACTIONS = [
+  'ACCESS_KEY_RENEWAL_REMINDER_FAILED',
+] as const;
+
+export const TELEGRAM_RENEWAL_REMINDER_EXCEPTION_QUICK_FILTERS = [
+  'needsTelegramLink',
+  'deliveryDisabled',
+  'reminderFailed',
+  'automationBlocked',
+] as const;
+
+export type TelegramRenewalReminderExceptionQuickFilter =
+  (typeof TELEGRAM_RENEWAL_REMINDER_EXCEPTION_QUICK_FILTERS)[number];
+
 export type TelegramRenewalAutomationAuditRow = {
   entityId: string | null;
   action: string;
@@ -38,6 +52,8 @@ export type TelegramRenewalAutomationSnapshot = {
   lastReminderAt: Date | null;
   lastRenewedAt: Date | null;
   lastReminderByWave: Partial<Record<TelegramRenewalReminderWave, Date>>;
+  lastFailedAt: Date | null;
+  lastFailedReason: string | null;
 };
 
 export type TelegramRenewalReminderCandidate = {
@@ -57,6 +73,30 @@ export type TelegramRenewalReminderEvaluation = {
   eligible: boolean;
   blockedReason: TelegramRenewalReminderBlockReason | null;
   cooldownUntil: Date | null;
+};
+
+export type TelegramRenewalReminderExceptionState = {
+  wave: TelegramRenewalReminderWave | null;
+  daysLeft: number | null;
+  blockedReason: TelegramRenewalReminderBlockReason | null;
+  cooldownUntil: Date | null;
+  reachable: boolean;
+  needsTelegramLink: boolean;
+  deliveryDisabled: boolean;
+  automationBlocked: boolean;
+  reminderFailed: boolean;
+  lastFailedAt: Date | null;
+  lastFailedReason: string | null;
+};
+
+export type TelegramRenewalReminderExceptionSummary = {
+  eligible: number;
+  reachable: number;
+  blocked: number;
+  failed: number;
+  needsTelegramLink: number;
+  deliveryDisabled: number;
+  automationBlocked: number;
 };
 
 export type TelegramRenewalReminderAudienceCandidate = {
@@ -145,6 +185,8 @@ export function buildTelegramRenewalAutomationSnapshotMap(rows: TelegramRenewalA
       lastReminderAt: null,
       lastRenewedAt: null,
       lastReminderByWave: {},
+      lastFailedAt: null,
+      lastFailedReason: null,
     };
 
     if (RENEWAL_REMINDER_AUDIT_ACTIONS.includes(row.action as (typeof RENEWAL_REMINDER_AUDIT_ACTIONS)[number])) {
@@ -167,6 +209,25 @@ export function buildTelegramRenewalAutomationSnapshotMap(rows: TelegramRenewalA
     if (RENEWAL_AUDIT_ACTIONS.includes(row.action as (typeof RENEWAL_AUDIT_ACTIONS)[number])) {
       if (!snapshot.lastRenewedAt || row.createdAt > snapshot.lastRenewedAt) {
         snapshot.lastRenewedAt = row.createdAt;
+      }
+    }
+
+    if (
+      TELEGRAM_RENEWAL_REMINDER_EXCEPTION_AUDIT_ACTIONS.includes(
+        row.action as (typeof TELEGRAM_RENEWAL_REMINDER_EXCEPTION_AUDIT_ACTIONS)[number],
+      )
+    ) {
+      if (!snapshot.lastFailedAt || row.createdAt > snapshot.lastFailedAt) {
+        const details = parseAuditDetails(row.details);
+        snapshot.lastFailedAt = row.createdAt;
+        snapshot.lastFailedReason =
+          typeof details?.error === 'string'
+            ? details.error
+            : typeof details?.message === 'string'
+              ? details.message
+              : typeof details?.reason === 'string'
+                ? details.reason
+                : 'Failed to send renewal reminder';
       }
     }
 
@@ -335,6 +396,116 @@ export function evaluateTelegramRenewalReminderCandidate(input: {
     blockedReason: null,
     cooldownUntil,
   };
+}
+
+export function deriveTelegramRenewalReminderExceptionState(input: {
+  candidate: TelegramRenewalReminderCandidate;
+  snapshot?: TelegramRenewalAutomationSnapshot | null;
+  settings: TelegramSalesSettings;
+  now: Date;
+}): TelegramRenewalReminderExceptionState {
+  const evaluation = evaluateTelegramRenewalReminderCandidate(input);
+  const lastResolvedAtCandidates = [
+    input.snapshot?.lastReminderAt ?? null,
+    input.snapshot?.lastRenewedAt ?? null,
+  ].filter((value): value is Date => Boolean(value));
+  const lastResolvedAt = lastResolvedAtCandidates.length > 0
+    ? new Date(Math.max(...lastResolvedAtCandidates.map((value) => value.getTime())))
+    : null;
+  const lastFailedAt = input.snapshot?.lastFailedAt ?? null;
+  const reminderFailed = Boolean(
+    lastFailedAt && (!lastResolvedAt || lastFailedAt.getTime() > lastResolvedAt.getTime()),
+  );
+  const needsTelegramLink = evaluation.blockedReason === 'NO_TELEGRAM_LINK';
+  const deliveryDisabled = evaluation.blockedReason === 'TELEGRAM_DELIVERY_DISABLED';
+  const automationBlocked = Boolean(
+    evaluation.wave
+      && evaluation.blockedReason
+      && !needsTelegramLink
+      && !deliveryDisabled,
+  );
+
+  return {
+    wave: evaluation.wave,
+    daysLeft: evaluation.daysLeft,
+    blockedReason: evaluation.blockedReason,
+    cooldownUntil: evaluation.cooldownUntil,
+    reachable: Boolean(
+      evaluation.wave
+        && input.candidate.telegramDeliveryEnabled
+        && input.candidate.destinationChatId,
+    ),
+    needsTelegramLink,
+    deliveryDisabled,
+    automationBlocked,
+    reminderFailed,
+    lastFailedAt: reminderFailed ? lastFailedAt : null,
+    lastFailedReason: reminderFailed ? (input.snapshot?.lastFailedReason ?? null) : null,
+  };
+}
+
+export function matchesTelegramRenewalReminderExceptionQuickFilter(
+  state: TelegramRenewalReminderExceptionState,
+  filter: TelegramRenewalReminderExceptionQuickFilter,
+) {
+  switch (filter) {
+    case 'needsTelegramLink':
+      return state.needsTelegramLink;
+    case 'deliveryDisabled':
+      return state.deliveryDisabled;
+    case 'reminderFailed':
+      return state.reminderFailed;
+    case 'automationBlocked':
+      return state.automationBlocked;
+    default:
+      return false;
+  }
+}
+
+export function summarizeTelegramRenewalReminderExceptionStates(
+  states: Iterable<TelegramRenewalReminderExceptionState>,
+): TelegramRenewalReminderExceptionSummary {
+  const summary: TelegramRenewalReminderExceptionSummary = {
+    eligible: 0,
+    reachable: 0,
+    blocked: 0,
+    failed: 0,
+    needsTelegramLink: 0,
+    deliveryDisabled: 0,
+    automationBlocked: 0,
+  };
+
+  for (const state of states) {
+    if (state.wave) {
+      summary.eligible += 1;
+    }
+
+    if (state.reachable) {
+      summary.reachable += 1;
+    }
+
+    if (state.deliveryDisabled) {
+      summary.deliveryDisabled += 1;
+    }
+
+    if (state.needsTelegramLink) {
+      summary.needsTelegramLink += 1;
+    }
+
+    if (state.automationBlocked) {
+      summary.automationBlocked += 1;
+    }
+
+    if (state.deliveryDisabled || state.needsTelegramLink || state.automationBlocked) {
+      summary.blocked += 1;
+    }
+
+    if (state.reminderFailed) {
+      summary.failed += 1;
+    }
+  }
+
+  return summary;
 }
 
 function compareReminderCandidates(
@@ -638,6 +809,19 @@ export async function runTelegramRenewalReminderAutomation(input: {
 
       sentByWave[candidate.wave] += 1;
     } catch (error) {
+      await writeAuditLog({
+        action: 'ACCESS_KEY_RENEWAL_REMINDER_FAILED',
+        entity: 'ACCESS_KEY',
+        entityId: candidate.accessKeyId,
+        details: {
+          automation: true,
+          scheduler: true,
+          wave: candidate.wave,
+          destinationChatId: candidate.destinationChatId,
+          error: (error as Error).message,
+          source: resolveReminderSource(candidate.wave),
+        },
+      });
       errors.push(`${candidate.accessKeyId}:${candidate.wave}:${(error as Error).message}`);
     }
   }
