@@ -442,6 +442,49 @@ function getRenewalExceptionMeta(
   return null;
 }
 
+function getRenewalOutreachMeta(
+  outreach: {
+    lastPreparedAt?: Date | string | null;
+    lastCompletedAt?: Date | string | null;
+    preparedThisCycle?: boolean;
+    completedThisCycle?: boolean;
+    pendingCompletion?: boolean;
+    neverPrepared?: boolean;
+  } | null | undefined,
+  isMyanmar: boolean,
+) {
+  const lastPreparedAt = outreach?.lastPreparedAt ? new Date(outreach.lastPreparedAt) : null;
+  const lastCompletedAt = outreach?.lastCompletedAt ? new Date(outreach.lastCompletedAt) : null;
+
+  if (outreach?.completedThisCycle && lastCompletedAt) {
+    return {
+      label: isMyanmar ? 'Outreach ပြီးပါပြီ' : 'Outreach done',
+      detail: isMyanmar
+        ? `${formatRelativeTime(lastCompletedAt)} manual outreach ပြီးစီးကြောင်း မှတ်ထားသည်။`
+        : `Manual outreach was marked complete ${formatRelativeTime(lastCompletedAt)}.`,
+      badgeClassName: 'border-emerald-500/40 text-emerald-500',
+    };
+  }
+
+  if (outreach?.pendingCompletion && lastPreparedAt) {
+    return {
+      label: isMyanmar ? 'Outreach pack ပြင်ပြီး' : 'Outreach prepared',
+      detail: isMyanmar
+        ? `${formatRelativeTime(lastPreparedAt)} outreach pack ကို ပြင်ထားပြီး complete မမှတ်ရသေးပါ။`
+        : `Outreach material was prepared ${formatRelativeTime(lastPreparedAt)} but not marked complete yet.`,
+      badgeClassName: 'border-sky-500/40 text-sky-500',
+    };
+  }
+
+  return {
+    label: isMyanmar ? 'Outreach မမှတ်ရသေး' : 'No outreach log',
+    detail: isMyanmar
+      ? 'လက်ရှိ renewal cycle အတွက် manual outreach activity မရှိသေးပါ။'
+      : 'No manual outreach activity is logged for this renewal cycle yet.',
+    badgeClassName: 'border-border/60 text-muted-foreground',
+  };
+}
+
 function KeyTagChip({
   tag,
   count,
@@ -3393,6 +3436,14 @@ function KeyRow({
       lastFailedAt?: Date | null;
       lastFailedReason?: string | null;
     } | null;
+    renewalOutreach?: {
+      lastPreparedAt?: Date | null;
+      lastCompletedAt?: Date | null;
+      preparedThisCycle?: boolean;
+      completedThisCycle?: boolean;
+      pendingCompletion?: boolean;
+      neverPrepared?: boolean;
+    } | null;
     server?: {
       id: string;
       name: string;
@@ -3427,6 +3478,7 @@ function KeyRow({
   const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(accessKey);
   const renewalReminderMeta = getRenewalReminderMeta(accessKey.renewalReminder, locale === 'my');
   const renewalExceptionMeta = getRenewalExceptionMeta(accessKey.renewalException, locale === 'my');
+  const renewalOutreachMeta = getRenewalOutreachMeta(accessKey.renewalOutreach, locale === 'my');
 
   return (
     <tr
@@ -3474,6 +3526,7 @@ function KeyRow({
             {renewalExceptionMeta ? (
               <p className="text-xs text-muted-foreground">{renewalExceptionMeta.detail}</p>
             ) : null}
+            <p className="text-xs text-muted-foreground">{renewalOutreachMeta.detail}</p>
             {accessKey.tags && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {stringToTags(accessKey.tags).map((tag) => (
@@ -3546,6 +3599,12 @@ function KeyRow({
               {renewalExceptionMeta.label}
             </Badge>
           ) : null}
+          <Badge
+            variant="outline"
+            className={cn('border text-[11px]', renewalOutreachMeta.badgeClassName)}
+          >
+            {renewalOutreachMeta.label}
+          </Badge>
           {accessKey.maxDevices ? (
             <div className="space-y-1">
               <Badge
@@ -3764,6 +3823,22 @@ type BulkTelegramConnectLinksResult = BulkProgressResult & {
   links: { id: string; name: string; url: string; expiresAt: string }[];
 };
 
+type RenewalOutreachPackResult = BulkProgressResult & {
+  items: {
+    id: string;
+    keyName: string;
+    customer: string;
+    telegramStatus: string;
+    expiry: string;
+    connectLink: string | null;
+    connectLinkExpiresAt: string | null;
+    suggestedMessage: string;
+  }[];
+  clipboardText: string;
+  csv: string;
+  filename: string;
+};
+
 function buildBulkTelegramConnectLinksClipboardText(
   links: BulkTelegramConnectLinksResult['links'],
   isMyanmar: boolean,
@@ -3773,6 +3848,16 @@ function buildBulkTelegramConnectLinksClipboardText(
     `${isMyanmar ? 'ချိတ်ဆက်ရန် link' : 'Connect link'}: ${link.url}`,
     `${isMyanmar ? 'သက်တမ်းကုန်မည့်အချိန်' : 'Expires at'}: ${formatDateTime(new Date(link.expiresAt))}`,
   ].join('\n')).join('\n\n');
+}
+
+function downloadTextFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function KeysPage() {
@@ -3926,6 +4011,7 @@ export default function KeysPage() {
     const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
     const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
     const renewalExceptionMeta = getRenewalExceptionMeta((key as any).renewalException, locale === 'my');
+    const renewalOutreachMeta = getRenewalOutreachMeta((key as any).renewalOutreach, locale === 'my');
 
     return (
       <div className="space-y-4">
@@ -3959,6 +4045,7 @@ export default function KeysPage() {
               {renewalExceptionMeta ? (
                 <p className="mt-1 text-xs text-muted-foreground">{renewalExceptionMeta.detail}</p>
               ) : null}
+              <p className="mt-1 text-xs text-muted-foreground">{renewalOutreachMeta.detail}</p>
             </div>
           </div>
           <div className="ml-3 flex flex-col items-end gap-2">
@@ -4002,6 +4089,12 @@ export default function KeysPage() {
                 {renewalExceptionMeta.label}
               </Badge>
             ) : null}
+            <Badge
+              variant="outline"
+              className={cn('text-[11px]', renewalOutreachMeta.badgeClassName)}
+            >
+              {renewalOutreachMeta.label}
+            </Badge>
             {key.maxDevices ? (
               <div className="flex flex-col items-end gap-1">
                 <Badge
@@ -4626,6 +4719,102 @@ export default function KeysPage() {
     },
   });
 
+  const prepareRenewalOutreachPackMutation = trpc.keys.prepareRenewalOutreachPack.useMutation({
+    onSuccess: async (result: RenewalOutreachPackResult, variables) => {
+      if (variables.mode === 'COPY') {
+        if (result.items.length > 0) {
+          await copyToClipboard(
+            result.clipboardText,
+            locale === 'my' ? 'Outreach pack ကူးယူပြီးပါပြီ' : 'Outreach pack copied',
+            locale === 'my'
+              ? `${result.success} ခုအတွက် outreach message များကို clipboard သို့ ကူးယူပြီးပါပြီ။`
+              : `Copied outreach messages for ${result.success} keys to the clipboard.`,
+          );
+        } else {
+          toast({
+            title: locale === 'my' ? 'Outreach pack မရပါ' : 'Outreach pack unavailable',
+            description: locale === 'my'
+              ? 'ကူးယူရန် outreach item မရှိပါ။'
+              : 'No outreach items were prepared.',
+            variant: 'destructive',
+          });
+        }
+      } else {
+        if (result.items.length > 0) {
+          downloadTextFile(result.csv, result.filename, 'text/csv;charset=utf-8;');
+          toast({
+            title: locale === 'my' ? 'Outreach CSV ထုတ်ယူပြီးပါပြီ' : 'Outreach CSV exported',
+            description: locale === 'my'
+              ? `${result.success} ခုအတွက် outreach CSV ကို ထုတ်ယူပြီးပါပြီ။`
+              : `Exported outreach CSV for ${result.success} keys.`,
+          });
+        } else {
+          toast({
+            title: locale === 'my' ? 'Outreach CSV မရပါ' : 'Outreach CSV unavailable',
+            description: locale === 'my'
+              ? 'ထုတ်ယူရန် outreach item မရှိပါ။'
+              : 'No outreach items were prepared for export.',
+            variant: 'destructive',
+          });
+        }
+      }
+
+      if (result.failed > 0) {
+        toast({
+          title: locale === 'my' ? 'တချို့ outreach item မရပါ' : 'Some outreach items failed',
+          description: locale === 'my'
+            ? `${result.failed} ခုကို မပြင်ဆင်နိုင်ပါ။ bulk result ကို စစ်ဆေးပါ။`
+            : `Failed to prepare ${result.failed} outreach items. Check the bulk result for details.`,
+          variant: 'destructive',
+        });
+      }
+
+      setBulkProgressResults(result);
+      await Promise.all([
+        utils.keys.list.invalidate(),
+        utils.keys.stats.invalidate(),
+      ]);
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'Outreach pack မပြင်နိုင်ပါ' : 'Outreach pack failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
+  const markRenewalOutreachCompletedMutation = trpc.keys.markRenewalOutreachCompleted.useMutation({
+    onSuccess: async (result) => {
+      toast({
+        title: locale === 'my' ? 'Outreach ပြီးစီးကြောင်း မှတ်ပြီးပါပြီ' : 'Outreach marked complete',
+        description: locale === 'my'
+          ? `${result.success} ခုကို handled အဖြစ် မှတ်ပြီးပါပြီ။`
+          : `Marked ${result.success} keys as handled.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      setSelectedKeys(new Set());
+      setBulkProgressResults(result);
+      await Promise.all([
+        utils.keys.list.invalidate(),
+        utils.keys.stats.invalidate(),
+      ]);
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'Outreach completion မမှတ်နိုင်ပါ' : 'Mark outreach failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
   // Bulk toggle status mutation
   const bulkToggleStatusMutation = trpc.keys.bulkToggleStatus.useMutation({
     onSuccess: (result) => {
@@ -4808,6 +4997,40 @@ export default function KeysPage() {
     setBulkProgressResults(null);
     setBulkProgressDialogOpen(true);
     bulkGenerateTelegramConnectLinksMutation.mutate({
+      ids: Array.from(selectedKeys),
+    });
+  };
+
+  const handleCopyRenewalOutreachPack = () => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(locale === 'my' ? 'Outreach pack ကူးယူရန် ပြင်ဆင်နေသည်' : 'Preparing outreach pack');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    prepareRenewalOutreachPackMutation.mutate({
+      ids: Array.from(selectedKeys),
+      locale,
+      mode: 'COPY',
+    });
+  };
+
+  const handleExportRenewalOutreachCsv = () => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(locale === 'my' ? 'Outreach CSV ပြင်ဆင်နေသည်' : 'Preparing outreach CSV');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    prepareRenewalOutreachPackMutation.mutate({
+      ids: Array.from(selectedKeys),
+      locale,
+      mode: 'EXPORT',
+    });
+  };
+
+  const handleMarkRenewalOutreachCompleted = () => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(locale === 'my' ? 'Outreach completion မှတ်နေသည်' : 'Marking outreach complete');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    markRenewalOutreachCompletedMutation.mutate({
       ids: Array.from(selectedKeys),
     });
   };
@@ -5013,6 +5236,8 @@ export default function KeysPage() {
     bulkRenewalReminderMutation.isPending ||
     bulkEnableTelegramDeliveryMutation.isPending ||
     bulkGenerateTelegramConnectLinksMutation.isPending ||
+    prepareRenewalOutreachPackMutation.isPending ||
+    markRenewalOutreachCompletedMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
@@ -6509,12 +6734,39 @@ export default function KeysPage() {
               {bulkGenerateTelegramConnectLinksMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LinkCopy className="mr-2 h-4 w-4" />}
               {locale === 'my' ? 'Telegram connect link များ ကူးမည်' : 'Copy connect links'}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyRenewalOutreachPack}
+              disabled={selectedKeys.size === 0 || prepareRenewalOutreachPackMutation.isPending}
+            >
+              {prepareRenewalOutreachPackMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              {locale === 'my' ? 'Outreach message များ ကူးမည်' : 'Copy outreach pack'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportRenewalOutreachCsv}
+              disabled={selectedKeys.size === 0 || prepareRenewalOutreachPackMutation.isPending}
+            >
+              {prepareRenewalOutreachPackMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {locale === 'my' ? 'Outreach CSV ထုတ်မည်' : 'Export outreach CSV'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkRenewalOutreachCompleted}
+              disabled={selectedKeys.size === 0 || markRenewalOutreachCompletedMutation.isPending}
+            >
+              {markRenewalOutreachCompletedMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+              {locale === 'my' ? 'Outreach ပြီးစီးကြောင်း မှတ်မည်' : 'Mark outreach done'}
+            </Button>
           </div>
 
           <p className="text-xs text-muted-foreground">
             {locale === 'my'
-              ? `Renew နှင့် reminder action များ၏ result ကို bulk progress dialog နှင့် audit trail ထဲတွင် ဆက်လက်မြင်နိုင်မည်။ Visible selection ${visibleRenewalQueueSelectedCount} ခု ရွေးထားသည်။`
-              : `Renew and reminder actions feed the existing bulk progress dialog and audit trail. ${visibleRenewalQueueSelectedCount} visible queue items are currently selected.`}
+              ? `Renew, reminder, outreach action များ၏ result ကို bulk progress dialog နှင့် audit trail ထဲတွင် ဆက်လက်မြင်နိုင်မည်။ Visible selection ${visibleRenewalQueueSelectedCount} ခု ရွေးထားသည်။`
+              : `Renew, reminder, and outreach actions feed the existing bulk progress dialog and audit trail. ${visibleRenewalQueueSelectedCount} visible queue items are currently selected.`}
           </p>
         </CardContent>
       </Card>
@@ -6600,6 +6852,7 @@ export default function KeysPage() {
               const { deviceCount, overLimit, stage, stageLabel } = getDeviceLimitVisualState(key);
               const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
               const renewalExceptionMeta = getRenewalExceptionMeta((key as any).renewalException, locale === 'my');
+              const renewalOutreachMeta = getRenewalOutreachMeta((key as any).renewalOutreach, locale === 'my');
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -6684,6 +6937,13 @@ export default function KeysPage() {
                           <p className="text-muted-foreground">{renewalExceptionMeta.detail}</p>
                         </>
                       ) : null}
+                      <Badge
+                        variant="outline"
+                        className={cn('border w-fit', renewalOutreachMeta.badgeClassName)}
+                      >
+                        {renewalOutreachMeta.label}
+                      </Badge>
+                      <p className="text-muted-foreground">{renewalOutreachMeta.detail}</p>
                     </div>
                     {key.maxDevices ? (
                       <div className="flex items-center justify-between text-xs">

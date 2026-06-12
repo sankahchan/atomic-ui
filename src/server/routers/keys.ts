@@ -94,6 +94,11 @@ import {
   type RenewalReminderQuickFilter,
 } from '@/lib/renewal-reminder-tracking';
 import {
+  buildRenewalOutreachSnapshotMap,
+  deriveRenewalOutreachState,
+  RENEWAL_OUTREACH_AUDIT_ACTIONS,
+} from '@/lib/renewal-outreach-tracking';
+import {
   buildTelegramRenewalAutomationSnapshotMap,
   deriveTelegramRenewalReminderExceptionState,
   matchesTelegramRenewalReminderExceptionQuickFilter,
@@ -282,6 +287,16 @@ const bulkTelegramDeliverySchema = z.object({
 });
 
 const bulkTelegramConnectLinksSchema = z.object({
+  ids: z.array(z.string()).min(1),
+});
+
+const bulkRenewalOutreachSchema = z.object({
+  ids: z.array(z.string()).min(1),
+  locale: z.string().optional().nullable(),
+  mode: z.enum(['COPY', 'EXPORT']),
+});
+
+const bulkRenewalOutreachCompletionSchema = z.object({
   ids: z.array(z.string()).min(1),
 });
 
@@ -685,6 +700,7 @@ async function getAccessKeyRenewalQueueStateMaps(
         string,
         ReturnType<typeof deriveTelegramRenewalReminderExceptionState>
       >(),
+      outreachStateById: new Map<string, ReturnType<typeof deriveRenewalOutreachState>>(),
     };
   }
 
@@ -697,6 +713,7 @@ async function getAccessKeyRenewalQueueStateMaps(
           ...RENEWAL_REMINDER_AUDIT_ACTIONS,
           ...RENEWAL_AUDIT_ACTIONS,
           ...TELEGRAM_RENEWAL_REMINDER_EXCEPTION_AUDIT_ACTIONS,
+          ...RENEWAL_OUTREACH_AUDIT_ACTIONS,
         ],
       },
     },
@@ -709,11 +726,13 @@ async function getAccessKeyRenewalQueueStateMaps(
   });
 
   const snapshotMap = buildTelegramRenewalAutomationSnapshotMap(auditRows);
+  const outreachSnapshotMap = buildRenewalOutreachSnapshotMap(auditRows);
   const reminderStateById = new Map<string, ReturnType<typeof deriveRenewalReminderState>>();
   const exceptionStateById = new Map<
     string,
     ReturnType<typeof deriveTelegramRenewalReminderExceptionState>
   >();
+  const outreachStateById = new Map<string, ReturnType<typeof deriveRenewalOutreachState>>();
 
   for (const key of accessKeys) {
     const snapshot = snapshotMap.get(key.id);
@@ -738,11 +757,13 @@ async function getAccessKeyRenewalQueueStateMaps(
         now,
       }),
     );
+    outreachStateById.set(key.id, deriveRenewalOutreachState(outreachSnapshotMap.get(key.id)));
   }
 
   return {
     reminderStateById,
     exceptionStateById,
+    outreachStateById,
   };
 }
 
@@ -760,6 +781,187 @@ function getRenewalReminderCooldownMessage(cooldownUntil: Date) {
     minute: '2-digit',
     hour12: true,
   })} before sending another one.`;
+}
+
+type RenewalOutreachPackItem = {
+  id: string;
+  keyName: string;
+  customer: string;
+  telegramStatus: string;
+  expiry: string;
+  connectLink: string | null;
+  connectLinkExpiresAt: string | null;
+  suggestedMessage: string;
+};
+
+function isMyanmarLocale(locale?: string | null) {
+  return typeof locale === 'string' && locale.toLowerCase().startsWith('my');
+}
+
+function formatRenewalOutreachDate(date: Date) {
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function getRenewalOutreachExpiryLabel(input: {
+  status: string;
+  expiresAt: Date | null;
+  dataLimitBytes: bigint | null;
+  usedBytes: bigint;
+  now: Date;
+  isMyanmar: boolean;
+}) {
+  const isDepleted = input.status === 'DEPLETED'
+    || (input.dataLimitBytes !== null && input.usedBytes >= input.dataLimitBytes);
+  if (isDepleted) {
+    return input.isMyanmar ? 'Data ကုန်နေသည်' : 'Depleted';
+  }
+
+  if (!input.expiresAt) {
+    return input.isMyanmar ? 'သက်တမ်း မသတ်မှတ်ထား' : 'No fixed expiry';
+  }
+
+  const remainingMs = input.expiresAt.getTime() - input.now.getTime();
+  if (remainingMs <= 0) {
+    return input.isMyanmar
+      ? `${formatRenewalOutreachDate(input.expiresAt)} တွင် သက်တမ်းကုန်ပြီး`
+      : `Expired on ${formatRenewalOutreachDate(input.expiresAt)}`;
+  }
+
+  const daysLeft = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+  if (daysLeft <= 1) {
+    return input.isMyanmar
+      ? `${formatRenewalOutreachDate(input.expiresAt)} တွင် သက်တမ်းကုန်မည်`
+      : `Expires ${formatRenewalOutreachDate(input.expiresAt)}`;
+  }
+
+  return input.isMyanmar
+    ? `${daysLeft} ရက်အတွင်း သက်တမ်းကုန်မည် (${formatRenewalOutreachDate(input.expiresAt)})`
+    : `Expires in ${daysLeft} days (${formatRenewalOutreachDate(input.expiresAt)})`;
+}
+
+function getRenewalOutreachTelegramStatusLabel(input: {
+  exceptionState: ReturnType<typeof deriveTelegramRenewalReminderExceptionState>;
+  isMyanmar: boolean;
+}) {
+  const { exceptionState, isMyanmar } = input;
+
+  if (exceptionState.needsTelegramLink && exceptionState.deliveryDisabled) {
+    return isMyanmar
+      ? 'Telegram link မရှိ၊ delivery ပိတ်ထား'
+      : 'Needs Telegram link, delivery disabled';
+  }
+
+  if (exceptionState.needsTelegramLink) {
+    return isMyanmar ? 'Telegram link မရှိသေး' : 'Needs Telegram link';
+  }
+
+  if (exceptionState.deliveryDisabled) {
+    return isMyanmar ? 'Telegram delivery ပိတ်ထား' : 'Linked, delivery disabled';
+  }
+
+  if (exceptionState.reminderFailed) {
+    return isMyanmar ? 'Telegram reminder မအောင်မြင်' : 'Linked, reminder failed';
+  }
+
+  if (exceptionState.automationBlocked) {
+    return isMyanmar ? 'Telegram linked, automation ပိတ်မိ' : 'Linked, automation blocked';
+  }
+
+  return isMyanmar ? 'Telegram linked' : 'Linked and reachable';
+}
+
+function buildRenewalOutreachSuggestedMessage(input: {
+  keyName: string;
+  expiry: string;
+  connectLink: string | null;
+  exceptionState: ReturnType<typeof deriveTelegramRenewalReminderExceptionState>;
+  isMyanmar: boolean;
+}) {
+  if (input.isMyanmar) {
+    const lines = [
+      `မင်္ဂလာပါ။ သင့် key "${input.keyName}" သည် ${input.expiry} ဖြစ်နေပါသည်။`,
+      input.exceptionState.needsTelegramLink && input.connectLink
+        ? `Telegram မှ renewal update များရရန် ဒီ link ကိုဖွင့်ပြီး bot ကိုချိတ်ပါ - ${input.connectLink}`
+        : null,
+      input.exceptionState.reminderFailed
+        ? 'Telegram reminder မရောက်သောကြောင့် manual follow-up လုပ်ပေးထားသည်။'
+        : null,
+      input.exceptionState.deliveryDisabled
+        ? 'ဒီ key အတွက် Telegram delivery ပိတ်ထားသောကြောင့် manual follow-up လုပ်ပေးထားသည်။'
+        : null,
+      'Renew လုပ်လိုပါက reply ပြန်ပေးပါ၊ သို့မဟုတ် support ကို ဆက်သွယ်ပေးပါ။',
+    ];
+
+    return lines.filter(Boolean).join('\n');
+  }
+
+  const lines = [
+    `Hello, your key "${input.keyName}" is currently ${input.expiry}.`,
+    input.exceptionState.needsTelegramLink && input.connectLink
+      ? `To receive renewal updates on Telegram, open this link and start the bot: ${input.connectLink}`
+      : null,
+    input.exceptionState.reminderFailed
+      ? 'Telegram delivery did not reach this key, so this is a manual follow-up.'
+      : null,
+    input.exceptionState.deliveryDisabled
+      ? 'Telegram delivery is currently disabled for this key, so this is a manual follow-up.'
+      : null,
+    'Reply if you want renewal help or need the key extended.',
+  ];
+
+  return lines.filter(Boolean).join('\n');
+}
+
+function buildRenewalOutreachClipboardText(items: RenewalOutreachPackItem[], isMyanmar: boolean) {
+  return items.map((item, index) => [
+    `${index + 1}. ${item.keyName}`,
+    `${isMyanmar ? 'အသုံးပြုသူ' : 'Customer'}: ${item.customer}`,
+    `${isMyanmar ? 'Telegram အခြေအနေ' : 'Telegram status'}: ${item.telegramStatus}`,
+    `${isMyanmar ? 'သက်တမ်း' : 'Expiry'}: ${item.expiry}`,
+    item.connectLink ? `${isMyanmar ? 'Connect link' : 'Connect link'}: ${item.connectLink}` : null,
+    item.connectLinkExpiresAt
+      ? `${isMyanmar ? 'Link သက်တမ်းကုန်မည့်အချိန်' : 'Link expires at'}: ${item.connectLinkExpiresAt}`
+      : null,
+    `${isMyanmar ? 'ပို့ရန်စာ' : 'Suggested message'}:\n${item.suggestedMessage}`,
+  ].filter(Boolean).join('\n')).join('\n\n');
+}
+
+function escapeRenewalOutreachCsvValue(value: string) {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function buildRenewalOutreachCsv(items: RenewalOutreachPackItem[]) {
+  const headers = [
+    'Key Name',
+    'Customer',
+    'Telegram Status',
+    'Expiry',
+    'Connect Link',
+    'Connect Link Expires At',
+    'Suggested Message',
+  ];
+
+  const rows = items.map((item) => [
+    item.keyName,
+    item.customer,
+    item.telegramStatus,
+    item.expiry,
+    item.connectLink ?? '',
+    item.connectLinkExpiresAt ?? '',
+    item.suggestedMessage,
+  ]);
+
+  return [
+    headers.map((header) => escapeRenewalOutreachCsvValue(header)).join(','),
+    ...rows.map((row) => row.map((cell) => escapeRenewalOutreachCsvValue(cell)).join(',')),
+  ].join('\n');
 }
 
 async function resolveAccessKeySlug(requestedSlug: string | null | undefined, name: string, excludeId?: string) {
@@ -1066,6 +1268,7 @@ export const keysRouter = router({
       let keys: ListedAccessKey[] = [];
       let reminderStateById = new Map<string, ReturnType<typeof deriveRenewalReminderState>>();
       let exceptionStateById = new Map<string, ReturnType<typeof deriveTelegramRenewalReminderExceptionState>>();
+      let outreachStateById = new Map<string, ReturnType<typeof deriveRenewalOutreachState>>();
       let renewalReminderSummary = summarizeRenewalReminderStates([]);
       let renewalExceptionSummary = summarizeTelegramRenewalReminderExceptionStates([]);
 
@@ -1194,6 +1397,12 @@ export const keysRouter = router({
             }),
           ]),
         );
+        outreachStateById = new Map(
+          pagedIds.map((accessKeyId) => [
+            accessKeyId,
+            renewalQueueStateMaps.outreachStateById.get(accessKeyId) ?? deriveRenewalOutreachState(null),
+          ]),
+        );
 
         if (pagedIds.length > 0) {
           keys = await db.accessKey.findMany({
@@ -1219,6 +1428,7 @@ export const keysRouter = router({
         const renewalQueueStateMaps = await getAccessKeyRenewalQueueStateMaps(keys, salesSettings, now);
         reminderStateById = renewalQueueStateMaps.reminderStateById;
         exceptionStateById = renewalQueueStateMaps.exceptionStateById;
+        outreachStateById = renewalQueueStateMaps.outreachStateById;
       }
 
       // Calculate usage percentages and remaining time
@@ -1257,6 +1467,7 @@ export const keysRouter = router({
               settings: salesSettings,
               now,
             }),
+          renewalOutreach: outreachStateById.get(key.id) ?? deriveRenewalOutreachState(null),
         };
       });
 
@@ -3063,16 +3274,6 @@ export const keysRouter = router({
           continue;
         }
 
-        if (!key.telegramDeliveryEnabled) {
-          results.failed += 1;
-          results.errors.push({
-            id,
-            name: key.name,
-            error: 'Telegram delivery is disabled for this key.',
-          });
-          continue;
-        }
-
         try {
           const link = await createAccessKeyTelegramConnectLink({
             accessKeyId: key.id,
@@ -3099,6 +3300,257 @@ export const keysRouter = router({
             error: error instanceof Error ? error.message : 'Failed to generate Telegram connect link',
           });
         }
+      }
+
+      return results;
+    }),
+
+  prepareRenewalOutreachPack: adminProcedure
+    .input(bulkRenewalOutreachSchema)
+    .mutation(async ({ ctx, input }) => {
+      const uniqueIds = Array.from(new Set(input.ids));
+      const isMyanmar = isMyanmarLocale(input.locale);
+      const now = new Date();
+      const salesSettings = await getTelegramSalesSettings();
+
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: uniqueIds } },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          owner: true,
+          status: true,
+          expiresAt: true,
+          dataLimitBytes: true,
+          usedBytes: true,
+          telegramId: true,
+          telegramDeliveryEnabled: true,
+          userId: true,
+          user: {
+            select: {
+              email: true,
+              telegramChatId: true,
+            },
+          },
+        },
+      });
+
+      let botUsername: string | null = null;
+      let botUsernameError: string | null = null;
+      const telegramConfig = await getTelegramConfig();
+      if (telegramConfig) {
+        botUsername = await getTelegramBotUsername(telegramConfig.botToken, telegramConfig.botUsername);
+        if (!botUsername) {
+          botUsernameError = 'Unable to resolve the Telegram bot username.';
+        }
+      } else {
+        botUsernameError = 'Telegram bot is not configured.';
+      }
+
+      const queueStateMaps = await getAccessKeyRenewalQueueStateMaps(
+        keys.map((key) => ({
+          id: key.id,
+          status: key.status,
+          expiresAt: key.expiresAt,
+          dataLimitBytes: key.dataLimitBytes,
+          usedBytes: key.usedBytes,
+          telegramDeliveryEnabled: key.telegramDeliveryEnabled,
+          telegramId: key.telegramId,
+          user: key.user,
+        })),
+        salesSettings,
+        now,
+      );
+
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+      const items: RenewalOutreachPackItem[] = [];
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = {
+        success: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      for (const id of uniqueIds) {
+        const key = keysById.get(id);
+
+        if (!key) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: 'Unknown',
+            error: 'Access key not found',
+          });
+          continue;
+        }
+
+        const exceptionState = queueStateMaps.exceptionStateById.get(key.id)
+          ?? deriveTelegramRenewalReminderExceptionState({
+            candidate: {
+              accessKeyId: key.id,
+              keyName: key.name,
+              status: key.status,
+              expiresAt: key.expiresAt,
+              dataLimitBytes: key.dataLimitBytes,
+              usedBytes: key.usedBytes,
+              telegramDeliveryEnabled: key.telegramDeliveryEnabled,
+              destinationChatId: key.telegramId || key.user?.telegramChatId || null,
+            },
+            snapshot: null,
+            settings: salesSettings,
+            now,
+          });
+
+        let connectLink: string | null = null;
+        let connectLinkExpiresAt: string | null = null;
+
+        if (exceptionState.needsTelegramLink) {
+          if (!botUsername) {
+            results.failed += 1;
+            results.errors.push({
+              id: key.id,
+              name: key.name,
+              error: botUsernameError || 'Unable to resolve the Telegram bot username.',
+            });
+            continue;
+          }
+
+          try {
+            const link = await createAccessKeyTelegramConnectLink({
+              accessKeyId: key.id,
+              createdByUserId: ctx.user.id,
+              botUsername,
+              keySnapshot: {
+                id: key.id,
+                userId: key.userId,
+              },
+            });
+            connectLink = link.url;
+            connectLinkExpiresAt = formatRenewalOutreachDate(link.expiresAt);
+          } catch (error) {
+            results.failed += 1;
+            results.errors.push({
+              id: key.id,
+              name: key.name,
+              error: error instanceof Error ? error.message : 'Failed to generate Telegram connect link',
+            });
+            continue;
+          }
+        }
+
+        const customer = key.owner || key.email || key.user?.email || (isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned');
+        const expiry = getRenewalOutreachExpiryLabel({
+          status: key.status,
+          expiresAt: key.expiresAt,
+          dataLimitBytes: key.dataLimitBytes,
+          usedBytes: key.usedBytes,
+          now,
+          isMyanmar,
+        });
+        const telegramStatus = getRenewalOutreachTelegramStatusLabel({
+          exceptionState,
+          isMyanmar,
+        });
+        const suggestedMessage = buildRenewalOutreachSuggestedMessage({
+          keyName: key.name,
+          expiry,
+          connectLink,
+          exceptionState,
+          isMyanmar,
+        });
+
+        items.push({
+          id: key.id,
+          keyName: key.name,
+          customer,
+          telegramStatus,
+          expiry,
+          connectLink,
+          connectLinkExpiresAt,
+          suggestedMessage,
+        });
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: input.mode === 'COPY'
+            ? 'ACCESS_KEY_RENEWAL_OUTREACH_COPIED'
+            : 'ACCESS_KEY_RENEWAL_OUTREACH_EXPORTED',
+          entity: 'ACCESS_KEY',
+          entityId: key.id,
+          details: {
+            bulk: true,
+            batchSize: uniqueIds.length,
+            telegramStatus,
+            connectLinkIncluded: Boolean(connectLink),
+          },
+        });
+
+        results.success += 1;
+      }
+
+      return {
+        ...results,
+        items,
+        clipboardText: buildRenewalOutreachClipboardText(items, isMyanmar),
+        csv: buildRenewalOutreachCsv(items),
+        filename: `renewal-outreach-pack-${now.toISOString().slice(0, 10)}.csv`,
+      };
+    }),
+
+  markRenewalOutreachCompleted: adminProcedure
+    .input(bulkRenewalOutreachCompletionSchema)
+    .mutation(async ({ ctx, input }) => {
+      const uniqueIds = Array.from(new Set(input.ids));
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: uniqueIds } },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = {
+        success: 0,
+        failed: 0,
+        errors: [],
+      };
+
+      for (const id of uniqueIds) {
+        const key = keysById.get(id);
+
+        if (!key) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: 'Unknown',
+            error: 'Access key not found',
+          });
+          continue;
+        }
+
+        await writeAuditLog({
+          userId: ctx.user.id,
+          ip: ctx.clientIp,
+          action: 'ACCESS_KEY_RENEWAL_OUTREACH_COMPLETED',
+          entity: 'ACCESS_KEY',
+          entityId: key.id,
+          details: {
+            bulk: true,
+            batchSize: uniqueIds.length,
+          },
+        });
+
+        results.success += 1;
       }
 
       return results;
@@ -3895,13 +4347,6 @@ export const keysRouter = router({
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Access key not found',
-        });
-      }
-
-      if (!key.telegramDeliveryEnabled) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Telegram delivery is disabled for this key.',
         });
       }
 
