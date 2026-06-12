@@ -24,6 +24,18 @@ export const RENEWAL_OUTREACH_RESULT_OUTCOMES = Object.keys(
 export type RenewalOutreachResultOutcome =
   keyof typeof RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME;
 
+export const RENEWAL_OUTREACH_QUICK_FILTERS = [
+  'outreachNeverPrepared',
+  'outreachPendingResult',
+  'outreachSent',
+  'outreachReplied',
+  'outreachRenewed',
+  'outreachNoResponse',
+  'outreachDone',
+] as const;
+
+export type RenewalOutreachQuickFilter = (typeof RENEWAL_OUTREACH_QUICK_FILTERS)[number];
+
 export const RENEWAL_OUTREACH_RESULT_AUDIT_ACTIONS = Object.values(
   RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME,
 ) as Array<(typeof RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME)[RenewalOutreachResultOutcome]>;
@@ -49,6 +61,17 @@ export type RenewalOutreachState = RenewalOutreachSnapshot & {
   pendingResult: boolean;
   pendingCompletion: boolean;
   neverPrepared: boolean;
+};
+
+export type RenewalOutreachSummary = {
+  tracked: number;
+  neverPrepared: number;
+  pendingResult: number;
+  sent: number;
+  replied: number;
+  renewed: number;
+  noResponse: number;
+  done: number;
 };
 
 export type RenewalOutreachAuditRow = {
@@ -144,6 +167,81 @@ export function deriveRenewalOutreachState(
     pendingCompletion: preparedThisCycle && !resultLoggedThisCycle,
     neverPrepared: !preparedThisCycle,
   };
+}
+
+export function matchesRenewalOutreachQuickFilter(
+  state: RenewalOutreachState,
+  filter: RenewalOutreachQuickFilter,
+) {
+  switch (filter) {
+    case 'outreachNeverPrepared':
+      return state.neverPrepared;
+    case 'outreachPendingResult':
+      return state.pendingResult;
+    case 'outreachSent':
+      return state.resultLoggedThisCycle && state.lastOutcome === 'SENT';
+    case 'outreachReplied':
+      return state.resultLoggedThisCycle && state.lastOutcome === 'REPLIED';
+    case 'outreachRenewed':
+      return state.resultLoggedThisCycle && state.lastOutcome === 'RENEWED';
+    case 'outreachNoResponse':
+      return state.resultLoggedThisCycle && state.lastOutcome === 'NO_RESPONSE';
+    case 'outreachDone':
+      return state.resultLoggedThisCycle && state.lastOutcome === 'DONE';
+    default:
+      return false;
+  }
+}
+
+export function summarizeRenewalOutreachStates(states: Iterable<RenewalOutreachState>): RenewalOutreachSummary {
+  const summary: RenewalOutreachSummary = {
+    tracked: 0,
+    neverPrepared: 0,
+    pendingResult: 0,
+    sent: 0,
+    replied: 0,
+    renewed: 0,
+    noResponse: 0,
+    done: 0,
+  };
+
+  for (const state of states) {
+    if (state.preparedThisCycle) {
+      summary.tracked += 1;
+    } else {
+      summary.neverPrepared += 1;
+    }
+
+    if (state.pendingResult) {
+      summary.pendingResult += 1;
+    }
+
+    if (!state.resultLoggedThisCycle || !state.lastOutcome) {
+      continue;
+    }
+
+    switch (state.lastOutcome) {
+      case 'SENT':
+        summary.sent += 1;
+        break;
+      case 'REPLIED':
+        summary.replied += 1;
+        break;
+      case 'RENEWED':
+        summary.renewed += 1;
+        break;
+      case 'NO_RESPONSE':
+        summary.noResponse += 1;
+        break;
+      case 'DONE':
+        summary.done += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return summary;
 }
 
 function getRenewalOutreachOutcomeForAction(action: string): RenewalOutreachResultOutcome | null {
