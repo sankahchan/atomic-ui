@@ -83,7 +83,7 @@
     "ip-range-check": "^0.2.0",
     "jose": "^6.2.3",
     "lucide-react": "^1.8.0",
-    "next": "15.5.18",
+    "next": "16.2.7",
     "next-themes": "^0.2.1",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.10",
