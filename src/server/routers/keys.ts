@@ -50,7 +50,7 @@ import {
   sendAccessKeySupportMessage,
   sendAccessKeySharePageToTelegram,
 } from '@/lib/services/telegram-bot';
-import { sendTelegramMessage } from '@/lib/services/telegram-runtime';
+import { getTelegramBotUsername, sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import {
   getAccessKeySubscriptionAnalytics,
   SUBSCRIPTION_EVENT_TYPES,
@@ -278,6 +278,10 @@ const bulkRenewalReminderSchema = z.object({
 });
 
 const bulkTelegramDeliverySchema = z.object({
+  ids: z.array(z.string()).min(1),
+});
+
+const bulkTelegramConnectLinksSchema = z.object({
   ids: z.array(z.string()).min(1),
 });
 
@@ -2998,6 +3002,103 @@ export const keysRouter = router({
         });
 
         results.success += 1;
+      }
+
+      return results;
+    }),
+
+  bulkGenerateTelegramConnectLinks: adminProcedure
+    .input(bulkTelegramConnectLinksSchema)
+    .mutation(async ({ ctx, input }) => {
+      const uniqueIds = Array.from(new Set(input.ids));
+      const telegramConfig = await getTelegramConfig();
+      if (!telegramConfig) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Telegram bot is not configured.',
+        });
+      }
+
+      const botUsername = await getTelegramBotUsername(telegramConfig.botToken, telegramConfig.botUsername);
+      if (!botUsername) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Unable to resolve the Telegram bot username.',
+        });
+      }
+
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: uniqueIds } },
+        select: {
+          id: true,
+          name: true,
+          userId: true,
+          telegramDeliveryEnabled: true,
+        },
+      });
+
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+        links: { id: string; name: string; url: string; expiresAt: string }[];
+      } = {
+        success: 0,
+        failed: 0,
+        errors: [],
+        links: [],
+      };
+
+      for (const id of uniqueIds) {
+        const key = keysById.get(id);
+
+        if (!key) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: 'Unknown',
+            error: 'Access key not found',
+          });
+          continue;
+        }
+
+        if (!key.telegramDeliveryEnabled) {
+          results.failed += 1;
+          results.errors.push({
+            id,
+            name: key.name,
+            error: 'Telegram delivery is disabled for this key.',
+          });
+          continue;
+        }
+
+        try {
+          const link = await createAccessKeyTelegramConnectLink({
+            accessKeyId: key.id,
+            createdByUserId: ctx.user.id,
+            botUsername,
+            keySnapshot: {
+              id: key.id,
+              userId: key.userId,
+            },
+          });
+
+          results.success += 1;
+          results.links.push({
+            id: key.id,
+            name: key.name,
+            url: link.url,
+            expiresAt: link.expiresAt.toISOString(),
+          });
+        } catch (error) {
+          results.failed += 1;
+          results.errors.push({
+            id: key.id,
+            name: key.name,
+            error: error instanceof Error ? error.message : 'Failed to generate Telegram connect link',
+          });
+        }
       }
 
       return results;

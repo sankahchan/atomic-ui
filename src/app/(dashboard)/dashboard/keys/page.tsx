@@ -3754,6 +3754,27 @@ const AUTO_SYNC_OPTIONS = [
   { value: 60, label: '60s' },
 ];
 
+type BulkProgressResult = {
+  success: number;
+  failed: number;
+  errors?: { id: string; name: string; error: string }[];
+};
+
+type BulkTelegramConnectLinksResult = BulkProgressResult & {
+  links: { id: string; name: string; url: string; expiresAt: string }[];
+};
+
+function buildBulkTelegramConnectLinksClipboardText(
+  links: BulkTelegramConnectLinksResult['links'],
+  isMyanmar: boolean,
+) {
+  return links.map((link, index) => [
+    `${index + 1}. ${link.name}`,
+    `${isMyanmar ? 'ချိတ်ဆက်ရန် link' : 'Connect link'}: ${link.url}`,
+    `${isMyanmar ? 'သက်တမ်းကုန်မည့်အချိန်' : 'Expires at'}: ${formatDateTime(new Date(link.expiresAt))}`,
+  ].join('\n')).join('\n\n');
+}
+
 export default function KeysPage() {
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -4477,7 +4498,7 @@ export default function KeysPage() {
   const [bulkTagsMode, setBulkTagsMode] = useState<'add' | 'remove'>('add');
   const [bulkProgressDialogOpen, setBulkProgressDialogOpen] = useState(false);
   const [bulkProgressTitle, setBulkProgressTitle] = useState('');
-  const [bulkProgressResults, setBulkProgressResults] = useState<{ success: number; failed: number; errors?: { id: string; name: string; error: string }[] } | null>(null);
+  const [bulkProgressResults, setBulkProgressResults] = useState<BulkProgressResult | null>(null);
   const [keyToDelete, setKeyToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Bulk renew mutation
@@ -4555,6 +4576,49 @@ export default function KeysPage() {
     onError: (error) => {
       toast({
         title: locale === 'my' ? 'Telegram delivery မဖွင့်နိုင်ပါ' : 'Enable Telegram delivery failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
+  const bulkGenerateTelegramConnectLinksMutation = trpc.keys.bulkGenerateTelegramConnectLinks.useMutation({
+    onSuccess: async (result) => {
+      if (result.links.length > 0) {
+        await copyToClipboard(
+          buildBulkTelegramConnectLinksClipboardText(result.links, locale === 'my'),
+          locale === 'my' ? 'Connect link များ ကူးယူပြီးပါပြီ' : 'Connect links copied',
+          locale === 'my'
+            ? `${result.success} ခု၏ Telegram connect link များကို clipboard သို့ ကူးယူပြီးပါပြီ။`
+            : `Copied ${result.success} Telegram connect links to the clipboard.`,
+        );
+      } else {
+        toast({
+          title: locale === 'my' ? 'Connect link မရပါ' : 'Connect links failed',
+          description: locale === 'my'
+            ? 'ကူးယူရန် connect link မရှိပါ။'
+            : 'No Telegram connect links were generated.',
+          variant: 'destructive',
+        });
+      }
+
+      if (result.failed > 0) {
+        toast({
+          title: locale === 'my' ? 'တချို့ connect link များ မရပါ' : 'Some connect links failed',
+          description: locale === 'my'
+            ? `${result.failed} ခုကို မပြင်ဆင်နိုင်ပါ။ bulk result ကို စစ်ဆေးပါ။`
+            : `Failed to prepare ${result.failed} connect links. Check the bulk result for details.`,
+          variant: 'destructive',
+        });
+      }
+
+      setSelectedKeys(new Set());
+      setBulkProgressResults(result);
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'Connect link များ မရပါ' : 'Connect link batch failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -4734,6 +4798,16 @@ export default function KeysPage() {
     setBulkProgressResults(null);
     setBulkProgressDialogOpen(true);
     bulkEnableTelegramDeliveryMutation.mutate({
+      ids: Array.from(selectedKeys),
+    });
+  };
+
+  const handleBulkCopyTelegramConnectLinks = () => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(locale === 'my' ? 'Telegram connect link များ ပြင်ဆင်နေသည်' : 'Preparing Telegram connect links');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    bulkGenerateTelegramConnectLinksMutation.mutate({
       ids: Array.from(selectedKeys),
     });
   };
@@ -4938,6 +5012,7 @@ export default function KeysPage() {
     bulkRenewMutation.isPending ||
     bulkRenewalReminderMutation.isPending ||
     bulkEnableTelegramDeliveryMutation.isPending ||
+    bulkGenerateTelegramConnectLinksMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
@@ -6424,6 +6499,15 @@ export default function KeysPage() {
             >
               {bulkEnableTelegramDeliveryMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Power className="mr-2 h-4 w-4" />}
               {locale === 'my' ? 'Telegram delivery ဖွင့်မည်' : 'Enable Telegram delivery'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBulkCopyTelegramConnectLinks}
+              disabled={selectedKeys.size === 0 || bulkGenerateTelegramConnectLinksMutation.isPending}
+            >
+              {bulkGenerateTelegramConnectLinksMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LinkCopy className="mr-2 h-4 w-4" />}
+              {locale === 'my' ? 'Telegram connect link များ ကူးမည်' : 'Copy connect links'}
             </Button>
           </div>
 

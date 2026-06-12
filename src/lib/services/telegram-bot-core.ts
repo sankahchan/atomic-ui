@@ -5656,18 +5656,17 @@ function buildTelegramCommandUrl(botUsername?: string | null, command?: string |
 export async function createAccessKeyTelegramConnectLink(input: {
   accessKeyId: string;
   createdByUserId?: string | null;
+  botUsername?: string | null;
+  keySnapshot?: {
+    id: string;
+    userId: string | null;
+  };
 }) {
-  const config = await getTelegramConfig();
-  if (!config) {
-    throw new Error('Telegram bot is not configured.');
-  }
-
-  const key = await db.accessKey.findUnique({
+  const key = input.keySnapshot ?? await db.accessKey.findUnique({
     where: { id: input.accessKeyId },
     select: {
       id: true,
       userId: true,
-      name: true,
     },
   });
 
@@ -5675,9 +5674,19 @@ export async function createAccessKeyTelegramConnectLink(input: {
     throw new Error('Access key not found.');
   }
 
-  const botUsername = await getTelegramBotUsername(config.botToken, config.botUsername);
+  let botUsername = input.botUsername?.replace(/^@/, '').trim() ?? '';
   if (!botUsername) {
-    throw new Error('Unable to resolve the Telegram bot username.');
+    const config = await getTelegramConfig();
+    if (!config) {
+      throw new Error('Telegram bot is not configured.');
+    }
+
+    const resolvedBotUsername = await getTelegramBotUsername(config.botToken, config.botUsername);
+    if (!resolvedBotUsername) {
+      throw new Error('Unable to resolve the Telegram bot username.');
+    }
+
+    botUsername = resolvedBotUsername.replace(/^@/, '').trim();
   }
 
   const token = generateRandomString(24);
