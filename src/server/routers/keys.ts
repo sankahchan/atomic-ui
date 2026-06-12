@@ -97,6 +97,8 @@ import {
   buildRenewalOutreachSnapshotMap,
   deriveRenewalOutreachState,
   RENEWAL_OUTREACH_AUDIT_ACTIONS,
+  RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME,
+  type RenewalOutreachResultOutcome,
 } from '@/lib/renewal-outreach-tracking';
 import {
   buildTelegramRenewalAutomationSnapshotMap,
@@ -296,8 +298,10 @@ const bulkRenewalOutreachSchema = z.object({
   mode: z.enum(['COPY', 'EXPORT']),
 });
 
-const bulkRenewalOutreachCompletionSchema = z.object({
+const bulkRenewalOutreachResultSchema = z.object({
   ids: z.array(z.string()).min(1),
+  outcome: z.enum(['DONE', 'SENT', 'REPLIED', 'RENEWED', 'NO_RESPONSE']),
+  note: z.string().trim().max(280).optional().nullable(),
 });
 
 const renewalPresetListSchema = z.object({
@@ -3502,8 +3506,8 @@ export const keysRouter = router({
       };
     }),
 
-  markRenewalOutreachCompleted: adminProcedure
-    .input(bulkRenewalOutreachCompletionSchema)
+  markRenewalOutreachResult: adminProcedure
+    .input(bulkRenewalOutreachResultSchema)
     .mutation(async ({ ctx, input }) => {
       const uniqueIds = Array.from(new Set(input.ids));
       const keys = await db.accessKey.findMany({
@@ -3524,6 +3528,8 @@ export const keysRouter = router({
         failed: 0,
         errors: [],
       };
+      const action = RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME[input.outcome as RenewalOutreachResultOutcome];
+      const note = input.note?.trim() ? input.note.trim() : null;
 
       for (const id of uniqueIds) {
         const key = keysById.get(id);
@@ -3541,12 +3547,14 @@ export const keysRouter = router({
         await writeAuditLog({
           userId: ctx.user.id,
           ip: ctx.clientIp,
-          action: 'ACCESS_KEY_RENEWAL_OUTREACH_COMPLETED',
+          action,
           entity: 'ACCESS_KEY',
           entityId: key.id,
           details: {
             bulk: true,
             batchSize: uniqueIds.length,
+            outcome: input.outcome,
+            ...(note ? { note } : {}),
           },
         });
 

@@ -226,6 +226,16 @@ type DeviceLimitVisualState = {
   deviceLimitAutoDisabledAt?: Date | string | null;
 };
 
+type RenewalOutreachOutcome = 'DONE' | 'SENT' | 'REPLIED' | 'RENEWED' | 'NO_RESPONSE';
+
+const RENEWAL_OUTREACH_OUTCOME_OPTIONS: RenewalOutreachOutcome[] = [
+  'SENT',
+  'REPLIED',
+  'RENEWED',
+  'NO_RESPONSE',
+  'DONE',
+];
+
 function getDeviceLimitVisualState(key: DeviceLimitVisualState) {
   const deviceCount = key.deviceLimitObservedDevices ?? key.estimatedDevices ?? 0;
   const overLimit = key.deviceLimitOverLimit ?? (key.maxDevices != null && deviceCount > key.maxDevices);
@@ -446,32 +456,41 @@ function getRenewalOutreachMeta(
   outreach: {
     lastPreparedAt?: Date | string | null;
     lastCompletedAt?: Date | string | null;
+    lastResultAt?: Date | string | null;
+    lastOutcome?: RenewalOutreachOutcome | null;
     preparedThisCycle?: boolean;
+    resultLoggedThisCycle?: boolean;
     completedThisCycle?: boolean;
+    pendingResult?: boolean;
     pendingCompletion?: boolean;
     neverPrepared?: boolean;
   } | null | undefined,
   isMyanmar: boolean,
 ) {
   const lastPreparedAt = outreach?.lastPreparedAt ? new Date(outreach.lastPreparedAt) : null;
-  const lastCompletedAt = outreach?.lastCompletedAt ? new Date(outreach.lastCompletedAt) : null;
+  const lastResultAt = outreach?.lastResultAt
+    ? new Date(outreach.lastResultAt)
+    : outreach?.lastCompletedAt
+      ? new Date(outreach.lastCompletedAt)
+      : null;
 
-  if (outreach?.completedThisCycle && lastCompletedAt) {
+  if ((outreach?.resultLoggedThisCycle || outreach?.completedThisCycle) && lastResultAt) {
+    const outcomeMeta = getRenewalOutreachOutcomeMeta(outreach?.lastOutcome ?? 'DONE', isMyanmar);
     return {
-      label: isMyanmar ? 'Outreach ပြီးပါပြီ' : 'Outreach done',
+      label: outcomeMeta.label,
       detail: isMyanmar
-        ? `${formatRelativeTime(lastCompletedAt)} manual outreach ပြီးစီးကြောင်း မှတ်ထားသည်။`
-        : `Manual outreach was marked complete ${formatRelativeTime(lastCompletedAt)}.`,
-      badgeClassName: 'border-emerald-500/40 text-emerald-500',
+        ? `${formatRelativeTime(lastResultAt)} ${outcomeMeta.detailMy}`
+        : `${outcomeMeta.detailEn} ${formatRelativeTime(lastResultAt)}.`,
+      badgeClassName: outcomeMeta.badgeClassName,
     };
   }
 
-  if (outreach?.pendingCompletion && lastPreparedAt) {
+  if ((outreach?.pendingResult || outreach?.pendingCompletion) && lastPreparedAt) {
     return {
       label: isMyanmar ? 'Outreach pack ပြင်ပြီး' : 'Outreach prepared',
       detail: isMyanmar
         ? `${formatRelativeTime(lastPreparedAt)} outreach pack ကို ပြင်ထားပြီး complete မမှတ်ရသေးပါ။`
-        : `Outreach material was prepared ${formatRelativeTime(lastPreparedAt)} but not marked complete yet.`,
+        : `Outreach material was prepared ${formatRelativeTime(lastPreparedAt)} but no result is logged yet.`,
       badgeClassName: 'border-sky-500/40 text-sky-500',
     };
   }
@@ -483,6 +502,89 @@ function getRenewalOutreachMeta(
       : 'No manual outreach activity is logged for this renewal cycle yet.',
     badgeClassName: 'border-border/60 text-muted-foreground',
   };
+}
+
+function getRenewalOutreachOutcomeMeta(outcome: RenewalOutreachOutcome, isMyanmar: boolean) {
+  switch (outcome) {
+    case 'SENT':
+      return {
+        label: isMyanmar ? 'Outreach ပို့ပြီး' : 'Outreach sent',
+        detailMy: 'manual outreach ပို့ပြီးကြောင်း မှတ်ထားသည်။',
+        detailEn: 'Manual outreach was logged as sent',
+        badgeClassName: 'border-sky-500/40 text-sky-500',
+      };
+    case 'REPLIED':
+      return {
+        label: isMyanmar ? 'အသုံးပြုသူ ပြန်စာပို့' : 'Customer replied',
+        detailMy: 'အသုံးပြုသူ ပြန်စာပို့ပြီးကြောင်း မှတ်ထားသည်။',
+        detailEn: 'A customer reply was logged',
+        badgeClassName: 'border-emerald-500/40 text-emerald-500',
+      };
+    case 'RENEWED':
+      return {
+        label: isMyanmar ? 'Outreach ပြီး renew ဖြစ်' : 'Renewed after outreach',
+        detailMy: 'manual outreach နောက် renewal ဖြစ်သွားကြောင်း မှတ်ထားသည်။',
+        detailEn: 'A renewal conversion was logged',
+        badgeClassName: 'border-emerald-500/40 text-emerald-500',
+      };
+    case 'NO_RESPONSE':
+      return {
+        label: isMyanmar ? 'ပြန်စာမရှိ' : 'No response',
+        detailMy: 'ပြန်စာမရှိသေးကြောင်း မှတ်ထားသည်။',
+        detailEn: 'No response was logged',
+        badgeClassName: 'border-amber-500/40 text-amber-500',
+      };
+    case 'DONE':
+    default:
+      return {
+        label: isMyanmar ? 'Outreach ပြီးပါပြီ' : 'Outreach done',
+        detailMy: 'manual outreach ပြီးစီးကြောင်း မှတ်ထားသည်။',
+        detailEn: 'Manual outreach was marked complete',
+        badgeClassName: 'border-emerald-500/40 text-emerald-500',
+      };
+  }
+}
+
+function getRenewalOutreachOutcomeOptionLabel(outcome: RenewalOutreachOutcome, isMyanmar: boolean) {
+  switch (outcome) {
+    case 'SENT':
+      return isMyanmar ? 'ပို့ပြီး' : 'Sent';
+    case 'REPLIED':
+      return isMyanmar ? 'ပြန်စာရပြီး' : 'Replied';
+    case 'RENEWED':
+      return isMyanmar ? 'renew ဖြစ်ပြီး' : 'Renewed';
+    case 'NO_RESPONSE':
+      return isMyanmar ? 'ပြန်စာမရှိ' : 'No response';
+    case 'DONE':
+    default:
+      return isMyanmar ? 'ပြီးစီး' : 'Done';
+  }
+}
+
+function getRenewalOutreachOutcomeOptionDescription(outcome: RenewalOutreachOutcome, isMyanmar: boolean) {
+  switch (outcome) {
+    case 'SENT':
+      return isMyanmar
+        ? 'Message ပို့ပြီးကြောင်းကို audit trail ထဲမှာ မှတ်မည်။'
+        : 'Log that the manual outreach message was sent.';
+    case 'REPLIED':
+      return isMyanmar
+        ? 'အသုံးပြုသူ reply ပြန်လာကြောင်းကို မှတ်မည်။'
+        : 'Log that the customer replied after outreach.';
+    case 'RENEWED':
+      return isMyanmar
+        ? 'Outreach နောက် renewal conversion ဖြစ်သွားကြောင်း မှတ်မည်။'
+        : 'Log that the outreach converted into a renewal.';
+    case 'NO_RESPONSE':
+      return isMyanmar
+        ? 'ပြန်စာမရှိသေးကြောင်းကို မှတ်မည်။'
+        : 'Log that no reply has come back yet.';
+    case 'DONE':
+    default:
+      return isMyanmar
+        ? 'Outcome မခွဲဘဲ handled အဖြစ် မှတ်မည်။'
+        : 'Mark the outreach cycle as handled without a specific outcome.';
+  }
 }
 
 function KeyTagChip({
@@ -2658,6 +2760,120 @@ function BulkTagsDialog({
   );
 }
 
+function BulkRenewalOutreachResultDialog({
+  open,
+  onOpenChange,
+  count,
+  onConfirm,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  count: number;
+  onConfirm: (input: { outcome: RenewalOutreachOutcome; note: string | null }) => void;
+  isPending: boolean;
+}) {
+  const { t, locale } = useLocale();
+  const isMyanmar = locale === 'my';
+  const selectedLabel = count === 1 ? t('keys.bulk.selected_singular') : t('keys.bulk.selected_plural');
+  const [outcome, setOutcome] = useState<RenewalOutreachOutcome>('SENT');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (!open) {
+      setOutcome('SENT');
+      setNote('');
+    }
+  }, [open]);
+
+  const handleSubmit = () => {
+    onConfirm({
+      outcome,
+      note: note.trim() ? note.trim() : null,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md overflow-hidden p-0">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+            {isMyanmar ? 'Outreach result မှတ်ရန်' : 'Log outreach result'}
+          </DialogTitle>
+          <DialogDescription>
+            {isMyanmar
+              ? `${count} ${selectedLabel} အတွက် manual outreach outcome ကို audit trail ထဲမှာ မှတ်မည်။`
+              : `Log the manual outreach outcome for ${count} ${selectedLabel} in the audit trail.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>{isMyanmar ? 'Outcome' : 'Outcome'}</DialogSectionTitle>
+              <DialogSectionDescription>
+                {isMyanmar
+                  ? 'ရွေးထားသော outcome ကို selection တစ်ခုလုံးအပေါ် သက်ရောက်စေမည်။'
+                  : 'The selected outcome will be applied to the full current selection.'}
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="renewal-outreach-outcome">{isMyanmar ? 'မှတ်မည့်အခြေအနေ' : 'Result to log'}</Label>
+                <Select value={outcome} onValueChange={(value) => setOutcome(value as RenewalOutreachOutcome)}>
+                  <SelectTrigger id="renewal-outreach-outcome">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RENEWAL_OUTREACH_OUTCOME_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {getRenewalOutreachOutcomeOptionLabel(option, isMyanmar)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {getRenewalOutreachOutcomeOptionDescription(outcome, isMyanmar)}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="renewal-outreach-note">{isMyanmar ? 'မှတ်ချက် (optional)' : 'Note (optional)'}</Label>
+                <Textarea
+                  id="renewal-outreach-note"
+                  value={note}
+                  onChange={(event) => setNote(event.target.value.slice(0, 280))}
+                  placeholder={isMyanmar
+                    ? 'ဥပမာ - Viber မှတစ်ဆင့် follow-up လုပ်ပြီး၊ ညပိုင်းတွင်ပြန်ဆက်မည်'
+                    : 'Optional context for the audit log, for example: followed up via Viber and asked to check again tonight'}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {isMyanmar
+                    ? `${note.length}/280 စာလုံး။ Audit log ထဲတွင် outcome နှင့်အတူ သိမ်းမည်။`
+                    : `${note.length}/280 characters. This note will be stored with the outcome in the audit log.`}
+                </p>
+              </div>
+            </div>
+          </DialogSection>
+        </DialogBody>
+
+        <DialogFooter className="ops-modal-sticky-footer">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {t('keys.cancel')}
+          </Button>
+          <Button onClick={handleSubmit} disabled={isPending}>
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isMyanmar ? 'Result မှတ်မည်' : 'Log result'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /**
  * BulkProgressDialog Component
  *
@@ -3439,8 +3655,12 @@ function KeyRow({
     renewalOutreach?: {
       lastPreparedAt?: Date | null;
       lastCompletedAt?: Date | null;
+      lastResultAt?: Date | null;
+      lastOutcome?: RenewalOutreachOutcome | null;
       preparedThisCycle?: boolean;
+      resultLoggedThisCycle?: boolean;
       completedThisCycle?: boolean;
+      pendingResult?: boolean;
       pendingCompletion?: boolean;
       neverPrepared?: boolean;
     } | null;
@@ -4588,6 +4808,7 @@ export default function KeysPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bulkRenewDialogOpen, setBulkRenewDialogOpen] = useState(false);
   const [bulkTagsDialogOpen, setBulkTagsDialogOpen] = useState(false);
+  const [bulkRenewalOutreachResultDialogOpen, setBulkRenewalOutreachResultDialogOpen] = useState(false);
   const [bulkTagsMode, setBulkTagsMode] = useState<'add' | 'remove'>('add');
   const [bulkProgressDialogOpen, setBulkProgressDialogOpen] = useState(false);
   const [bulkProgressTitle, setBulkProgressTitle] = useState('');
@@ -4787,15 +5008,17 @@ export default function KeysPage() {
     },
   });
 
-  const markRenewalOutreachCompletedMutation = trpc.keys.markRenewalOutreachCompleted.useMutation({
-    onSuccess: async (result) => {
+  const markRenewalOutreachResultMutation = trpc.keys.markRenewalOutreachResult.useMutation({
+    onSuccess: async (result, variables) => {
+      const outcomeLabel = getRenewalOutreachOutcomeOptionLabel(variables.outcome, locale === 'my');
       toast({
-        title: locale === 'my' ? 'Outreach ပြီးစီးကြောင်း မှတ်ပြီးပါပြီ' : 'Outreach marked complete',
+        title: locale === 'my' ? 'Outreach result မှတ်ပြီးပါပြီ' : 'Outreach result logged',
         description: locale === 'my'
-          ? `${result.success} ခုကို handled အဖြစ် မှတ်ပြီးပါပြီ။`
-          : `Marked ${result.success} keys as handled.`,
+          ? `${result.success} ခုကို ${outcomeLabel} အဖြစ် မှတ်ပြီးပါပြီ။`
+          : `Logged ${outcomeLabel.toLowerCase()} for ${result.success} keys.`,
         variant: result.failed > 0 ? 'destructive' : 'default',
       });
+      setBulkRenewalOutreachResultDialogOpen(false);
       setSelectedKeys(new Set());
       setBulkProgressResults(result);
       await Promise.all([
@@ -4807,7 +5030,7 @@ export default function KeysPage() {
     },
     onError: (error) => {
       toast({
-        title: locale === 'my' ? 'Outreach completion မမှတ်နိုင်ပါ' : 'Mark outreach failed',
+        title: locale === 'my' ? 'Outreach result မမှတ်နိုင်ပါ' : 'Log outreach result failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -5025,13 +5248,25 @@ export default function KeysPage() {
     });
   };
 
-  const handleMarkRenewalOutreachCompleted = () => {
+  const handleOpenRenewalOutreachResultDialog = () => {
     if (selectedKeys.size === 0) return;
-    setBulkProgressTitle(locale === 'my' ? 'Outreach completion မှတ်နေသည်' : 'Marking outreach complete');
+    setBulkRenewalOutreachResultDialogOpen(true);
+  };
+
+  const handleMarkRenewalOutreachResult = (input: { outcome: RenewalOutreachOutcome; note: string | null }) => {
+    if (selectedKeys.size === 0) return;
+    setBulkProgressTitle(
+      locale === 'my'
+        ? `Outreach result (${getRenewalOutreachOutcomeOptionLabel(input.outcome, true)}) မှတ်နေသည်`
+        : `Logging outreach result (${getRenewalOutreachOutcomeOptionLabel(input.outcome, false)})`,
+    );
     setBulkProgressResults(null);
     setBulkProgressDialogOpen(true);
-    markRenewalOutreachCompletedMutation.mutate({
+    setBulkRenewalOutreachResultDialogOpen(false);
+    markRenewalOutreachResultMutation.mutate({
       ids: Array.from(selectedKeys),
+      outcome: input.outcome,
+      note: input.note,
     });
   };
 
@@ -5237,7 +5472,7 @@ export default function KeysPage() {
     bulkEnableTelegramDeliveryMutation.isPending ||
     bulkGenerateTelegramConnectLinksMutation.isPending ||
     prepareRenewalOutreachPackMutation.isPending ||
-    markRenewalOutreachCompletedMutation.isPending ||
+    markRenewalOutreachResultMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
@@ -6755,11 +6990,11 @@ export default function KeysPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleMarkRenewalOutreachCompleted}
-              disabled={selectedKeys.size === 0 || markRenewalOutreachCompletedMutation.isPending}
+              onClick={handleOpenRenewalOutreachResultDialog}
+              disabled={selectedKeys.size === 0 || markRenewalOutreachResultMutation.isPending}
             >
-              {markRenewalOutreachCompletedMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-              {locale === 'my' ? 'Outreach ပြီးစီးကြောင်း မှတ်မည်' : 'Mark outreach done'}
+              {markRenewalOutreachResultMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+              {locale === 'my' ? 'Outreach result မှတ်မည်' : 'Log outreach result'}
             </Button>
           </div>
 
@@ -7294,12 +7529,20 @@ export default function KeysPage() {
         isPending={bulkAddTagsMutation.isPending || bulkRemoveTagsMutation.isPending}
       />
 
+      <BulkRenewalOutreachResultDialog
+        open={bulkRenewalOutreachResultDialogOpen}
+        onOpenChange={setBulkRenewalOutreachResultDialogOpen}
+        count={selectedKeys.size}
+        onConfirm={handleMarkRenewalOutreachResult}
+        isPending={markRenewalOutreachResultMutation.isPending}
+      />
+
       <BulkProgressDialog
         open={bulkProgressDialogOpen}
         onOpenChange={setBulkProgressDialogOpen}
         title={bulkProgressTitle}
         results={bulkProgressResults}
-        isPending={bulkToggleStatusMutation.isPending || bulkArchiveMutation.isPending || bulkMoveMutation.isPending}
+        isPending={isBulkBusy}
       />
 
       {/* Bulk Move Dialog */}
