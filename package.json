@@ -78,7 +78,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "date-fns": "^4.3.0",
-    "geist": "^1.7.1",
+    "geist": "^1.7.2",
     "geoip-lite": "^2.0.2",
     "ip-range-check": "^0.2.0",
     "jose": "^6.2.3",
