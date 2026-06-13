@@ -29,6 +29,8 @@ const quickFiltersSchema = z.object({
   outreachRenewed: z.boolean().optional(),
   outreachNoResponse: z.boolean().optional(),
   outreachDone: z.boolean().optional(),
+  outreachOlderThan24h: z.boolean().optional(),
+  outreachOlderThan72h: z.boolean().optional(),
   overDeviceLimit: z.boolean().optional(),
   deviceLimitWarned: z.boolean().optional(),
 });

@@ -228,6 +228,8 @@ type DeviceLimitVisualState = {
 };
 
 type RenewalOutreachOutcome = 'DONE' | 'SENT' | 'REPLIED' | 'RENEWED' | 'NO_RESPONSE';
+type RenewalOutreachAgeQuickFilter = 'outreachOlderThan24h' | 'outreachOlderThan72h';
+type RenewalOutreachLaneFilter = 'stalePendingResult' | 'staleSent' | 'staleNoResponse';
 type RenewalOutreachMetaInput = {
   lastPreparedAt?: Date | string | null;
   lastCompletedAt?: Date | string | null;
@@ -240,6 +242,17 @@ type RenewalOutreachMetaInput = {
   pendingCompletion?: boolean;
   neverPrepared?: boolean;
 } | null | undefined;
+
+type RenewalOutreachStaleSummary = {
+  olderThan24h: number;
+  olderThan72h: number;
+  pendingResult24h: number;
+  pendingResult72h: number;
+  sent24h: number;
+  sent72h: number;
+  noResponse24h: number;
+  noResponse72h: number;
+};
 
 type RenewalOutreachQuickFilter =
   | 'outreachNeverPrepared'
@@ -561,6 +574,25 @@ function getRenewalOutreachAgeMeta(outreach: RenewalOutreachMetaInput) {
     label: relativeTime,
     ...tone,
   };
+}
+
+function getRenewalOutreachStaleLaneCount(
+  summary: RenewalOutreachStaleSummary,
+  lane: RenewalOutreachLaneFilter,
+  ageFilter: RenewalOutreachAgeQuickFilter | null,
+) {
+  const use72h = ageFilter === 'outreachOlderThan72h';
+
+  switch (lane) {
+    case 'stalePendingResult':
+      return use72h ? summary.pendingResult72h : summary.pendingResult24h;
+    case 'staleSent':
+      return use72h ? summary.sent72h : summary.sent24h;
+    case 'staleNoResponse':
+      return use72h ? summary.noResponse72h : summary.noResponse24h;
+    default:
+      return 0;
+  }
 }
 
 function getRenewalOutreachOutcomeMeta(outcome: RenewalOutreachOutcome, isMyanmar: boolean) {
@@ -4236,8 +4268,22 @@ export default function KeysPage() {
             : filters.quickFilters.outreachNoResponse
               ? 'outreachNoResponse'
               : filters.quickFilters.outreachDone
-                ? 'outreachDone'
+              ? 'outreachDone'
                 : null;
+  const activeOutreachAgeFilter: RenewalOutreachAgeQuickFilter | null = filters.quickFilters.outreachOlderThan72h
+    ? 'outreachOlderThan72h'
+    : filters.quickFilters.outreachOlderThan24h
+      ? 'outreachOlderThan24h'
+      : null;
+  const activeOutreachLaneFilter: RenewalOutreachLaneFilter | null = activeOutreachAgeFilter
+    ? activeOutreachStateFilter === 'outreachPendingResult'
+      ? 'stalePendingResult'
+      : activeOutreachStateFilter === 'outreachSent'
+        ? 'staleSent'
+        : activeOutreachStateFilter === 'outreachNoResponse'
+          ? 'staleNoResponse'
+          : null
+    : null;
   const isRenewalQueueDepleted = statusFilter === 'DEPLETED';
   const hasRenewalQueueFilters = Boolean(
     activeRenewalWindow
@@ -4245,6 +4291,7 @@ export default function KeysPage() {
     || activeReminderStateFilter
     || activeExceptionStateFilter
     || activeOutreachStateFilter
+    || activeOutreachAgeFilter
     || isRenewalQueueDepleted,
   );
   const applyTagFilter = useCallback((tag: string) => {
@@ -4301,15 +4348,46 @@ export default function KeysPage() {
     setPage(1);
   }, [setQuickFilter]);
 
+  const setOutreachAgeFilter = useCallback((filter: RenewalOutreachAgeQuickFilter | null) => {
+    setQuickFilter('outreachOlderThan24h', filter === 'outreachOlderThan24h');
+    setQuickFilter('outreachOlderThan72h', filter === 'outreachOlderThan72h');
+    setPage(1);
+  }, [setQuickFilter]);
+
+  const setOutreachLaneFilter = useCallback((filter: RenewalOutreachLaneFilter | null) => {
+    if (!filter) {
+      setOutreachStateFilter(null);
+      setOutreachAgeFilter(null);
+      return;
+    }
+
+    setOutreachAgeFilter(activeOutreachAgeFilter ?? 'outreachOlderThan24h');
+    setOutreachStateFilter(
+      filter === 'stalePendingResult'
+        ? 'outreachPendingResult'
+        : filter === 'staleSent'
+          ? 'outreachSent'
+          : 'outreachNoResponse',
+    );
+  }, [activeOutreachAgeFilter, setOutreachAgeFilter, setOutreachStateFilter]);
+
   const clearRenewalQueueFilters = useCallback(() => {
     setRenewalWindow(null);
     setQuickFilter('telegramLinked', false);
     setReminderStateFilter(null);
     setExceptionStateFilter(null);
     setOutreachStateFilter(null);
+    setOutreachAgeFilter(null);
     setStatusFilter((current) => (current === 'DEPLETED' ? '' : current));
     setPage(1);
-  }, [setQuickFilter, setReminderStateFilter, setExceptionStateFilter, setOutreachStateFilter, setRenewalWindow]);
+  }, [
+    setQuickFilter,
+    setReminderStateFilter,
+    setExceptionStateFilter,
+    setOutreachStateFilter,
+    setOutreachAgeFilter,
+    setRenewalWindow,
+  ]);
 
   const pageSize = 20;
 
@@ -4602,6 +4680,8 @@ export default function KeysPage() {
     outreachRenewed: filters.quickFilters.outreachRenewed || undefined,
     outreachNoResponse: filters.quickFilters.outreachNoResponse || undefined,
     outreachDone: filters.quickFilters.outreachDone || undefined,
+    outreachOlderThan24h: filters.quickFilters.outreachOlderThan24h || undefined,
+    outreachOlderThan72h: filters.quickFilters.outreachOlderThan72h || undefined,
     overDeviceLimit: filters.quickFilters.overDeviceLimit || undefined,
     deviceLimitWarned: filters.quickFilters.deviceLimitWarned || undefined,
     tag: filters.tagFilter || undefined,
@@ -4761,6 +4841,16 @@ export default function KeysPage() {
     renewed: 0,
     noResponse: 0,
     done: 0,
+  };
+  const renewalOutreachStaleSummary: RenewalOutreachStaleSummary = data?.renewalOutreachStaleSummary ?? {
+    olderThan24h: 0,
+    olderThan72h: 0,
+    pendingResult24h: 0,
+    pendingResult72h: 0,
+    sent24h: 0,
+    sent72h: 0,
+    noResponse24h: 0,
+    noResponse72h: 0,
   };
 
   // Helper to check if a key is online using recent server-side session activity.
@@ -5587,6 +5677,8 @@ export default function KeysPage() {
     filters.quickFilters.outreachRenewed ||
     filters.quickFilters.outreachNoResponse ||
     filters.quickFilters.outreachDone ||
+    filters.quickFilters.outreachOlderThan24h ||
+    filters.quickFilters.outreachOlderThan72h ||
     filters.quickFilters.overDeviceLimit ||
     filters.quickFilters.deviceLimitWarned ||
     filters.tagFilter ||
@@ -6323,7 +6415,7 @@ export default function KeysPage() {
           />
         </div>
 
-        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.neverReminded || filters.quickFilters.remindedToday || filters.quickFilters.reminded24hAgo || filters.quickFilters.renewedAfterReminder || filters.quickFilters.needsTelegramLink || filters.quickFilters.deliveryDisabled || filters.quickFilters.reminderFailed || filters.quickFilters.automationBlocked || filters.quickFilters.outreachNeverPrepared || filters.quickFilters.outreachPendingResult || filters.quickFilters.outreachSent || filters.quickFilters.outreachReplied || filters.quickFilters.outreachRenewed || filters.quickFilters.outreachNoResponse || filters.quickFilters.outreachDone || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
+        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.neverReminded || filters.quickFilters.remindedToday || filters.quickFilters.reminded24hAgo || filters.quickFilters.renewedAfterReminder || filters.quickFilters.needsTelegramLink || filters.quickFilters.deliveryDisabled || filters.quickFilters.reminderFailed || filters.quickFilters.automationBlocked || filters.quickFilters.outreachNeverPrepared || filters.quickFilters.outreachPendingResult || filters.quickFilters.outreachSent || filters.quickFilters.outreachReplied || filters.quickFilters.outreachRenewed || filters.quickFilters.outreachNoResponse || filters.quickFilters.outreachDone || filters.quickFilters.outreachOlderThan24h || filters.quickFilters.outreachOlderThan72h || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
           <Button
             variant="ghost"
             size="sm"
@@ -6988,6 +7080,102 @@ export default function KeysPage() {
                   <span className="ml-2 text-xs opacity-80">{renewalOutreachSummary.renewed}</span>
                 </Button>
               </div>
+              <div className="mt-4 border-t border-border/60 pt-4">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {locale === 'my' ? 'ဟောင်းနေသော follow-up lane များ' : 'Stale follow-up lanes'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {locale === 'my'
+                        ? '24 နာရီ၊ 72 နာရီ ကျော်သွားသော unresolved outreach work ကို lane အလိုက် ချက်ချင်းစိစစ်နိုင်သည်။'
+                        : 'Jump straight into unresolved outreach work that has aged past 24 or 72 hours.'}
+                    </p>
+                  </div>
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    {activeOutreachAgeFilter === 'outreachOlderThan72h'
+                      ? (locale === 'my' ? 'လက်ရှိ threshold: 72h+' : 'Current threshold: 72h+')
+                      : activeOutreachAgeFilter === 'outreachOlderThan24h'
+                        ? (locale === 'my' ? 'လက်ရှိ threshold: 24h+' : 'Current threshold: 24h+')
+                        : (locale === 'my' ? 'Threshold: 24h+ / 72h+' : 'Threshold: 24h+ / 72h+')}
+                  </p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    variant={activeOutreachAgeFilter === 'outreachOlderThan24h' ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(activeOutreachAgeFilter === 'outreachOlderThan24h' && 'bg-amber-600 hover:bg-amber-700')}
+                    onClick={() => setOutreachAgeFilter(activeOutreachAgeFilter === 'outreachOlderThan24h' ? null : 'outreachOlderThan24h')}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? '24h ကျော်' : 'Older than 24h'}
+                    <span className="ml-2 text-xs opacity-80">{renewalOutreachStaleSummary.olderThan24h}</span>
+                  </Button>
+                  <Button
+                    variant={activeOutreachAgeFilter === 'outreachOlderThan72h' ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(activeOutreachAgeFilter === 'outreachOlderThan72h' && 'bg-red-600 hover:bg-red-700')}
+                    onClick={() => setOutreachAgeFilter(activeOutreachAgeFilter === 'outreachOlderThan72h' ? null : 'outreachOlderThan72h')}
+                  >
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? '72h ကျော်' : 'Older than 72h'}
+                    <span className="ml-2 text-xs opacity-80">{renewalOutreachStaleSummary.olderThan72h}</span>
+                  </Button>
+                  <Button
+                    variant={activeOutreachLaneFilter === 'stalePendingResult' ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(activeOutreachLaneFilter === 'stalePendingResult' && 'bg-sky-600 hover:bg-sky-700')}
+                    onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'stalePendingResult' ? null : 'stalePendingResult')}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? 'ဟောင်းနေသော awaiting result' : 'Stale awaiting result'}
+                    <span className="ml-2 text-xs opacity-80">
+                      {getRenewalOutreachStaleLaneCount(
+                        renewalOutreachStaleSummary,
+                        'stalePendingResult',
+                        activeOutreachAgeFilter,
+                      )}
+                    </span>
+                  </Button>
+                  <Button
+                    variant={activeOutreachLaneFilter === 'staleSent' ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(activeOutreachLaneFilter === 'staleSent' && 'bg-sky-600 hover:bg-sky-700')}
+                    onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'staleSent' ? null : 'staleSent')}
+                  >
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? 'ဟောင်းနေသော sent' : 'Stale sent'}
+                    <span className="ml-2 text-xs opacity-80">
+                      {getRenewalOutreachStaleLaneCount(
+                        renewalOutreachStaleSummary,
+                        'staleSent',
+                        activeOutreachAgeFilter,
+                      )}
+                    </span>
+                  </Button>
+                  <Button
+                    variant={activeOutreachLaneFilter === 'staleNoResponse' ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(activeOutreachLaneFilter === 'staleNoResponse' && 'bg-amber-600 hover:bg-amber-700')}
+                    onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'staleNoResponse' ? null : 'staleNoResponse')}
+                  >
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? 'ဟောင်းနေသော no response' : 'Stale no response'}
+                    <span className="ml-2 text-xs opacity-80">
+                      {getRenewalOutreachStaleLaneCount(
+                        renewalOutreachStaleSummary,
+                        'staleNoResponse',
+                        activeOutreachAgeFilter,
+                      )}
+                    </span>
+                  </Button>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {locale === 'my'
+                    ? 'Lane filter များက visible queue ကိုသာ ကျဉ်းစေသည်။ အောက်က Select visible page နှင့် bulk outreach/result action များက လက်ရှိ lane အပေါ်မှာပဲ အလုပ်လုပ်မည်။'
+                    : 'Lane filters narrow only the visible queue. Use Select visible page and the bulk outreach/result actions below to work the current lane only.'}
+                </p>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -7172,6 +7360,24 @@ export default function KeysPage() {
             >
               <CheckCircle2 className="mr-2 h-4 w-4" />
               {locale === 'my' ? 'Outreach ပြီးစီး' : 'Outreach done'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachOlderThan24h ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachOlderThan24h && 'bg-amber-600 hover:bg-amber-700')}
+              onClick={() => setOutreachAgeFilter(filters.quickFilters.outreachOlderThan24h ? null : 'outreachOlderThan24h')}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Outreach 24h ကျော်' : 'Outreach older than 24h'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachOlderThan72h ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachOlderThan72h && 'bg-red-600 hover:bg-red-700')}
+              onClick={() => setOutreachAgeFilter(filters.quickFilters.outreachOlderThan72h ? null : 'outreachOlderThan72h')}
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Outreach 72h ကျော်' : 'Outreach older than 72h'}
             </Button>
             {hasRenewalQueueFilters ? (
               <Button variant="ghost" size="sm" onClick={clearRenewalQueueFilters}>

@@ -24,6 +24,14 @@ export const RENEWAL_OUTREACH_RESULT_OUTCOMES = Object.keys(
 export type RenewalOutreachResultOutcome =
   keyof typeof RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME;
 
+export const RENEWAL_OUTREACH_AGE_QUICK_FILTERS = [
+  'outreachOlderThan24h',
+  'outreachOlderThan72h',
+] as const;
+
+export type RenewalOutreachAgeQuickFilter =
+  (typeof RENEWAL_OUTREACH_AGE_QUICK_FILTERS)[number];
+
 export const RENEWAL_OUTREACH_QUICK_FILTERS = [
   'outreachNeverPrepared',
   'outreachPendingResult',
@@ -72,6 +80,17 @@ export type RenewalOutreachSummary = {
   renewed: number;
   noResponse: number;
   done: number;
+};
+
+export type RenewalOutreachStaleSummary = {
+  olderThan24h: number;
+  olderThan72h: number;
+  pendingResult24h: number;
+  pendingResult72h: number;
+  sent24h: number;
+  sent72h: number;
+  noResponse24h: number;
+  noResponse72h: number;
 };
 
 export type RenewalOutreachAuditRow = {
@@ -204,6 +223,45 @@ export function getRenewalOutreachCurrentCycleActivityAt(
   return null;
 }
 
+export function getRenewalOutreachCurrentCycleActivityAgeHours(
+  source?: RenewalOutreachCurrentCycleActivitySource | null,
+  now = new Date(),
+): number | null {
+  const activityAt = getRenewalOutreachCurrentCycleActivityAt(source);
+  if (!activityAt) {
+    return null;
+  }
+
+  return Math.max(0, (now.getTime() - activityAt.getTime()) / (60 * 60 * 1000));
+}
+
+export function isRenewalOutreachFollowUpStale(
+  state: RenewalOutreachState,
+  thresholdHours: number,
+  now = new Date(),
+) {
+  const needsFollowUp =
+    state.pendingResult
+    || (state.resultLoggedThisCycle && (state.lastOutcome === 'SENT' || state.lastOutcome === 'NO_RESPONSE'));
+  const ageHours = getRenewalOutreachCurrentCycleActivityAgeHours(state, now);
+
+  return Boolean(needsFollowUp && ageHours != null && ageHours >= thresholdHours);
+}
+
+export function matchesRenewalOutreachAgeQuickFilter(
+  state: RenewalOutreachState,
+  filter: RenewalOutreachAgeQuickFilter,
+  now = new Date(),
+) {
+  switch (filter) {
+    case 'outreachOlderThan72h':
+      return isRenewalOutreachFollowUpStale(state, 72, now);
+    case 'outreachOlderThan24h':
+    default:
+      return isRenewalOutreachFollowUpStale(state, 24, now);
+  }
+}
+
 export function matchesRenewalOutreachQuickFilter(
   state: RenewalOutreachState,
   filter: RenewalOutreachQuickFilter,
@@ -273,6 +331,70 @@ export function summarizeRenewalOutreachStates(states: Iterable<RenewalOutreachS
         break;
       default:
         break;
+    }
+  }
+
+  return summary;
+}
+
+export function summarizeRenewalOutreachStaleStates(
+  states: Iterable<RenewalOutreachState>,
+  now = new Date(),
+): RenewalOutreachStaleSummary {
+  const summary: RenewalOutreachStaleSummary = {
+    olderThan24h: 0,
+    olderThan72h: 0,
+    pendingResult24h: 0,
+    pendingResult72h: 0,
+    sent24h: 0,
+    sent72h: 0,
+    noResponse24h: 0,
+    noResponse72h: 0,
+  };
+
+  for (const state of states) {
+    const olderThan24h = isRenewalOutreachFollowUpStale(state, 24, now);
+    const olderThan72h = isRenewalOutreachFollowUpStale(state, 72, now);
+
+    if (olderThan24h) {
+      summary.olderThan24h += 1;
+    }
+
+    if (olderThan72h) {
+      summary.olderThan72h += 1;
+    }
+
+    if (state.pendingResult) {
+      if (olderThan24h) {
+        summary.pendingResult24h += 1;
+      }
+      if (olderThan72h) {
+        summary.pendingResult72h += 1;
+      }
+      continue;
+    }
+
+    if (!state.resultLoggedThisCycle || !state.lastOutcome) {
+      continue;
+    }
+
+    if (state.lastOutcome === 'SENT') {
+      if (olderThan24h) {
+        summary.sent24h += 1;
+      }
+      if (olderThan72h) {
+        summary.sent72h += 1;
+      }
+      continue;
+    }
+
+    if (state.lastOutcome === 'NO_RESPONSE') {
+      if (olderThan24h) {
+        summary.noResponse24h += 1;
+      }
+      if (olderThan72h) {
+        summary.noResponse72h += 1;
+      }
     }
   }
 

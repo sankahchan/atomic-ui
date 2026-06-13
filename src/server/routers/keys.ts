@@ -97,10 +97,13 @@ import {
 import {
   buildRenewalOutreachSnapshotMap,
   deriveRenewalOutreachState,
+  matchesRenewalOutreachAgeQuickFilter,
   matchesRenewalOutreachQuickFilter,
   RENEWAL_OUTREACH_AUDIT_ACTIONS,
   RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME,
+  summarizeRenewalOutreachStaleStates,
   summarizeRenewalOutreachStates,
+  type RenewalOutreachAgeQuickFilter,
   type RenewalOutreachQuickFilter,
   type RenewalOutreachResultOutcome,
 } from '@/lib/renewal-outreach-tracking';
@@ -267,6 +270,8 @@ const listKeysSchema = z.object({
   outreachRenewed: z.boolean().optional(),
   outreachNoResponse: z.boolean().optional(),
   outreachDone: z.boolean().optional(),
+  outreachOlderThan24h: z.boolean().optional(),
+  outreachOlderThan72h: z.boolean().optional(),
   // Tag/owner filters
   tag: z.string().optional(),
   owner: z.string().optional(),
@@ -1109,6 +1114,8 @@ export const keysRouter = router({
         outreachRenewed,
         outreachNoResponse,
         outreachDone,
+        outreachOlderThan24h,
+        outreachOlderThan72h,
         tag,
         owner,
         overDeviceLimit,
@@ -1273,11 +1280,17 @@ export const keysRouter = router({
                   : outreachDone
                     ? 'outreachDone'
                     : null;
+      const outreachAgeQuickFilter: RenewalOutreachAgeQuickFilter | null = outreachOlderThan72h
+        ? 'outreachOlderThan72h'
+        : outreachOlderThan24h
+          ? 'outreachOlderThan24h'
+          : null;
 
       const shouldBuildOrderedMatchSet = Boolean(
         reminderQuickFilter
         || exceptionQuickFilter
         || outreachQuickFilter
+        || outreachAgeQuickFilter
         || expiringWindowDays
         || status === 'DEPLETED'
         || telegramLinked
@@ -1310,6 +1323,7 @@ export const keysRouter = router({
       let renewalReminderSummary = summarizeRenewalReminderStates([]);
       let renewalExceptionSummary = summarizeTelegramRenewalReminderExceptionStates([]);
       let renewalOutreachSummary = summarizeRenewalOutreachStates([]);
+      let renewalOutreachStaleSummary = summarizeRenewalOutreachStaleStates([]);
 
       if (shouldBuildOrderedMatchSet) {
         const orderedMatchingKeys = await db.accessKey.findMany({
@@ -1385,6 +1399,13 @@ export const keysRouter = router({
             return false;
           }
 
+          if (
+            outreachAgeQuickFilter
+            && !matchesRenewalOutreachAgeQuickFilter(outreachState, outreachAgeQuickFilter, now)
+          ) {
+            return false;
+          }
+
           return true;
         });
         const prioritizedOrderedIds = filteredOrderedIds.sort((leftId, rightId) => {
@@ -1446,6 +1467,12 @@ export const keysRouter = router({
           prioritizedOrderedIds.map((accessKeyId) => (
             renewalQueueStateMaps.outreachStateById.get(accessKeyId) ?? deriveRenewalOutreachState(null)
           )),
+        );
+        renewalOutreachStaleSummary = summarizeRenewalOutreachStaleStates(
+          prioritizedOrderedIds.map((accessKeyId) => (
+            renewalQueueStateMaps.outreachStateById.get(accessKeyId) ?? deriveRenewalOutreachState(null)
+          )),
+          now,
         );
 
         const pagedIds = prioritizedOrderedIds.slice((page - 1) * pageSize, page * pageSize);
@@ -1596,6 +1623,7 @@ export const keysRouter = router({
         renewalReminderSummary,
         renewalExceptionSummary,
         renewalOutreachSummary,
+        renewalOutreachStaleSummary,
       };
     }),
 
