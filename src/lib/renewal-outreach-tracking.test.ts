@@ -5,7 +5,11 @@ import {
   buildRenewalOutreachSnapshotMap,
   deriveRenewalOutreachState,
   getRenewalOutreachCurrentCycleActivityAt,
+  getRenewalOutreachCurrentCycleActivityAgeHours,
+  isRenewalOutreachFollowUpStale,
+  matchesRenewalOutreachAgeQuickFilter,
   matchesRenewalOutreachQuickFilter,
+  summarizeRenewalOutreachStaleStates,
   summarizeRenewalOutreachStates,
 } from './renewal-outreach-tracking';
 
@@ -158,4 +162,50 @@ test('renewal outreach current-cycle activity prefers result time, then prepared
   assert.equal(getRenewalOutreachCurrentCycleActivityAt(completed)?.toISOString(), resultAt.toISOString());
   assert.equal(getRenewalOutreachCurrentCycleActivityAt(resetAfterRenewal), null);
   assert.equal(getRenewalOutreachCurrentCycleActivityAt(null), null);
+});
+
+test('renewal outreach stale helpers only count unresolved follow-up work by age threshold', () => {
+  const now = new Date('2026-06-13T08:00:00.000Z');
+  const pending36h = deriveRenewalOutreachState({
+    lastPreparedAt: new Date('2026-06-11T20:00:00.000Z'),
+  });
+  const sent80h = deriveRenewalOutreachState({
+    lastPreparedAt: new Date('2026-06-09T23:00:00.000Z'),
+    lastCompletedAt: new Date('2026-06-10T00:00:00.000Z'),
+    lastResultAt: new Date('2026-06-10T00:00:00.000Z'),
+    lastOutcome: 'SENT',
+  });
+  const noResponse30h = deriveRenewalOutreachState({
+    lastPreparedAt: new Date('2026-06-11T01:00:00.000Z'),
+    lastCompletedAt: new Date('2026-06-12T02:00:00.000Z'),
+    lastResultAt: new Date('2026-06-12T02:00:00.000Z'),
+    lastOutcome: 'NO_RESPONSE',
+  });
+  const replied80h = deriveRenewalOutreachState({
+    lastPreparedAt: new Date('2026-06-09T23:00:00.000Z'),
+    lastCompletedAt: new Date('2026-06-10T00:00:00.000Z'),
+    lastResultAt: new Date('2026-06-10T00:00:00.000Z'),
+    lastOutcome: 'REPLIED',
+  });
+
+  assert.equal(getRenewalOutreachCurrentCycleActivityAgeHours(pending36h, now), 36);
+  assert.equal(isRenewalOutreachFollowUpStale(pending36h, 24, now), true);
+  assert.equal(isRenewalOutreachFollowUpStale(pending36h, 72, now), false);
+  assert.equal(matchesRenewalOutreachAgeQuickFilter(sent80h, 'outreachOlderThan24h', now), true);
+  assert.equal(matchesRenewalOutreachAgeQuickFilter(sent80h, 'outreachOlderThan72h', now), true);
+  assert.equal(matchesRenewalOutreachAgeQuickFilter(replied80h, 'outreachOlderThan24h', now), false);
+
+  assert.deepEqual(
+    summarizeRenewalOutreachStaleStates([pending36h, sent80h, noResponse30h, replied80h], now),
+    {
+      olderThan24h: 3,
+      olderThan72h: 1,
+      pendingResult24h: 1,
+      pendingResult72h: 0,
+      sent24h: 1,
+      sent72h: 1,
+      noResponse24h: 1,
+      noResponse72h: 0,
+    },
+  );
 });
