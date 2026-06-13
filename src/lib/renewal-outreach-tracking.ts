@@ -80,6 +80,20 @@ export type RenewalOutreachAuditRow = {
   createdAt: Date;
 };
 
+type RenewalOutreachCurrentCycleActivitySource = Partial<
+  Pick<
+    RenewalOutreachState,
+    | 'lastPreparedAt'
+    | 'lastCompletedAt'
+    | 'lastResultAt'
+    | 'preparedThisCycle'
+    | 'resultLoggedThisCycle'
+    | 'completedThisCycle'
+    | 'pendingResult'
+    | 'pendingCompletion'
+  >
+>;
+
 export function buildRenewalOutreachSnapshotMap(rows: RenewalOutreachAuditRow[]) {
   const snapshots = new Map<string, RenewalOutreachSnapshot>();
 
@@ -167,6 +181,27 @@ export function deriveRenewalOutreachState(
     pendingCompletion: preparedThisCycle && !resultLoggedThisCycle,
     neverPrepared: !preparedThisCycle,
   };
+}
+
+export function getRenewalOutreachCurrentCycleActivityAt(
+  source?: RenewalOutreachCurrentCycleActivitySource | null,
+): Date | null {
+  const lastPreparedAt = source?.lastPreparedAt ?? null;
+  const lastCompletedAt = source?.lastCompletedAt ?? null;
+  const lastResultAt = source?.lastResultAt ?? null;
+
+  if ((source?.resultLoggedThisCycle || source?.completedThisCycle) && (lastResultAt || lastCompletedAt)) {
+    return lastResultAt ?? lastCompletedAt;
+  }
+
+  if (
+    (source?.pendingResult || source?.pendingCompletion || source?.preparedThisCycle)
+    && lastPreparedAt
+  ) {
+    return lastPreparedAt;
+  }
+
+  return null;
 }
 
 export function matchesRenewalOutreachQuickFilter(
