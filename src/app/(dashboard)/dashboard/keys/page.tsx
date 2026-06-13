@@ -228,6 +228,15 @@ type DeviceLimitVisualState = {
 
 type RenewalOutreachOutcome = 'DONE' | 'SENT' | 'REPLIED' | 'RENEWED' | 'NO_RESPONSE';
 
+type RenewalOutreachQuickFilter =
+  | 'outreachNeverPrepared'
+  | 'outreachPendingResult'
+  | 'outreachSent'
+  | 'outreachReplied'
+  | 'outreachRenewed'
+  | 'outreachNoResponse'
+  | 'outreachDone';
+
 const RENEWAL_OUTREACH_OUTCOME_OPTIONS: RenewalOutreachOutcome[] = [
   'SENT',
   'REPLIED',
@@ -4155,12 +4164,28 @@ export default function KeysPage() {
         : filters.quickFilters.automationBlocked
           ? 'automationBlocked'
           : null;
+  const activeOutreachStateFilter: RenewalOutreachQuickFilter | null = filters.quickFilters.outreachNeverPrepared
+    ? 'outreachNeverPrepared'
+    : filters.quickFilters.outreachPendingResult
+      ? 'outreachPendingResult'
+      : filters.quickFilters.outreachSent
+        ? 'outreachSent'
+        : filters.quickFilters.outreachReplied
+          ? 'outreachReplied'
+          : filters.quickFilters.outreachRenewed
+            ? 'outreachRenewed'
+            : filters.quickFilters.outreachNoResponse
+              ? 'outreachNoResponse'
+              : filters.quickFilters.outreachDone
+                ? 'outreachDone'
+                : null;
   const isRenewalQueueDepleted = statusFilter === 'DEPLETED';
   const hasRenewalQueueFilters = Boolean(
     activeRenewalWindow
     || filters.quickFilters.telegramLinked
     || activeReminderStateFilter
     || activeExceptionStateFilter
+    || activeOutreachStateFilter
     || isRenewalQueueDepleted,
   );
   const applyTagFilter = useCallback((tag: string) => {
@@ -4206,14 +4231,26 @@ export default function KeysPage() {
     setPage(1);
   }, [setQuickFilter]);
 
+  const setOutreachStateFilter = useCallback((filter: RenewalOutreachQuickFilter | null) => {
+    setQuickFilter('outreachNeverPrepared', filter === 'outreachNeverPrepared');
+    setQuickFilter('outreachPendingResult', filter === 'outreachPendingResult');
+    setQuickFilter('outreachSent', filter === 'outreachSent');
+    setQuickFilter('outreachReplied', filter === 'outreachReplied');
+    setQuickFilter('outreachRenewed', filter === 'outreachRenewed');
+    setQuickFilter('outreachNoResponse', filter === 'outreachNoResponse');
+    setQuickFilter('outreachDone', filter === 'outreachDone');
+    setPage(1);
+  }, [setQuickFilter]);
+
   const clearRenewalQueueFilters = useCallback(() => {
     setRenewalWindow(null);
     setQuickFilter('telegramLinked', false);
     setReminderStateFilter(null);
     setExceptionStateFilter(null);
+    setOutreachStateFilter(null);
     setStatusFilter((current) => (current === 'DEPLETED' ? '' : current));
     setPage(1);
-  }, [setQuickFilter, setReminderStateFilter, setExceptionStateFilter, setRenewalWindow]);
+  }, [setQuickFilter, setReminderStateFilter, setExceptionStateFilter, setOutreachStateFilter, setRenewalWindow]);
 
   const pageSize = 20;
 
@@ -4490,6 +4527,13 @@ export default function KeysPage() {
     deliveryDisabled: filters.quickFilters.deliveryDisabled || undefined,
     reminderFailed: filters.quickFilters.reminderFailed || undefined,
     automationBlocked: filters.quickFilters.automationBlocked || undefined,
+    outreachNeverPrepared: filters.quickFilters.outreachNeverPrepared || undefined,
+    outreachPendingResult: filters.quickFilters.outreachPendingResult || undefined,
+    outreachSent: filters.quickFilters.outreachSent || undefined,
+    outreachReplied: filters.quickFilters.outreachReplied || undefined,
+    outreachRenewed: filters.quickFilters.outreachRenewed || undefined,
+    outreachNoResponse: filters.quickFilters.outreachNoResponse || undefined,
+    outreachDone: filters.quickFilters.outreachDone || undefined,
     overDeviceLimit: filters.quickFilters.overDeviceLimit || undefined,
     deviceLimitWarned: filters.quickFilters.deviceLimitWarned || undefined,
     tag: filters.tagFilter || undefined,
@@ -4639,6 +4683,16 @@ export default function KeysPage() {
     needsTelegramLink: 0,
     deliveryDisabled: 0,
     automationBlocked: 0,
+  };
+  const renewalOutreachSummary = data?.renewalOutreachSummary ?? {
+    tracked: 0,
+    neverPrepared: 0,
+    pendingResult: 0,
+    sent: 0,
+    replied: 0,
+    renewed: 0,
+    noResponse: 0,
+    done: 0,
   };
 
   // Helper to check if a key is online using recent server-side session activity.
@@ -5458,6 +5512,13 @@ export default function KeysPage() {
     filters.quickFilters.deliveryDisabled ||
     filters.quickFilters.reminderFailed ||
     filters.quickFilters.automationBlocked ||
+    filters.quickFilters.outreachNeverPrepared ||
+    filters.quickFilters.outreachPendingResult ||
+    filters.quickFilters.outreachSent ||
+    filters.quickFilters.outreachReplied ||
+    filters.quickFilters.outreachRenewed ||
+    filters.quickFilters.outreachNoResponse ||
+    filters.quickFilters.outreachDone ||
     filters.quickFilters.overDeviceLimit ||
     filters.quickFilters.deviceLimitWarned ||
     filters.tagFilter ||
@@ -6194,7 +6255,7 @@ export default function KeysPage() {
           />
         </div>
 
-        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.neverReminded || filters.quickFilters.remindedToday || filters.quickFilters.reminded24hAgo || filters.quickFilters.renewedAfterReminder || filters.quickFilters.needsTelegramLink || filters.quickFilters.deliveryDisabled || filters.quickFilters.reminderFailed || filters.quickFilters.automationBlocked || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
+        {(filters.quickFilters.online || filters.quickFilters.expiring3d || filters.quickFilters.expiring7d || filters.quickFilters.expiring14d || filters.quickFilters.overQuota || filters.quickFilters.inactive30d || filters.quickFilters.telegramLinked || filters.quickFilters.neverReminded || filters.quickFilters.remindedToday || filters.quickFilters.reminded24hAgo || filters.quickFilters.renewedAfterReminder || filters.quickFilters.needsTelegramLink || filters.quickFilters.deliveryDisabled || filters.quickFilters.reminderFailed || filters.quickFilters.automationBlocked || filters.quickFilters.outreachNeverPrepared || filters.quickFilters.outreachPendingResult || filters.quickFilters.outreachSent || filters.quickFilters.outreachReplied || filters.quickFilters.outreachRenewed || filters.quickFilters.outreachNoResponse || filters.quickFilters.outreachDone || filters.quickFilters.overDeviceLimit || filters.quickFilters.deviceLimitWarned || filters.tagFilter || filters.ownerFilter || statusFilter === 'DEPLETED') && (
           <Button
             variant="ghost"
             size="sm"
@@ -6763,6 +6824,32 @@ export default function KeysPage() {
                 <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.failed : 0}</p>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Outreach မမှတ်ရသေး' : 'No outreach log'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.neverPrepared : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'ရလဒ်မမှတ်ရသေး' : 'Awaiting result'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.pendingResult : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'အသုံးပြုသူ ပြန်စာပို့' : 'Customer replied'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.replied : 0}</p>
+              </div>
+              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {locale === 'my' ? 'Outreach ပြီး renew ဖြစ်' : 'Renewed after outreach'}
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.renewed : 0}</p>
+              </div>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -6883,6 +6970,69 @@ export default function KeysPage() {
             >
               <Clock className="mr-2 h-4 w-4" />
               {locale === 'my' ? 'Automation ပိတ်မိ' : 'Automation blocked'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachNeverPrepared ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachNeverPrepared && 'bg-slate-600 hover:bg-slate-700')}
+              onClick={() => setOutreachStateFilter(filters.quickFilters.outreachNeverPrepared ? null : 'outreachNeverPrepared')}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Outreach မမှတ်ရသေး' : 'No outreach log'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachPendingResult ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachPendingResult && 'bg-sky-600 hover:bg-sky-700')}
+              onClick={() => setOutreachStateFilter(filters.quickFilters.outreachPendingResult ? null : 'outreachPendingResult')}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'ရလဒ်မမှတ်ရသေး' : 'Awaiting result'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachSent ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachSent && 'bg-sky-600 hover:bg-sky-700')}
+              onClick={() => setOutreachStateFilter(filters.quickFilters.outreachSent ? null : 'outreachSent')}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Outreach ပို့ပြီး' : 'Outreach sent'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachReplied ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachReplied && 'bg-emerald-600 hover:bg-emerald-700')}
+              onClick={() => setOutreachStateFilter(filters.quickFilters.outreachReplied ? null : 'outreachReplied')}
+            >
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'အသုံးပြုသူ ပြန်စာပို့' : 'Customer replied'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachRenewed ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachRenewed && 'bg-emerald-600 hover:bg-emerald-700')}
+              onClick={() => setOutreachStateFilter(filters.quickFilters.outreachRenewed ? null : 'outreachRenewed')}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Outreach ပြီး renew ဖြစ်' : 'Renewed after outreach'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachNoResponse ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachNoResponse && 'bg-amber-600 hover:bg-amber-700')}
+              onClick={() => setOutreachStateFilter(filters.quickFilters.outreachNoResponse ? null : 'outreachNoResponse')}
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'ပြန်စာမရှိ' : 'No response'}
+            </Button>
+            <Button
+              variant={filters.quickFilters.outreachDone ? 'default' : 'outline'}
+              size="sm"
+              className={cn(filters.quickFilters.outreachDone && 'bg-emerald-600 hover:bg-emerald-700')}
+              onClick={() => setOutreachStateFilter(filters.quickFilters.outreachDone ? null : 'outreachDone')}
+            >
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              {locale === 'my' ? 'Outreach ပြီးစီး' : 'Outreach done'}
             </Button>
             {hasRenewalQueueFilters ? (
               <Button variant="ghost" size="sm" onClick={clearRenewalQueueFilters}>

@@ -96,8 +96,11 @@ import {
 import {
   buildRenewalOutreachSnapshotMap,
   deriveRenewalOutreachState,
+  matchesRenewalOutreachQuickFilter,
   RENEWAL_OUTREACH_AUDIT_ACTIONS,
   RENEWAL_OUTREACH_RESULT_ACTIONS_BY_OUTCOME,
+  summarizeRenewalOutreachStates,
+  type RenewalOutreachQuickFilter,
   type RenewalOutreachResultOutcome,
 } from '@/lib/renewal-outreach-tracking';
 import {
@@ -256,6 +259,13 @@ const listKeysSchema = z.object({
   deliveryDisabled: z.boolean().optional(),
   reminderFailed: z.boolean().optional(),
   automationBlocked: z.boolean().optional(),
+  outreachNeverPrepared: z.boolean().optional(),
+  outreachPendingResult: z.boolean().optional(),
+  outreachSent: z.boolean().optional(),
+  outreachReplied: z.boolean().optional(),
+  outreachRenewed: z.boolean().optional(),
+  outreachNoResponse: z.boolean().optional(),
+  outreachDone: z.boolean().optional(),
   // Tag/owner filters
   tag: z.string().optional(),
   owner: z.string().optional(),
@@ -1091,6 +1101,13 @@ export const keysRouter = router({
         deliveryDisabled,
         reminderFailed,
         automationBlocked,
+        outreachNeverPrepared,
+        outreachPendingResult,
+        outreachSent,
+        outreachReplied,
+        outreachRenewed,
+        outreachNoResponse,
+        outreachDone,
         tag,
         owner,
         overDeviceLimit,
@@ -1240,10 +1257,26 @@ export const keysRouter = router({
             : automationBlocked
               ? 'automationBlocked'
               : null;
+      const outreachQuickFilter: RenewalOutreachQuickFilter | null = outreachNeverPrepared
+        ? 'outreachNeverPrepared'
+        : outreachPendingResult
+          ? 'outreachPendingResult'
+          : outreachSent
+            ? 'outreachSent'
+            : outreachReplied
+              ? 'outreachReplied'
+              : outreachRenewed
+                ? 'outreachRenewed'
+                : outreachNoResponse
+                  ? 'outreachNoResponse'
+                  : outreachDone
+                    ? 'outreachDone'
+                    : null;
 
       const shouldBuildOrderedMatchSet = Boolean(
         reminderQuickFilter
         || exceptionQuickFilter
+        || outreachQuickFilter
         || expiringWindowDays
         || status === 'DEPLETED'
         || telegramLinked
@@ -1275,6 +1308,7 @@ export const keysRouter = router({
       let outreachStateById = new Map<string, ReturnType<typeof deriveRenewalOutreachState>>();
       let renewalReminderSummary = summarizeRenewalReminderStates([]);
       let renewalExceptionSummary = summarizeTelegramRenewalReminderExceptionStates([]);
+      let renewalOutreachSummary = summarizeRenewalOutreachStates([]);
 
       if (shouldBuildOrderedMatchSet) {
         const orderedMatchingKeys = await db.accessKey.findMany({
@@ -1331,6 +1365,8 @@ export const keysRouter = router({
               settings: salesSettings,
               now,
             });
+          const outreachState =
+            renewalQueueStateMaps.outreachStateById.get(accessKeyId) ?? deriveRenewalOutreachState(null);
 
           if (reminderQuickFilter && !matchesRenewalReminderQuickFilter(reminderState, reminderQuickFilter)) {
             return false;
@@ -1340,6 +1376,10 @@ export const keysRouter = router({
             exceptionQuickFilter
             && !matchesTelegramRenewalReminderExceptionQuickFilter(exceptionState, exceptionQuickFilter)
           ) {
+            return false;
+          }
+
+          if (outreachQuickFilter && !matchesRenewalOutreachQuickFilter(outreachState, outreachQuickFilter)) {
             return false;
           }
 
@@ -1370,6 +1410,11 @@ export const keysRouter = router({
               settings: salesSettings,
               now,
             })
+          )),
+        );
+        renewalOutreachSummary = summarizeRenewalOutreachStates(
+          filteredOrderedIds.map((accessKeyId) => (
+            renewalQueueStateMaps.outreachStateById.get(accessKeyId) ?? deriveRenewalOutreachState(null)
           )),
         );
 
@@ -1520,6 +1565,7 @@ export const keysRouter = router({
         hasMore: page * pageSize < total,
         renewalReminderSummary,
         renewalExceptionSummary,
+        renewalOutreachSummary,
       };
     }),
 
