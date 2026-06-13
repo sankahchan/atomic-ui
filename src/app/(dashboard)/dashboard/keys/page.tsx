@@ -6742,8 +6742,8 @@ export default function KeysPage() {
               </CardTitle>
               <CardDescription>
                 {locale === 'my'
-                  ? 'Expire နီးနေသော သို့မဟုတ် data ကုန်နေသော key များကို စစ်ပြီး package ဖြင့် renew လုပ်ကာ Telegram reminder ပို့နိုင်သည်။'
-                  : 'Filter expiring or depleted keys, select the current queue, then renew with a package or send Telegram reminders.'}
+                  ? 'Expire နီးနေသော သို့မဟုတ် data ကုန်နေသော key များကို စစ်ပြီး package ဖြင့် renew လုပ်ကာ Telegram reminder ပို့နိုင်သည်။ Priority order သည် first touch မရှိသေးသော key များနှင့် unresolved outreach များကို အရင်တင်ပေးသည်။'
+                  : 'Filter expiring or depleted keys, select the current queue, then renew with a package or send Telegram reminders. Priority order keeps untouched and unresolved outreach work at the top.'}
               </CardDescription>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -6848,6 +6848,77 @@ export default function KeysPage() {
                   {locale === 'my' ? 'Outreach ပြီး renew ဖြစ်' : 'Renewed after outreach'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.renewed : 0}</p>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-background/75 p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">
+                    {locale === 'my' ? 'အလုပ်လမ်းကြောင်း' : 'Queue focus'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'my'
+                      ? 'တစ်ချက်နှိပ်ပြီး first touch, reply စောင့်နေမှု, conversion lane များသို့ တန်းဝင်နိုင်သည်။'
+                      : 'Jump straight into first-touch, waiting-for-reply, and conversion lanes with one click.'}
+                  </p>
+                </div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  {locale === 'my'
+                    ? 'ဦးစားပေး: no log -> pending -> sent -> no response -> converted'
+                    : 'Priority: no log -> pending -> sent -> no response -> converted'}
+                </p>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant={activeOutreachStateFilter === 'outreachNeverPrepared' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachStateFilter === 'outreachNeverPrepared' && 'bg-slate-600 hover:bg-slate-700')}
+                  onClick={() => setOutreachStateFilter(activeOutreachStateFilter === 'outreachNeverPrepared' ? null : 'outreachNeverPrepared')}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'ပထမဆက်သွယ်ရန်' : 'Needs first touch'}
+                  <span className="ml-2 text-xs opacity-80">{renewalOutreachSummary.neverPrepared}</span>
+                </Button>
+                <Button
+                  variant={activeOutreachStateFilter === 'outreachPendingResult' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachStateFilter === 'outreachPendingResult' && 'bg-sky-600 hover:bg-sky-700')}
+                  onClick={() => setOutreachStateFilter(activeOutreachStateFilter === 'outreachPendingResult' ? null : 'outreachPendingResult')}
+                >
+                  <Clock className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'ရလဒ်စောင့်နေသည်' : 'Awaiting result'}
+                  <span className="ml-2 text-xs opacity-80">{renewalOutreachSummary.pendingResult}</span>
+                </Button>
+                <Button
+                  variant={activeOutreachStateFilter === 'outreachSent' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachStateFilter === 'outreachSent' && 'bg-sky-600 hover:bg-sky-700')}
+                  onClick={() => setOutreachStateFilter(activeOutreachStateFilter === 'outreachSent' ? null : 'outreachSent')}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'ပြန်စာစောင့်နေသည်' : 'Waiting for reply'}
+                  <span className="ml-2 text-xs opacity-80">{renewalOutreachSummary.sent}</span>
+                </Button>
+                <Button
+                  variant={activeOutreachStateFilter === 'outreachNoResponse' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachStateFilter === 'outreachNoResponse' && 'bg-amber-600 hover:bg-amber-700')}
+                  onClick={() => setOutreachStateFilter(activeOutreachStateFilter === 'outreachNoResponse' ? null : 'outreachNoResponse')}
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'ပြန်စာမရှိ' : 'No response'}
+                  <span className="ml-2 text-xs opacity-80">{renewalOutreachSummary.noResponse}</span>
+                </Button>
+                <Button
+                  variant={activeOutreachStateFilter === 'outreachRenewed' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachStateFilter === 'outreachRenewed' && 'bg-emerald-600 hover:bg-emerald-700')}
+                  onClick={() => setOutreachStateFilter(activeOutreachStateFilter === 'outreachRenewed' ? null : 'outreachRenewed')}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'Renew ဖြစ်ပြီး' : 'Converted'}
+                  <span className="ml-2 text-xs opacity-80">{renewalOutreachSummary.renewed}</span>
+                </Button>
               </div>
             </div>
           </div>

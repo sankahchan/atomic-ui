@@ -83,6 +83,7 @@ import {
 } from '@/lib/access-key-renewal';
 import { getTelegramSalesSettings, type TelegramSalesSettings } from '@/lib/services/telegram-sales';
 import { resolveAccessKeyRenewalPresets } from '@/lib/renewal-package-presets';
+import { compareRenewalQueuePriority } from '@/lib/renewal-queue-prioritization';
 import {
   deriveRenewalReminderState,
   buildRenewalReminderSnapshotMap,
@@ -1319,6 +1320,7 @@ export const keysRouter = router({
             expiresAt: true,
             usedBytes: true,
             dataLimitBytes: true,
+            createdAt: true,
             telegramDeliveryEnabled: true,
             telegramId: true,
             user: {
@@ -1385,15 +1387,43 @@ export const keysRouter = router({
 
           return true;
         });
+        const prioritizedOrderedIds = filteredOrderedIds.sort((leftId, rightId) => {
+          const leftKey = orderedMatchingKeysById.get(leftId);
+          const rightKey = orderedMatchingKeysById.get(rightId);
+          if (!leftKey || !rightKey) {
+            return 0;
+          }
 
-        total = filteredOrderedIds.length;
+          return compareRenewalQueuePriority(
+            {
+              id: leftKey.id,
+              status: leftKey.status,
+              expiresAt: leftKey.expiresAt,
+              dataLimitBytes: leftKey.dataLimitBytes,
+              usedBytes: leftKey.usedBytes,
+              createdAt: leftKey.createdAt,
+              outreachState: renewalQueueStateMaps.outreachStateById.get(leftId) ?? deriveRenewalOutreachState(null),
+            },
+            {
+              id: rightKey.id,
+              status: rightKey.status,
+              expiresAt: rightKey.expiresAt,
+              dataLimitBytes: rightKey.dataLimitBytes,
+              usedBytes: rightKey.usedBytes,
+              createdAt: rightKey.createdAt,
+              outreachState: renewalQueueStateMaps.outreachStateById.get(rightId) ?? deriveRenewalOutreachState(null),
+            },
+          );
+        });
+
+        total = prioritizedOrderedIds.length;
         renewalReminderSummary = summarizeRenewalReminderStates(
-          filteredOrderedIds.map((accessKeyId) => (
+          prioritizedOrderedIds.map((accessKeyId) => (
             renewalQueueStateMaps.reminderStateById.get(accessKeyId) ?? deriveRenewalReminderState(null)
           )),
         );
         renewalExceptionSummary = summarizeTelegramRenewalReminderExceptionStates(
-          filteredOrderedIds.map((accessKeyId) => (
+          prioritizedOrderedIds.map((accessKeyId) => (
             renewalQueueStateMaps.exceptionStateById.get(accessKeyId)
             ?? deriveTelegramRenewalReminderExceptionState({
               candidate: {
@@ -1413,12 +1443,12 @@ export const keysRouter = router({
           )),
         );
         renewalOutreachSummary = summarizeRenewalOutreachStates(
-          filteredOrderedIds.map((accessKeyId) => (
+          prioritizedOrderedIds.map((accessKeyId) => (
             renewalQueueStateMaps.outreachStateById.get(accessKeyId) ?? deriveRenewalOutreachState(null)
           )),
         );
 
-        const pagedIds = filteredOrderedIds.slice((page - 1) * pageSize, page * pageSize);
+        const pagedIds = prioritizedOrderedIds.slice((page - 1) * pageSize, page * pageSize);
         reminderStateById = new Map(
           pagedIds.map((accessKeyId) => [
             accessKeyId,
