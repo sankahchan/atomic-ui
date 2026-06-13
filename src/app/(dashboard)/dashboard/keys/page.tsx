@@ -128,6 +128,7 @@ import { KeysBulkActionsBar } from './_components/keys-bulk-actions-bar';
 import { RenewKeyDialog, type RenewKeyDialogKeyData } from '@/components/keys/renew-key-dialog';
 import { RenewalPackagePicker } from '@/components/keys/renewal-package-picker';
 import type { RenewalPackagePreset } from '@/lib/renewal-package-presets';
+import { getRenewalOutreachCurrentCycleActivityAt } from '@/lib/renewal-outreach-tracking';
 
 /**
  * Status badge configuration for visual consistency
@@ -227,6 +228,18 @@ type DeviceLimitVisualState = {
 };
 
 type RenewalOutreachOutcome = 'DONE' | 'SENT' | 'REPLIED' | 'RENEWED' | 'NO_RESPONSE';
+type RenewalOutreachMetaInput = {
+  lastPreparedAt?: Date | string | null;
+  lastCompletedAt?: Date | string | null;
+  lastResultAt?: Date | string | null;
+  lastOutcome?: RenewalOutreachOutcome | null;
+  preparedThisCycle?: boolean;
+  resultLoggedThisCycle?: boolean;
+  completedThisCycle?: boolean;
+  pendingResult?: boolean;
+  pendingCompletion?: boolean;
+  neverPrepared?: boolean;
+} | null | undefined;
 
 type RenewalOutreachQuickFilter =
   | 'outreachNeverPrepared'
@@ -462,18 +475,7 @@ function getRenewalExceptionMeta(
 }
 
 function getRenewalOutreachMeta(
-  outreach: {
-    lastPreparedAt?: Date | string | null;
-    lastCompletedAt?: Date | string | null;
-    lastResultAt?: Date | string | null;
-    lastOutcome?: RenewalOutreachOutcome | null;
-    preparedThisCycle?: boolean;
-    resultLoggedThisCycle?: boolean;
-    completedThisCycle?: boolean;
-    pendingResult?: boolean;
-    pendingCompletion?: boolean;
-    neverPrepared?: boolean;
-  } | null | undefined,
+  outreach: RenewalOutreachMetaInput,
   isMyanmar: boolean,
 ) {
   const lastPreparedAt = outreach?.lastPreparedAt ? new Date(outreach.lastPreparedAt) : null;
@@ -510,6 +512,54 @@ function getRenewalOutreachMeta(
       ? 'လက်ရှိ renewal cycle အတွက် manual outreach activity မရှိသေးပါ။'
       : 'No manual outreach activity is logged for this renewal cycle yet.',
     badgeClassName: 'border-border/60 text-muted-foreground',
+  };
+}
+
+function getRenewalOutreachAgeMeta(outreach: RenewalOutreachMetaInput) {
+  const activityAt = getRenewalOutreachCurrentCycleActivityAt({
+    lastPreparedAt: outreach?.lastPreparedAt ? new Date(outreach.lastPreparedAt) : null,
+    lastCompletedAt: outreach?.lastCompletedAt ? new Date(outreach.lastCompletedAt) : null,
+    lastResultAt: outreach?.lastResultAt ? new Date(outreach.lastResultAt) : null,
+    preparedThisCycle: outreach?.preparedThisCycle,
+    resultLoggedThisCycle: outreach?.resultLoggedThisCycle,
+    completedThisCycle: outreach?.completedThisCycle,
+    pendingResult: outreach?.pendingResult,
+    pendingCompletion: outreach?.pendingCompletion,
+  });
+
+  if (!activityAt) {
+    return null;
+  }
+
+  const ageHours = Math.max(0, (Date.now() - activityAt.getTime()) / (60 * 60 * 1000));
+  const outcome = outreach?.lastOutcome ?? null;
+  const needsAttention =
+    outreach?.pendingResult
+    || outreach?.pendingCompletion
+    || outcome === 'SENT'
+    || outcome === 'NO_RESPONSE';
+
+  const tone =
+    !needsAttention
+      ? {
+          badgeClassName: 'border-emerald-500/40 text-emerald-500',
+        }
+      : ageHours >= 72
+        ? {
+            badgeClassName: 'border-red-500/40 text-red-500',
+          }
+        : ageHours >= 24 || outcome === 'NO_RESPONSE'
+          ? {
+              badgeClassName: 'border-amber-500/40 text-amber-500',
+            }
+          : {
+              badgeClassName: 'border-sky-500/40 text-sky-500',
+            };
+
+  const relativeTime = formatRelativeTime(activityAt);
+  return {
+    label: relativeTime,
+    ...tone,
   };
 }
 
@@ -3708,6 +3758,7 @@ function KeyRow({
   const renewalReminderMeta = getRenewalReminderMeta(accessKey.renewalReminder, locale === 'my');
   const renewalExceptionMeta = getRenewalExceptionMeta(accessKey.renewalException, locale === 'my');
   const renewalOutreachMeta = getRenewalOutreachMeta(accessKey.renewalOutreach, locale === 'my');
+  const renewalOutreachAgeMeta = getRenewalOutreachAgeMeta(accessKey.renewalOutreach);
 
   return (
     <tr
@@ -3834,6 +3885,14 @@ function KeyRow({
           >
             {renewalOutreachMeta.label}
           </Badge>
+          {renewalOutreachAgeMeta ? (
+            <Badge
+              variant="outline"
+              className={cn('border text-[11px]', renewalOutreachAgeMeta.badgeClassName)}
+            >
+              {renewalOutreachAgeMeta.label}
+            </Badge>
+          ) : null}
           {accessKey.maxDevices ? (
             <div className="space-y-1">
               <Badge
@@ -4269,6 +4328,7 @@ export default function KeysPage() {
     const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
     const renewalExceptionMeta = getRenewalExceptionMeta((key as any).renewalException, locale === 'my');
     const renewalOutreachMeta = getRenewalOutreachMeta((key as any).renewalOutreach, locale === 'my');
+    const renewalOutreachAgeMeta = getRenewalOutreachAgeMeta((key as any).renewalOutreach);
 
     return (
       <div className="space-y-4">
@@ -4352,6 +4412,14 @@ export default function KeysPage() {
             >
               {renewalOutreachMeta.label}
             </Badge>
+            {renewalOutreachAgeMeta ? (
+              <Badge
+                variant="outline"
+                className={cn('text-[11px]', renewalOutreachAgeMeta.badgeClassName)}
+              >
+                {renewalOutreachAgeMeta.label}
+              </Badge>
+            ) : null}
             {key.maxDevices ? (
               <div className="flex flex-col items-end gap-1">
                 <Badge
@@ -7309,6 +7377,7 @@ export default function KeysPage() {
               const renewalReminderMeta = getRenewalReminderMeta((key as any).renewalReminder, locale === 'my');
               const renewalExceptionMeta = getRenewalExceptionMeta((key as any).renewalException, locale === 'my');
               const renewalOutreachMeta = getRenewalOutreachMeta((key as any).renewalOutreach, locale === 'my');
+              const renewalOutreachAgeMeta = getRenewalOutreachAgeMeta((key as any).renewalOutreach);
 
               return (
                 <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
@@ -7400,6 +7469,14 @@ export default function KeysPage() {
                         {renewalOutreachMeta.label}
                       </Badge>
                       <p className="text-muted-foreground">{renewalOutreachMeta.detail}</p>
+                      {renewalOutreachAgeMeta ? (
+                        <Badge
+                          variant="outline"
+                          className={cn('border w-fit', renewalOutreachAgeMeta.badgeClassName)}
+                        >
+                          {renewalOutreachAgeMeta.label}
+                        </Badge>
+                      ) : null}
                     </div>
                     {key.maxDevices ? (
                       <div className="flex items-center justify-between text-xs">

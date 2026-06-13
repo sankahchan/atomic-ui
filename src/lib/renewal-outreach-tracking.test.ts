@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildRenewalOutreachSnapshotMap,
   deriveRenewalOutreachState,
+  getRenewalOutreachCurrentCycleActivityAt,
   matchesRenewalOutreachQuickFilter,
   summarizeRenewalOutreachStates,
 } from './renewal-outreach-tracking';
@@ -133,4 +134,28 @@ test('renewal outreach quick filters and summaries reflect current-cycle state',
       done: 0,
     },
   );
+});
+
+test('renewal outreach current-cycle activity prefers result time, then prepared time, and clears after renew', () => {
+  const preparedAt = new Date('2026-06-12T02:00:00.000Z');
+  const resultAt = new Date('2026-06-12T05:00:00.000Z');
+
+  const pending = deriveRenewalOutreachState({
+    lastPreparedAt: preparedAt,
+  });
+  const completed = deriveRenewalOutreachState({
+    lastPreparedAt: preparedAt,
+    lastCompletedAt: resultAt,
+    lastResultAt: resultAt,
+    lastOutcome: 'SENT',
+  });
+  const resetAfterRenewal = deriveRenewalOutreachState({
+    lastPreparedAt: preparedAt,
+    lastRenewedAt: new Date('2026-06-12T06:00:00.000Z'),
+  });
+
+  assert.equal(getRenewalOutreachCurrentCycleActivityAt(pending)?.toISOString(), preparedAt.toISOString());
+  assert.equal(getRenewalOutreachCurrentCycleActivityAt(completed)?.toISOString(), resultAt.toISOString());
+  assert.equal(getRenewalOutreachCurrentCycleActivityAt(resetAfterRenewal), null);
+  assert.equal(getRenewalOutreachCurrentCycleActivityAt(null), null);
 });
