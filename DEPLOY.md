@@ -213,9 +213,17 @@ Notes:
 - `PUBLIC_SHARE_DOMAIN` adds a dedicated public-only host for `/s`, `/sub`, `/c`, `/api/subscription/*`, and `/api/sub/*`.
 - `ALLOW_IP_FALLBACK=true` keeps the original server IP reachable in parallel. Set it to `false` if you want raw IP traffic redirected to the domain instead.
 - Domain certificates use the standard Let's Encrypt flow through `certbot`.
-- Auto-renew is handled by `certbot.timer`.
+- Auto-renew is handled by `atomic-ui-domain-cert-renew.timer`, which runs `certbot renew` twice daily and reloads nginx through a deploy hook whenever a certificate changes.
 - On the public share host, nginx blocks admin routes like `/login`, `/dashboard`, and `/settings` with `404`.
 - Make sure the `share` DNS record already points at your VPS before the HTTPS script runs, or certificate issuance for the public share host will fail.
+
+For an existing domain-based VPS that was installed before this timer existed, sync the renewal units once:
+
+```bash
+sudo APP_DIR=/opt/atomic-ui bash scripts/sync-https-renewal.sh
+```
+
+Regular `scripts/deploy-vps.sh` deploys also run this sync step automatically after the app comes back up.
 
 ## Updates
 To update the application:

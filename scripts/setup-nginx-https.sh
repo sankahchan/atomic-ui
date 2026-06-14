@@ -547,6 +547,13 @@ issue_domain_certificate() {
     --keep-until-expiring
 }
 
+sync_domain_renewal() {
+  APP_DIR="${APP_DIR:-$(pwd)}" \
+  PANEL_DOMAIN="${PANEL_DOMAIN}" \
+  PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN}" \
+  bash "$(dirname "$0")/sync-https-renewal.sh"
+}
+
 configure_ip_renewal() {
   cat >/etc/systemd/system/atomic-ui-cert-renew.service <<EOF
 [Unit]
@@ -738,9 +745,7 @@ if [[ "${issue_share_domain_cert}" == "true" ]]; then
   issue_domain_certificate "${PUBLIC_SHARE_DOMAIN}"
 fi
 
-if [[ "${issue_panel_domain_cert}" == "true" || "${issue_share_domain_cert}" == "true" ]]; then
-  systemctl enable --now certbot.timer >/dev/null 2>&1 || true
-fi
+sync_domain_renewal
 
 if [[ "${issue_ip_cert}" == "true" ]]; then
   issue_ip_certificate
