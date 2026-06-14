@@ -4237,6 +4237,7 @@ export default function KeysPage() {
   const isRenewalWorkspace = pathname === '/dashboard/renewal' || searchParams.get('workspace') === 'renewal';
   const persistedFilterPageKey = isRenewalWorkspace ? 'access-keys-renewal' : 'access-keys';
   const showRenewalOpsFilters = isRenewalWorkspace;
+  const effectiveViewMode = isRenewalWorkspace ? 'list' : viewMode;
   const inventoryWorkspaceHref = '/dashboard/keys';
   const renewalWorkspaceHref = '/dashboard/renewal';
   const workspaceTitle = isRenewalWorkspace ? (locale === 'my' ? 'Renewal Ops' : 'Renewal Ops') : t('keys.title');
@@ -5951,11 +5952,11 @@ export default function KeysPage() {
                   {fillTemplate(t('keys.activity.summary'), { count: onlineCount })}
                 </span>
                 <span className="ops-pill">
-                  {isRenewalWorkspace ? <Smartphone className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                  {isRenewalWorkspace ? <Clock className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
                   {isRenewalWorkspace
                     ? locale === 'my'
-                      ? `သတိပေးချက် ${stats?.deviceLimitWarned ?? 0} ခု ပို့ထားသည်`
-                      : `${stats?.deviceLimitWarned ?? 0} warnings sent`
+                      ? `Follow-up လိုအပ် ${renewalReminderSummary.pendingFollowUp} ခု`
+                      : `${renewalReminderSummary.pendingFollowUp} follow-up due`
                     : locale === 'my'
                       ? `24 နာရီအတွင်း expire မည့် သော့ ${stats?.expiringIn24h ?? 0} ခု`
                       : `${stats?.expiringIn24h ?? 0} expiring in 24h`}
@@ -5965,62 +5966,130 @@ export default function KeysPage() {
           </div>
 
           <div className="ops-hero-aside space-y-4">
-            <div className="space-y-1">
-              <p className="ops-section-heading">{locale === 'my' ? 'စာရင်းအကျဉ်းချုပ်' : 'Inventory overview'}</p>
-                          <p className="text-sm font-semibold">{locale === 'my' ? 'လက်ရှိ အသုံးပြုခွင့်သော့ အခြေအနေ' : 'Live access key state'}</p>
-              <p className="text-sm text-muted-foreground">
-                {locale === 'my'
-                  ? 'အောက်ပါ အချက်ပြမှုများက ယခုစာရင်းအတွက် ချက်ချင်း လုပ်ဆောင်ရန် လိုအပ်မှု ရှိ/မရှိကို ပြသပေးသည်။'
-                  : 'The signals below tell you whether the list needs action right now.'}
-              </p>
-            </div>
+            {isRenewalWorkspace ? (
+              <>
+                <div className="space-y-1">
+                  <p className="ops-section-heading">{locale === 'my' ? 'Renewal overview' : 'Renewal overview'}</p>
+                  <p className="text-sm font-semibold">{locale === 'my' ? 'ယခုဦးစားပေး လုပ်ဆောင်ရမည့် lane များ' : 'Operator priorities right now'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {locale === 'my'
+                      ? 'အောက်ပါအရေအတွက်များက reminder, follow-up, Telegram recovery နှင့် outreach result များထဲမှ ဘယ် lane ကို အရင်လုပ်သင့်သည်ကို ပြသည်။'
+                      : 'These counts tell you which reminder, recovery, and outreach lane needs work first.'}
+                  </p>
+                </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="ops-kpi-tile p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'အသုံးပြုနိုင်သော သော့များ' : 'Active keys'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {locale === 'my' ? `စုစုပေါင်း သော့ ${stats?.total ?? 0} ခု` : `${stats?.total ?? 0} total keys`}
-                </p>
-              </div>
-              <div className="ops-kpi-tile p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'မကြာသေးမီ ဒေတာအသွားအလာ' : 'Recent traffic'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{locale === 'my' ? 'လက်ရှိအသုံးပြုမှု ရှိသော သော့များ' : 'Keys with live activity'}</p>
-              </div>
-              <div className="ops-kpi-tile p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'စက်ကန့်သတ်ချက်' : 'Device caps'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold leading-none">{stats?.deviceLimitOverLimit ?? 0}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{locale === 'my' ? 'လက်ရှိ ကန့်သတ်ချက် ကျော်နေသည်' : 'Currently over the limit'}</p>
-              </div>
-              <div className="ops-kpi-tile p-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'စာရင်း အကျယ်အဝန်း' : 'List scope'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold leading-none">
-                  {hasAnyFilters ? (locale === 'my' ? 'စစ်ထုတ်ထား' : 'Filtered') : locale === 'my' ? 'အပြည့်' : 'Full'}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {hasAnyFilters
-                    ? locale === 'my'
-                      ? 'စစ်ထုတ်မှုများကြောင့် စာရင်းကို ကျဉ်းအောင် ပြထားသည်'
-                      : 'Filters are narrowing the table'
-                    : locale === 'my'
-                      ? 'စာရင်းအားလုံးကို အပြည့်အဝ မြင်နေရသည်'
-                      : 'You are seeing the complete inventory'}
-                </p>
-              </div>
-            </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'Queue စုစုပေါင်း' : 'Queue total'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{data?.total ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {locale === 'my' ? `${visibleRenewalQueueItems.length} ခု လက်ရှိမြင်နေရသည်` : `${visibleRenewalQueueItems.length} visible right now`}
+                    </p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'Reminder ရနိုင်' : 'Reminder-ready'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{visibleRenewalReminderEligibleCount}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {locale === 'my' ? 'Telegram ချိတ်ထားပြီး cooldown မရှိသေးသော key များ' : 'Keys that can take a reminder right now'}
+                    </p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{renewalReminderSummary.pendingFollowUp}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {locale === 'my' ? 'တစ်ကြိမ် reminder ပို့ပြီး နောက်ထပ်ဆက်လုပ်ရန်လိုသော lane' : 'Reminder lanes that need the next touch'}
+                    </p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'ရလဒ်မမှတ်ရသေး' : 'Awaiting result'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{renewalOutreachSummary.pendingResult}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {locale === 'my' ? 'Outreach လုပ်ပြီး result မမှတ်ရသေးသော key များ' : 'Outreach already happened, but the result is still missing'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="ops-support-card">
+                  <p className="text-sm font-semibold">{locale === 'my' ? 'Telegram recovery' : 'Telegram recovery'}</p>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-2xl font-semibold">{renewalExceptionSummary.needsTelegramLink}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {locale === 'my' ? 'Telegram link မရှိသေးသဖြင့် reminder မပို့နိုင်သေးသော key များ' : 'Keys blocked because the customer still needs a Telegram link'}
+                      </p>
+                    </div>
+                    <LinkCopy className="h-5 w-5 text-violet-400" />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <p className="ops-section-heading">{locale === 'my' ? 'စာရင်းအကျဉ်းချုပ်' : 'Inventory overview'}</p>
+                  <p className="text-sm font-semibold">{locale === 'my' ? 'လက်ရှိ အသုံးပြုခွင့်သော့ အခြေအနေ' : 'Live access key state'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {locale === 'my'
+                      ? 'အောက်ပါ အချက်ပြမှုများက ယခုစာရင်းအတွက် ချက်ချင်း လုပ်ဆောင်ရန် လိုအပ်မှု ရှိ/မရှိကို ပြသပေးသည်။'
+                      : 'The signals below tell you whether the list needs action right now.'}
+                  </p>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'အသုံးပြုနိုင်သော သော့များ' : 'Active keys'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.active ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {locale === 'my' ? `စုစုပေါင်း သော့ ${stats?.total ?? 0} ခု` : `${stats?.total ?? 0} total keys`}
+                    </p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'မကြာသေးမီ ဒေတာအသွားအလာ' : 'Recent traffic'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{onlineCount}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{locale === 'my' ? 'လက်ရှိအသုံးပြုမှု ရှိသော သော့များ' : 'Keys with live activity'}</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'စက်ကန့်သတ်ချက်' : 'Device caps'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">{stats?.deviceLimitOverLimit ?? 0}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{locale === 'my' ? 'လက်ရှိ ကန့်သတ်ချက် ကျော်နေသည်' : 'Currently over the limit'}</p>
+                  </div>
+                  <div className="ops-kpi-tile p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      {locale === 'my' ? 'စာရင်း အကျယ်အဝန်း' : 'List scope'}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold leading-none">
+                      {hasAnyFilters ? (locale === 'my' ? 'စစ်ထုတ်ထား' : 'Filtered') : locale === 'my' ? 'အပြည့်' : 'Full'}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {hasAnyFilters
+                        ? locale === 'my'
+                          ? 'စစ်ထုတ်မှုများကြောင့် စာရင်းကို ကျဉ်းအောင် ပြထားသည်'
+                          : 'Filters are narrowing the table'
+                        : locale === 'my'
+                          ? 'စာရင်းအားလုံးကို အပြည့်အဝ မြင်နေရသည်'
+                          : 'You are seeing the complete inventory'}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {stats && (
+        {stats && !isRenewalWorkspace && (
           <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
             <div className="ops-kpi-tile p-3.5">
               <div className="flex items-center gap-2">
@@ -6079,48 +6148,7 @@ export default function KeysPage() {
           </div>
         )}
 
-        {stats && showRenewalOpsFilters ? (
-          <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
-            <div className="ops-kpi-tile p-3.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-violet-500/20 bg-violet-500/10">
-                  <Smartphone className="h-4 w-4 text-violet-300" />
-                </div>
-                <p className="text-xs font-medium text-violet-300">{locale === 'my' ? 'စက်ကန့်သတ်ချက် ကျော်လွန်' : 'Over device limit'}</p>
-              </div>
-              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitOverLimit ?? 0}</p>
-            </div>
-            <div className="ops-kpi-tile p-3.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-amber-500/20 bg-amber-500/10">
-                  <AlertTriangle className="h-4 w-4 text-amber-300" />
-                </div>
-                <p className="text-xs font-medium text-amber-300">{locale === 'my' ? 'သတိပေးချက် ပို့ထား' : 'Warning sent'}</p>
-              </div>
-              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitWarned ?? 0}</p>
-            </div>
-            <div className="ops-kpi-tile p-3.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-fuchsia-500/20 bg-fuchsia-500/10">
-                  <Clock className="h-4 w-4 text-fuchsia-300" />
-                </div>
-                <p className="text-xs font-medium text-fuchsia-300">Pending disable</p>
-              </div>
-              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitPendingDisable ?? 0}</p>
-            </div>
-            <div className="ops-kpi-tile p-3.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[0.9rem] border border-red-500/20 bg-red-500/10">
-                  <Power className="h-4 w-4 text-red-300" />
-                </div>
-                <p className="text-xs font-medium text-red-300">Auto-disabled</p>
-              </div>
-              <p className="mt-3 text-[1.45rem] font-semibold leading-none">{stats.deviceLimitAutoDisabled ?? 0}</p>
-            </div>
-          </div>
-        ) : null}
-
-        {stats ? (
+        {stats && !isRenewalWorkspace ? (
           <div className="rounded-[1.35rem] border border-border/60 bg-background/55 p-3.5 dark:bg-white/[0.02]">
             <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
               <div>
@@ -6223,45 +6251,47 @@ export default function KeysPage() {
           </Button>
         </div>
 
-        <div className="ops-table-toolbar md:hidden">
-          <div className="flex flex-1 items-center justify-center rounded-[0.95rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
+        {!isRenewalWorkspace ? (
+          <div className="ops-table-toolbar md:hidden">
+            <div className="flex flex-1 items-center justify-center rounded-[0.95rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
+              <Button
+                variant={effectiveViewMode === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-9 flex-1 rounded-[0.8rem] px-2"
+                onClick={() => setViewMode('list')}
+              >
+                <LayoutList className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={effectiveViewMode === 'grid' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-9 flex-1 rounded-[0.8rem] px-2"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={effectiveViewMode === 'group' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-9 flex-1 rounded-[0.8rem] px-2"
+                onClick={() => setViewMode('group')}
+                title={t('keys.view.group_by_server')}
+              >
+                <ListIcon className="w-4 h-4" />
+              </Button>
+            </div>
+
             <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-9 flex-1 rounded-[0.8rem] px-2"
-              onClick={() => setViewMode('list')}
+              variant="outline"
+              className="h-9 flex-1 rounded-[0.95rem] text-xs font-medium"
+              onClick={() => syncAllMutation.mutate()}
+              disabled={syncAllMutation.isPending}
             >
-              <LayoutList className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-9 flex-1 rounded-[0.8rem] px-2"
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'group' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-9 flex-1 rounded-[0.8rem] px-2"
-              onClick={() => setViewMode('group')}
-              title={t('keys.view.group_by_server')}
-            >
-              <ListIcon className="w-4 h-4" />
+              <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
+              {syncAllMutation.isPending ? t('keys.syncing') : t('keys.sync')}
             </Button>
           </div>
-
-          <Button
-            variant="outline"
-            className="h-9 flex-1 rounded-[0.95rem] text-xs font-medium"
-            onClick={() => syncAllMutation.mutate()}
-            disabled={syncAllMutation.isPending}
-          >
-            <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {syncAllMutation.isPending ? t('keys.syncing') : t('keys.sync')}
-          </Button>
-        </div>
+        ) : null}
 
         {(autoRefresh.isActive || hasAnyFilters || !!stats) && (
           <div className="ops-table-meta text-xs text-muted-foreground">
@@ -6288,6 +6318,7 @@ export default function KeysPage() {
       </div>
 
       {/* Quick Filter Pills */}
+      {!isRenewalWorkspace ? (
       <div className="ops-chip-cloud hidden md:flex">
         <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t('keys.quick_filters.label')}:</span>
         <div className="mr-1.5 inline-flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-medium text-cyan-100">
@@ -6507,6 +6538,7 @@ export default function KeysPage() {
           </Button>
         )}
       </div>
+      ) : null}
 
       {/* Filters */}
       <div className="ops-table-toolbar hidden md:flex md:gap-2">
@@ -6580,97 +6612,99 @@ export default function KeysPage() {
           </Button>
         )}
 
-        {/* Export dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-10 rounded-[1rem] px-3.5 text-xs font-medium" disabled={!!exportingFormat}>
-              {exportingFormat ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4 mr-2" />
-              )}
-              {exportingFormat
-                ? fillTemplate(t('keys.exporting'), { format: exportingFormat.toUpperCase() })
-                : t('keys.export')}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleExport('json')} disabled={!!exportingFormat}>
-              <FileJson className="w-4 h-4 mr-2" />
-              {t('keys.export_json')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport('csv')} disabled={!!exportingFormat}>
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              {t('keys.export_csv')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!isRenewalWorkspace ? (
+          <>
+            {/* Export dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 rounded-[1rem] px-3.5 text-xs font-medium" disabled={!!exportingFormat}>
+                  {exportingFormat ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  {exportingFormat
+                    ? fillTemplate(t('keys.exporting'), { format: exportingFormat.toUpperCase() })
+                    : t('keys.export')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('json')} disabled={!!exportingFormat}>
+                  <FileJson className="w-4 h-4 mr-2" />
+                  {t('keys.export_json')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('csv')} disabled={!!exportingFormat}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  {t('keys.export_csv')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          {/* View mode toggle - visible on all screens */}
-          <div className="flex items-center rounded-[0.95rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
-            <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-9 rounded-[0.75rem] px-2.5"
-              onClick={() => setViewMode('list')}
-            >
-              <LayoutList className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-9 rounded-[0.75rem] px-2.5"
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'group' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-9 rounded-[0.75rem] px-2.5"
-              onClick={() => setViewMode('group')}
-              title={t('keys.view.group_by_server')}
-            >
-              <ListIcon className="w-4 h-4" />
-            </Button>
-          </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <div className="flex items-center rounded-[0.95rem] border border-border/60 bg-background/55 p-0.5 dark:bg-white/[0.02]">
+                <Button
+                  variant={effectiveViewMode === 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-9 rounded-[0.75rem] px-2.5"
+                  onClick={() => setViewMode('list')}
+                >
+                  <LayoutList className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={effectiveViewMode === 'grid' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-9 rounded-[0.75rem] px-2.5"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={effectiveViewMode === 'group' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-9 rounded-[0.75rem] px-2.5"
+                  onClick={() => setViewMode('group')}
+                  title={t('keys.view.group_by_server')}
+                >
+                  <ListIcon className="w-4 h-4" />
+                </Button>
+              </div>
 
-          {/* Auto-sync selector */}
-          <div className="flex items-center gap-1 rounded-[0.95rem] border border-border/60 bg-background/55 px-2 py-1 dark:bg-white/[0.02]">
-            <RefreshCw className={cn('w-4 h-4 text-muted-foreground', syncAllMutation.isPending && 'animate-spin')} />
-            <Select
-              value={autoRefresh.interval.toString()}
-              onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
-            >
-              <SelectTrigger className="h-8 w-[78px] rounded-[0.8rem] border-0 bg-transparent shadow-none focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AUTO_SYNC_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value.toString()}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {autoRefresh.isActive && (
-              <span className="min-w-[24px] text-[11px] text-muted-foreground">
-                {autoRefresh.countdown}s
-              </span>
-            )}
-          </div>
+              <div className="flex items-center gap-1 rounded-[0.95rem] border border-border/60 bg-background/55 px-2 py-1 dark:bg-white/[0.02]">
+                <RefreshCw className={cn('w-4 h-4 text-muted-foreground', syncAllMutation.isPending && 'animate-spin')} />
+                <Select
+                  value={autoRefresh.interval.toString()}
+                  onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
+                >
+                  <SelectTrigger className="h-8 w-[78px] rounded-[0.8rem] border-0 bg-transparent shadow-none focus:ring-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AUTO_SYNC_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value.toString()}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {autoRefresh.isActive && (
+                  <span className="min-w-[24px] text-[11px] text-muted-foreground">
+                    {autoRefresh.countdown}s
+                  </span>
+                )}
+              </div>
 
-          <Button
-            variant="outline"
-            className="h-10 rounded-[1rem] px-3.5 text-xs font-medium"
-            onClick={() => syncAllMutation.mutate()}
-            disabled={syncAllMutation.isPending}
-          >
-            <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
-            {syncAllMutation.isPending ? t('keys.syncing') : t('keys.sync')}
-          </Button>
-        </div>
+              <Button
+                variant="outline"
+                className="h-10 rounded-[1rem] px-3.5 text-xs font-medium"
+                onClick={() => syncAllMutation.mutate()}
+                disabled={syncAllMutation.isPending}
+              >
+                <RefreshCw className={cn('w-4 h-4 mr-2', syncAllMutation.isPending && 'animate-spin')} />
+                {syncAllMutation.isPending ? t('keys.syncing') : t('keys.sync')}
+              </Button>
+            </div>
+          </>
+        ) : null}
       </div>
 
       <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
@@ -6980,123 +7014,66 @@ export default function KeysPage() {
 
       {isRenewalWorkspace ? (
         <Card className="mb-6 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-background to-background shadow-[0_20px_45px_rgba(12,18,38,0.12)]">
-        <CardHeader className="pb-4">
+        <CardHeader className="space-y-4 pb-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xl:max-w-2xl">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Calendar className="h-5 w-5 text-primary" />
                 {locale === 'my' ? 'သက်တမ်းတိုး အလုပ်စာရင်း' : 'Renewal queue'}
               </CardTitle>
               <CardDescription>
                 {locale === 'my'
-                  ? 'Expire နီးနေသော သို့မဟုတ် data ကုန်နေသော key များကို စစ်ပြီး package ဖြင့် renew လုပ်ကာ Telegram reminder ပို့နိုင်သည်။ Priority order သည် first touch မရှိသေးသော key များနှင့် unresolved outreach များကို အရင်တင်ပေးသည်။'
-                  : 'Filter expiring or depleted keys, select the current queue, then renew with a package or send Telegram reminders. Priority order keeps untouched and unresolved outreach work at the top.'}
+                  ? 'Expire နီးနေသော သို့မဟုတ် data ကုန်နေသော key များကို စစ်ပြီး package ဖြင့် renew လုပ်ကာ Telegram reminder ပို့နိုင်သည်။ Queue header ကို page context နဲ့ operator lane shortcut ပဲထားပြီး summary duplication ကို ဖြုတ်ထားသည်။'
+                  : 'Filter expiring or depleted keys, select the current queue, then renew with a package or send Telegram reminders. This header keeps only page context and lane shortcuts instead of repeating the full summary wall.'}
               </CardDescription>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Queue စုစုပေါင်း' : 'Queue total'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? data?.total ?? 0 : 0}</p>
-              </div>
+            <div className="grid w-full gap-2 sm:grid-cols-2 xl:max-w-[30rem]">
               <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   {locale === 'my' ? 'မြင်နေသောစာမျက်နှာ' : 'Visible page'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{visibleRenewalQueueItems.length}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === 'my' ? `Queue စုစုပေါင်း ${data?.total ?? 0} ခု` : `${data?.total ?? 0} total in queue`}
+                </p>
               </div>
               <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   {locale === 'my' ? 'ရွေးထားပြီး' : 'Selected'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{selectedKeys.size}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === 'my' ? 'Bulk action များသည် ဒီ set အပေါ်မှာ အလုပ်လုပ်မည်' : 'Bulk actions run against this set'}
+                </p>
               </div>
               <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   {locale === 'my' ? 'Reminder ရနိုင်' : 'Reminder-ready'}
                 </p>
                 <p className="mt-2 text-2xl font-semibold">{visibleRenewalReminderEligibleCount}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Reminder ပို့ပြီး' : 'Reminded'}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === 'my' ? 'လက်ရှိ page မှာ ချက်ချင်းပို့နိုင်သော key များ' : 'Keys on this page that can be reminded now'}
                 </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.reminded : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.neverReminded : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.renewedAfterReminder : 0}</p>
               </div>
               <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                   {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
                 </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalReminderSummary.pendingFollowUp : 0}</p>
+                <p className="mt-2 text-2xl font-semibold">{renewalReminderSummary.pendingFollowUp}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {hasRenewalQueueFilters
+                    ? locale === 'my'
+                      ? 'လက်ရှိ filter ထဲက next touch လိုအပ်သော lane'
+                      : 'Next-touch work inside the current filtered queue'
+                    : locale === 'my'
+                      ? 'ယခု queue အတွင်း next touch လိုအပ်သော lane'
+                      : 'Next-touch work inside the current queue'}
+                </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Telegram ရောက်နိုင်' : 'Reachable'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.reachable : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Blocked' : 'Blocked'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.blocked : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Telegram link မရှိ' : 'No Telegram link'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.needsTelegramLink : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Failed sends' : 'Failed sends'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalExceptionSummary.failed : 0}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Outreach မမှတ်ရသေး' : 'No outreach log'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.neverPrepared : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'ရလဒ်မမှတ်ရသေး' : 'Awaiting result'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.pendingResult : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'အသုံးပြုသူ ပြန်စာပို့' : 'Customer replied'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.replied : 0}</p>
-              </div>
-              <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                  {locale === 'my' ? 'Outreach ပြီး renew ဖြစ်' : 'Renewed after outreach'}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">{hasRenewalQueueFilters ? renewalOutreachSummary.renewed : 0}</p>
-              </div>
-            </div>
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
             <div className="rounded-2xl border border-border/60 bg-background/75 p-4">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -7105,8 +7082,8 @@ export default function KeysPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {locale === 'my'
-                      ? 'တစ်ချက်နှိပ်ပြီး first touch, reply စောင့်နေမှု, conversion lane များသို့ တန်းဝင်နိုင်သည်။'
-                      : 'Jump straight into first-touch, waiting-for-reply, and conversion lanes with one click.'}
+                      ? 'ပထမဆက်သွယ်ရန်, ရလဒ်စောင့်နေမှု, ပြန်စာမရသေးမှု, conversion lane များကို တစ်ချက်နှိပ်ပြီး စီမံနိုင်သည်။'
+                      : 'Jump straight into first-touch, waiting, no-response, and conversion lanes.'}
                   </p>
                 </div>
                 <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -7167,104 +7144,104 @@ export default function KeysPage() {
                   <span className="ml-2 text-xs opacity-80">{renewalOutreachSummary.renewed}</span>
                 </Button>
               </div>
-              <div className="mt-4 border-t border-border/60 pt-4">
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {locale === 'my' ? 'ဟောင်းနေသော follow-up lane များ' : 'Stale follow-up lanes'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {locale === 'my'
-                        ? '24 နာရီ၊ 72 နာရီ ကျော်သွားသော unresolved outreach work ကို lane အလိုက် ချက်ချင်းစိစစ်နိုင်သည်။'
-                        : 'Jump straight into unresolved outreach work that has aged past 24 or 72 hours.'}
-                    </p>
-                  </div>
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                    {activeOutreachAgeFilter === 'outreachOlderThan72h'
-                      ? (locale === 'my' ? 'လက်ရှိ threshold: 72h+' : 'Current threshold: 72h+')
-                      : activeOutreachAgeFilter === 'outreachOlderThan24h'
-                        ? (locale === 'my' ? 'လက်ရှိ threshold: 24h+' : 'Current threshold: 24h+')
-                        : (locale === 'my' ? 'Threshold: 24h+ / 72h+' : 'Threshold: 24h+ / 72h+')}
-                  </p>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    variant={activeOutreachAgeFilter === 'outreachOlderThan24h' ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(activeOutreachAgeFilter === 'outreachOlderThan24h' && 'bg-amber-600 hover:bg-amber-700')}
-                    onClick={() => setOutreachAgeFilter(activeOutreachAgeFilter === 'outreachOlderThan24h' ? null : 'outreachOlderThan24h')}
-                  >
-                    <Clock className="mr-2 h-4 w-4" />
-                    {locale === 'my' ? '24h ကျော်' : 'Older than 24h'}
-                    <span className="ml-2 text-xs opacity-80">{renewalOutreachStaleSummary.olderThan24h}</span>
-                  </Button>
-                  <Button
-                    variant={activeOutreachAgeFilter === 'outreachOlderThan72h' ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(activeOutreachAgeFilter === 'outreachOlderThan72h' && 'bg-red-600 hover:bg-red-700')}
-                    onClick={() => setOutreachAgeFilter(activeOutreachAgeFilter === 'outreachOlderThan72h' ? null : 'outreachOlderThan72h')}
-                  >
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    {locale === 'my' ? '72h ကျော်' : 'Older than 72h'}
-                    <span className="ml-2 text-xs opacity-80">{renewalOutreachStaleSummary.olderThan72h}</span>
-                  </Button>
-                  <Button
-                    variant={activeOutreachLaneFilter === 'stalePendingResult' ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(activeOutreachLaneFilter === 'stalePendingResult' && 'bg-sky-600 hover:bg-sky-700')}
-                    onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'stalePendingResult' ? null : 'stalePendingResult')}
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    {locale === 'my' ? 'ဟောင်းနေသော awaiting result' : 'Stale awaiting result'}
-                    <span className="ml-2 text-xs opacity-80">
-                      {getRenewalOutreachStaleLaneCount(
-                        renewalOutreachStaleSummary,
-                        'stalePendingResult',
-                        activeOutreachAgeFilter,
-                      )}
-                    </span>
-                  </Button>
-                  <Button
-                    variant={activeOutreachLaneFilter === 'staleSent' ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(activeOutreachLaneFilter === 'staleSent' && 'bg-sky-600 hover:bg-sky-700')}
-                    onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'staleSent' ? null : 'staleSent')}
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    {locale === 'my' ? 'ဟောင်းနေသော sent' : 'Stale sent'}
-                    <span className="ml-2 text-xs opacity-80">
-                      {getRenewalOutreachStaleLaneCount(
-                        renewalOutreachStaleSummary,
-                        'staleSent',
-                        activeOutreachAgeFilter,
-                      )}
-                    </span>
-                  </Button>
-                  <Button
-                    variant={activeOutreachLaneFilter === 'staleNoResponse' ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(activeOutreachLaneFilter === 'staleNoResponse' && 'bg-amber-600 hover:bg-amber-700')}
-                    onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'staleNoResponse' ? null : 'staleNoResponse')}
-                  >
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    {locale === 'my' ? 'ဟောင်းနေသော no response' : 'Stale no response'}
-                    <span className="ml-2 text-xs opacity-80">
-                      {getRenewalOutreachStaleLaneCount(
-                        renewalOutreachStaleSummary,
-                        'staleNoResponse',
-                        activeOutreachAgeFilter,
-                      )}
-                    </span>
-                  </Button>
-                </div>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {locale === 'my'
-                    ? 'Lane filter များက visible queue ကိုသာ ကျဉ်းစေသည်။ အောက်က Select visible page နှင့် bulk outreach/result action များက လက်ရှိ lane အပေါ်မှာပဲ အလုပ်လုပ်မည်။'
-                    : 'Lane filters narrow only the visible queue. Use Select visible page and the bulk outreach/result actions below to work the current lane only.'}
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-background/75 p-4">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium">
+                  {locale === 'my' ? 'ဟောင်းနေသော follow-up lane များ' : 'Stale follow-up lanes'}
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  {locale === 'my'
+                    ? '24 နာရီ၊ 72 နာရီ ကျော်သွားသော unresolved outreach work ကို lane အလိုက် ချက်ချင်းစိစစ်နိုင်သည်။'
+                    : 'Jump straight into unresolved outreach work that has aged past 24 or 72 hours.'}
+                </p>
+              </div>
+              <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                {activeOutreachAgeFilter === 'outreachOlderThan72h'
+                  ? (locale === 'my' ? 'လက်ရှိ threshold: 72h+' : 'Current threshold: 72h+')
+                  : activeOutreachAgeFilter === 'outreachOlderThan24h'
+                    ? (locale === 'my' ? 'လက်ရှိ threshold: 24h+' : 'Current threshold: 24h+')
+                    : (locale === 'my' ? 'Threshold: 24h+ / 72h+' : 'Threshold: 24h+ / 72h+')}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant={activeOutreachAgeFilter === 'outreachOlderThan24h' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachAgeFilter === 'outreachOlderThan24h' && 'bg-amber-600 hover:bg-amber-700')}
+                  onClick={() => setOutreachAgeFilter(activeOutreachAgeFilter === 'outreachOlderThan24h' ? null : 'outreachOlderThan24h')}
+                >
+                  <Clock className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? '24h ကျော်' : 'Older than 24h'}
+                  <span className="ml-2 text-xs opacity-80">{renewalOutreachStaleSummary.olderThan24h}</span>
+                </Button>
+                <Button
+                  variant={activeOutreachAgeFilter === 'outreachOlderThan72h' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachAgeFilter === 'outreachOlderThan72h' && 'bg-red-600 hover:bg-red-700')}
+                  onClick={() => setOutreachAgeFilter(activeOutreachAgeFilter === 'outreachOlderThan72h' ? null : 'outreachOlderThan72h')}
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? '72h ကျော်' : 'Older than 72h'}
+                  <span className="ml-2 text-xs opacity-80">{renewalOutreachStaleSummary.olderThan72h}</span>
+                </Button>
+                <Button
+                  variant={activeOutreachLaneFilter === 'stalePendingResult' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachLaneFilter === 'stalePendingResult' && 'bg-sky-600 hover:bg-sky-700')}
+                  onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'stalePendingResult' ? null : 'stalePendingResult')}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'ဟောင်းနေသော awaiting result' : 'Stale awaiting result'}
+                  <span className="ml-2 text-xs opacity-80">
+                    {getRenewalOutreachStaleLaneCount(
+                      renewalOutreachStaleSummary,
+                      'stalePendingResult',
+                      activeOutreachAgeFilter,
+                    )}
+                  </span>
+                </Button>
+                <Button
+                  variant={activeOutreachLaneFilter === 'staleSent' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachLaneFilter === 'staleSent' && 'bg-sky-600 hover:bg-sky-700')}
+                  onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'staleSent' ? null : 'staleSent')}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'ဟောင်းနေသော sent' : 'Stale sent'}
+                  <span className="ml-2 text-xs opacity-80">
+                    {getRenewalOutreachStaleLaneCount(
+                      renewalOutreachStaleSummary,
+                      'staleSent',
+                      activeOutreachAgeFilter,
+                    )}
+                  </span>
+                </Button>
+                <Button
+                  variant={activeOutreachLaneFilter === 'staleNoResponse' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(activeOutreachLaneFilter === 'staleNoResponse' && 'bg-amber-600 hover:bg-amber-700')}
+                  onClick={() => setOutreachLaneFilter(activeOutreachLaneFilter === 'staleNoResponse' ? null : 'staleNoResponse')}
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  {locale === 'my' ? 'ဟောင်းနေသော no response' : 'Stale no response'}
+                  <span className="ml-2 text-xs opacity-80">
+                    {getRenewalOutreachStaleLaneCount(
+                      renewalOutreachStaleSummary,
+                      'staleNoResponse',
+                      activeOutreachAgeFilter,
+                    )}
+                  </span>
+                </Button>
               </div>
             </div>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            {locale === 'my'
+              ? 'Lane filter များက visible queue ကိုသာ ကျဉ်းစေသည်။ အောက်က Select visible page နှင့် bulk outreach/result action များက လက်ရှိ lane အပေါ်မှာပဲ အလုပ်လုပ်မည်။'
+              : 'Lane filters narrow only the visible queue. Use Select visible page and the bulk outreach/result actions below to work the current lane only.'}
+          </p>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="flex flex-wrap gap-2">
@@ -7676,7 +7653,7 @@ export default function KeysPage() {
             <Card key={i} className="h-32 bg-muted animate-pulse" />
           ))}
         </div>
-      ) : viewMode === 'group' ? (
+      ) : effectiveViewMode === 'group' ? (
         <ServerGroupList
           keys={data?.items || []}
           onToggleStatus={(key, checked) => handleToggleStatus(key.id)}
@@ -7693,7 +7670,7 @@ export default function KeysPage() {
           onQr={(key) => setQrDialogKey({ id: key.id, name: key.name })}
           isProcessingId={togglingKeyId}
         />
-      ) : (viewMode === 'grid' || viewMode === 'list') ? (
+      ) : (effectiveViewMode === 'grid' || effectiveViewMode === 'list') ? (
         <MobileCardView
           data={data?.items || []}
           renderCard={renderKeyCard}
@@ -7704,7 +7681,7 @@ export default function KeysPage() {
       {renderPagination('mobile')}
 
       {/* Desktop Grid View */}
-      {viewMode === 'grid' && (
+      {effectiveViewMode === 'grid' && (
         <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
           {isLoading ? (
             [...Array(8)].map((_, i) => (
@@ -7977,7 +7954,7 @@ export default function KeysPage() {
       )}
 
       {/* Keys table (List View) - show on desktop always when list mode, and on mobile when list mode */}
-      <Card className={cn('ops-data-shell mb-6 overflow-hidden', viewMode === 'list' ? 'hidden md:block' : 'hidden')}>
+      <Card className={cn('ops-data-shell mb-6 overflow-hidden', effectiveViewMode === 'list' ? 'hidden md:block' : 'hidden')}>
         <div className="overflow-x-auto">
           <table className="w-full">
 
