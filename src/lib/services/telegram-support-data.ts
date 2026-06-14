@@ -1,3 +1,4 @@
+import { type Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { generateRandomString } from '@/lib/utils';
 import {
@@ -5,6 +6,49 @@ import {
   resolveTelegramSupportIssueLabel,
 } from '@/lib/services/telegram-support-cards';
 import { type TelegramSupportIssueCategory } from '@/lib/services/telegram-support-types';
+
+export const TELEGRAM_SUPPORT_FIRST_RESPONSE_SLA_MS = 2 * 60 * 60 * 1000;
+
+export function buildCustomerSubmittedTelegramSupportThreadWhere(
+  where: Prisma.TelegramSupportThreadWhereInput = {},
+): Prisma.TelegramSupportThreadWhereInput {
+  const customerReplyWhere: Prisma.TelegramSupportThreadWhereInput = {
+    replies: {
+      some: {
+        senderType: 'CUSTOMER',
+      },
+    },
+  };
+
+  if (Object.keys(where).length === 0) {
+    return customerReplyWhere;
+  }
+
+  return {
+    AND: [
+      where,
+      customerReplyWhere,
+    ],
+  };
+}
+
+export function resolveTelegramSupportFirstResponseDueAt(input: {
+  senderType: 'CUSTOMER' | 'ADMIN';
+  existingFirstResponseDueAt?: Date | null;
+  existingFirstAdminReplyAt?: Date | null;
+  now?: Date;
+}) {
+  if (
+    input.senderType !== 'CUSTOMER'
+    || input.existingFirstResponseDueAt
+    || input.existingFirstAdminReplyAt
+  ) {
+    return undefined;
+  }
+
+  const now = input.now ?? new Date();
+  return new Date(now.getTime() + TELEGRAM_SUPPORT_FIRST_RESPONSE_SLA_MS);
+}
 
 async function resolveTelegramSupportUser(input: {
   telegramChatId: string;
@@ -79,7 +123,7 @@ export async function createTelegramSupportThread(input: {
     data: {
       threadCode: await generateTelegramSupportThreadCode(),
       status: 'OPEN',
-      waitingOn: 'ADMIN',
+      waitingOn: 'USER',
       issueCategory: input.category,
       locale: input.locale,
       telegramChatId,
@@ -87,7 +131,7 @@ export async function createTelegramSupportThread(input: {
       telegramUsername: input.username || null,
       userId: linkedUser?.id || null,
       subject: resolveTelegramSupportIssueLabel(input.category, input.locale),
-      firstResponseDueAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      firstResponseDueAt: null,
     },
     include: {
       replies: {
@@ -124,10 +168,10 @@ export async function listTelegramSupportThreadsForUser(input: {
   limit?: number;
 }) {
   return db.telegramSupportThread.findMany({
-    where: {
+    where: buildCustomerSubmittedTelegramSupportThreadWhere({
       telegramChatId: String(input.chatId),
       telegramUserId: String(input.telegramUserId),
-    },
+    }),
     include: {
       replies: {
         orderBy: [{ createdAt: 'asc' }],
@@ -161,6 +205,7 @@ export async function addTelegramSupportReply(input: {
     where: { id: input.threadId },
     select: {
       firstAdminReplyAt: true,
+      firstResponseDueAt: true,
     },
   });
   const nextStatus = input.markHandled
@@ -182,6 +227,13 @@ export async function addTelegramSupportReply(input: {
   if (!storedMessage) {
     throw new Error('Support reply message is required.');
   }
+
+  const nextFirstResponseDueAt = resolveTelegramSupportFirstResponseDueAt({
+    senderType: input.senderType,
+    existingFirstResponseDueAt: existingThread?.firstResponseDueAt,
+    existingFirstAdminReplyAt: existingThread?.firstAdminReplyAt,
+    now,
+  });
 
   return db.$transaction(async (tx) => {
     const createdReply = await tx.telegramSupportReply.create({
@@ -223,6 +275,7 @@ export async function addTelegramSupportReply(input: {
         waitingOn: nextWaitingOn,
         lastCustomerReplyAt: input.senderType === 'CUSTOMER' ? now : undefined,
         lastAdminReplyAt: input.senderType === 'ADMIN' ? now : undefined,
+        firstResponseDueAt: nextFirstResponseDueAt,
         firstAdminReplyAt:
           input.senderType === 'ADMIN'
             ? existingThread?.firstAdminReplyAt || now

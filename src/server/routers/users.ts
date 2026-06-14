@@ -55,6 +55,7 @@ import {
   type TelegramSalesSettings,
 } from '@/lib/services/telegram-sales';
 import {
+  buildCustomerSubmittedTelegramSupportThreadWhere,
   findTelegramSupportThreadByIdForAdmin,
   resolveTelegramSupportIssueLabel,
 } from '@/lib/services/telegram-support';
@@ -654,9 +655,9 @@ export const usersRouter = router({
       const supportThreads =
         telegramIdentifiers.length > 0 || Boolean(user.id)
           ? await db.telegramSupportThread.findMany({
-              where: {
+              where: buildCustomerSubmittedTelegramSupportThreadWhere({
                 OR: supportThreadWhere,
-              },
+              }),
               include: {
                 replies: {
                   orderBy: [{ createdAt: 'desc' }],
@@ -1127,7 +1128,7 @@ export const usersRouter = router({
       const [threads, activeSummaryRows] =
         await Promise.all([
           db.telegramSupportThread.findMany({
-            where,
+            where: buildCustomerSubmittedTelegramSupportThreadWhere(where),
             include: {
               user: {
                 select: {
@@ -1145,9 +1146,9 @@ export const usersRouter = router({
             take: limit,
           }),
           db.telegramSupportThread.findMany({
-            where: {
+            where: buildCustomerSubmittedTelegramSupportThreadWhere({
               status: { in: ['OPEN', 'ESCALATED'] },
-            },
+            }),
             select: {
               status: true,
               waitingOn: true,
@@ -1266,11 +1267,11 @@ export const usersRouter = router({
       const now = new Date();
       const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
       const rows = await db.telegramSupportThread.findMany({
-        where: {
+        where: buildCustomerSubmittedTelegramSupportThreadWhere({
           createdAt: {
             gte: since,
           },
-        },
+        }),
         select: {
           id: true,
           status: true,
