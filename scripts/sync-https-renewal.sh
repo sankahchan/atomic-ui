@@ -5,6 +5,7 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-${1:-/opt/atomic-ui}}"
 PANEL_DOMAIN="${PANEL_DOMAIN:-}"
 PUBLIC_SHARE_DOMAIN="${PUBLIC_SHARE_DOMAIN:-}"
+LETSENCRYPT_WEBROOT="${LETSENCRYPT_WEBROOT:-/var/www/letsencrypt}"
 DOMAIN_RENEW_SERVICE="/etc/systemd/system/atomic-ui-domain-cert-renew.service"
 DOMAIN_RENEW_TIMER="/etc/systemd/system/atomic-ui-domain-cert-renew.timer"
 CERTBOT_DEPLOY_HOOK="/etc/letsencrypt/renewal-hooks/deploy/atomic-ui-reload-nginx.sh"
@@ -23,12 +24,33 @@ read_host_file() {
   fi
 }
 
+sync_renewal_webroot() {
+  local domain_name="$1"
+  local renewal_conf="/etc/letsencrypt/renewal/${domain_name}.conf"
+
+  if [[ -z "${domain_name}" || ! -f "${renewal_conf}" ]]; then
+    return
+  fi
+
+  if ! grep -q '^authenticator = webroot$' "${renewal_conf}"; then
+    return
+  fi
+
+  if grep -q "^webroot_path = ${LETSENCRYPT_WEBROOT},$" "${renewal_conf}"; then
+    return
+  fi
+
+  sed -i "s#^webroot_path = .*#webroot_path = ${LETSENCRYPT_WEBROOT},#" "${renewal_conf}"
+  echo "Updated legacy certbot webroot for ${domain_name} -> ${LETSENCRYPT_WEBROOT}"
+}
+
 configure_domain_renewal() {
   if ! command -v certbot >/dev/null 2>&1; then
     apt-get update -qq >/dev/null
     apt-get install -y -qq certbot >/dev/null
   fi
 
+  mkdir -p "${LETSENCRYPT_WEBROOT}/.well-known/acme-challenge"
   mkdir -p "$(dirname "${CERTBOT_DEPLOY_HOOK}")"
   cat >"${CERTBOT_DEPLOY_HOOK}" <<'EOF'
 #!/bin/sh
@@ -94,5 +116,7 @@ if [[ -z "${PANEL_DOMAIN}" && -z "${PUBLIC_SHARE_DOMAIN}" ]]; then
   exit 0
 fi
 
+sync_renewal_webroot "${PANEL_DOMAIN}"
+sync_renewal_webroot "${PUBLIC_SHARE_DOMAIN}"
 configure_domain_renewal
 echo "Atomic-UI domain certificate renewal is active for panel=${PANEL_DOMAIN:-none} share=${PUBLIC_SHARE_DOMAIN:-none}."
