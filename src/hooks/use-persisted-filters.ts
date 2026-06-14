@@ -44,10 +44,11 @@ const filtersSchema = z.object({
 export type QuickFilters = z.infer<typeof quickFiltersSchema>;
 export type Filters = z.infer<typeof filtersSchema>;
 
-type PageKey = 'access-keys' | 'dynamic-keys';
+type PageKey = 'access-keys' | 'access-keys-renewal' | 'dynamic-keys';
 
 const STORAGE_KEYS: Record<PageKey, string> = {
   'access-keys': `atomic:filters:access-keys:${STORAGE_VERSION}`,
+  'access-keys-renewal': `atomic:filters:access-keys-renewal:${STORAGE_VERSION}`,
   'dynamic-keys': `atomic:filters:dynamic-keys:${STORAGE_VERSION}`,
 };
 
