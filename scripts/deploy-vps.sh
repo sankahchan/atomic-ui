@@ -169,4 +169,6 @@ if [[ "${PROBE_OK}" -ne 1 ]]; then
   echo "Final health probe failed after retries: ${PROBE_URL}" >&2
   exit 1
 fi
+
+APP_DIR="${APP_DIR}" bash scripts/sync-https-renewal.sh
 REMOTE
