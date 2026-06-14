@@ -18,7 +18,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { keepPreviousData } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -4232,12 +4232,14 @@ export default function KeysPage() {
   const autoRefreshRef = useRef<(() => void) | null>(null);
   const { t, locale } = useLocale();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isRenewalWorkspace = searchParams.get('workspace') === 'renewal';
+  const isRenewalWorkspace = pathname === '/dashboard/renewal' || searchParams.get('workspace') === 'renewal';
   const persistedFilterPageKey = isRenewalWorkspace ? 'access-keys-renewal' : 'access-keys';
   const showRenewalOpsFilters = isRenewalWorkspace;
   const inventoryWorkspaceHref = '/dashboard/keys';
-  const renewalWorkspaceHref = '/dashboard/keys?workspace=renewal';
+  const renewalWorkspaceHref = '/dashboard/renewal';
+  const workspaceTitle = isRenewalWorkspace ? (locale === 'my' ? 'Renewal Ops' : 'Renewal Ops') : t('keys.title');
   const getItemLabel = useCallback(
     (count: number) => t(count === 1 ? 'keys.bulk.item_singular' : 'keys.bulk.item_plural'),
     [t],
@@ -5823,12 +5825,12 @@ export default function KeysPage() {
           <div className="space-y-4">
             <div className="space-y-3">
               <span className="ops-pill border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
-                <Key className="h-3.5 w-3.5" />
-                {t('keys.title')}
+                {isRenewalWorkspace ? <Calendar className="h-3.5 w-3.5" /> : <Key className="h-3.5 w-3.5" />}
+                {workspaceTitle}
               </span>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.45rem]">{t('keys.title')}</h1>
+                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl xl:text-[2.45rem]">{workspaceTitle}</h1>
                   <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200">
                     <Sparkles className="mr-1 h-3.5 w-3.5" />
                     {locale === 'my' ? 'မြင်ကွင်းသစ်' : 'Frosted'}
@@ -5847,71 +5849,69 @@ export default function KeysPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => setCreateDialogOpen(true)}
-                className="h-10 rounded-full px-4"
-                data-testid="create-access-key"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                {locale === 'my' ? 'သော့ ဖန်တီးရန်' : 'Create key'}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
-                onClick={() => setBulkCreateDialogOpen(true)}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                {locale === 'my' ? 'အစုလိုက် ဖန်တီးရန်' : 'Bulk create'}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
-                asChild
-              >
-                <Link href="/dashboard/templates">
-                  <FileText className="mr-2 h-4 w-4" />
-                  {locale === 'my' ? 'တမ်းပလိတ်များကို ဖွင့်မည်' : 'Open templates'}
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
-                asChild
-              >
-                <Link href="/dashboard/archived">
-                  <Archive className="mr-2 h-4 w-4" />
-                  {locale === 'my' ? 'အဟောင်းမှတ်တမ်းကို ကြည့်မည်' : 'View archive'}
-                </Link>
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="ops-pill">
-                <ArrowRightLeft className="h-3.5 w-3.5" />
-                {locale === 'my' ? 'Workspace' : 'Workspace'}
-              </span>
-              <Button
-                asChild
-                size="sm"
-                variant={isRenewalWorkspace ? 'outline' : 'default'}
-                className="h-9 rounded-full px-4"
-              >
-                <Link href={inventoryWorkspaceHref}>
-                  <Key className="mr-2 h-4 w-4" />
-                  {locale === 'my' ? 'Access Keys' : 'Access Keys'}
-                </Link>
-              </Button>
-              <Button
-                asChild
-                size="sm"
-                variant={isRenewalWorkspace ? 'default' : 'outline'}
-                className="h-9 rounded-full px-4"
-              >
-                <Link href={renewalWorkspaceHref}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {locale === 'my' ? 'Renewal Ops' : 'Renewal Ops'}
-                </Link>
-              </Button>
+              {isRenewalWorkspace ? (
+                <>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    asChild
+                  >
+                    <Link href={inventoryWorkspaceHref}>
+                      <Key className="mr-2 h-4 w-4" />
+                      {locale === 'my' ? 'Access Keys ကို ဖွင့်မည်' : 'Open Access Keys'}
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    asChild
+                  >
+                    <Link href="/dashboard/templates">
+                      <FileText className="mr-2 h-4 w-4" />
+                      {locale === 'my' ? 'တမ်းပလိတ်များကို ဖွင့်မည်' : 'Open templates'}
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => setCreateDialogOpen(true)}
+                    className="h-10 rounded-full px-4"
+                    data-testid="create-access-key"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? 'သော့ ဖန်တီးရန်' : 'Create key'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    onClick={() => setBulkCreateDialogOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? 'အစုလိုက် ဖန်တီးရန်' : 'Bulk create'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    asChild
+                  >
+                    <Link href="/dashboard/templates">
+                      <FileText className="mr-2 h-4 w-4" />
+                      {locale === 'my' ? 'တမ်းပလိတ်များကို ဖွင့်မည်' : 'Open templates'}
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    asChild
+                  >
+                    <Link href="/dashboard/archived">
+                      <Archive className="mr-2 h-4 w-4" />
+                      {locale === 'my' ? 'အဟောင်းမှတ်တမ်းကို ကြည့်မည်' : 'View archive'}
+                    </Link>
+                  </Button>
+                </>
+              )}
             </div>
 
             <div className="ops-support-card space-y-3">
@@ -5919,9 +5919,13 @@ export default function KeysPage() {
                 <div>
                   <p className="text-sm font-semibold">{locale === 'my' ? 'လက်ရှိမြင်ကွင်း' : 'Current view'}</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    {locale === 'my'
-                      ? 'ဒေတာအသုံးပြုမှု၊ စက်ဖိအား၊ ပိုင်ရှင် သို့မဟုတ် tag အလိုက် စစ်ထုတ်နေစဉ်လည်း လက်ရှိလုပ်ဆောင်နေသောစာရင်းကို မျက်နှာပြင်ပေါ်တွင် ထင်ရှားစွာ ထားရှိပါ။'
-                      : 'Keep the working set visible while you filter by traffic, device pressure, owner, or tag.'}
+                    {isRenewalWorkspace
+                      ? locale === 'my'
+                        ? 'Reminders, follow-up lanes, Telegram recovery နှင့် outreach result များကို လက်ရှိ queue context ပျောက်မသွားစေဘဲ တစ်နေရာတည်းတွင် စီမံပါ။'
+                        : 'Keep reminder lanes, Telegram recovery, and outreach results visible while you work the current renewal queue.'
+                      : locale === 'my'
+                        ? 'ဒေတာအသုံးပြုမှု၊ စက်ဖိအား၊ ပိုင်ရှင် သို့မဟုတ် tag အလိုက် စစ်ထုတ်နေစဉ်လည်း လက်ရှိလုပ်ဆောင်နေသောစာရင်းကို မျက်နှာပြင်ပေါ်တွင် ထင်ရှားစွာ ထားရှိပါ။'
+                        : 'Keep the working set visible while you filter by traffic, device pressure, owner, or tag.'}
                   </p>
                 </div>
                 {hasAnyFilters ? (
@@ -7602,7 +7606,7 @@ export default function KeysPage() {
                 <Button asChild size="sm" className="rounded-full px-4">
                   <Link href={renewalWorkspaceHref}>
                     <Calendar className="mr-2 h-4 w-4" />
-                    {locale === 'my' ? 'Renewal workspace ကို ဖွင့်မည်' : 'Open renewal workspace'}
+                    {locale === 'my' ? 'Renewal Ops ကို ဖွင့်မည်' : 'Open Renewal Ops'}
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="sm" className="rounded-full px-4">

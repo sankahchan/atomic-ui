@@ -2,6 +2,7 @@ import {
   ArrowRightLeft,
   ActivitySquare,
   Bell,
+  CalendarClock,
   Flame,
   FileText,
   Key,
@@ -26,6 +27,7 @@ export const primaryDashboardNavItems = [
 ] as const;
 
 export const adminToolNavItems = [
+  { href: '/dashboard/renewal', icon: CalendarClock, labelKey: 'nav.renewal_ops', descriptionKey: 'tools.renewal_ops.desc' },
   { href: '/dashboard/incidents', icon: Flame, labelKey: 'nav.incidents', descriptionKey: 'tools.incidents.desc' },
   { href: '/dashboard/support', icon: MessageSquare, labelKey: 'nav.support', descriptionKey: 'tools.support.desc' },
   { href: '/dashboard/jobs', icon: ActivitySquare, labelKey: 'nav.jobs', descriptionKey: 'tools.jobs.desc' },

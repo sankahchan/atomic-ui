@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   AlertTriangle,
   BarChart3,
+  CalendarClock,
   CheckCircle2,
   ChevronRight,
   Globe2,
@@ -238,6 +239,19 @@ function KeyOperationsSummary({
             </p>
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+
+        <Link
+          href="/dashboard/renewal"
+          className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-border/60 bg-background/55 px-4 py-3 transition-colors hover:bg-background/80 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{t('dashboard.review_renewal_ops')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('dashboard.review_renewal_ops_desc')}
+            </p>
+          </div>
+          <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
         </Link>
       </div>
     </div>
