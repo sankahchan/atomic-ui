@@ -21,10 +21,12 @@ export {
 
 export {
   addTelegramSupportReply,
+  buildCustomerSubmittedTelegramSupportThreadWhere,
   createTelegramSupportThread,
   findTelegramSupportThreadByIdForAdmin,
   findTelegramSupportThreadByIdForUser,
   listTelegramSupportThreadsForUser,
+  resolveTelegramSupportFirstResponseDueAt,
 } from '@/lib/services/telegram-support-data';
 
 export {

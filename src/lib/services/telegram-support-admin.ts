@@ -6,6 +6,7 @@ import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks
 import { type TelegramSupportThreadQueueSnapshot } from '@/lib/services/telegram-domain-types';
 import {
   addTelegramSupportReply,
+  buildCustomerSubmittedTelegramSupportThreadWhere,
   buildTelegramSupportThreadKeyboard,
   buildTelegramSupportThreadStatusMessage,
   findTelegramSupportThreadByIdForAdmin,
@@ -38,6 +39,7 @@ export async function listTelegramSupportThreadsForAdminQueue(input: {
   }
 >> {
   const baseWhere: Prisma.TelegramSupportThreadWhereInput = {
+    ...buildCustomerSubmittedTelegramSupportThreadWhere(),
     status: {
       in: ['OPEN', 'ESCALATED'],
     },
@@ -62,27 +64,27 @@ export async function listTelegramSupportThreadsForAdminQueue(input: {
       where: baseWhere,
     }),
     db.telegramSupportThread.count({
-      where: {
+      where: buildCustomerSubmittedTelegramSupportThreadWhere({
         status: 'OPEN',
         NOT: {
           waitingOn: 'USER',
         },
-      },
+      }),
     }),
     db.telegramSupportThread.count({
-      where: {
+      where: buildCustomerSubmittedTelegramSupportThreadWhere({
         status: 'OPEN',
         waitingOn: 'USER',
-      },
+      }),
     }),
     db.telegramSupportThread.count({
-      where: {
+      where: buildCustomerSubmittedTelegramSupportThreadWhere({
         ...baseWhere,
         firstAdminReplyAt: null,
         firstResponseDueAt: {
           lte: new Date(),
         },
-      },
+      }),
     }),
     db.telegramSupportThread.findMany({
       where: listWhere,

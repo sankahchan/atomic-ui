@@ -4241,6 +4241,14 @@ export default function KeysPage() {
   const inventoryWorkspaceHref = '/dashboard/keys';
   const renewalWorkspaceHref = '/dashboard/renewal';
   const workspaceTitle = isRenewalWorkspace ? (locale === 'my' ? 'Renewal Ops' : 'Renewal Ops') : t('keys.title');
+  const mobileFiltersTitle = isRenewalWorkspace
+    ? (locale === 'my' ? 'Queue စစ်ထုတ်ရန်' : 'Queue filters')
+    : t('keys.mobile_filters');
+  const mobileFiltersDescription = isRenewalWorkspace
+    ? (locale === 'my'
+      ? 'Renewal queue အတွက် status, server နှင့် reminder/outreach lane များကိုသာ ပြင်ဆင်နိုင်သည်။'
+      : 'Adjust only the status, server, and reminder/outreach lanes for the renewal queue.')
+    : t('keys.mobile_filters_desc');
   const getItemLabel = useCallback(
     (count: number) => t(count === 1 ? 'keys.bulk.item_singular' : 'keys.bulk.item_plural'),
     [t],
@@ -6710,297 +6718,576 @@ export default function KeysPage() {
       <Dialog open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
         <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[calc(100vw-1rem)] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t('keys.mobile_filters')}</DialogTitle>
-            <DialogDescription>{t('keys.mobile_filters_desc')}</DialogDescription>
+            <DialogTitle>{mobileFiltersTitle}</DialogTitle>
+            <DialogDescription>{mobileFiltersDescription}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>{t('keys.status_filter')}</Label>
-                <Select
-                  value={statusFilter || 'all'}
-                  onValueChange={(value) => {
-                    setStatusFilter(value === 'all' ? '' : value);
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t('keys.status_filter')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('keys.status_filter')}</SelectItem>
-                    <SelectItem value="ACTIVE">{t('keys.status.active')}</SelectItem>
-                    <SelectItem value="PENDING">{t('keys.status.pending')}</SelectItem>
-                    <SelectItem value="DEPLETED">{t('keys.status.depleted')}</SelectItem>
-                    <SelectItem value="EXPIRED">{t('keys.status.expired')}</SelectItem>
-                    <SelectItem value="DISABLED">{t('keys.status.disabled')}</SelectItem>
-                  </SelectContent>
-                </Select>
+          {isRenewalWorkspace ? (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>{t('keys.status_filter')}</Label>
+                  <Select
+                    value={statusFilter || 'all'}
+                    onValueChange={(value) => {
+                      setStatusFilter(value === 'all' ? '' : value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('keys.status_filter')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('keys.status_filter')}</SelectItem>
+                      <SelectItem value="ACTIVE">{t('keys.status.active')}</SelectItem>
+                      <SelectItem value="PENDING">{t('keys.status.pending')}</SelectItem>
+                      <SelectItem value="DEPLETED">{t('keys.status.depleted')}</SelectItem>
+                      <SelectItem value="EXPIRED">{t('keys.status.expired')}</SelectItem>
+                      <SelectItem value="DISABLED">{t('keys.status.disabled')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t('keys.server_filter')}</Label>
+                  <Select
+                    value={serverFilter || 'all'}
+                    onValueChange={(value) => {
+                      setServerFilter(value === 'all' ? '' : value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('keys.server_filter')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('keys.server_filter')}</SelectItem>
+                      {servers?.map((server) => (
+                        <SelectItem key={server.id} value={server.id}>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {server.countryCode && getCountryFlag(server.countryCode)} {server.name}
+                            </span>
+                            <ServerLifecycleBadge mode={server.lifecycleMode} />
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label>{t('keys.server_filter')}</Label>
+                <Label>{locale === 'my' ? 'Renewal window' : 'Renewal window'}</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={filters.quickFilters.expiring3d ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.expiring3d && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setRenewalWindow(filters.quickFilters.expiring3d ? null : 3)}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? '၃ ရက်အတွင်း' : 'Expires in 3d'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setRenewalWindow(filters.quickFilters.expiring7d ? null : 7)}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {t('keys.quick_filters.expiring7d')}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.expiring14d ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.expiring14d && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setRenewalWindow(filters.quickFilters.expiring14d ? null : 14)}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? '၁၄ ရက်အတွင်း' : 'Expires in 14d'}
+                  </Button>
+                  <Button
+                    variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
+                    onClick={toggleRenewalDepletedFilter}
+                  >
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Data ကုန်နေသည်' : 'Depleted'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.telegramLinked ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.telegramLinked && 'bg-sky-600 hover:bg-sky-700')}
+                    onClick={toggleRenewalTelegramLinkedFilter}
+                  >
+                    <MessageSquare className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{locale === 'my' ? 'Reminder lane' : 'Reminder lane'}</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={filters.quickFilters.neverReminded ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.neverReminded && 'bg-slate-600 hover:bg-slate-700')}
+                    onClick={() => setReminderStateFilter(filters.quickFilters.neverReminded ? null : 'neverReminded')}
+                  >
+                    <MessageSquare className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.remindedToday ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.remindedToday && 'bg-sky-600 hover:bg-sky-700')}
+                    onClick={() => setReminderStateFilter(filters.quickFilters.remindedToday ? null : 'remindedToday')}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'ဒီနေ့ reminder ပို့ပြီး' : 'Reminded today'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.reminded24hAgo ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.reminded24hAgo && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setReminderStateFilter(filters.quickFilters.reminded24hAgo ? null : 'reminded24hAgo')}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.renewedAfterReminder ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.renewedAfterReminder && 'bg-emerald-600 hover:bg-emerald-700')}
+                    onClick={() => setReminderStateFilter(filters.quickFilters.renewedAfterReminder ? null : 'renewedAfterReminder')}
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{locale === 'my' ? 'Telegram recovery' : 'Telegram recovery'}</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={filters.quickFilters.needsTelegramLink ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.needsTelegramLink && 'bg-violet-600 hover:bg-violet-700')}
+                    onClick={() => setExceptionStateFilter(filters.quickFilters.needsTelegramLink ? null : 'needsTelegramLink')}
+                  >
+                    <LinkCopy className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Telegram link မရှိ' : 'Needs Telegram link'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.deliveryDisabled ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.deliveryDisabled && 'bg-amber-600 hover:bg-amber-700')}
+                    onClick={() => setExceptionStateFilter(filters.quickFilters.deliveryDisabled ? null : 'deliveryDisabled')}
+                  >
+                    <Power className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Delivery ပိတ်ထား' : 'Delivery disabled'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.reminderFailed ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.reminderFailed && 'bg-red-600 hover:bg-red-700')}
+                    onClick={() => setExceptionStateFilter(filters.quickFilters.reminderFailed ? null : 'reminderFailed')}
+                  >
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Reminder မအောင်မြင်' : 'Reminder failed'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.automationBlocked ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.automationBlocked && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setExceptionStateFilter(filters.quickFilters.automationBlocked ? null : 'automationBlocked')}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Automation ပိတ်မိ' : 'Automation blocked'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{locale === 'my' ? 'Outreach lane' : 'Outreach lane'}</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={filters.quickFilters.outreachNeverPrepared ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachNeverPrepared && 'bg-slate-600 hover:bg-slate-700')}
+                    onClick={() => setOutreachStateFilter(filters.quickFilters.outreachNeverPrepared ? null : 'outreachNeverPrepared')}
+                  >
+                    <FileText className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Outreach မမှတ်ရသေး' : 'No outreach log'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachPendingResult ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachPendingResult && 'bg-sky-600 hover:bg-sky-700')}
+                    onClick={() => setOutreachStateFilter(filters.quickFilters.outreachPendingResult ? null : 'outreachPendingResult')}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'ရလဒ်မမှတ်ရသေး' : 'Awaiting result'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachSent ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachSent && 'bg-sky-600 hover:bg-sky-700')}
+                    onClick={() => setOutreachStateFilter(filters.quickFilters.outreachSent ? null : 'outreachSent')}
+                  >
+                    <MessageSquare className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Outreach ပို့ပြီး' : 'Outreach sent'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachReplied ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachReplied && 'bg-emerald-600 hover:bg-emerald-700')}
+                    onClick={() => setOutreachStateFilter(filters.quickFilters.outreachReplied ? null : 'outreachReplied')}
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'အသုံးပြုသူ ပြန်စာပို့' : 'Customer replied'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachRenewed ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachRenewed && 'bg-emerald-600 hover:bg-emerald-700')}
+                    onClick={() => setOutreachStateFilter(filters.quickFilters.outreachRenewed ? null : 'outreachRenewed')}
+                  >
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Outreach ပြီး renew ဖြစ်' : 'Renewed after outreach'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachNoResponse ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachNoResponse && 'bg-amber-600 hover:bg-amber-700')}
+                    onClick={() => setOutreachStateFilter(filters.quickFilters.outreachNoResponse ? null : 'outreachNoResponse')}
+                  >
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'ပြန်စာမရှိ' : 'No response'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachDone ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachDone && 'bg-emerald-600 hover:bg-emerald-700')}
+                    onClick={() => setOutreachStateFilter(filters.quickFilters.outreachDone ? null : 'outreachDone')}
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Outreach ပြီးစီး' : 'Outreach done'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachOlderThan24h ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachOlderThan24h && 'bg-amber-600 hover:bg-amber-700')}
+                    onClick={() => setOutreachAgeFilter(filters.quickFilters.outreachOlderThan24h ? null : 'outreachOlderThan24h')}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Outreach 24h ကျော်' : 'Outreach older than 24h'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.outreachOlderThan72h ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.outreachOlderThan72h && 'bg-red-600 hover:bg-red-700')}
+                    onClick={() => setOutreachAgeFilter(filters.quickFilters.outreachOlderThan72h ? null : 'outreachOlderThan72h')}
+                  >
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Outreach 72h ကျော်' : 'Outreach older than 72h'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>{t('keys.status_filter')}</Label>
+                  <Select
+                    value={statusFilter || 'all'}
+                    onValueChange={(value) => {
+                      setStatusFilter(value === 'all' ? '' : value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('keys.status_filter')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('keys.status_filter')}</SelectItem>
+                      <SelectItem value="ACTIVE">{t('keys.status.active')}</SelectItem>
+                      <SelectItem value="PENDING">{t('keys.status.pending')}</SelectItem>
+                      <SelectItem value="DEPLETED">{t('keys.status.depleted')}</SelectItem>
+                      <SelectItem value="EXPIRED">{t('keys.status.expired')}</SelectItem>
+                      <SelectItem value="DISABLED">{t('keys.status.disabled')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t('keys.server_filter')}</Label>
+                  <Select
+                    value={serverFilter || 'all'}
+                    onValueChange={(value) => {
+                      setServerFilter(value === 'all' ? '' : value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('keys.server_filter')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('keys.server_filter')}</SelectItem>
+                      {servers?.map((server) => (
+                        <SelectItem key={server.id} value={server.id}>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {server.countryCode && getCountryFlag(server.countryCode)} {server.name}
+                            </span>
+                            <ServerLifecycleBadge mode={server.lifecycleMode} />
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('keys.quick_filters.label')}</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={filters.quickFilters.online ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
+                    onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
+                  >
+                    <Wifi className="w-3 h-3 mr-1" />
+                    {t('keys.quick_filters.online')}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.expiring3d ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.expiring3d && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setRenewalWindow(filters.quickFilters.expiring3d ? null : 3)}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? '၃ ရက်အတွင်း' : 'Expires in 3d'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setRenewalWindow(filters.quickFilters.expiring7d ? null : 7)}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {t('keys.quick_filters.expiring7d')}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.expiring14d ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.expiring14d && 'bg-orange-600 hover:bg-orange-700')}
+                    onClick={() => setRenewalWindow(filters.quickFilters.expiring14d ? null : 14)}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? '၁၄ ရက်အတွင်း' : 'Expires in 14d'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.telegramLinked ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.telegramLinked && 'bg-sky-600 hover:bg-sky-700')}
+                    onClick={toggleRenewalTelegramLinkedFilter}
+                  >
+                    <MessageSquare className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
+                  </Button>
+                  {showRenewalOpsFilters ? (
+                    <>
+                      <Button
+                        variant={filters.quickFilters.neverReminded ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.neverReminded && 'bg-slate-600 hover:bg-slate-700')}
+                        onClick={() => setReminderStateFilter(filters.quickFilters.neverReminded ? null : 'neverReminded')}
+                      >
+                        <MessageSquare className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
+                      </Button>
+                      <Button
+                        variant={filters.quickFilters.remindedToday ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.remindedToday && 'bg-sky-600 hover:bg-sky-700')}
+                        onClick={() => setReminderStateFilter(filters.quickFilters.remindedToday ? null : 'remindedToday')}
+                      >
+                        <Clock className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'ဒီနေ့ reminder ပို့ပြီး' : 'Reminded today'}
+                      </Button>
+                      <Button
+                        variant={filters.quickFilters.reminded24hAgo ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.reminded24hAgo && 'bg-orange-600 hover:bg-orange-700')}
+                        onClick={() => setReminderStateFilter(filters.quickFilters.reminded24hAgo ? null : 'reminded24hAgo')}
+                      >
+                        <Clock className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
+                      </Button>
+                      <Button
+                        variant={filters.quickFilters.renewedAfterReminder ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.renewedAfterReminder && 'bg-emerald-600 hover:bg-emerald-700')}
+                        onClick={() => setReminderStateFilter(filters.quickFilters.renewedAfterReminder ? null : 'renewedAfterReminder')}
+                      >
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
+                      </Button>
+                      <Button
+                        variant={filters.quickFilters.needsTelegramLink ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.needsTelegramLink && 'bg-violet-600 hover:bg-violet-700')}
+                        onClick={() => setExceptionStateFilter(filters.quickFilters.needsTelegramLink ? null : 'needsTelegramLink')}
+                      >
+                        <LinkCopy className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'Telegram link မရှိ' : 'Needs Telegram link'}
+                      </Button>
+                      <Button
+                        variant={filters.quickFilters.deliveryDisabled ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.deliveryDisabled && 'bg-amber-600 hover:bg-amber-700')}
+                        onClick={() => setExceptionStateFilter(filters.quickFilters.deliveryDisabled ? null : 'deliveryDisabled')}
+                      >
+                        <Power className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'Delivery ပိတ်ထား' : 'Delivery disabled'}
+                      </Button>
+                      <Button
+                        variant={filters.quickFilters.reminderFailed ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.reminderFailed && 'bg-red-600 hover:bg-red-700')}
+                        onClick={() => setExceptionStateFilter(filters.quickFilters.reminderFailed ? null : 'reminderFailed')}
+                      >
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'Reminder မအောင်မြင်' : 'Reminder failed'}
+                      </Button>
+                      <Button
+                        variant={filters.quickFilters.automationBlocked ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(filters.quickFilters.automationBlocked && 'bg-orange-600 hover:bg-orange-700')}
+                        onClick={() => setExceptionStateFilter(filters.quickFilters.automationBlocked ? null : 'automationBlocked')}
+                      >
+                        <Clock className="w-3 h-3 mr-1" />
+                        {locale === 'my' ? 'Automation ပိတ်မိ' : 'Automation blocked'}
+                      </Button>
+                    </>
+                  ) : null}
+                  <Button
+                    variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
+                    onClick={toggleRenewalDepletedFilter}
+                  >
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'Data ကုန်နေသည်' : 'Depleted'}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
+                    onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
+                  >
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    {t('keys.quick_filters.over_quota')}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
+                    onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
+                  >
+                    <EyeOff className="w-3 h-3 mr-1" />
+                    {t('keys.quick_filters.inactive30d')}
+                  </Button>
+                  <Button
+                    variant={filters.quickFilters.overDeviceLimit ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(filters.quickFilters.overDeviceLimit && 'bg-violet-600 hover:bg-violet-700')}
+                    onClick={() => setQuickFilter('overDeviceLimit', !filters.quickFilters.overDeviceLimit)}
+                  >
+                    <Smartphone className="w-3 h-3 mr-1" />
+                    {locale === 'my' ? 'စက်ကန့်သတ်ချက် ကျော်လွန်' : 'Over device limit'}
+                  </Button>
+                  {showRenewalOpsFilters ? (
+                    <Button
+                      variant={filters.quickFilters.deviceLimitWarned ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(filters.quickFilters.deviceLimitWarned && 'bg-amber-600 hover:bg-amber-700')}
+                      onClick={() => setQuickFilter('deviceLimitWarned', !filters.quickFilters.deviceLimitWarned)}
+                    >
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      {locale === 'my' ? 'သတိပေးချက် ပို့ပြီး' : 'Warning sent'}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="mobile-key-tag-filter">{t('keys.quick_filters.tag')}</Label>
+                  <Input
+                    id="mobile-key-tag-filter"
+                    placeholder={t('keys.quick_filters.tag_placeholder')}
+                    value={filters.tagFilter || ''}
+                    onChange={(e) => setTagFilter(e.target.value || undefined)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mobile-key-owner-filter">{t('keys.quick_filters.owner')}</Label>
+                  <Input
+                    id="mobile-key-owner-filter"
+                    placeholder={t('keys.quick_filters.owner_placeholder')}
+                    value={filters.ownerFilter || ''}
+                    onChange={(e) => setOwnerFilter(e.target.value || undefined)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('keys.refresh_interval')}</Label>
                 <Select
-                  value={serverFilter || 'all'}
-                  onValueChange={(value) => {
-                    setServerFilter(value === 'all' ? '' : value);
-                    setPage(1);
-                  }}
+                  value={autoRefresh.interval.toString()}
+                  onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={t('keys.server_filter')} />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">{t('keys.server_filter')}</SelectItem>
-                    {servers?.map((server) => (
-                      <SelectItem key={server.id} value={server.id}>
-                        <div className="flex items-center gap-2">
-                          <span>
-                            {server.countryCode && getCountryFlag(server.countryCode)} {server.name}
-                          </span>
-                          <ServerLifecycleBadge mode={server.lifecycleMode} />
-                        </div>
+                    {AUTO_SYNC_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value.toString()}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>{t('keys.quick_filters.label')}</Label>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <Button
-                  variant={filters.quickFilters.online ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.online && 'bg-green-600 hover:bg-green-700')}
-                  onClick={() => setQuickFilter('online', !filters.quickFilters.online)}
+                  variant="outline"
+                  onClick={() => handleExport('json')}
+                  disabled={!!exportingFormat}
                 >
-                  <Wifi className="w-3 h-3 mr-1" />
-                  {t('keys.quick_filters.online')}
+                  <FileJson className="w-4 h-4 mr-2" />
+                  {t('keys.export_json')}
                 </Button>
                 <Button
-                  variant={filters.quickFilters.expiring3d ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.expiring3d && 'bg-orange-600 hover:bg-orange-700')}
-                  onClick={() => setRenewalWindow(filters.quickFilters.expiring3d ? null : 3)}
+                  variant="outline"
+                  onClick={() => handleExport('csv')}
+                  disabled={!!exportingFormat}
                 >
-                  <Clock className="w-3 h-3 mr-1" />
-                  {locale === 'my' ? '၃ ရက်အတွင်း' : 'Expires in 3d'}
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  {t('keys.export_csv')}
                 </Button>
-                <Button
-                  variant={filters.quickFilters.expiring7d ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.expiring7d && 'bg-orange-600 hover:bg-orange-700')}
-                  onClick={() => setRenewalWindow(filters.quickFilters.expiring7d ? null : 7)}
-                >
-                  <Clock className="w-3 h-3 mr-1" />
-                  {t('keys.quick_filters.expiring7d')}
-                </Button>
-                <Button
-                  variant={filters.quickFilters.expiring14d ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.expiring14d && 'bg-orange-600 hover:bg-orange-700')}
-                  onClick={() => setRenewalWindow(filters.quickFilters.expiring14d ? null : 14)}
-                >
-                  <Clock className="w-3 h-3 mr-1" />
-                  {locale === 'my' ? '၁၄ ရက်အတွင်း' : 'Expires in 14d'}
-                </Button>
-                <Button
-                  variant={filters.quickFilters.telegramLinked ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.telegramLinked && 'bg-sky-600 hover:bg-sky-700')}
-                  onClick={toggleRenewalTelegramLinkedFilter}
-                >
-                  <MessageSquare className="w-3 h-3 mr-1" />
-                  {locale === 'my' ? 'Telegram ချိတ်ထားသည်' : 'Telegram linked'}
-                </Button>
-                {showRenewalOpsFilters ? (
-                  <>
-                    <Button
-                      variant={filters.quickFilters.neverReminded ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.neverReminded && 'bg-slate-600 hover:bg-slate-700')}
-                      onClick={() => setReminderStateFilter(filters.quickFilters.neverReminded ? null : 'neverReminded')}
-                    >
-                      <MessageSquare className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'Reminder မပို့ရသေး' : 'Never reminded'}
-                    </Button>
-                    <Button
-                      variant={filters.quickFilters.remindedToday ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.remindedToday && 'bg-sky-600 hover:bg-sky-700')}
-                      onClick={() => setReminderStateFilter(filters.quickFilters.remindedToday ? null : 'remindedToday')}
-                    >
-                      <Clock className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'ဒီနေ့ reminder ပို့ပြီး' : 'Reminded today'}
-                    </Button>
-                    <Button
-                      variant={filters.quickFilters.reminded24hAgo ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.reminded24hAgo && 'bg-orange-600 hover:bg-orange-700')}
-                      onClick={() => setReminderStateFilter(filters.quickFilters.reminded24hAgo ? null : 'reminded24hAgo')}
-                    >
-                      <Clock className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'Follow-up လိုအပ်' : 'Follow-up due'}
-                    </Button>
-                    <Button
-                      variant={filters.quickFilters.renewedAfterReminder ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.renewedAfterReminder && 'bg-emerald-600 hover:bg-emerald-700')}
-                      onClick={() => setReminderStateFilter(filters.quickFilters.renewedAfterReminder ? null : 'renewedAfterReminder')}
-                    >
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'Reminder နောက် Renew လုပ်ပြီး' : 'Renewed after reminder'}
-                    </Button>
-                    <Button
-                      variant={filters.quickFilters.needsTelegramLink ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.needsTelegramLink && 'bg-violet-600 hover:bg-violet-700')}
-                      onClick={() => setExceptionStateFilter(filters.quickFilters.needsTelegramLink ? null : 'needsTelegramLink')}
-                    >
-                      <LinkCopy className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'Telegram link မရှိ' : 'Needs Telegram link'}
-                    </Button>
-                    <Button
-                      variant={filters.quickFilters.deliveryDisabled ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.deliveryDisabled && 'bg-amber-600 hover:bg-amber-700')}
-                      onClick={() => setExceptionStateFilter(filters.quickFilters.deliveryDisabled ? null : 'deliveryDisabled')}
-                    >
-                      <Power className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'Delivery ပိတ်ထား' : 'Delivery disabled'}
-                    </Button>
-                    <Button
-                      variant={filters.quickFilters.reminderFailed ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.reminderFailed && 'bg-red-600 hover:bg-red-700')}
-                      onClick={() => setExceptionStateFilter(filters.quickFilters.reminderFailed ? null : 'reminderFailed')}
-                    >
-                      <AlertTriangle className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'Reminder မအောင်မြင်' : 'Reminder failed'}
-                    </Button>
-                    <Button
-                      variant={filters.quickFilters.automationBlocked ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(filters.quickFilters.automationBlocked && 'bg-orange-600 hover:bg-orange-700')}
-                      onClick={() => setExceptionStateFilter(filters.quickFilters.automationBlocked ? null : 'automationBlocked')}
-                    >
-                      <Clock className="w-3 h-3 mr-1" />
-                      {locale === 'my' ? 'Automation ပိတ်မိ' : 'Automation blocked'}
-                    </Button>
-                  </>
-                ) : null}
-                <Button
-                  variant={statusFilter === 'DEPLETED' ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(statusFilter === 'DEPLETED' && 'bg-red-600 hover:bg-red-700')}
-                  onClick={toggleRenewalDepletedFilter}
-                >
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {locale === 'my' ? 'Data ကုန်နေသည်' : 'Depleted'}
-                </Button>
-                <Button
-                  variant={filters.quickFilters.overQuota ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.overQuota && 'bg-red-600 hover:bg-red-700')}
-                  onClick={() => setQuickFilter('overQuota', !filters.quickFilters.overQuota)}
-                >
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {t('keys.quick_filters.over_quota')}
-                </Button>
-                <Button
-                  variant={filters.quickFilters.inactive30d ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.inactive30d && 'bg-gray-600 hover:bg-gray-700')}
-                  onClick={() => setQuickFilter('inactive30d', !filters.quickFilters.inactive30d)}
-                >
-                  <EyeOff className="w-3 h-3 mr-1" />
-                  {t('keys.quick_filters.inactive30d')}
-                </Button>
-                <Button
-                  variant={filters.quickFilters.overDeviceLimit ? 'default' : 'outline'}
-                  size="sm"
-                  className={cn(filters.quickFilters.overDeviceLimit && 'bg-violet-600 hover:bg-violet-700')}
-                  onClick={() => setQuickFilter('overDeviceLimit', !filters.quickFilters.overDeviceLimit)}
-                >
-                  <Smartphone className="w-3 h-3 mr-1" />
-                  {locale === 'my' ? 'စက်ကန့်သတ်ချက် ကျော်လွန်' : 'Over device limit'}
-                </Button>
-                {showRenewalOpsFilters ? (
-                  <Button
-                    variant={filters.quickFilters.deviceLimitWarned ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(filters.quickFilters.deviceLimitWarned && 'bg-amber-600 hover:bg-amber-700')}
-                    onClick={() => setQuickFilter('deviceLimitWarned', !filters.quickFilters.deviceLimitWarned)}
-                  >
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    {locale === 'my' ? 'သတိပေးချက် ပို့ပြီး' : 'Warning sent'}
-                  </Button>
-                ) : null}
               </div>
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="mobile-key-tag-filter">{t('keys.quick_filters.tag')}</Label>
-                <Input
-                  id="mobile-key-tag-filter"
-                  placeholder={t('keys.quick_filters.tag_placeholder')}
-                  value={filters.tagFilter || ''}
-                  onChange={(e) => setTagFilter(e.target.value || undefined)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mobile-key-owner-filter">{t('keys.quick_filters.owner')}</Label>
-                <Input
-                  id="mobile-key-owner-filter"
-                  placeholder={t('keys.quick_filters.owner_placeholder')}
-                  value={filters.ownerFilter || ''}
-                  onChange={(e) => setOwnerFilter(e.target.value || undefined)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t('keys.refresh_interval')}</Label>
-              <Select
-                value={autoRefresh.interval.toString()}
-                onValueChange={(value) => autoRefresh.setInterval(parseInt(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {AUTO_SYNC_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value.toString()}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Button
-                variant="outline"
-                onClick={() => handleExport('json')}
-                disabled={!!exportingFormat}
-              >
-                <FileJson className="w-4 h-4 mr-2" />
-                {t('keys.export_json')}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleExport('csv')}
-                disabled={!!exportingFormat}
-              >
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                {t('keys.export_csv')}
-              </Button>
-            </div>
-          </div>
+          )}
 
           <DialogFooter className="sticky bottom-0 gap-2 border-t bg-background pt-4 sm:gap-0">
             <Button variant="outline" onClick={clearAllFilters}>

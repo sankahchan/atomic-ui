@@ -1,6 +1,7 @@
 import { withAbsoluteBasePath } from '@/lib/base-path';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
+import { buildCustomerSubmittedTelegramSupportThreadWhere } from '@/lib/services/telegram-support-data';
 import {
   getTelegramConfig,
   getTelegramSupportLink,
@@ -80,7 +81,7 @@ export async function runTelegramSupportSlaAlertCycle() {
   const now = new Date();
   const repeatBefore = new Date(now.getTime() - SUPPORT_SLA_ALERT_REPEAT_MS);
   const overdueThreads = await db.telegramSupportThread.findMany({
-    where: {
+    where: buildCustomerSubmittedTelegramSupportThreadWhere({
       status: {
         in: ['OPEN', 'ESCALATED'],
       },
@@ -92,7 +93,7 @@ export async function runTelegramSupportSlaAlertCycle() {
         { firstResponseLastAlertAt: null },
         { firstResponseLastAlertAt: { lte: repeatBefore } },
       ],
-    },
+    }),
     include: {
       replies: {
         orderBy: [{ createdAt: 'desc' }],

@@ -6,6 +6,7 @@ import { getConfiguredPublicAppOrigin, getPublicBasePath } from '@/lib/subscript
 import { buildTelegramMenuCallbackData } from '@/lib/services/telegram-callbacks';
 import { type BackupVerificationSummary } from '@/lib/services/backup-verification';
 import { getMonitoringSettings, type MonitoringSettings } from '@/lib/services/monitoring-config';
+import { buildCustomerSubmittedTelegramSupportThreadWhere } from '@/lib/services/telegram-support-data';
 import { escapeHtml, formatTelegramDateTime } from '@/lib/services/telegram-ui';
 import {
   getTelegramConfig,
@@ -539,18 +540,18 @@ export async function collectAdminQueueHealthSnapshot(input?: {
     oldestReviewOrders,
   ] = await Promise.all([
     db.telegramSupportThread.count({
-      where: {
+      where: buildCustomerSubmittedTelegramSupportThreadWhere({
         status: { in: ['OPEN', 'ESCALATED'] },
         firstAdminReplyAt: null,
         firstResponseDueAt: { lte: now },
-      },
+      }),
     }),
     db.telegramSupportThread.findMany({
-      where: {
+      where: buildCustomerSubmittedTelegramSupportThreadWhere({
         status: { in: ['OPEN', 'ESCALATED'] },
         firstAdminReplyAt: null,
         firstResponseDueAt: { lte: now },
-      },
+      }),
       orderBy: [{ firstResponseDueAt: 'asc' }, { createdAt: 'asc' }],
       take: 3,
       select: {
