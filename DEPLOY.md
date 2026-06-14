@@ -214,6 +214,7 @@ Notes:
 - `ALLOW_IP_FALLBACK=true` keeps the original server IP reachable in parallel. Set it to `false` if you want raw IP traffic redirected to the domain instead.
 - Domain certificates use the standard Let's Encrypt flow through `certbot`.
 - Auto-renew is handled by `atomic-ui-domain-cert-renew.timer`, which runs `certbot renew` twice daily and reloads nginx through a deploy hook whenever a certificate changes.
+- Existing installs with older `certbot` renewal files are healed to the nginx ACME webroot automatically during the sync step.
 - On the public share host, nginx blocks admin routes like `/login`, `/dashboard`, and `/settings` with `404`.
 - Make sure the `share` DNS record already points at your VPS before the HTTPS script runs, or certificate issuance for the public share host will fail.
 

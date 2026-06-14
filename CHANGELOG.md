@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.16 - 2026-06-14
+
+### Changed
+
+- Added an Atomic-UI-managed domain certificate renewal sync so direct VPS deploys install their own `atomic-ui-domain-cert-renew.timer` and reload nginx through a Certbot deploy hook when certificates change.
+
+### Fixed
+
+- Healed legacy Certbot renewal configs that still pointed the panel domain at `/var/www/html` even though nginx serves ACME challenges from `/var/www/letsencrypt`, preventing silent renewal failures on older installs.
+- Restored the production `outlineadmin.com` HTTPS certificate after the stale renewal webroot mismatch left the site serving an expired certificate.
+
 ## v1.2.15 - 2026-05-09
 
 ### Changed
