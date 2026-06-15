@@ -86,7 +86,7 @@
     "next": "16.2.7",
     "next-themes": "^0.2.1",
     "node-cron": "^4.2.1",
-    "nodemailer": "^8.0.10",
+    "nodemailer": "^9.0.0",
     "otplib": "^13.1.1",
     "qrcode": "^1.5.3",
     "react": "^18.2.0",
