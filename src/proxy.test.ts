@@ -8,7 +8,7 @@ import {
   CLIENT_BUILD_HEADER_NAME,
   CLIENT_BUILD_QUERY_PARAM_NAME,
 } from '@/lib/deploy-guard';
-import { isPublicRoute, middleware } from '@/middleware';
+import { isPublicRoute, proxy } from '@/proxy';
 
 const originalBuildId = process.env.NEXT_PUBLIC_APP_VERSION;
 
@@ -43,7 +43,7 @@ test('stale server action requests are rejected before Next.js handles them', as
     },
   });
 
-  const response = await middleware(request);
+  const response = await proxy(request);
 
   assert.equal(response.status, 409);
   assert.equal(response.headers.get('x-atomic-stale-build'), '1');
@@ -64,7 +64,7 @@ test('fresh server action requests are not rejected by the stale-build guard', a
     },
   });
 
-  const response = await middleware(request);
+  const response = await proxy(request);
 
   assert.notEqual(response.status, 409);
   assert.notEqual(response.headers.get('x-atomic-stale-build'), '1');
@@ -81,7 +81,7 @@ test('client build header takes precedence over stale build cookie on server act
     },
   });
 
-  const response = await middleware(request);
+  const response = await proxy(request);
 
   assert.notEqual(response.status, 409);
   assert.notEqual(response.headers.get('x-atomic-stale-build'), '1');
@@ -100,7 +100,7 @@ test('client build query marker takes precedence over a refreshed build cookie o
     },
   );
 
-  const response = await middleware(request);
+  const response = await proxy(request);
 
   assert.equal(response.status, 409);
   assert.equal(response.headers.get('x-atomic-stale-build'), '1');
@@ -115,7 +115,7 @@ test('app-version checks do not refresh the build cookie', async () => {
     },
   });
 
-  const response = await middleware(request);
+  const response = await proxy(request);
 
   assert.equal(response.headers.get('set-cookie'), null);
 });
@@ -129,7 +129,7 @@ test('document navigations still receive the current build cookie', async () => 
     },
   });
 
-  const response = await middleware(request);
+  const response = await proxy(request);
   const cookieHeader = response.headers.get('set-cookie');
 
   assert.notEqual(cookieHeader, null);

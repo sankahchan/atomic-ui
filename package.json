@@ -16,7 +16,7 @@
     "build": "NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-$(git rev-parse --short=12 HEAD 2>/dev/null || echo dev)} NODE_OPTIONS=\"${NODE_OPTIONS:---max-old-space-size=4096}\" next build",
     "build:low-memory": "bash scripts/build-low-memory.sh",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx --ignore-pattern .next --ignore-pattern prisma/.generated --ignore-pattern test-results",
     "db:generate": "sh scripts/prisma-command.sh generate",
     "db:push": "node scripts/prisma-safe-db-push.js",
     "restore:sqlite": "node scripts/restore-sqlite-backup.js",

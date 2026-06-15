@@ -1,11 +1,11 @@
 /**
- * Next.js Middleware for Authentication
+ * Next.js Proxy for Authentication
  * 
- * This middleware runs on every request to protected routes and handles
+ * This proxy runs on every request to protected routes and handles
  * authentication verification. It checks for a valid session cookie and
  * redirects unauthenticated users to the login page.
  * 
- * The middleware uses Next.js's Edge Runtime, which means it runs at the
+ * The proxy uses Next.js's Edge Runtime, which means it runs at the
  * edge (close to the user) for faster response times. However, this also
  * means we can't use Node.js-specific APIs or make database calls directly.
  * Instead, we verify the JWT token structure and rely on the API routes
@@ -217,13 +217,13 @@ function applyBuildCookie(request: NextRequest, normalizedPath: string, response
 }
 
 /**
- * Middleware function
+ * Proxy function
  * 
  * This function is called for every request matching the configured
  * matcher pattern. It performs authentication checks and handles
  * redirects as needed.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const normalizedPath = normalizePathname(request, pathname);
   const publicShareHost = getPublicShareHost();
@@ -289,7 +289,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Verify the JWT token structure
-  // Note: We can't verify against the database in middleware (Edge Runtime),
+  // Note: We can't verify against the database in proxy (Edge Runtime),
   // so we only check that the token is structurally valid. Full session
   // validation happens in the tRPC context.
   try {
@@ -321,7 +321,7 @@ export async function middleware(request: NextRequest) {
     return applyBuildCookie(request, normalizedPath, NextResponse.next());
   } catch (error) {
     // Token is invalid or expired
-    console.error('Middleware: Invalid session token');
+    console.error('Proxy: Invalid session token');
 
     // Clear the invalid cookie
     const response = normalizedPath.startsWith('/api/')
@@ -339,9 +339,9 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * Middleware Configuration
+ * Proxy Configuration
  * 
- * The matcher specifies which routes the middleware should run on.
+ * The matcher specifies which routes the proxy should run on.
  * We exclude static files and Next.js internals to improve performance.
  */
 export const config = {

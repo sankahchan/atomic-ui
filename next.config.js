@@ -27,7 +27,6 @@ const nextConfig = {
     NEXT_PUBLIC_BASE_PATH: panelPath,
   },
 
-  eslint: { ignoreDuringBuilds: false },
   typescript: { ignoreBuildErrors: false },
 
   // External packages for server components (required for Prisma and native modules)
