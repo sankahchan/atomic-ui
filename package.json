@@ -110,7 +110,7 @@
     "@types/archiver": "^7.0.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/geoip-lite": "^1.4.4",
-    "@types/node": "^20.11.24",
+    "@types/node": "^25.9.3",
     "@types/nodemailer": "^8.0.0",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.61",
