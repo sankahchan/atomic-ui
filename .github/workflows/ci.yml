@@ -105,6 +105,57 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
+  lint-and-test:
+    name: lint-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_REF"
+          git checkout --detach FETCH_HEAD
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            npm ci \
+              --fetch-retries=5 \
+              --fetch-retry-factor=2 \
+              --fetch-retry-mintimeout=10000 \
+              --fetch-retry-maxtimeout=60000 && exit 0
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "npm ci failed after $attempt attempts"
+              exit 1
+            fi
+
+            echo "npm ci failed on attempt $attempt; retrying..."
+            sleep $((attempt * 10))
+          done
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Prepare test database
+        run: |
+          mkdir -p prisma/data
+          npx prisma db push --schema prisma/schema.prisma --skip-generate
+
+      - name: Run unit tests
+        run: npm test
+
   build:
     name: build
     runs-on: ubuntu-latest
