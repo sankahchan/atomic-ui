@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Script from 'next/script';
 import { PlopProvider } from '@plop-ui/react';
+import { withBasePath } from '@/lib/base-path';
 
 type WebAppKey = {
   id: string;
@@ -115,7 +116,7 @@ export default function TelegramWebAppPage() {
 
     (async () => {
       try {
-        const sessionResponse = await fetch('/api/telegram/webapp/session', {
+        const sessionResponse = await fetch(withBasePath('/api/telegram/webapp/session'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initData: webApp.initData }),
@@ -127,7 +128,7 @@ export default function TelegramWebAppPage() {
         if (cancelled) return;
         setToken(sessionBody.token);
 
-        const keysResponse = await fetch('/api/telegram/webapp/keys', {
+        const keysResponse = await fetch(withBasePath('/api/telegram/webapp/keys'), {
           headers: { Authorization: `Bearer ${sessionBody.token}` },
         });
         const keysBody = (await keysResponse.json()) as WebAppData & { error?: string };
@@ -154,7 +155,9 @@ export default function TelegramWebAppPage() {
       const cached = links[key.id];
       if (cached) return cached;
       const response = await fetch(
-        `/api/telegram/webapp/keys/${encodeURIComponent(key.id)}/links?kind=${key.kind}`,
+        withBasePath(
+          `/api/telegram/webapp/keys/${encodeURIComponent(key.id)}/links?kind=${key.kind}`,
+        ),
         { headers: { Authorization: `Bearer ${token}` } },
       );
       const body = (await response.json()) as KeyLinks & { error?: string };

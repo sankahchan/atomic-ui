@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { withBasePath } from '@/lib/base-path';
 import { getTelegramWebAppUrl } from '@/lib/services/telegram-keys';
 
 const URL_ENV_KEYS = [
@@ -55,5 +56,18 @@ test('Telegram Mini App URL works without a panel base path', () => {
 test('Telegram Mini App URL is omitted when no app origin is configured', () => {
   withEnv({}, () => {
     assert.equal(getTelegramWebAppUrl(), null);
+  });
+});
+
+test('Telegram Web App API calls respect the client-exposed base path', () => {
+  withEnv({ NEXT_PUBLIC_BASE_PATH: '/bda71d6f' }, () => {
+    assert.equal(
+      withBasePath('/api/telegram/webapp/session'),
+      '/bda71d6f/api/telegram/webapp/session',
+    );
+    assert.equal(
+      withBasePath('/api/telegram/webapp/keys'),
+      '/bda71d6f/api/telegram/webapp/keys',
+    );
   });
 });
