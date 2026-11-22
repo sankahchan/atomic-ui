@@ -778,9 +778,9 @@ function CreateKeyDialog({
     tags: '',
     dataLimitGB: '',
     dataLimitResetStrategy: 'NEVER',
-    expirationType: 'NEVER',
+    expirationType: 'START_ON_FIRST_USE',
     expiresAt: '',
-    durationDays: '',
+    durationDays: '30',
     method: 'chacha20-ietf-poly1305',
     userId: 'unassigned', // Use 'unassigned' to represent null/undefined in Select
     templateId: 'none',
@@ -3372,7 +3372,7 @@ function BulkCreateDialog({
   const [count, setCount] = useState('5');
   const [namePrefix, setNamePrefix] = useState('Batch');
   const [dataLimitGB, setDataLimitGB] = useState('');
-  const [expirationType, setExpirationType] = useState<'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE'>('NEVER');
+  const [expirationType, setExpirationType] = useState<'NEVER' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE'>('START_ON_FIRST_USE');
   const [durationDays, setDurationDays] = useState('30');
   const [confirmDrainingServers, setConfirmDrainingServers] = useState(false);
 
@@ -3408,7 +3408,7 @@ function BulkCreateDialog({
       setCount('5');
       setNamePrefix('Batch');
       setDataLimitGB('');
-      setExpirationType('NEVER');
+      setExpirationType('START_ON_FIRST_USE');
       setDurationDays('30');
       setConfirmDrainingServers(false);
     }
@@ -3469,7 +3469,9 @@ function BulkCreateDialog({
       namePrefix: namePrefix.trim(),
       dataLimitGB: dataLimitGB ? Number.parseFloat(dataLimitGB) : null,
       expirationType,
-      durationDays: expirationType === 'DURATION_FROM_CREATION' ? Math.max(1, Number.parseInt(durationDays || '1', 10) || 1) : null,
+      durationDays: expirationType === 'DURATION_FROM_CREATION' || expirationType === 'START_ON_FIRST_USE'
+        ? Math.max(1, Number.parseInt(durationDays || '1', 10) || 1)
+        : null,
       confirmDrainingServers: needsDrainingConfirmation ? confirmDrainingServers : undefined,
     });
   };
@@ -4230,6 +4232,8 @@ export default function KeysPage() {
   const [renewingKey, setRenewingKey] = useState<RenewKeyDialogKeyData | null>(null);
   const [selectedRenewalQueuePresetCode, setSelectedRenewalQueuePresetCode] = useState<string | null>(null);
   const autoRefreshRef = useRef<(() => void) | null>(null);
+  const syncTriggerRef = useRef<(() => void) | null>(null);
+  const syncInFlightRef = useRef(false);
   const { t, locale } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
@@ -4692,6 +4696,7 @@ export default function KeysPage() {
   const autoRefresh = useAutoRefresh({
     onRefresh: useCallback(() => {
       autoRefreshRef.current?.();
+      syncTriggerRef.current?.();
     }, []),
   });
 
@@ -4913,6 +4918,29 @@ export default function KeysPage() {
     },
   });
 
+  // Sync a single server after a key is created so new usage data is persisted.
+  const syncServerMutation = trpc.servers.sync.useMutation({
+    onSuccess: () => {
+      refetch();
+      refetchStats();
+      refetchOnline();
+    },
+  });
+
+  // The Auto Sync interval now performs a real Outline sync, but never overlaps
+  // with another sync (manual, post-create, or a previous interval tick).
+  syncTriggerRef.current = () => {
+    if (syncAllMutation.isPending || syncServerMutation.isPending || syncInFlightRef.current) {
+      return;
+    }
+    syncInFlightRef.current = true;
+    syncAllMutation.mutate(undefined, {
+      onSettled: () => {
+        syncInFlightRef.current = false;
+      },
+    });
+  };
+
   // Auto-open create dialog if query param present
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -4921,8 +4949,9 @@ export default function KeysPage() {
     }
   }, []);
 
-  // Note: Auto-refresh now refetches read-only queries above; the Sync button
-  // below remains the explicit server-write path.
+  // Note: Auto-refresh refetches read-only queries and triggers a real Outline
+  // server sync through syncTriggerRef. The Sync button remains available for
+  // an explicit on-demand sync.
 
   // Delete mutation
   const deleteMutation = trpc.keys.delete.useMutation({
@@ -8363,6 +8392,18 @@ export default function KeysPage() {
           setCreatedKey(newKey);
           refetch();
           refetchStats();
+          const serverId = newKey.server?.id;
+          if (serverId && !syncInFlightRef.current && !syncAllMutation.isPending && !syncServerMutation.isPending) {
+            syncInFlightRef.current = true;
+            syncServerMutation.mutate(
+              { id: serverId },
+              {
+                onSettled: () => {
+                  syncInFlightRef.current = false;
+                },
+              },
+            );
+          }
         }}
       />
 
@@ -8372,6 +8413,7 @@ export default function KeysPage() {
         onSuccess={() => {
           refetch();
           refetchStats();
+          syncTriggerRef.current?.();
         }}
       />
 
