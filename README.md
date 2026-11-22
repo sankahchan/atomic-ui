@@ -1,6 +1,7 @@
 # Atomic-UI
 
-Advanced Outline VPN control center built with Next.js 14, TypeScript, Prisma, and tRPC.
+Advanced Outline VPN control center built with Next.js 16, React 19, TypeScript, Prisma, and tRPC.
+The authenticated dashboard uses [PlopUI](https://github.com/Snorlark/plop-ui) for a hand-drawn paper-and-ink interface that stays readable across desktop, tablet, and phone layouts.
 
 Atomic-UI combines:
 - multi-server Outline operations
@@ -9,14 +10,33 @@ Atomic-UI combines:
 - customer CRM, finance, and announcement tooling
 - direct VPS install/deploy flows for low-memory hosts
 
-![Atomic-UI Screenshot](https://github.com/user-attachments/assets/e3a543e6-165f-472b-a46b-462a15c96ed0)
+**PlopUI operations dashboard**
+
+![Atomic-UI PlopUI dashboard](docs/assets/dashboard.png)
+
+**PlopUI dialogs**
+
+![Add Outline Server dialog](docs/assets/dialog-add-server.png)
+
+![Create Access Key dialog](docs/assets/dialog-create-key.png)
+
+**Mobile Access Keys**
+
+![Atomic-UI mobile Access Keys](docs/assets/mobile-access-keys.png)
 
 ## What Atomic-UI Does
+
+### Dashboard UI
+- PlopUI paper panels, ink outlines, sticker shadows, and hand-drawn lettering across the dashboard shell and page content
+- Portaled dialogs, confirmation alerts, selects, dropdown menus, and mobile sheets inherit the same skin and the active dark/light theme
+- Dense desktop tables switch to compact tablet layouts and readable mobile cards with comfortable touch targets
+- Access Keys scrolling avoids blur and layout churn so long key lists stay smooth on low-powered devices
 
 ### Control center
 - Multi-server Outline management with health, latency, lifecycle, and outage tools
 - Normal access keys and dynamic keys with quotas, expirations, templates, bulk actions, and QR/share delivery
-- Server lifecycle controls including draining, maintenance, and manual-vs-auto assignment behavior
+- Immediate sync after key creation plus interval Auto Sync; `START_ON_FIRST_USE` keys stay `PENDING` until real Outline traffic activates them
+- Server lifecycle controls including draining, maintenance, and manual-vs-auto assignment behavior; empty draining/maintenance servers no longer block sync
 
 ### Telegram product surface
 - Customer commands for `/start`, `/buy`, `/renew`, `/mykeys`, `/orders`, `/inbox`, `/offers`, `/support`, `/premium`, and `/premiumregion`
@@ -37,6 +57,8 @@ Atomic-UI combines:
 ### Security and access control
 - Admin scopes: `OWNER`, `ADMIN`, `FINANCE`, `SUPPORT`
 - Session auth, 2FA, recovery codes, and WebAuthn passkeys
+- Admin-only settings reads with authentication artifacts filtered out and protected from direct updates
+- Owner-or-admin enforcement on access-key subscription URLs and scope checks on security settings
 - Dashboard access rules by IP/CIDR/country
 - Backup and restore flows with smoke validation
 
@@ -117,6 +139,7 @@ npm run build
 ```
 
 `npm run typecheck` is the canonical source-only TypeScript pass for this repo.
+CI also runs ESLint, the unit suite, the Myanmar copy guard, smoke E2E, typecheck, the production build, and Docker builds for every pull request.
 Atomic-UI now expects Node.js 24.x for local development, CI, Docker builds, and direct VPS/systemd installs.
 
 ### Smoke tests
@@ -141,6 +164,7 @@ npm run smoke:telegram
 - `Tools -> Monitoring` is the operator surface for backup verification health, Telegram webhook health, and admin queue aging. Threshold meanings and response steps are in [docs/monitoring-operations.md](docs/monitoring-operations.md).
 - Restoring a production backup onto a test server copies the Telegram bot settings, but Telegram keeps sending updates to the currently registered live webhook until you explicitly switch it. Do not reset the webhook on a test restore host.
 - Subscription branding no longer supports custom CSS. Legacy `subscriptionCustomCss` values are ignored and cleared on save.
+- Direct VPS nginx configs should gzip proxied HTML, CSS, JavaScript, JSON, and SVG. Dashboard shell links prefetch on hover/focus instead of all at mount, which keeps the first load and route changes cheap.
 
 ### Low-memory VPS deploy
 
@@ -163,6 +187,7 @@ This repository now uses semver-style Git tags:
 - `v1.2.1` standalone deployment asset hotfix
 - `v1.2.2` Telegram smoke + VPS install lockfile hardening
 - `v1.2.3` dependency security refresh
+- `v1.2.17` PlopUI dashboard, portaled surface theming, sync/activation hardening, and performance work
 - `v2.0.0` breaking release
 
 ### Recommended release flow
@@ -238,6 +263,7 @@ npm run db:studio
 
 ## Documentation
 
+- [CHANGELOG.md](CHANGELOG.md): release history and detailed fixes
 - [DEPLOY.md](DEPLOY.md): Docker and direct VPS deployment
 - [docs/postgres-cutover.md](docs/postgres-cutover.md): SQLite to Postgres cutover runbook
 - [docs/fresh-vps-bootstrap.md](docs/fresh-vps-bootstrap.md): first-time VPS bootstrap
