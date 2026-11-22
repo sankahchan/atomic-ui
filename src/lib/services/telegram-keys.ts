@@ -1,3 +1,4 @@
+import { withAbsoluteBasePath } from '@/lib/base-path';
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { resolveLocalizedTemplate } from '@/lib/localized-templates';
@@ -452,15 +453,15 @@ export function buildTelegramKeyDetailMessage(input: {
   });
 }
 
-function getTelegramWebAppUrl() {
-  const raw = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
-  if (!raw) return null;
+export function getTelegramWebAppUrl() {
+  const hasOrigin = Boolean(
+    process.env.NEXT_PUBLIC_APP_URL
+    || process.env.APP_URL
+    || process.env.NEXTAUTH_URL,
+  );
+  if (!hasOrigin) return null;
   try {
-    const url = new URL(raw);
-    url.pathname = `${url.pathname.replace(/\/$/, '')}/webapp`;
-    url.search = '';
-    url.hash = '';
-    return url.toString();
+    return new URL(withAbsoluteBasePath('/webapp')).toString();
   } catch {
     return null;
   }
