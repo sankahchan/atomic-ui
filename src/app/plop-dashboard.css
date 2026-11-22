@@ -523,8 +523,10 @@
   }
 }
 
-/* Dialogs, popovers and sheets */
-.plop-dashboard [role='dialog'] {
+/* Dialogs, popovers, sheets and their portaled surfaces. Radix portals are
+   mounted into `.plop-portal-host` (inside this provider), so these rules now
+   reach the surfaces that used to fall back to document.body. */
+.plop-dashboard :is([role='dialog'], .ops-menu-content) {
   border: 3px solid var(--plop-panel-stroke);
   border-radius: var(--plop-radius-cut);
   background-color: var(--plop-panel-bg);
@@ -536,6 +538,18 @@
   box-shadow: 7px 8px 0 var(--plop-panel-shadow);
   color: var(--plop-on);
   font-family: var(--plop-font-body);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.plop-dashboard .ops-modal-close {
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-blob);
+  background: var(--plop-panel-bg-soft);
+  box-shadow: 3px 3px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard .ops-modal-overlay {
@@ -544,9 +558,20 @@
   -webkit-backdrop-filter: blur(4px);
 }
 
-.plop-dashboard [data-radix-popper-content-wrapper] [role='dialog'],
-.plop-dashboard [role='menu'] {
+.plop-dashboard [data-radix-popper-content-wrapper] :is([role='dialog'], .ops-menu-content) {
   box-shadow: 4px 5px 0 var(--plop-panel-shadow);
+}
+
+.plop-dashboard .ops-menu-content [role='menuitem'] {
+  border-radius: var(--plop-radius-box);
+  font-family: var(--plop-font-letter);
+  font-weight: 700;
+}
+
+.plop-dashboard .ops-menu-content [role='menuitem'][data-highlighted],
+.plop-dashboard .ops-menu-content [role='menuitem'][data-state='open'] {
+  background: var(--plop-mustard);
+  color: #1c2e8c;
 }
 
 /* Charts and skeleton states */

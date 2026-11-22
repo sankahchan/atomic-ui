@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.2.17 - 2026-11-23
+
+### Added
+
+- Reskinned the entire authenticated dashboard with PlopUI, including shared cards, buttons, inputs, tables, badges, charts, and page-level panels.
+- Extended the PlopUI skin to Radix portaled surfaces so dialogs, confirmation dialogs, selects, dropdown menus, and sheets inherit the active dashboard theme instead of falling back to the old glass style.
+- Added immediate server sync after creating an access key while keeping Auto Sync on its configured interval.
+- Added first-use activation for `START_ON_FIRST_USE` keys: a 30-day key stays `PENDING` until real Outline traffic is observed, then becomes `ACTIVE` and starts its duration.
+- Added lint and unit-test execution to CI alongside typecheck and build.
+
+### Changed
+
+- Reduced dashboard route prefetching and enabled gzip for proxied HTML, CSS, JavaScript, JSON, and SVG assets to improve first load and navigation speed.
+- Optimized Access Keys scrolling by removing global smooth scrolling, unnecessary blur work, oversized transitions, sparkline refetch churn, and excessive live polling.
+- Tuned phone and tablet views with denser tablet tables, larger touch targets, and stable mobile card scroll heights.
+- Hardened sync handling by excluding empty draining/maintenance servers from `syncAll`, shortening Outline API timeouts, and guarding overlapping sync triggers.
+
+### Fixed
+
+- Restricted `settings.getAll` to admins and filtered authentication artifacts such as temporary login and WebAuthn challenge settings out of settings responses and updates.
+- Enforced owner-or-admin access on access-key subscription URLs to prevent cross-user link disclosure.
+- Enforced notification-manage scope on security settings procedures instead of relying on role alone.
+- Fixed hydration mismatch in the PlopUI shell by mirroring the resolved theme only after mount.
+- Stabilized timezone-dependent Telegram commerce tests by pinning them to UTC.
+
 ## v1.2.16 - 2026-06-14
 
 ### Changed

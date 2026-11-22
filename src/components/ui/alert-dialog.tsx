@@ -4,12 +4,19 @@ import * as React from "react"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { usePlopPortalContainer } from "@/components/providers/plop-shell-provider"
 
 const AlertDialog = AlertDialogPrimitive.Root
 
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger
 
-const AlertDialogPortal = AlertDialogPrimitive.Portal
+const AlertDialogPortal = (
+  props: React.ComponentProps<typeof AlertDialogPrimitive.Portal>
+) => {
+  const container = usePlopPortalContainer()
+  return <AlertDialogPrimitive.Portal container={container ?? undefined} {...props} />
+}
+AlertDialogPortal.displayName = AlertDialogPrimitive.Portal.displayName
 
 const AlertDialogOverlay = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
