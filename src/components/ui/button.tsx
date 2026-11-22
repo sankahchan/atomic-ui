@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
  */
 const buttonVariants = cva(
   // Base styles applied to all buttons
-  'inline-flex items-center justify-center whitespace-nowrap rounded-[1.1rem] text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'ops-button inline-flex items-center justify-center whitespace-nowrap rounded-[1.1rem] text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
@@ -86,6 +86,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
+        data-plop-button-variant={variant ?? 'default'}
+        data-plop-button-size={size ?? 'default'}
         ref={ref}
         {...props}
       />
