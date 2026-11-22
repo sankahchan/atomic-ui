@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
  * easy extension if different label styles are needed in the future.
  */
 const labelVariants = cva(
-  'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+  'ops-label text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
 );
 
 /**

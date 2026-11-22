@@ -1,0 +1,566 @@
+/**
+ * PlopUI dashboard skin
+ *
+ * This file is intentionally scoped to `.plop-dashboard`, which is rendered by
+ * PlopShellProvider inside the dashboard layout. Authentication and public
+ * portal pages keep their previous visual treatment.
+ *
+ * Component APIs stay unchanged: the rules below restyle stable hook classes
+ * added to the existing shared primitives.
+ */
+
+.plop-dashboard {
+  /* Tailwind-facing tokens, translated from PlopUI's palette. */
+  --background: 42 41% 89%;
+  --foreground: 229 69% 50%;
+  --card: 45 100% 98%;
+  --card-foreground: 230 67% 33%;
+  --popover: 45 100% 98%;
+  --popover-foreground: 230 67% 33%;
+  --primary: 229 69% 50%;
+  --primary-foreground: 45 100% 98%;
+  --secondary: 229 67% 80%;
+  --secondary-foreground: 230 67% 33%;
+  --muted: 43 91% 62%;
+  --muted-foreground: 230 67% 33%;
+  --accent: 146 42% 74%;
+  --accent-foreground: 230 67% 33%;
+  --destructive: 9 75% 47%;
+  --destructive-foreground: 45 100% 98%;
+  --border: 229 69% 50%;
+  --input: 229 69% 50%;
+  --ring: 9 75% 47%;
+  --radius: 14px;
+
+  /* Local skin tokens. */
+  --plop-panel-bg: #fbf8f0;
+  --plop-panel-bg-soft: #f3eedf;
+  --plop-panel-stroke: #2848d8;
+  --plop-panel-shadow: rgba(40, 72, 216, 0.24);
+  --plop-panel-muted: rgba(40, 72, 216, 0.08);
+  --plop-panel-text-on-fill: #1c2e8c;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--plop-on);
+  font-family: var(--plop-font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  background-attachment: fixed;
+}
+
+.plop-dashboard.dark,
+.dark .plop-dashboard,
+.plop-dashboard[data-plop-theme='dark'] {
+  --background: 228 47% 14%;
+  --foreground: 45 100% 98%;
+  --card: 229 42% 22%;
+  --card-foreground: 45 100% 98%;
+  --popover: 229 42% 22%;
+  --popover-foreground: 45 100% 98%;
+  --primary: 43 91% 62%;
+  --primary-foreground: 228 47% 14%;
+  --secondary: 229 36% 28%;
+  --secondary-foreground: 45 100% 98%;
+  --muted: 229 30% 24%;
+  --muted-foreground: 43 30% 82%;
+  --accent: 146 42% 74%;
+  --accent-foreground: 228 47% 14%;
+  --destructive: 9 75% 47%;
+  --destructive-foreground: 45 100% 98%;
+  --border: 45 40% 78%;
+  --input: 45 40% 78%;
+  --ring: 43 91% 62%;
+
+  --plop-panel-bg: #202a4e;
+  --plop-panel-bg-soft: #27345e;
+  --plop-panel-stroke: #fff8e7;
+  --plop-panel-shadow: rgba(255, 248, 231, 0.18);
+  --plop-panel-muted: rgba(255, 248, 231, 0.08);
+  --plop-panel-text-on-fill: #131a35;
+}
+
+/* The old animated mesh fights the paper texture, so retire it inside the skin. */
+.plop-dashboard .bg-mesh {
+  opacity: 0;
+}
+
+.plop-dashboard .bg-mesh > div {
+  display: none;
+}
+
+/* Lettering */
+.plop-dashboard :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--plop-font-letter);
+  font-weight: 900;
+  letter-spacing: -0.015em;
+}
+
+.plop-dashboard :is(.font-sans, .font-mono) {
+  font-family: var(--plop-font-body);
+}
+
+.plop-dashboard .font-mono,
+.plop-dashboard code,
+.plop-dashboard pre {
+  font-family: var(--plop-font-mono);
+}
+
+/* Shared paper panels */
+.plop-dashboard :is(
+    .glass,
+    .glass-medium,
+    .glass-light,
+    .ops-card,
+    .ops-panel,
+    .ops-hero,
+    .ops-kpi-tile,
+    .ops-showcase,
+    .ops-support-card,
+    .ops-mini-tile,
+    .ops-action-tile,
+    .ops-stat-pod,
+    .ops-hero-aside,
+    .ops-detail-card,
+    .ops-command-bar,
+    .ops-table-toolbar,
+    .ops-table-meta,
+    .ops-chip-cloud,
+    .ops-filter-bar,
+    .ops-data-shell,
+    .ops-mobile-card,
+    .ops-mobile-action-stack,
+    .ops-chart-shell,
+    .ops-empty-state,
+    .ops-surface-skeleton,
+    .ops-pill
+  ) {
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-box);
+  background-color: var(--plop-panel-bg);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 11px,
+    var(--plop-panel-muted) 11px 12px
+  );
+  box-shadow: 4px 5px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Page-level tiles that bypass the shared Card primitive still get the paper
+   treatment. The attribute hooks target the old arbitrary dark gradients. */
+.plop-dashboard [class*='dark:bg-[radial-gradient'],
+.plop-dashboard [class*='dark:bg-[linear-gradient(180deg,rgba(5,12,24'] {
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-box);
+  background-color: var(--plop-panel-bg);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 11px,
+    var(--plop-panel-muted) 11px 12px
+  );
+  box-shadow: 4px 5px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+}
+
+/* Dashboard shell */
+.plop-dashboard .glass-sidebar {
+  border: 3px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-cut);
+  background-color: var(--plop-panel-bg);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 14px,
+    var(--plop-panel-muted) 14px 15px
+  );
+  box-shadow: 6px 0 0 var(--plop-panel-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.plop-dashboard .ops-topbar {
+  border: 3px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-box);
+  background-color: var(--plop-panel-bg);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 12px,
+    var(--plop-panel-muted) 12px 13px
+  );
+  box-shadow: 4px 5px 0 var(--plop-panel-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.plop-dashboard .ops-sidebar-item {
+  min-height: 3.15rem;
+  border: 2px solid transparent;
+  border-radius: var(--plop-radius-box);
+  background: transparent;
+  color: var(--plop-on-soft);
+  font-family: var(--plop-font-letter);
+  font-weight: 700;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.plop-dashboard .ops-sidebar-item:hover {
+  border-color: var(--plop-panel-stroke);
+  background: var(--plop-panel-muted);
+  color: var(--plop-on);
+  box-shadow: 2px 2px 0 var(--plop-panel-shadow);
+}
+
+.plop-dashboard .ops-sidebar-item[aria-current='page'] {
+  border-color: var(--plop-panel-stroke);
+  background: var(--plop-mustard);
+  box-shadow: 3px 3px 0 var(--plop-panel-shadow);
+  color: #1c2e8c;
+  transform: rotate(-0.6deg);
+}
+
+.plop-dashboard .ops-sidebar-item[aria-current='page'] svg {
+  color: #1c2e8c;
+}
+
+.plop-dashboard .glass-bottom-bar {
+  border: 3px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-cut);
+  background-color: var(--plop-panel-bg);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 10px,
+    var(--plop-panel-muted) 10px 11px
+  );
+  box-shadow: 0 5px 0 var(--plop-panel-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.plop-dashboard .ops-mobile-dock-pill {
+  border: 2px solid var(--plop-panel-stroke);
+  background: var(--plop-panel-bg-soft);
+  color: var(--plop-on-soft);
+  box-shadow: none;
+}
+
+.plop-dashboard .ops-mobile-dock-pill-active {
+  background: var(--plop-mustard);
+  color: #1c2e8c;
+  box-shadow: 3px 3px 0 var(--plop-panel-shadow);
+  transform: rotate(-2deg);
+}
+
+.plop-dashboard .ops-mobile-dock-label,
+.plop-dashboard .ops-mobile-dock-label-active {
+  font-family: var(--plop-font-letter);
+  font-weight: 800;
+  color: var(--plop-on);
+  opacity: 1;
+}
+
+/* Buttons */
+.plop-dashboard .ops-button {
+  min-height: 2.25rem;
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-box);
+  background: var(--plop-panel-bg-soft);
+  box-shadow: 3px 3px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+  font-family: var(--plop-font-letter);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  padding-inline: 0.9rem;
+  transition: transform 120ms var(--plop-ease-squish), box-shadow 120ms var(--plop-ease-squish);
+}
+
+.plop-dashboard .ops-button:hover:not(:disabled) {
+  transform: translate(1px, 1px) rotate(-0.4deg);
+  box-shadow: 2px 2px 0 var(--plop-panel-shadow);
+}
+
+.plop-dashboard .ops-button:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 var(--plop-panel-shadow);
+}
+
+.plop-dashboard .ops-button[data-plop-button-variant='default'] {
+  background: var(--plop-ink);
+  color: var(--plop-on-ink);
+}
+
+.plop-dashboard .ops-button[data-plop-button-variant='destructive'] {
+  background: var(--plop-tomato);
+  color: var(--plop-on-fill-tomato);
+}
+
+.plop-dashboard .ops-button[data-plop-button-variant='secondary'] {
+  background: var(--plop-periwinkle);
+  color: #1c2e8c;
+}
+
+.plop-dashboard .ops-button[data-plop-button-variant='outline'] {
+  background: transparent;
+  color: var(--plop-on);
+}
+
+.plop-dashboard .ops-button[data-plop-button-variant='ghost'] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--plop-on-soft);
+}
+
+.plop-dashboard .ops-button[data-plop-button-variant='ghost']:hover:not(:disabled) {
+  border-color: var(--plop-panel-stroke);
+  background: var(--plop-panel-muted);
+  box-shadow: 2px 2px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+}
+
+.plop-dashboard .ops-button[data-plop-button-variant='link'] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--plop-ink-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.plop-dashboard .ops-button[data-plop-button-size='sm'] {
+  min-height: 2rem;
+  padding-inline: 0.7rem;
+}
+
+.plop-dashboard .ops-button[data-plop-button-size='lg'] {
+  min-height: 2.75rem;
+  padding-inline: 1.35rem;
+}
+
+.plop-dashboard .ops-button[data-plop-button-size='icon'] {
+  width: 2.35rem;
+  height: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0;
+  border-radius: var(--plop-radius-blob);
+}
+
+/* Form controls */
+.plop-dashboard :is(.ops-input, .ops-textarea, .ops-select-trigger) {
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-box);
+  background: var(--plop-panel-bg);
+  box-shadow: 3px 3px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+  font-family: var(--plop-font-body);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.plop-dashboard :is(.ops-input, .ops-textarea, .ops-select-trigger):focus-visible {
+  outline: 3px dashed var(--plop-focus);
+  outline-offset: 2px;
+  box-shadow: 3px 3px 0 var(--plop-panel-shadow);
+}
+
+.plop-dashboard .ops-input::placeholder,
+.plop-dashboard .ops-textarea::placeholder {
+  color: var(--plop-placeholder);
+  opacity: 1;
+}
+
+.plop-dashboard .ops-label {
+  color: var(--plop-on);
+  font-family: var(--plop-font-letter);
+  font-weight: 800;
+}
+
+.plop-dashboard .ops-select-content {
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-box);
+  background: var(--plop-panel-bg);
+  box-shadow: 4px 5px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.plop-dashboard [role='option'][data-highlighted] {
+  background: var(--plop-mustard);
+  color: #1c2e8c;
+  border-radius: var(--plop-radius-box);
+}
+
+.plop-dashboard .ops-tabs-list {
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-box);
+  background: var(--plop-panel-bg-soft);
+  box-shadow: 3px 3px 0 var(--plop-panel-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.plop-dashboard .ops-tabs-trigger {
+  border-radius: var(--plop-radius-box);
+  color: var(--plop-on-soft);
+  font-family: var(--plop-font-letter);
+  font-weight: 700;
+}
+
+.plop-dashboard .ops-tabs-trigger[data-state='active'] {
+  background: var(--plop-mustard);
+  box-shadow: 2px 2px 0 var(--plop-panel-shadow);
+  color: #1c2e8c;
+}
+
+.plop-dashboard .ops-switch {
+  border: 2.5px solid var(--plop-panel-stroke);
+  border-radius: 999px;
+  background: var(--plop-panel-bg-soft);
+  box-shadow: 2px 2px 0 var(--plop-panel-shadow);
+}
+
+.plop-dashboard .ops-switch[data-state='checked'] {
+  background: var(--plop-mint);
+}
+
+.plop-dashboard .ops-switch span {
+  border: 2px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-blob);
+  background: var(--plop-panel-bg);
+  height: 1.05rem;
+  width: 1.05rem;
+}
+
+/* Status labels */
+.plop-dashboard .ops-badge {
+  border: 2px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-sticker);
+  background: var(--plop-panel-bg-soft);
+  box-shadow: 2px 2px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+  font-family: var(--plop-font-letter);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  transform: rotate(-0.8deg);
+}
+
+.plop-dashboard .ops-badge[data-plop-badge-variant='default'] {
+  background: var(--plop-ink);
+  color: var(--plop-on-ink);
+}
+
+.plop-dashboard .ops-badge[data-plop-badge-variant='secondary'],
+.plop-dashboard .ops-badge[data-plop-badge-variant='info'] {
+  background: var(--plop-periwinkle);
+  color: #1c2e8c;
+}
+
+.plop-dashboard .ops-badge[data-plop-badge-variant='destructive'],
+.plop-dashboard .ops-badge[data-plop-badge-variant='danger'] {
+  background: var(--plop-tomato);
+  color: var(--plop-on-fill-tomato);
+}
+
+.plop-dashboard .ops-badge[data-plop-badge-variant='success'] {
+  background: var(--plop-mint);
+  color: #1c2e8c;
+}
+
+.plop-dashboard .ops-badge[data-plop-badge-variant='warning'] {
+  background: var(--plop-mustard);
+  color: #1c2e8c;
+}
+
+.plop-dashboard .ops-badge[data-plop-badge-variant='outline'] {
+  background: transparent;
+}
+
+/* Tables */
+.plop-dashboard .ops-table-head {
+  background: var(--plop-mustard);
+  color: #1c2e8c;
+}
+
+.plop-dashboard .ops-table-head th {
+  color: #1c2e8c;
+  font-family: var(--plop-font-letter);
+  font-weight: 900;
+  letter-spacing: 0.09em;
+}
+
+.plop-dashboard .ops-table-row {
+  border-color: var(--plop-panel-stroke);
+}
+
+.plop-dashboard .ops-table-row:hover {
+  background: var(--plop-panel-muted);
+}
+
+.plop-dashboard .ops-table td {
+  border-color: var(--plop-panel-muted);
+}
+
+/* Dialogs, popovers and sheets */
+.plop-dashboard [role='dialog'] {
+  border: 3px solid var(--plop-panel-stroke);
+  border-radius: var(--plop-radius-cut);
+  background-color: var(--plop-panel-bg);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 14px,
+    var(--plop-panel-muted) 14px 15px
+  );
+  box-shadow: 7px 8px 0 var(--plop-panel-shadow);
+  color: var(--plop-on);
+  font-family: var(--plop-font-body);
+}
+
+.plop-dashboard .ops-modal-overlay {
+  background: rgba(19, 26, 53, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.plop-dashboard [data-radix-popper-content-wrapper] [role='dialog'],
+.plop-dashboard [role='menu'] {
+  box-shadow: 4px 5px 0 var(--plop-panel-shadow);
+}
+
+/* Charts and skeleton states */
+.plop-dashboard .recharts-cartesian-grid line {
+  stroke: var(--plop-panel-stroke);
+  opacity: 0.18;
+}
+
+.plop-dashboard .recharts-text {
+  fill: var(--plop-on-soft);
+  font-family: var(--plop-font-body);
+}
+
+.plop-dashboard .ops-skeleton-line {
+  border-radius: var(--plop-radius-box);
+  background: var(--plop-panel-muted);
+}
+
+/* Keep the hand-drawn look comfortable on dense ops screens. */
+@media (max-width: 640px) {
+  .plop-dashboard .ops-button {
+    font-size: 13px;
+  }
+
+  .plop-dashboard :is(h1, h2) {
+    font-size: 1.4rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plop-dashboard .ops-button,
+  .plop-dashboard .ops-badge,
+  .plop-dashboard .ops-sidebar-item[aria-current='page'],
+  .plop-dashboard .ops-mobile-dock-pill-active {
+    transform: none;
+  }
+}

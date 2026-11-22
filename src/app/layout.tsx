@@ -7,7 +7,10 @@ import { ThemeProvider } from '@/components/providers/theme-provider';
 import { TRPCProvider } from '@/components/providers/trpc-provider';
 import { SessionProvider } from '@/components/providers/session-provider';
 import { Toaster } from '@/components/ui/toaster';
+import '@plop-ui/fonts/fonts.css';
+import '@plop-ui/react/styles.css';
 import './globals.css';
+import './plop-dashboard.css';
 
 /**
  * Application Metadata

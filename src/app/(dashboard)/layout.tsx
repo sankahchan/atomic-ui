@@ -14,7 +14,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { Tag } from '@plop-ui/react';
 import { trpc } from '@/lib/trpc';
+import { PlopShellProvider } from '@/components/providers/plop-shell-provider';
 import { APP_RELEASE_LABEL } from '@/lib/app-version';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -132,6 +134,7 @@ function Sidebar({
                       : 'text-muted-foreground hover:text-foreground dark:text-slate-400 dark:hover:text-slate-100'
                   )}
                   title={isCollapsed ? t(item.labelKey) : undefined}
+                  aria-current={isActive ? 'page' : undefined}
                 >
                   <item.icon className={cn(
                     'w-5 h-5 flex-shrink-0',
@@ -281,9 +284,19 @@ function Header({
             <div className="hidden sm:flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm dark:border-cyan-400/15 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">{user.email}</span>
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary dark:border dark:border-cyan-300/20 dark:bg-cyan-400/10 dark:text-cyan-200">
+              <Tag
+                tone={
+                  user?.role === 'ADMIN'
+                    ? 'tomato'
+                    : user?.role === 'CLIENT'
+                      ? 'mint'
+                      : 'periwinkle'
+                }
+                seed={user.email}
+                tilt={-1}
+              >
                 {userRoleLabel}
-              </span>
+              </Tag>
             </div>
           )}
 
@@ -374,60 +387,64 @@ export default function DashboardLayout({
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <GradientMeshBackground />
-        <div className="flex flex-col items-center gap-4 relative z-10">
-          <Atom className="h-12 w-12 text-primary animate-spin" />
-          <p className="text-muted-foreground">{locale === 'my' ? 'တင်နေသည်…' : 'Loading...'}</p>
-          <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-3000 fill-mode-forwards opacity-0" style={{ animationDelay: '3s' }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={async () => {
-                try {
-                  await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                  });
-                } catch {
-                  // Redirect to login even if the explicit logout request fails.
-                } finally {
-                  router.replace('/login');
-                  router.refresh();
-                }
-              }}
-            >
-              {locale === 'my' ? 'ကြာနေပါသလား? ထွက်မည်' : 'Taking too long? Sign out'}
-            </Button>
+      <PlopShellProvider>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <GradientMeshBackground />
+          <div className="flex flex-col items-center gap-4 relative z-10">
+            <Atom className="h-12 w-12 text-primary animate-spin" />
+            <p className="text-muted-foreground">{locale === 'my' ? 'တင်နေသည်…' : 'Loading...'}</p>
+            <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-3000 fill-mode-forwards opacity-0" style={{ animationDelay: '3s' }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await fetch('/api/auth/logout', {
+                      method: 'POST',
+                      credentials: 'same-origin',
+                    });
+                  } catch {
+                    // Redirect to login even if the explicit logout request fails.
+                  } finally {
+                    router.replace('/login');
+                    router.refresh();
+                  }
+                }}
+              >
+                {locale === 'my' ? 'ကြာနေပါသလား? ထွက်မည်' : 'Taking too long? Sign out'}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </PlopShellProvider>
     );
   }
 
   // Error state
   if (hasError || isError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <GradientMeshBackground />
-        <div className="flex flex-col items-center gap-4 text-center p-8 relative z-10">
-          <Atom className="h-12 w-12 text-red-500" />
-          <h2 className="text-xl font-semibold text-foreground">
-            {locale === 'my' ? 'ချိတ်ဆက်မှု အမှား' : 'Connection Error'}
-          </h2>
-          <p className="text-muted-foreground max-w-md">
-            {locale === 'my'
-              ? 'ဆာဗာသို့ မချိတ်ဆက်နိုင်ပါ။ သင်၏ ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်မံကြိုးစားပါ။'
-              : 'Unable to connect to the server. Please check your connection and try again.'}
-          </p>
-          <Button
-            onClick={() => router.refresh()}
-            className="mt-4"
-          >
-            {locale === 'my' ? 'ထပ်မံကြိုးစားမည်' : 'Retry'}
-          </Button>
+      <PlopShellProvider>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <GradientMeshBackground />
+          <div className="flex flex-col items-center gap-4 text-center p-8 relative z-10">
+            <Atom className="h-12 w-12 text-red-500" />
+            <h2 className="text-xl font-semibold text-foreground">
+              {locale === 'my' ? 'ချိတ်ဆက်မှု အမှား' : 'Connection Error'}
+            </h2>
+            <p className="text-muted-foreground max-w-md">
+              {locale === 'my'
+                ? 'ဆာဗာသို့ မချိတ်ဆက်နိုင်ပါ။ သင်၏ ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်မံကြိုးစားပါ။'
+                : 'Unable to connect to the server. Please check your connection and try again.'}
+            </p>
+            <Button
+              onClick={() => router.refresh()}
+              className="mt-4"
+            >
+              {locale === 'my' ? 'ထပ်မံကြိုးစားမည်' : 'Retry'}
+            </Button>
+          </div>
         </div>
-      </div>
+      </PlopShellProvider>
     );
   }
 
@@ -437,50 +454,52 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="ops-mobile-root min-h-screen min-h-[100dvh] overflow-x-hidden bg-background">
-      {/* Animated gradient mesh background */}
-      <GradientMeshBackground />
+    <PlopShellProvider>
+      <div className="ops-mobile-root min-h-screen min-h-[100dvh] overflow-x-hidden bg-background">
+        {/* Animated gradient mesh background */}
+        <GradientMeshBackground />
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block">
-        <Sidebar
-          isCollapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        {/* Desktop sidebar */}
+        <div className="hidden lg:block">
+          <Sidebar
+            isCollapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
+        </div>
+
+        {/* Main content area */}
+        <div className={cn(
+          'relative flex min-h-screen flex-col transition-all duration-300 lg:pb-4 lg:pr-4',
+          'lg:ml-[20.5rem]',
+          sidebarCollapsed && 'lg:ml-[8rem]'
+        )}>
+          {/* Header */}
+          <Header
+            user={user}
+            onLogout={handleLogout}
+            onOpenTools={() => setMobileToolsOpen(true)}
+          />
+
+          {/* Page content — extra bottom padding on mobile for tab bar */}
+          <main className="flex-1 px-3 pb-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+1.5rem)] pt-3 sm:px-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
+            <div className="ops-page">
+              {children}
+            </div>
+          </main>
+        </div>
+
+        {/* Mobile bottom tab bar */}
+        <BottomTabBar />
+
+        {/* Mobile tools sheet */}
+        <MoreMenu
+          open={mobileToolsOpen}
+          onClose={() => setMobileToolsOpen(false)}
         />
+
+        {/* Scroll to top button */}
+        <ScrollToTop />
       </div>
-
-      {/* Main content area */}
-      <div className={cn(
-        'relative flex min-h-screen flex-col transition-all duration-300 lg:pb-4 lg:pr-4',
-        'lg:ml-[20.5rem]',
-        sidebarCollapsed && 'lg:ml-[8rem]'
-      )}>
-        {/* Header */}
-        <Header
-          user={user}
-          onLogout={handleLogout}
-          onOpenTools={() => setMobileToolsOpen(true)}
-        />
-
-        {/* Page content — extra bottom padding on mobile for tab bar */}
-        <main className="flex-1 px-3 pb-[calc(var(--bottom-bar-height)+var(--safe-area-bottom)+1.5rem)] pt-3 sm:px-4 md:px-6 lg:px-8 lg:pb-10 lg:pt-6">
-          <div className="ops-page">
-            {children}
-          </div>
-        </main>
-      </div>
-
-      {/* Mobile bottom tab bar */}
-      <BottomTabBar />
-
-      {/* Mobile tools sheet */}
-      <MoreMenu
-        open={mobileToolsOpen}
-        onClose={() => setMobileToolsOpen(false)}
-      />
-
-      {/* Scroll to top button */}
-      <ScrollToTop />
-    </div>
+    </PlopShellProvider>
   );
 }
