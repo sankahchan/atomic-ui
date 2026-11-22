@@ -39,21 +39,7 @@ import { BottomTabBar } from '@/components/layout/bottom-tab-bar';
 import { GradientMeshBackground } from '@/components/layout/gradient-mesh-bg';
 import { MoreMenu } from '@/components/layout/more-menu';
 import { useLocale } from '@/hooks/use-locale';
-import {
-  adminToolNavItems,
-  primaryDashboardNavItems,
-  settingsShortcutItems,
-} from '@/components/layout/dashboard-nav';
-
-/**
- * Navigation items for route prefetching.
- */
-const navItems = [
-  ...primaryDashboardNavItems,
-  ...adminToolNavItems,
-  ...settingsShortcutItems,
-  { href: '/dashboard/tools' },
-];
+import { primaryDashboardNavItems } from '@/components/layout/dashboard-nav';
 
 /**
  * Sidebar Component (Desktop only)
@@ -68,6 +54,7 @@ function Sidebar({
   onToggle: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { locale, t } = useLocale();
 
   return (
@@ -135,6 +122,8 @@ function Sidebar({
                   )}
                   title={isCollapsed ? t(item.labelKey) : undefined}
                   aria-current={isActive ? 'page' : undefined}
+                  onMouseEnter={() => router.prefetch(item.href)}
+                  onFocus={() => router.prefetch(item.href)}
                 >
                   <item.icon className={cn(
                     'w-5 h-5 flex-shrink-0',
@@ -334,14 +323,6 @@ export default function DashboardLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
-
-  // Warm route chunks for faster dashboard navigation.
-  useEffect(() => {
-    for (const item of navItems) {
-      router.prefetch(item.href);
-    }
-    router.prefetch('/portal');
-  }, [router]);
 
   // Fetch current user with error handling
   const { data: user, isLoading, isError, error } = trpc.auth.me.useQuery(undefined, {
