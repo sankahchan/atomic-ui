@@ -150,10 +150,14 @@
 }
 
 /* Keep repeated key cards cheap while the list scrolls. */
-.plop-dashboard .ops-mobile-card,
+.plop-dashboard .ops-mobile-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 276px;
+}
+
 .plop-dashboard .ops-key-card {
   content-visibility: auto;
-  contain-intrinsic-size: auto 240px;
+  contain-intrinsic-size: auto 260px;
 }
 
 /* Page-level tiles that bypass the shared Card primitive still get the paper
@@ -514,6 +518,15 @@
   border-color: var(--plop-panel-muted);
 }
 
+/* Tablets get a denser table instead of a sideways-scrolling one. */
+@media (min-width: 768px) and (max-width: 1120px) {
+  .plop-dashboard .ops-table th,
+  .plop-dashboard .ops-table td {
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+}
+
 /* Dialogs, popovers and sheets */
 .plop-dashboard [role='dialog'] {
   border: 3px solid var(--plop-panel-stroke);
@@ -564,6 +577,19 @@
 
   .plop-dashboard :is(h1, h2) {
     font-size: 1.4rem;
+  }
+}
+
+/* Touch screens need larger targets than the dense desktop chips. */
+@media (hover: none) and (pointer: coarse) {
+  .plop-dashboard button.ops-tag-chip {
+    min-height: 2.25rem;
+    padding-block: 0.45rem;
+  }
+
+  .plop-dashboard .ops-button[data-plop-button-size='icon'] {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
   }
 }
 
