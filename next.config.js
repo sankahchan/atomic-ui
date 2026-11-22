@@ -104,7 +104,7 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/:path*',
+        source: '/((?!webapp).*)',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'same-origin' },
@@ -120,6 +120,29 @@ const nextConfig = {
               "font-src 'self' data: https:",
               "style-src 'self' 'unsafe-inline' https:",
               "script-src 'self' 'unsafe-inline' blob:",
+              "connect-src 'self' https: wss: ws:",
+              "media-src 'self' data: blob: https:",
+            ].join('; '),
+          },
+        ],
+      },
+      {
+        source: '/webapp/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors https://telegram.org https://web.telegram.org",
+              "object-src 'none'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data: https:",
+              "style-src 'self' 'unsafe-inline' https:",
+              "script-src 'self' 'unsafe-inline' blob: https://telegram.org",
               "connect-src 'self' https: wss: ws:",
               "media-src 'self' data: blob: https:",
             ].join('; '),

@@ -26,6 +26,13 @@ test('status page is explicitly public', () => {
   assert.equal(isPublicRoute('/status/history'), true);
 });
 
+test('Telegram Web App routes are public but still initData-authenticated', () => {
+  assert.equal(isPublicRoute('/webapp'), true);
+  assert.equal(isPublicRoute('/api/telegram/webapp/session'), true);
+  assert.equal(isPublicRoute('/api/telegram/webhook'), true);
+  assert.equal(isPublicRoute('/webappish'), false);
+});
+
 test('exact public-route matching does not leak to sibling paths', () => {
   assert.equal(isPublicRoute('/login'), true);
   assert.equal(isPublicRoute('/login-approval'), true);

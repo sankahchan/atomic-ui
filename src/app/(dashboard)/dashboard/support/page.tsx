@@ -226,6 +226,7 @@ export default function SupportCenterPage() {
   const [issueFilter, setIssueFilter] = useState<SupportIssueFilter>('ALL');
   const [analyticsWindowDays, setAnalyticsWindowDays] = useState(30);
   const [search, setSearch] = useState('');
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, string>>({});
 
   const currentUserQuery = trpc.auth.me.useQuery();
   const threadsQuery = trpc.users.listSupportThreads.useQuery({
@@ -259,9 +260,20 @@ export default function SupportCenterPage() {
     },
   });
 
+  const assignMutation = trpc.users.assignSupportThread.useMutation({
+    onSuccess: async () => {
+      await Promise.all([threadsQuery.refetch(), analyticsQuery.refetch()]);
+      toast({ title: isMyanmar ? 'အကူအညီ စကားဝိုင်း တာဝန်ခွဲဝေမှုကို အပ်ဒိတ်လုပ်ပြီးပါပြီ' : 'Support thread assignment updated' });
+    },
+    onError: (error) => {
+      toast({ title: isMyanmar ? 'တာဝန်ခွဲဝေမှု မအောင်မြင်ပါ' : 'Assign failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const currentUserId = currentUserQuery.data?.id ?? null;
-  const isBusy = claimMutation.isPending || unclaimMutation.isPending;
+  const isBusy = claimMutation.isPending || unclaimMutation.isPending || assignMutation.isPending;
   const threads = threadsQuery.data?.threads || [];
+  const assignableAdmins = threadsQuery.data?.assignableAdmins || [];
 
   const boardCards = [
     {
@@ -612,6 +624,8 @@ export default function SupportCenterPage() {
               const linkedContext = getSupportThreadContextSummary(thread, isMyanmar);
               const threadHref = withBasePath(`/dashboard/support/threads/${thread.id}`);
               const customerHref = thread.customer ? withBasePath(`/dashboard/users/${thread.customer.id}`) : null;
+              const currentAssignmentValue = thread.assignedAdminUserId || 'unassigned';
+              const selectedAdminId = assignmentDrafts[thread.id] ?? currentAssignmentValue;
 
               return (
                 <div key={thread.id} className="rounded-[1.1rem] border border-border/60 bg-background/40 p-4 dark:bg-white/[0.03]">
@@ -668,6 +682,57 @@ export default function SupportCenterPage() {
                           {isMyanmar ? 'တာဝန်ယူမည်' : 'Claim'}
                         </Button>
                       )}
+                      {assignableAdmins.length > 0 ? (
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={selectedAdminId}
+                            onValueChange={(value) =>
+                              setAssignmentDrafts((current) => ({ ...current, [thread.id]: value }))
+                            }
+                          >
+                            <SelectTrigger className="min-w-[180px]">
+                              <SelectValue placeholder={isMyanmar ? 'စီမံခန့်ခွဲသူ ရွေးပါ' : 'Select admin'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">{isMyanmar ? 'မသတ်မှတ်ရသေး' : 'Unassigned'}</SelectItem>
+                              {thread.assignedAdminUserId && !assignableAdmins.some((admin) => admin.id === thread.assignedAdminUserId) ? (
+                                <SelectItem value={thread.assignedAdminUserId}>
+                                  {thread.assignedAdminName || thread.assignedAdminUserId}
+                                </SelectItem>
+                              ) : null}
+                              {assignableAdmins.map((admin) => (
+                                <SelectItem key={admin.id} value={admin.id}>
+                                  {admin.email}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isBusy || selectedAdminId === currentAssignmentValue}
+                            onClick={() => {
+                              assignMutation.mutate(
+                                {
+                                  threadId: thread.id,
+                                  assignedAdminUserId: selectedAdminId === 'unassigned' ? null : selectedAdminId,
+                                },
+                                {
+                                  onSuccess: () => {
+                                    setAssignmentDrafts((current) => {
+                                      const next = { ...current };
+                                      delete next[thread.id];
+                                      return next;
+                                    });
+                                  },
+                                },
+                              );
+                            }}
+                          >
+                            {isMyanmar ? 'သတ်မှတ်မည်' : 'Assign'}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
