@@ -145,8 +145,8 @@
   );
   box-shadow: 4px 5px 0 var(--plop-panel-shadow);
   color: var(--plop-on);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* Keep repeated key cards cheap while the list scrolls. */
@@ -183,8 +183,8 @@
     var(--plop-panel-muted) 14px 15px
   );
   box-shadow: 6px 0 0 var(--plop-panel-shadow);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard .ops-topbar {
@@ -197,8 +197,8 @@
     var(--plop-panel-muted) 12px 13px
   );
   box-shadow: 4px 5px 0 var(--plop-panel-shadow);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard .ops-sidebar-item {
@@ -209,8 +209,8 @@
   color: var(--plop-on-soft);
   font-family: var(--plop-font-letter);
   font-weight: 700;
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard .ops-sidebar-item:hover {
@@ -242,8 +242,8 @@
     var(--plop-panel-muted) 10px 11px
   );
   box-shadow: 0 5px 0 var(--plop-panel-shadow);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard .ops-mobile-dock-pill {
@@ -280,8 +280,8 @@
   font-weight: 800;
   letter-spacing: 0.01em;
   padding-inline: 0.9rem;
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   transition: transform 120ms var(--plop-ease-squish), box-shadow 120ms var(--plop-ease-squish);
 }
 
@@ -364,8 +364,8 @@
   box-shadow: 3px 3px 0 var(--plop-panel-shadow);
   color: var(--plop-on);
   font-family: var(--plop-font-body);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard :is(.ops-input, .ops-textarea, .ops-select-trigger):focus-visible {
@@ -392,8 +392,8 @@
   background: var(--plop-panel-bg);
   box-shadow: 4px 5px 0 var(--plop-panel-shadow);
   color: var(--plop-on);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard [role='option'][data-highlighted] {
@@ -407,8 +407,8 @@
   border-radius: var(--plop-radius-box);
   background: var(--plop-panel-bg-soft);
   box-shadow: 3px 3px 0 var(--plop-panel-shadow);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard .ops-tabs-trigger {
@@ -454,8 +454,8 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   transform: rotate(-0.8deg);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .plop-dashboard .ops-badge[data-plop-badge-variant='default'] {
