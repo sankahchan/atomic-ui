@@ -1125,7 +1125,7 @@ export const usersRouter = router({
         ];
       }
 
-      const [threads, activeSummaryRows] =
+      const [threads, activeSummaryRows, assignableAdmins] =
         await Promise.all([
           db.telegramSupportThread.findMany({
             where: buildCustomerSubmittedTelegramSupportThreadWhere(where),
@@ -1157,6 +1157,7 @@ export const usersRouter = router({
               assignedAdminUserId: true,
             },
           }),
+          listAssignableSupportAdmins(),
         ]);
 
       const summary = activeSummaryRows.reduce(
@@ -1194,6 +1195,7 @@ export const usersRouter = router({
 
       return {
         summary,
+        assignableAdmins,
         threads: threads.map((thread) => {
           const latestReply = thread.replies[0] || null;
           return {

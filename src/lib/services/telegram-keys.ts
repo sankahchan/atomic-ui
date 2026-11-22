@@ -452,14 +452,38 @@ export function buildTelegramKeyDetailMessage(input: {
   });
 }
 
+function getTelegramWebAppUrl() {
+  const raw = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    url.pathname = `${url.pathname.replace(/\/$/, '')}/webapp`;
+    url.search = '';
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function buildTelegramKeysSummaryKeyboard(input: {
   locale: SupportedLocale;
   items: TelegramCommerceKeyItem[];
   page: number;
 }) {
   const pagination = paginateTelegramCommerce(input.items, input.page);
-  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = pagination.pageItems.map((item) => {
-    const buttons: Array<{ text: string; callback_data?: string; url?: string }> = [];
+  const rows: Array<Array<{
+    text: string;
+    callback_data?: string;
+    url?: string;
+    web_app?: { url: string };
+  }>> = pagination.pageItems.map((item) => {
+    const buttons: Array<{
+      text: string;
+      callback_data?: string;
+      url?: string;
+      web_app?: { url: string };
+    }> = [];
     if (item.sharePageUrl) {
       buttons.push({
         text: input.locale === 'my' ? 'ဖွင့်မည်' : 'Open',
@@ -494,6 +518,14 @@ function buildTelegramKeysSummaryKeyboard(input: {
   });
   if (pager) {
     rows.push(pager);
+  }
+
+  const webAppUrl = getTelegramWebAppUrl();
+  if (webAppUrl) {
+    rows.push([{
+      text: input.locale === 'my' ? '📲 Mini App ဖွင့်မည်' : '📲 Open Mini App',
+      web_app: { url: webAppUrl },
+    }]);
   }
 
   return { inline_keyboard: rows };
