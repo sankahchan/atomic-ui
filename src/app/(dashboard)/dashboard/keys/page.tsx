@@ -703,7 +703,7 @@ function KeyTagChip({
   );
 
   const className = cn(
-    'inline-flex items-center gap-1.5 rounded-full border font-medium transition-colors',
+    'ops-tag-chip inline-flex items-center gap-1.5 rounded-full border font-medium transition-colors',
     compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs',
     getTagToneClassName(tag),
     active && 'border-primary/45 ring-2 ring-primary/10 dark:border-cyan-400/30'
@@ -8270,7 +8270,7 @@ export default function KeysPage() {
       {/* Keys table (List View) - show on desktop always when list mode, and on mobile when list mode */}
       <Card className={cn('ops-data-shell mb-6 overflow-hidden', effectiveViewMode === 'list' ? 'hidden md:block' : 'hidden')}>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="ops-table w-full">
 
             <thead>
               <tr className="border-b border-border/60 bg-background/55 text-left align-middle backdrop-blur-sm dark:bg-[rgba(4,10,21,0.72)]">
