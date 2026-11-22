@@ -4,6 +4,7 @@ import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePlopPortalContainer } from '@/components/providers/plop-shell-provider';
 
 /**
  * Dialog Component System
@@ -27,7 +28,15 @@ import { cn } from '@/lib/utils';
 
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
-const DialogPortal = DialogPrimitive.Portal;
+
+const DialogPortal = (
+  props: React.ComponentProps<typeof DialogPrimitive.Portal>
+) => {
+  const container = usePlopPortalContainer();
+  return <DialogPrimitive.Portal container={container ?? undefined} {...props} />;
+};
+DialogPortal.displayName = DialogPrimitive.Portal.displayName;
+
 const DialogClose = DialogPrimitive.Close;
 
 /**
@@ -93,7 +102,7 @@ const DialogContent = React.forwardRef<
     >
       {children}
       {/* Close button in the top-right corner */}
-      <DialogPrimitive.Close className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/85 text-muted-foreground opacity-95 shadow-sm ring-offset-background transition-all hover:border-primary/25 hover:bg-background hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none dark:border-cyan-400/12 dark:bg-[rgba(5,12,24,0.82)] dark:hover:border-cyan-400/24 dark:hover:bg-[rgba(8,18,34,0.92)]">
+      <DialogPrimitive.Close className="ops-modal-close absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/85 text-muted-foreground opacity-95 shadow-sm ring-offset-background transition-all hover:border-primary/25 hover:bg-background hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none dark:border-cyan-400/12 dark:bg-[rgba(5,12,24,0.82)] dark:hover:border-cyan-400/24 dark:hover:bg-[rgba(8,18,34,0.92)]">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
