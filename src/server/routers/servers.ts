@@ -842,7 +842,7 @@ export const serversRouter = router({
         });
       }
 
-      const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
+      const client = createOutlineClient(server.apiUrl, server.apiCertSha256, 10_000);
 
       try {
         // Fetch server info
@@ -1390,15 +1390,25 @@ export const serversRouter = router({
     }
 
     try {
-      // Get all active servers
+      // Include active servers, plus draining/maintenance servers that still
+      // host keys. An empty draining server can stay offline for weeks and
+      // would otherwise hold the sync lock on every tick.
       const servers = await db.server.findMany({
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          OR: [
+            { lifecycleMode: 'ACTIVE' },
+            { accessKeys: { some: { status: { not: 'DISABLED' } } } },
+          ],
+        },
       });
 
       const results: { serverId: string; serverName: string; success: boolean; error?: string }[] = [];
 
     for (const server of servers) {
-      const client = createOutlineClient(server.apiUrl, server.apiCertSha256);
+      // Auto-sync holds the shared lock; fail fast instead of waiting 30s per
+      // unreachable server call.
+      const client = createOutlineClient(server.apiUrl, server.apiCertSha256, 10_000);
 
       try {
         // Fetch server info

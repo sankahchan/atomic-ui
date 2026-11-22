@@ -158,11 +158,13 @@ export class OutlineClient {
   private apiUrl: string;
   private certSha256: string;
   private httpsAgent: https.Agent;
+  private requestTimeoutMs: number;
 
-  constructor(apiUrl: string, certSha256: string) {
+  constructor(apiUrl: string, certSha256: string, requestTimeoutMs = 30_000) {
     // Remove trailing slash from API URL for consistency
     this.apiUrl = apiUrl.replace(/\/$/, '');
     this.certSha256 = certSha256;
+    this.requestTimeoutMs = requestTimeoutMs;
 
     // Disable TLS session caching so repeated self-signed manager calls keep
     // returning the peer certificate fingerprint on every handshake.
@@ -313,8 +315,8 @@ export class OutlineClient {
         ));
       });
 
-      // Set timeout
-      req.setTimeout(30000, () => {
+      // Fail fast for callers such as auto-sync that hold a shared lock.
+      req.setTimeout(this.requestTimeoutMs, () => {
         req.destroy();
         reject(new OutlineApiError('Connection timeout', 0));
       });
@@ -537,8 +539,12 @@ export class OutlineClient {
 /**
  * Create an Outline client from server configuration
  */
-export function createOutlineClient(apiUrl: string, certSha256: string): OutlineClient {
-  return new OutlineClient(apiUrl, certSha256);
+export function createOutlineClient(
+  apiUrl: string,
+  certSha256: string,
+  requestTimeoutMs = 30_000,
+): OutlineClient {
+  return new OutlineClient(apiUrl, certSha256, requestTimeoutMs);
 }
 
 /**
