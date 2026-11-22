@@ -638,22 +638,9 @@ export async function handleSubscriptionRequest(
         return buildDeviceInstallErrorResponse(deviceClaimResult);
       }
 
-      // Handle START_ON_FIRST_USE expiration type
-      if (dynamicKey.expirationType === 'START_ON_FIRST_USE' && !dynamicKey.firstUsedAt) {
-        const firstUsedAt = new Date();
-        const expiresAt = dynamicKey.durationDays
-          ? new Date(firstUsedAt.getTime() + dynamicKey.durationDays * 24 * 60 * 60 * 1000)
-          : null;
-
-        await db.dynamicAccessKey.update({
-          where: { id: dynamicKey.id },
-          data: {
-            firstUsedAt,
-            expiresAt,
-            status: 'ACTIVE',
-          },
-        });
-      }
+      // START_ON_FIRST_USE keys stay PENDING here. Opening this route only serves
+      // the subscription/config; activation happens in server sync when real
+      // Outline traffic is observed.
 
       // Handle SELF_MANAGED vs MANUAL mode differently
       const routingPreferences = parseDynamicRoutingPreferences({
@@ -884,22 +871,9 @@ export async function handleSubscriptionRequest(
       return NextResponse.json({ error: 'Client URL is disabled' }, { status: 403 });
     }
 
-    // Handle START_ON_FIRST_USE expiration type
-    if (accessKey.expirationType === 'START_ON_FIRST_USE' && !accessKey.firstUsedAt) {
-      const firstUsedAt = new Date();
-      const expiresAt = accessKey.durationDays
-        ? new Date(firstUsedAt.getTime() + accessKey.durationDays * 24 * 60 * 60 * 1000)
-        : null;
-
-      await db.accessKey.update({
-        where: { id: accessKey.id },
-        data: {
-          firstUsedAt,
-          expiresAt,
-          status: 'ACTIVE',
-        },
-      });
-    }
+    // START_ON_FIRST_USE keys stay PENDING here. Opening this route only serves
+    // the subscription/config; activation happens in server sync when real
+    // Outline traffic is observed.
 
     if (!accessKey.accessUrl) {
       return NextResponse.json({ error: 'No access URL available' }, { status: 404 });
