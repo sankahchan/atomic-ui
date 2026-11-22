@@ -13,6 +13,8 @@ dist/
 prisma/data/
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 
 # Environment files
 .env
