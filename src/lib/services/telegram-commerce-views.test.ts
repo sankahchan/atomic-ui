@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+// Keep date formatting assertions deterministic across developer machines and CI.
+process.env.TZ = 'UTC';
+
 import {
   buildTelegramBuySummaryMessage,
   buildTelegramBuyPlanDetailMessage,
@@ -824,7 +827,7 @@ test('premium support detail stays compact and avoids timeline dumps', () => {
   assert.match(message, /Next step:/);
   assert.match(message, /Last reply/);
   assert.match(message, /Use Check status to refresh, or Reply if you need to add more detail\./);
-  assert.match(message, /Requested Apr 20, 2026, 05:00 PM/);
+  assert.match(message, /Requested Apr 20, 2026, 08:00 AM/);
   assert.doesNotMatch(message, /What happens next/);
   assert.doesNotMatch(message, /Timeline/i);
   assert.doesNotMatch(message, /Follow-up history/i);
