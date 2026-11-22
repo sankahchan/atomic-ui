@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { router, protectedProcedure, adminProcedure } from '../trpc';
+import { router, protectedProcedure, adminProcedure as baseAdminProcedure } from '../trpc';
+import { hasNotificationManageScope } from '@/lib/admin-scope';
 import { db } from '@/lib/db';
 import { TRPCError } from '@trpc/server';
 import { TOTP, generateSecret, generateURI, verify } from 'otplib';
@@ -132,6 +133,20 @@ function parseSessionUserAgent(userAgent: string | null) {
     };
 }
 
+/**
+ * Security configuration is limited to OWNER/ADMIN-scoped admins. Self-service
+ * 2FA/WebAuthn procedures below remain protected (not admin-scoped).
+ */
+const securityAdminProcedure = baseAdminProcedure.use(({ ctx, next }) => {
+    if (!hasNotificationManageScope(ctx.user.adminScope)) {
+        throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to manage security settings.',
+        });
+    }
+    return next();
+});
+
 export const securityRouter = router({
     // ============================================
     // Security Rules (existing)
@@ -140,7 +155,7 @@ export const securityRouter = router({
     /**
      * List all security rules.
      */
-    listRules: protectedProcedure.query(async () => {
+    listRules: securityAdminProcedure.query(async () => {
         return db.securityRule.findMany({
             orderBy: { createdAt: 'desc' },
         });
@@ -149,7 +164,7 @@ export const securityRouter = router({
     /**
      * Create a new security rule.
      */
-    createRule: adminProcedure
+    createRule: securityAdminProcedure
         .input(z.object({
             type: z.enum(['ALLOW', 'BLOCK']),
             targetType: z.enum(['IP', 'CIDR', 'COUNTRY']),
@@ -190,7 +205,7 @@ export const securityRouter = router({
     /**
      * Toggle rule active status.
      */
-    toggleRule: adminProcedure
+    toggleRule: securityAdminProcedure
         .input(z.object({ id: z.string() }))
         .mutation(async ({ input }) => {
             const rule = await db.securityRule.findUnique({
@@ -210,7 +225,7 @@ export const securityRouter = router({
     /**
      * Delete a rule.
      */
-    deleteRule: adminProcedure
+    deleteRule: securityAdminProcedure
         .input(z.object({ id: z.string() }))
         .mutation(async ({ input }) => {
             return db.securityRule.delete({
@@ -218,11 +233,11 @@ export const securityRouter = router({
             });
         }),
 
-    getAdminLoginProtectionConfig: adminProcedure.query(async () => {
+    getAdminLoginProtectionConfig: securityAdminProcedure.query(async () => {
         return getAdminLoginProtectionConfig();
     }),
 
-    updateAdminLoginProtectionConfig: adminProcedure
+    updateAdminLoginProtectionConfig: securityAdminProcedure
         .input(
             z.object({
                 enabled: z.boolean(),
@@ -297,7 +312,7 @@ export const securityRouter = router({
             return saveAdminLoginProtectionConfig(input);
         }),
 
-    approveAdminLoginApproval: adminProcedure
+    approveAdminLoginApproval: securityAdminProcedure
         .input(z.object({ approvalId: z.string().min(1) }))
         .mutation(async ({ ctx, input }) => {
             return approveAdminLoginApproval({
@@ -306,7 +321,7 @@ export const securityRouter = router({
             });
         }),
 
-    rejectAdminLoginApproval: adminProcedure
+    rejectAdminLoginApproval: securityAdminProcedure
         .input(z.object({
             approvalId: z.string().min(1),
             note: z.string().trim().max(2000).optional(),
@@ -319,7 +334,7 @@ export const securityRouter = router({
             });
         }),
 
-    getAdminLoginAbuseOverview: adminProcedure.query(async ({ ctx }) => {
+    getAdminLoginAbuseOverview: securityAdminProcedure.query(async ({ ctx }) => {
         const overview = await getAdminLoginAbuseOverview();
         return {
             ...overview,
@@ -327,7 +342,7 @@ export const securityRouter = router({
         };
     }),
 
-    saveAdminLoginSavedView: adminProcedure
+    saveAdminLoginSavedView: securityAdminProcedure
         .input(z.object({
             id: z.string().min(1).optional(),
             name: z.string().trim().min(1).max(80),
@@ -349,13 +364,13 @@ export const securityRouter = router({
             });
         }),
 
-    deleteAdminLoginSavedView: adminProcedure
+    deleteAdminLoginSavedView: securityAdminProcedure
         .input(z.object({ id: z.string().min(1) }))
         .mutation(async ({ input }) => {
             return deleteAdminLoginSavedView(input.id);
         }),
 
-    suppressAdminLoginAlerts: adminProcedure
+    suppressAdminLoginAlerts: securityAdminProcedure
         .input(z.object({
             scopeType: z.enum(['IP', 'INCIDENT']),
             scopeValue: z.string().min(1),
@@ -369,7 +384,7 @@ export const securityRouter = router({
             });
         }),
 
-    removeAdminLoginAlertSuppression: adminProcedure
+    removeAdminLoginAlertSuppression: securityAdminProcedure
         .input(z.object({
             scopeType: z.enum(['IP', 'INCIDENT']),
             scopeValue: z.string().min(1),
@@ -381,7 +396,7 @@ export const securityRouter = router({
             });
         }),
 
-    bulkUpdateAdminLoginIncidents: adminProcedure
+    bulkUpdateAdminLoginIncidents: securityAdminProcedure
         .input(z.object({
             incidentIds: z.array(z.string().min(1)).min(1).max(100),
             action: z.enum(['ACKNOWLEDGE', 'RESOLVE', 'MUTE', 'UNMUTE', 'ASSIGN', 'UNASSIGN']),
@@ -396,7 +411,7 @@ export const securityRouter = router({
             });
         }),
 
-    bulkUpdateAdminLoginIps: adminProcedure
+    bulkUpdateAdminLoginIps: securityAdminProcedure
         .input(z.object({
             ips: z.array(z.string().min(1)).min(1).max(100),
             action: z.enum(['BLOCK', 'ALLOWLIST', 'PROMOTE', 'MUTE', 'UNMUTE', 'UNBAN']),
@@ -410,37 +425,37 @@ export const securityRouter = router({
             });
         }),
 
-    getAdminLoginIncidentDetail: adminProcedure
+    getAdminLoginIncidentDetail: securityAdminProcedure
         .input(z.object({ incidentId: z.string().min(1) }))
         .query(async ({ input }) => {
             return getAdminLoginIncidentDetail(input.incidentId);
         }),
 
-    exportAdminLoginIncidents: adminProcedure
+    exportAdminLoginIncidents: securityAdminProcedure
         .input(z.object({ format: z.enum(['csv', 'json']) }))
         .mutation(async ({ input }) => {
             return exportAdminLoginIncidents(input.format);
         }),
 
-    acknowledgeAdminLoginIncident: adminProcedure
+    acknowledgeAdminLoginIncident: securityAdminProcedure
         .input(z.object({ incidentId: z.string().min(1), note: z.string().trim().max(2000).optional() }))
         .mutation(async ({ ctx, input }) => {
             return acknowledgeAdminLoginIncident(input.incidentId, ctx.user.email, input.note);
         }),
 
-    resolveAdminLoginIncident: adminProcedure
+    resolveAdminLoginIncident: securityAdminProcedure
         .input(z.object({ incidentId: z.string().min(1), note: z.string().trim().max(2000).optional() }))
         .mutation(async ({ ctx, input }) => {
             return resolveAdminLoginIncident(input.incidentId, ctx.user.email, input.note);
         }),
 
-    addAdminLoginIncidentNote: adminProcedure
+    addAdminLoginIncidentNote: securityAdminProcedure
         .input(z.object({ incidentId: z.string().min(1), note: z.string().trim().min(1).max(2000) }))
         .mutation(async ({ ctx, input }) => {
             return addAdminLoginIncidentNote(input.incidentId, ctx.user.email, input.note);
         }),
 
-    assignAdminLoginIncident: adminProcedure
+    assignAdminLoginIncident: securityAdminProcedure
         .input(z.object({
             incidentId: z.string().min(1),
             assignedToEmail: z.string().email().nullable().optional(),
@@ -455,25 +470,25 @@ export const securityRouter = router({
             });
         }),
 
-    blockAdminLoginIp: adminProcedure
+    blockAdminLoginIp: securityAdminProcedure
         .input(z.object({ ip: z.string().min(1), note: z.string().trim().max(2000).optional() }))
         .mutation(async ({ ctx, input }) => {
             return blockAdminLoginIpPermanently(input.ip, ctx.user.email, input.note);
         }),
 
-    allowlistAdminLoginIp: adminProcedure
+    allowlistAdminLoginIp: securityAdminProcedure
         .input(z.object({ ip: z.string().min(1), note: z.string().trim().max(2000).optional() }))
         .mutation(async ({ ctx, input }) => {
             return allowlistAdminLoginIp(input.ip, ctx.user.email, input.note);
         }),
 
-    promoteAdminLoginIpToPermanentRule: adminProcedure
+    promoteAdminLoginIpToPermanentRule: securityAdminProcedure
         .input(z.object({ ip: z.string().min(1), note: z.string().trim().max(2000).optional() }))
         .mutation(async ({ ctx, input }) => {
             return promoteAdminLoginIpToPermanentRule(input.ip, ctx.user.email, input.note);
         }),
 
-    runAdminLoginIncidentDigestNow: adminProcedure.mutation(async () => {
+    runAdminLoginIncidentDigestNow: securityAdminProcedure.mutation(async () => {
         const result = await runAdminLoginIncidentDigestCycle({ force: true });
 
         if (result.skipped) {
@@ -486,7 +501,7 @@ export const securityRouter = router({
         return result;
     }),
 
-    unbanAdminLoginIp: adminProcedure
+    unbanAdminLoginIp: securityAdminProcedure
         .input(z.object({ ip: z.string().min(1) }))
         .mutation(async ({ input }) => {
             const result = await unbanAdminLoginIp(input.ip);
@@ -544,7 +559,7 @@ export const securityRouter = router({
         };
     }),
 
-    updateAdmin2FAPolicy: adminProcedure
+    updateAdmin2FAPolicy: securityAdminProcedure
         .input(z.object({
             required: z.boolean(),
         }))
@@ -1341,7 +1356,7 @@ export const securityRouter = router({
     /**
      * Trigger a manual security probe (admin only)
      */
-    triggerSecurityProbe: adminProcedure.mutation(async () => {
+    triggerSecurityProbe: securityAdminProcedure.mutation(async () => {
         // This would trigger the security worker to run immediately
         // For now, just return info about the last probe
         const dashboardProbe = await db.dashboardSecurityProbe.findUnique({

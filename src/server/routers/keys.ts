@@ -3940,11 +3940,12 @@ export const keysRouter = router({
    */
   getSubscriptionUrl: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const key = await db.accessKey.findUnique({
         where: { id: input.id },
         select: {
           id: true,
+          userId: true,
           subscriptionToken: true,
           accessUrl: true,
           name: true,
@@ -3956,6 +3957,13 @@ export const keysRouter = router({
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Access key not found',
+        });
+      }
+
+      if (ctx.user.role !== 'ADMIN' && key.userId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to view this access key.',
         });
       }
 

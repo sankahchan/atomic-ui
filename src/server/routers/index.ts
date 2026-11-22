@@ -58,6 +58,7 @@ import {
 import { getTotpEncryptionKeyHex } from '@/lib/totp-crypto';
 import { writeAuditLog } from '@/lib/audit';
 import {
+  ADMIN_LOGIN_PENDING_APPROVALS_SETTINGS_KEY,
   getAdminLoginChallengeDecision,
   getAdminLoginApprovalDecision,
   createAdminLoginApprovalRequest,
@@ -1047,20 +1048,39 @@ const tagsRouter = router({
 
 
 /**
+ * Settings that hold login-approval state or WebAuthn challenges. These are
+ * written by dedicated auth flows and must never be exposed or overwritten
+ * through the generic settings endpoints.
+ */
+const SENSITIVE_SETTING_KEY_PREFIXES = ['temp_auth_', 'webauthn_challenge_'];
+const SENSITIVE_SETTING_KEYS = new Set([ADMIN_LOGIN_PENDING_APPROVALS_SETTINGS_KEY]);
+
+function isSensitiveSettingKey(key: string) {
+  return (
+    SENSITIVE_SETTING_KEYS.has(key) ||
+    SENSITIVE_SETTING_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+/**
  * Settings Router
- * 
+ *
  * Manages application-wide settings.
  */
 const settingsRouter = router({
   /**
-   * Get all settings.
+   * Get all settings. Admin-only, and transient auth artifacts are filtered
+   * out even for admins to avoid leaking login-approval tokens.
    */
-  getAll: protectedProcedure.query(async () => {
+  getAll: adminProcedure.query(async () => {
     const settings = await db.settings.findMany();
 
     // Convert to key-value object
     const result: Record<string, unknown> = {};
     for (const setting of settings) {
+      if (isSensitiveSettingKey(setting.key)) {
+        continue;
+      }
       try {
         result[setting.key] = JSON.parse(setting.value);
       } catch {
@@ -1082,6 +1102,13 @@ const settingsRouter = router({
       })
     )
     .mutation(async ({ input }) => {
+      if (isSensitiveSettingKey(input.key)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This setting is managed by the authentication flow and cannot be changed here.',
+        });
+      }
+
       await db.settings.upsert({
         where: { key: input.key },
         create: {
