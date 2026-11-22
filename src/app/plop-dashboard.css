@@ -152,7 +152,8 @@
 /* Keep repeated key cards cheap while the list scrolls. */
 .plop-dashboard .ops-mobile-card {
   content-visibility: auto;
-  contain-intrinsic-size: auto 276px;
+  /* Match the rendered card height so skipped cards do not shift the scrollbar. */
+  contain-intrinsic-size: auto 460px;
 }
 
 .plop-dashboard .ops-key-card {
