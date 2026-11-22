@@ -4782,9 +4782,10 @@ export default function KeysPage() {
     [stats],
   );
 
-  // Fetch live usage plus recent server-side session state every 3 seconds.
+  // Fetch live usage plus recent server-side session state on the same cadence
+  // as Auto Sync so online detection stays responsive without extra renders.
   const { data: liveMetrics, refetch: refetchOnline } = trpc.keys.getLiveMetrics.useQuery(undefined, {
-    refetchInterval: 3000, // Always poll for responsive online detection
+    refetchInterval: 5000,
     refetchIntervalInBackground: false, // Pause when tab is hidden to save resources
   });
 
@@ -4793,7 +4794,7 @@ export default function KeysPage() {
     () => data?.items?.map((k) => k.id) ?? [],
     [data?.items],
   );
-  const { data: sparklineMap, refetch: refetchSparklines } = trpc.keys.getSparklines.useQuery(
+  const { data: sparklineMap } = trpc.keys.getSparklines.useQuery(
     { keyIds: keyIdsForSparklines },
     { enabled: keyIdsForSparklines.length > 0, staleTime: 60_000 },
   );
@@ -4801,9 +4802,6 @@ export default function KeysPage() {
   autoRefreshRef.current = () => {
     void refetch();
     void refetchStats();
-    if (keyIdsForSparklines.length > 0) {
-      void refetchSparklines();
-    }
   };
 
   const liveMetricsById = useMemo(
@@ -8018,7 +8016,7 @@ export default function KeysPage() {
               const renewalOutreachAgeMeta = getRenewalOutreachAgeMeta((key as any).renewalOutreach);
 
               return (
-                <Card key={key.id} className="group hover:border-primary/30 transition-all duration-200">
+                <Card key={key.id} className="ops-key-card group hover:border-primary/30 transition-colors duration-200">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2 min-w-0 flex-1">

@@ -149,6 +149,13 @@
   -webkit-backdrop-filter: none;
 }
 
+/* Keep repeated key cards cheap while the list scrolls. */
+.plop-dashboard .ops-mobile-card,
+.plop-dashboard .ops-key-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+
 /* Page-level tiles that bypass the shared Card primitive still get the paper
    treatment. The attribute hooks target the old arbitrary dark gradients. */
 .plop-dashboard [class*='dark:bg-[radial-gradient'],
@@ -273,6 +280,8 @@
   font-weight: 800;
   letter-spacing: 0.01em;
   padding-inline: 0.9rem;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition: transform 120ms var(--plop-ease-squish), box-shadow 120ms var(--plop-ease-squish);
 }
 
@@ -445,6 +454,8 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   transform: rotate(-0.8deg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .plop-dashboard .ops-badge[data-plop-badge-variant='default'] {

@@ -196,17 +196,11 @@
       linear-gradient(180deg, rgba(8, 12, 20, 0.995), rgba(10, 15, 26, 0.998) 48%, rgba(7, 12, 22, 1));
   }
 
-  /* Smooth scrolling with reduced motion support */
+  /* Native wheel/trackpad scrolling stays immediate. Smooth scrolling is
+     requested explicitly where needed (scroll-to-top, notification jumps). */
   html {
-    scroll-behavior: smooth;
     min-height: 100%;
     overflow-x: hidden;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
   }
 }
 
