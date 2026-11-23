@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
+import { umoeFont } from '@/lib/fonts';
 import { getAppBuildInfo } from '@/lib/app-build';
 import { DeployGuardProvider } from '@/components/providers/deploy-guard-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
@@ -74,7 +75,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${umoeFont.variable}`}
     >
       <body className="min-h-screen bg-background font-sans antialiased">
         {/* ThemeProvider enables dark/light mode switching */}
