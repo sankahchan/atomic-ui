@@ -23,7 +23,6 @@ type UsageAlertKey = {
   bandwidthAlertAt80: boolean;
   bandwidthAlertAt90: boolean;
   telegramId: string | null;
-  telegramDeliveryEnabled: boolean;
   user: { telegramChatId: string | null } | null;
 };
 
@@ -91,9 +90,8 @@ export async function runTelegramBandwidthAlertCycle() {
     return result;
   }
 
-  const linkedKeyWhere = {
+  const linkedKeyFilter = {
     status: 'ACTIVE',
-    telegramDeliveryEnabled: true,
     dataLimitBytes: { not: null },
     OR: [
       { telegramId: { not: null } },
@@ -109,13 +107,16 @@ export async function runTelegramBandwidthAlertCycle() {
     bandwidthAlertAt80: true,
     bandwidthAlertAt90: true,
     telegramId: true,
-    telegramDeliveryEnabled: true,
     user: { select: { telegramChatId: true } },
   };
 
   const [accessKeys, dynamicKeys, fallbackLocale] = await Promise.all([
-    db.accessKey.findMany({ where: linkedKeyWhere, select: keySelect }),
-    db.dynamicAccessKey.findMany({ where: linkedKeyWhere, select: keySelect }),
+    db.accessKey.findMany({
+      where: { ...linkedKeyFilter, telegramDeliveryEnabled: true },
+      select: keySelect,
+    }),
+    // Dynamic keys have no per-key Telegram delivery flag in the schema.
+    db.dynamicAccessKey.findMany({ where: linkedKeyFilter, select: keySelect }),
     getTelegramDefaultLocale(),
   ]);
 
