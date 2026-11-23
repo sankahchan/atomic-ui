@@ -32,14 +32,16 @@ test('getCommandKeyboard renders localized customer labels', () => {
   assert.equal(english.keyboard[1]?.[1]?.text, '📊 Status');
   assert.equal(english.keyboard[2]?.[0]?.text, '🌍 Switch Server');
   assert.equal(english.keyboard[2]?.[1]?.text, '📲 Setup');
-  assert.equal(english.keyboard.length, 5);
+  assert.equal(english.keyboard[5]?.[0]?.text, '📲 Mini App');
+  assert.equal(english.keyboard.length, 6);
   assert.equal(myanmar.keyboard[0]?.[0]?.text, '🛒 ဝယ်မည်');
   assert.equal(myanmar.keyboard[0]?.[1]?.text, '🗂 Key များ');
   assert.equal(myanmar.keyboard[4]?.[0]?.text, '❓ အကူအညီ');
   assert.equal(myanmar.keyboard[4]?.[1]?.text, '🌐 ဘာသာစကား');
-  assert.equal(adminMyanmar.keyboard[5]?.[0]?.text, '🧭 Admin စင်တာ');
-  assert.equal(adminMyanmar.keyboard[6]?.[0]?.text, '➕ ပုံမှန်ကီး');
-  assert.equal(adminMyanmar.keyboard[10]?.[1]?.text, '💸 ငွေပြန်အမ်းများ');
+  assert.equal(myanmar.keyboard[5]?.[0]?.text, '📲 Mini App');
+  assert.equal(adminMyanmar.keyboard[6]?.[0]?.text, '🧭 Admin စင်တာ');
+  assert.equal(adminMyanmar.keyboard[7]?.[0]?.text, '➕ ပုံမှန်ကီး');
+  assert.equal(adminMyanmar.keyboard[11]?.[1]?.text, '💸 ငွေပြန်အမ်းများ');
 });
 
 test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back to commands', () => {
@@ -50,6 +52,8 @@ test('normalizeTelegramReplyKeyboardCommand maps localized shortcut labels back 
   assert.equal(normalizeTelegramReplyKeyboardCommand('📊 Quick status', false), '/status');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🔄 Switch Server', false), '/switchserver');
   assert.equal(normalizeTelegramReplyKeyboardCommand('📲 Setup Guide', false), '/setup');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('📲 Mini App', false), '/webapp');
+  assert.equal(normalizeTelegramReplyKeyboardCommand('📲 Open Mini App', false), '/webapp');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🎁 Refer a friend', false), '/referral');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🌐 ဘာသာစကား', false), '/language');
   assert.equal(normalizeTelegramReplyKeyboardCommand('🛑 Cancel', false), '/cancel');
@@ -66,6 +70,7 @@ test('getTelegramUserBotCommands matches the registered storefront command surfa
       'status',
       'switchserver',
       'setup',
+      'webapp',
       'referral',
       'support',
       'help',
@@ -91,6 +96,7 @@ test('getTelegramAdminBotCommands extends the command menu for admin chats', () 
       'status',
       'switchserver',
       'setup',
+      'webapp',
       'referral',
       'support',
       'help',

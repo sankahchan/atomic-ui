@@ -115,6 +115,9 @@ const TELEGRAM_USER_COMMAND_ROWS: TelegramCommandShortcut[][] = [
     { command: '/help', labelEn: '❓ Help', labelMy: '❓ အကူအညီ' },
     { command: '/language', labelEn: '🌐 Language', labelMy: '🌐 ဘာသာစကား', aliases: ['🌐 Change language', '🌐 Switch language'] },
   ],
+  [
+    { command: '/webapp', labelEn: '📲 Mini App', labelMy: '📲 Mini App', aliases: ['📲 Open Mini App', '📲 Mini App ဖွင့်မည်'] },
+  ],
 ];
 
 const TELEGRAM_HIDDEN_USER_SHORTCUTS: TelegramCommandShortcut[] = [
@@ -185,6 +188,7 @@ export function getTelegramUserBotCommands(locale: SupportedLocale = 'en') {
       { command: 'status', description: '📊 အခြေအနေအမြန်' },
       { command: 'switchserver', description: '🌍 server ပြောင်း' },
       { command: 'setup', description: '📲 ချိတ်ဆက်နည်း' },
+      { command: 'webapp', description: '📲 Mini App ဖွင့်မည်' },
       { command: 'referral', description: '🎁 မိတ်ဆွေဖိတ်' },
       { command: 'support', description: '💬 အကူအညီ' },
       { command: 'help', description: '❓ အကူအညီ' },
@@ -201,6 +205,7 @@ export function getTelegramUserBotCommands(locale: SupportedLocale = 'en') {
     { command: 'status', description: '📊 Quick status' },
     { command: 'switchserver', description: '🌍 Switch server' },
     { command: 'setup', description: '📲 Setup guide' },
+    { command: 'webapp', description: '📲 Open Mini App' },
     { command: 'referral', description: '🎁 Refer a friend' },
     { command: 'support', description: '💬 Contact support' },
     { command: 'help', description: '❓ Help & FAQ' },

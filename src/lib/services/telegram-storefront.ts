@@ -5,7 +5,11 @@ import {
   buildSharePageUrl,
   buildShortShareUrl,
 } from '@/lib/subscription-links';
-import { findLinkedAccessKeys, findLinkedDynamicAccessKeys } from '@/lib/services/telegram-keys';
+import {
+  buildTelegramWebAppInlineButton,
+  findLinkedAccessKeys,
+  findLinkedDynamicAccessKeys,
+} from '@/lib/services/telegram-keys';
 import {
   ensureAccessKeySubscriptionToken,
   getDynamicKeyMessagingUrls,
@@ -1992,16 +1996,26 @@ export function buildTelegramStoreMainMenuView(input: {
     isMyanmar ? 'အောက်မှ သင်လုပ်ဆောင်လိုသည်ကို ရွေးချယ်ပါ 👇' : 'Choose an action below 👇',
   ].join('\n');
 
+  const webAppButton = buildTelegramWebAppInlineButton(locale);
+  const keyboardRows: Array<Array<{
+    text: string;
+    callback_data?: string;
+    web_app?: { url: string };
+  }>> = [
+    [{ text: isMyanmar ? '🛒 အစီအစဉ်များ ဝယ်မည်' : '🛒 Buy a Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
+    [
+      { text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
+      { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+    ],
+  ];
+  if (webAppButton) {
+    keyboardRows.push([webAppButton]);
+  }
+
   return {
     text,
     replyMarkup: {
-      inline_keyboard: [
-        [{ text: isMyanmar ? '🛒 အစီအစဉ်များ ဝယ်မည်' : '🛒 Buy a Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) }],
-        [
-          { text: isMyanmar ? '🔑 သော့များ' : '🔑 My Keys', callback_data: buildTelegramStorefrontCallbackData({ action: 'mykeys_home' }) },
-          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
-        ],
-      ],
+      inline_keyboard: keyboardRows,
     },
   };
 }
@@ -2324,6 +2338,25 @@ export function buildTelegramStoreActiveKeysView(
 
 export function buildTelegramStoreMyKeysEmptyView(locale: SupportedLocale = 'en') {
   const isMyanmar = locale === 'my';
+  const webAppButton = buildTelegramWebAppInlineButton(locale);
+  const keyboardRows: Array<Array<{
+    text: string;
+    callback_data?: string;
+    web_app?: { url: string };
+  }>> = [
+    [
+      { text: isMyanmar ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
+      { text: isMyanmar ? '❓ အကူအညီ' : '❓ Help', callback_data: buildTelegramStorefrontCallbackData({ action: 'help' }) },
+    ],
+    [
+      { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+      { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+    ],
+  ];
+  if (webAppButton) {
+    keyboardRows.push([webAppButton]);
+  }
+
   return {
     text: [
       isMyanmar ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
@@ -2336,16 +2369,7 @@ export function buildTelegramStoreMyKeysEmptyView(locale: SupportedLocale = 'en'
         : 'Buy a plan first. After activation, setup, QR, and renew actions will open from here\\.',
     ].join('\n'),
     replyMarkup: {
-      inline_keyboard: [
-        [
-          { text: isMyanmar ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
-          { text: isMyanmar ? '❓ အကူအညီ' : '❓ Help', callback_data: buildTelegramStorefrontCallbackData({ action: 'help' }) },
-        ],
-        [
-          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
-          { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
-        ],
-      ],
+      inline_keyboard: keyboardRows,
     },
   };
 }
@@ -3550,6 +3574,7 @@ export function buildTelegramStoreHelpView(input?: {
   const supportHandle = extractTelegramHandleFromUrl(input?.supportUrl) || '@YourSupportHandle';
   const locale = input?.locale || 'en';
   const isMyanmar = locale === 'my';
+  const webAppButton = buildTelegramWebAppInlineButton(locale);
   return {
     text: [
       isMyanmar ? '❓ *အကူအညီ & Setup*' : '❓ *Help & Setup*',
@@ -3573,6 +3598,7 @@ export function buildTelegramStoreHelpView(input?: {
           { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
         ],
         [{ text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) }],
+        ...(webAppButton ? [[webAppButton]] : []),
       ],
     },
   };

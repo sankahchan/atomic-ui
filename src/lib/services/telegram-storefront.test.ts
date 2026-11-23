@@ -224,7 +224,9 @@ test('store main menu matches the paid storefront button layout', () => {
   assert.match(view.text, /🔑 Active keys     :  3/);
   assert.match(view.text, /📅 Next expiry     :  02 Jun 2026/);
   assert.deepEqual(
-    view.replyMarkup.inline_keyboard.map((row) => row[0]?.text),
+    view.replyMarkup.inline_keyboard
+      .filter((row) => row.some((button) => 'callback_data' in button))
+      .map((row) => row[0]?.text),
     [
       '🛒 Buy a Plan',
       '🔑 My Keys',

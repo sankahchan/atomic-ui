@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { withBasePath } from '@/lib/base-path';
-import { getTelegramWebAppUrl } from '@/lib/services/telegram-keys';
+import {
+  buildTelegramWebAppInlineButton,
+  getTelegramWebAppUrl,
+} from '@/lib/services/telegram-keys';
+import {
+  buildTelegramStoreHelpView,
+  buildTelegramStoreMainMenuView,
+  buildTelegramStoreMyKeysEmptyView,
+} from '@/lib/services/telegram-storefront';
 
 const URL_ENV_KEYS = [
   'APP_URL',
@@ -70,4 +78,37 @@ test('Telegram Web App API calls respect the client-exposed base path', () => {
       '/bda71d6f/api/telegram/webapp/keys',
     );
   });
+});
+
+test('Mini App buttons are visible from the main menu, empty key state, and help view', () => {
+  withEnv(
+    {
+      APP_URL: 'https://outlineadmin.com/',
+      PANEL_PATH: '/bda71d6f',
+    },
+    () => {
+      const expectedUrl = 'https://outlineadmin.com/bda71d6f/webapp';
+      assert.deepEqual(buildTelegramWebAppInlineButton('my'), {
+        text: '📲 Mini App ဖွင့်မည်',
+        web_app: { url: expectedUrl },
+      });
+
+      for (const keyboard of [
+        buildTelegramStoreMainMenuView({
+          firstName: 'Sankha',
+          activeKeyCount: 0,
+          nextExpiryLabel: '—',
+          locale: 'my',
+        }).replyMarkup.inline_keyboard,
+        buildTelegramStoreMyKeysEmptyView('my').replyMarkup.inline_keyboard,
+        buildTelegramStoreHelpView({ locale: 'my' }).replyMarkup.inline_keyboard,
+      ]) {
+        assert.ok(
+          keyboard.some((row) => row.some((button) => (
+            'web_app' in button && button.web_app?.url === expectedUrl
+          ))),
+        );
+      }
+    },
+  );
 });

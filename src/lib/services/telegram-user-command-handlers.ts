@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
+import { buildTelegramWebAppInlineButton } from '@/lib/services/telegram-keys';
 import { type TelegramRetentionSource } from '@/lib/services/telegram-callbacks';
 import {
   appendTelegramOrderAdminNote,
@@ -499,13 +500,16 @@ export async function handleStoreMyKeysCommand(input: {
   });
 
   if (items.length === 0) {
+    const webAppButton = buildTelegramWebAppInlineButton(input.locale);
     const text = [
       input.locale === 'my' ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
       input.locale === 'my' ? 'အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'No active keys right now\\.',
       '',
-      input.locale === 'my' ? 'အောက်မှ နှိပ်ပြီး plan အသစ်ဝယ်ပါ\\.' : 'Tap below to buy a new plan\\.',
+      input.locale === 'my'
+        ? 'အောက်မှ နှိပ်ပြီး plan အသစ်ဝယ်ပါ။ Mini App ကိုလည်း ဖွင့်ကြည့်နိုင်ပါသည်\\.'
+        : 'Tap below to buy a new plan. You can also open the Mini App\\.',
     ].join('\n');
 
     return sendTelegramStoreView({
@@ -513,12 +517,15 @@ export async function handleStoreMyKeysCommand(input: {
       chatId: input.chatId,
       text,
       replyMarkup: {
-        inline_keyboard: [[
-          {
-            text: input.locale === 'my' ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan',
-            callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
-          },
-        ]],
+        inline_keyboard: [
+          [
+            {
+              text: input.locale === 'my' ? '➕ Plan အသစ်ဝယ်မည်' : '➕ Buy New Plan',
+              callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+            },
+          ],
+          ...(webAppButton ? [[webAppButton]] : []),
+        ],
       },
     });
   }

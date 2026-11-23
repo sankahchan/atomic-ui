@@ -467,6 +467,39 @@ export function getTelegramWebAppUrl() {
   }
 }
 
+export function buildTelegramWebAppInlineButton(locale: SupportedLocale) {
+  const webAppUrl = getTelegramWebAppUrl();
+  if (!webAppUrl) return null;
+
+  return {
+    text: locale === 'my' ? '📲 Mini App ဖွင့်မည်' : '📲 Open Mini App',
+    web_app: { url: webAppUrl },
+  };
+}
+
+export function buildTelegramWebAppKeyboard(locale: SupportedLocale) {
+  const button = buildTelegramWebAppInlineButton(locale);
+  if (!button) return null;
+
+  return { inline_keyboard: [[button]] };
+}
+
+export async function handleTelegramWebAppCommand(input: {
+  chatId: number;
+  botToken: string;
+  locale: SupportedLocale;
+}) {
+  const text = input.locale === 'my'
+    ? '📲 <b>Mini App</b>\nချိတ်ဆက်ထားသော key များကို ကြည့်ရှု့နိုင်ပါသည်။ config ကူးယူခြင်း၊ share link ဖွင့်ခြင်း၊ သက်တမ်းတိုးခြင်းနှင့် အကူအညီကို ဤနေရာမှ လုပ်ဆောင်နိုင်ပါသည်။'
+    : '📲 <b>Mini App</b>\nView your linked keys, copy config, open share links, renew, and get help from one place.';
+  const replyMarkup = buildTelegramWebAppKeyboard(input.locale);
+  const sent = await sendTelegramMessage(input.botToken, input.chatId, text, {
+    replyMarkup: replyMarkup ?? undefined,
+  });
+
+  return sent ? null : text;
+}
+
 function buildTelegramKeysSummaryKeyboard(input: {
   locale: SupportedLocale;
   items: TelegramCommerceKeyItem[];
@@ -521,12 +554,9 @@ function buildTelegramKeysSummaryKeyboard(input: {
     rows.push(pager);
   }
 
-  const webAppUrl = getTelegramWebAppUrl();
-  if (webAppUrl) {
-    rows.push([{
-      text: input.locale === 'my' ? '📲 Mini App ဖွင့်မည်' : '📲 Open Mini App',
-      web_app: { url: webAppUrl },
-    }]);
+  const webAppButton = buildTelegramWebAppInlineButton(input.locale);
+  if (webAppButton) {
+    rows.push([webAppButton]);
   }
 
   return { inline_keyboard: rows };
