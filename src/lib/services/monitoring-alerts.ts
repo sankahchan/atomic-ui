@@ -18,6 +18,10 @@ export const MONITOR_BACKUP_VERIFICATION_FAILED_EVENT_PREFIX = 'MONITOR_BACKUP_V
 export const MONITOR_TELEGRAM_WEBHOOK_HEALTH_EVENT_PREFIX = 'MONITOR_TELEGRAM_WEBHOOK_HEALTH';
 export const MONITOR_ADMIN_QUEUE_HEALTH_EVENT_PREFIX = 'MONITOR_ADMIN_QUEUE_HEALTH';
 
+// Telegram keeps last_error_date/last_error_message on getWebhookInfo indefinitely.
+// A failed delivery during a deploy would otherwise trigger admin alerts forever.
+const WEBHOOK_LAST_ERROR_STALE_MS = 30 * 60 * 1000;
+
 type MonitoringAlertDispatchResult = {
   skipped: boolean;
   reason?: 'not_configured' | 'cooldown';
@@ -189,6 +193,7 @@ export function resolveTelegramWebhookMonitorIssue(input: {
   webhookSecretConfigured: boolean;
   expectedWebhookUrl: string | null;
   backlogThreshold?: number;
+  now?: Date;
   webhookInfo: {
     url?: string | null;
     pending_update_count?: number | null;
@@ -231,7 +236,12 @@ export function resolveTelegramWebhookMonitorIssue(input: {
     summaries.push('URL mismatch');
   }
 
-  if (lastErrorMessage) {
+  const nowMs = input.now?.getTime() ?? Date.now();
+  const hasRecentDeliveryError =
+    Boolean(lastErrorMessage) &&
+    (!lastErrorAt || nowMs - lastErrorAt.getTime() <= WEBHOOK_LAST_ERROR_STALE_MS);
+
+  if (hasRecentDeliveryError) {
     issueCodes.push('delivery_error');
     summaries.push('Telegram reported delivery errors');
   }
