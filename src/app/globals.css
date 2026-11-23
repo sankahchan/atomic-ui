@@ -15,6 +15,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Include the user-provided Unicode Myanmar font in every font stack.
+   Its @font-face declares a unicode-range, so Latin keeps using Geist/PlopUI. */
+:root {
+  --plop-font-logo: var(--plop-sketchpop, "Sketchpop"), "Patrick Hand", "Chalkboard SE", "Comic Sans MS", var(--font-umoe), system-ui, sans-serif;
+  --plop-font-letter: var(--plop-sketchpop, "Sketchpop"), var(--plop-patrick-hand, "Patrick Hand"), "Patrick Hand", "Chalkboard SE", "Comic Sans MS", var(--font-umoe), system-ui, sans-serif;
+  --plop-font-body: var(--plop-sketchpop, "Sketchpop"), var(--plop-patrick-hand, "Patrick Hand"), "Patrick Hand", "Chalkboard SE", "Comic Sans MS", var(--font-umoe), system-ui, sans-serif;
+  --plop-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, var(--font-umoe), monospace;
+}
+
 /**
  * CSS Custom Properties (Design Tokens)
  * 

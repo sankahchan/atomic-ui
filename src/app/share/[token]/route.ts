@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { withBasePath } from '@/lib/base-path';
 import {
   buildSharePageUrl,
   buildShortShareUrl,
@@ -71,13 +72,22 @@ function buildInviteHtmlResponse(input: {
     ${autoRedirectMarkup}
     <style>
       :root { color-scheme: dark; }
+      @font-face {
+        font-family: 'Umoe Myanmar';
+        src: url('${withBasePath('/fonts/umoe-myanmar.woff2')}') format('woff2'),
+             url('${withBasePath('/fonts/umoe-myanmar.ttf')}') format('truetype');
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+        unicode-range: U+1000-109F, U+A9E0-A9FF, U+AA60-AA7F, U+25CC;
+      }
       body {
         margin: 0;
         min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", 'Umoe Myanmar', sans-serif;
         background:
           radial-gradient(circle at top right, rgba(34,211,238,0.18), transparent 28%),
           radial-gradient(circle at bottom left, rgba(168,85,247,0.16), transparent 30%),

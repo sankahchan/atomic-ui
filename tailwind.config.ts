@@ -80,8 +80,8 @@ const config: Config = {
       },
       // Typography
       fontFamily: {
-        sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-geist-mono)', 'monospace'],
+        sans: ['var(--font-geist-sans)', 'var(--font-umoe)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'var(--font-umoe)', 'monospace'],
       },
       // Border radius
       borderRadius: {
