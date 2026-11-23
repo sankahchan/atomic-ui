@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildTelegramStoreActiveKeysView,
+  buildTelegramStoreDataWarningView,
   buildTelegramStoreExpiryReminderView,
   buildTelegramStoreKeyPageView,
   buildTelegramStoreOrderConfirmedView,
@@ -841,4 +842,36 @@ test('store support and switch confirmation screens localize Burmese copy', () =
   assert.match(confirmation.text, /ပြန်မလုပ်နိုင်ပါ/);
   assert.match(confirmation.text, /Setup Guide သို့မဟုတ် QR/);
   assert.equal(confirmation.replyMarkup.inline_keyboard[0]?.[0]?.text, '✅ ပြောင်းမည်');
+});
+
+test('data warning view reflects the 90% threshold', () => {
+  const view = buildTelegramStoreDataWarningView({
+    planName: '💎 Pro',
+    usedLabel: '90 GB',
+    totalLabel: '100 GB',
+    priceLabel: '8,800 Ks',
+    progressBar: '█████████░',
+    plan: samplePlans[1]!,
+    threshold: 90,
+  });
+
+  assert.match(view.text, /Data Almost Gone/);
+  assert.match(view.text, /\*90%\*/);
+});
+
+test('depleted reminder has data-limit wording and a single renew button', () => {
+  const reminder = buildTelegramStoreExpiryReminderView({
+    firstName: 'Sankha',
+    planName: '💎 Pro',
+    expiryLabel: '02 Jun 2026',
+    priceLabel: '8,800 Ks',
+    plan: samplePlans[1]!,
+    depleted: true,
+    dataRemainingLabel: '0 B',
+  });
+
+  assert.match(reminder.text, /Data Limit Reached/);
+  assert.match(reminder.text, /Data used       :  0 B/);
+  assert.doesNotMatch(reminder.text, /Days left/);
+  assert.equal(reminder.replyMarkup.inline_keyboard.length, 1);
 });

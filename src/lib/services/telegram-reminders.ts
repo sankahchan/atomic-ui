@@ -239,7 +239,8 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
     | 'ENABLED'
     | 'EXPIRING_7D'
     | 'EXPIRING_3D'
-    | 'EXPIRED';
+    | 'EXPIRED'
+    | 'DEPLETED';
   daysLeft?: number;
 }) {
   if (input.type === 'CREATED' || input.type === 'ENABLED') {
@@ -290,7 +291,13 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
       )
     : null;
 
-  if (!isTrialKey && (input.type === 'EXPIRING_7D' || input.type === 'EXPIRING_3D' || input.type === 'EXPIRED')) {
+  if (
+    !isTrialKey &&
+    (input.type === 'EXPIRING_7D' ||
+      input.type === 'EXPIRING_3D' ||
+      input.type === 'EXPIRED' ||
+      input.type === 'DEPLETED')
+  ) {
     const { plan, renewTarget } = await resolveTelegramStoreRenewPlanContext({
       kind: 'access',
       keyId: key.id,
@@ -306,6 +313,7 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
       renewTarget,
       sameDay: input.type === 'EXPIRED',
       daysLeft: input.daysLeft,
+      depleted: input.type === 'DEPLETED',
       dataRemainingLabel: formatRemainingDataLabel({
         usedBytes: key.usedBytes,
         dataLimitBytes: key.dataLimitBytes,
@@ -370,12 +378,19 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
               `🔑 ${escapeHtml(key.name)}`,
               ui.lifecycleExpiring3Body(input.daysLeft ?? 3),
             ]
-          : [
-              ui.lifecycleExpiredTitle,
-              '',
-              `🔑 ${escapeHtml(key.name)}`,
-              ui.lifecycleExpiredBody,
-            ];
+          : input.type === 'DEPLETED'
+            ? [
+                ui.lifecycleDepletedTitle,
+                '',
+                `🔑 ${escapeHtml(key.name)}`,
+                ui.lifecycleDepletedBody,
+              ]
+            : [
+                ui.lifecycleExpiredTitle,
+                '',
+                `🔑 ${escapeHtml(key.name)}`,
+                ui.lifecycleExpiredBody,
+              ];
 
   if (input.type === 'EXPIRING_7D' || input.type === 'EXPIRING_3D') {
     lines.push(
@@ -1135,11 +1150,23 @@ export async function sendTelegramDigestToAdmins(input?: {
   const ui = getTelegramUi(locale);
   const since = new Date(now.getTime() - lookbackHours * 60 * 60 * 1000);
 
-  const [activeKeys, pendingKeys, depletedKeys, expiringSoon, openIncidents, healthCounts, recentViews] =
+  const [activeKeys, pendingKeys, depletedKeys, newKeys, expiringSoon, openIncidents, healthCounts, recentViews] =
     await Promise.all([
       db.accessKey.count({ where: { status: 'ACTIVE' } }),
       db.accessKey.count({ where: { status: 'PENDING' } }),
       db.accessKey.count({ where: { status: 'DEPLETED' } }),
+      db.auditLog.count({
+        where: {
+          action: {
+            in: [
+              'ACCESS_KEY_CREATED',
+              'TELEGRAM_ADMIN_ACCESS_KEY_CREATED',
+              'TELEGRAM_ADMIN_DYNAMIC_KEY_CREATED',
+            ],
+          },
+          createdAt: { gte: since },
+        },
+      }),
       db.accessKey.count({
         where: {
           status: { in: ['ACTIVE', 'PENDING'] },
@@ -1197,6 +1224,7 @@ export async function sendTelegramDigestToAdmins(input?: {
     ui.digestWindow(lookbackHours),
     `${ui.digestActiveKeys}: ${activeKeys}`,
     `${ui.digestPendingKeys}: ${pendingKeys}`,
+    `${ui.digestNewKeys}: ${newKeys}`,
     `${ui.digestDepletedKeys}: ${depletedKeys}`,
     `${ui.digestExpiringSoon}: ${expiringSoon}`,
     `${ui.digestOpenIncidents}: ${openIncidents}`,
@@ -1216,6 +1244,7 @@ export async function sendTelegramDigestToAdmins(input?: {
       adminChats: config.adminChatIds.length,
       lookbackHours,
       activeKeys,
+      newKeys,
       expiringSoon,
       openIncidents,
       recentViews,

@@ -343,6 +343,8 @@ export function getTelegramUi(locale: SupportedLocale) {
     lifecycleExpiring3Body: (days: number) => isMyanmar ? `${days} ရက်ခန့်သာ ကျန်ပါသည်။` : `Only about ${days} day(s) remain.`,
     lifecycleExpiredTitle: isMyanmar ? '⌛ <b>သင့် အသုံးပြုခွင့်သော့ သက်တမ်းကုန်သွားပါပြီ</b>' : '⌛ <b>Your access key has expired</b>',
     lifecycleExpiredBody: isMyanmar ? 'ဤ သော့ကို မလုပ်ဆောင်နိုင်တော့ပါ။ သက်တမ်းတိုးလိုပါက အကူအညီကို ဆက်သွယ်ပါ။' : 'The key is no longer active. Contact support if it should be renewed.',
+    lifecycleDepletedTitle: isMyanmar ? '📶 <b>သင့် အသုံးပြုခွင့်သော့ရဲ့ ဒေတာ ကုန်သွားပါပြီ</b>' : '📶 <b>Your access key has run out of data</b>',
+    lifecycleDepletedBody: isMyanmar ? 'ဒေတာ ပမာဏ ပြည့်သွားလို့ ချိတ်ဆက်မှု ရပ်သွားပါပြီ။ ဆက်လက်အသုံးပြုလိုပါက အောက်က button ကိုနှိပ်ပြီး သက်တမ်းတိုးပါ။' : 'The data limit has been reached, so this key can no longer connect. Use the button below to renew it.',
     startLinked: (username: string) =>
       isMyanmar
         ? `✅ <b>${username}</b> အတွက် Telegram ချိတ်ဆက်ပြီးပါပြီ။\n\n<b>အမြန်စတင်ရန်</b>\n• 🗂 /mykeys ဖြင့် သော့များနှင့် သက်တမ်းတိုးမှုများကို စစ်ပါ\n• 🛒 /buy ဖြင့် အော်ဒါအသစ် စတင်ပါ\n• 📊 /status ဖြင့် အမြန်အခြေအနေ စစ်ပါ\n• 🛟 /support ဖြင့် အကူအညီ ရယူပါ\n\nအောက်ရှိ မီနူးကို နှိပ်ပြီး ဆက်လုပ်နိုင်ပါသည်။`
@@ -973,6 +975,7 @@ export function getTelegramUi(locale: SupportedLocale) {
     digestWindow: (hours: number) => isMyanmar ? `အချိန်ကာလ: နောက်ဆုံး ${hours} နာရီ` : `Window: last ${hours} hour(s)`,
     digestActiveKeys: isMyanmar ? 'အသက်ဝင် သော့များ' : 'Active keys',
     digestPendingKeys: isMyanmar ? 'စောင့်ဆိုင်းနေသော သော့များ' : 'Pending keys',
+    digestNewKeys: isMyanmar ? 'ကာလအတွင်း အသစ်ထုတ်သော့များ' : 'New keys in window',
     digestDepletedKeys: isMyanmar ? 'အသုံးကုန် သော့များ' : 'Depleted keys',
     digestExpiringSoon: isMyanmar ? '၇ ရက်အတွင်း သက်တမ်းကုန်မည်' : 'Expiring in 7 days',
     digestOpenIncidents: isMyanmar ? 'ဖွင့်ထားသော အဖြစ်အပျက်များ' : 'Open incidents',
