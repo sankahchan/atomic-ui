@@ -31,6 +31,7 @@ test('resolveTelegramWebhookMonitorIssue detects mismatch, delivery errors, and 
     webhookSecretConfigured: true,
     expectedWebhookUrl: 'https://example.com/panel/api/telegram/webhook',
     backlogThreshold: 20,
+    now: new Date(1_776_818_400_000 + 60_000),
     webhookInfo: {
       url: 'https://wrong.example.com/api/telegram/webhook',
       pending_update_count: 42,
@@ -45,6 +46,41 @@ test('resolveTelegramWebhookMonitorIssue detects mismatch, delivery errors, and 
   assert.match(result.issueCode ?? '', /pending_backlog/);
   assert.match(result.summary ?? '', /URL mismatch/);
   assert.equal(result.pendingUpdateCount, 42);
+});
+
+test('resolveTelegramWebhookMonitorIssue ignores stale Telegram delivery errors', () => {
+  const result = resolveTelegramWebhookMonitorIssue({
+    webhookSecretConfigured: true,
+    expectedWebhookUrl: 'https://example.com/panel/api/telegram/webhook',
+    now: new Date('2026-11-23T12:00:00.000Z'),
+    webhookInfo: {
+      url: 'https://example.com/panel/api/telegram/webhook',
+      pending_update_count: 0,
+      last_error_date: Math.floor(new Date('2026-11-23T03:16:22.000Z').getTime() / 1000),
+      last_error_message: 'Wrong response from the webhook: 502 Bad Gateway',
+    },
+  });
+
+  assert.equal(result.healthy, true);
+  assert.equal(result.issueCode, null);
+  assert.equal(result.fingerprint, null);
+});
+
+test('resolveTelegramWebhookMonitorIssue flags recent Telegram delivery errors', () => {
+  const result = resolveTelegramWebhookMonitorIssue({
+    webhookSecretConfigured: true,
+    expectedWebhookUrl: 'https://example.com/panel/api/telegram/webhook',
+    now: new Date('2026-11-23T03:20:00.000Z'),
+    webhookInfo: {
+      url: 'https://example.com/panel/api/telegram/webhook',
+      pending_update_count: 0,
+      last_error_date: Math.floor(new Date('2026-11-23T03:16:22.000Z').getTime() / 1000),
+      last_error_message: 'Wrong response from the webhook: 502 Bad Gateway',
+    },
+  });
+
+  assert.equal(result.healthy, false);
+  assert.match(result.issueCode ?? '', /delivery_error/);
 });
 
 test('resolveTelegramWebhookMonitorIssue respects the configured backlog threshold', () => {
