@@ -62,6 +62,7 @@ const publicRoutes = [
   '/api/trpc/auth.logout',  // Logout API endpoint
   '/api/tasks/',            // Background tasks (cron jobs)
   '/_next',                 // Next.js static files
+  '/fonts/',                // Self-hosted font assets (public share pages)
   '/favicon.ico',           // Favicon
   '/uploads/',              // Uploaded files (covers, etc.)
 ];
@@ -74,6 +75,7 @@ const shareDomainRoutes = [
   '/api/subscription/',
   '/api/sub/',
   '/_next',
+  '/fonts/',
   '/favicon.ico',
   '/uploads/',
 ];

@@ -33,6 +33,12 @@ test('Telegram Web App routes are public but still initData-authenticated', () =
   assert.equal(isPublicRoute('/webappish'), false);
 });
 
+test('self-hosted font assets are public for standalone share pages', () => {
+  assert.equal(isPublicRoute('/fonts/umoe-myanmar.woff2'), true);
+  assert.equal(isPublicRoute('/fonts/umoe-myanmar.ttf'), true);
+  assert.equal(isPublicRoute('/fonts-private/secret'), false);
+});
+
 test('exact public-route matching does not leak to sibling paths', () => {
   assert.equal(isPublicRoute('/login'), true);
   assert.equal(isPublicRoute('/login-approval'), true);
