@@ -10,6 +10,7 @@ import { resolveTelegramAdminActor } from '@/lib/services/telegram-admin-core';
 import { handlePremiumSupportFollowUpText } from '@/lib/services/telegram-premium';
 import { handleTelegramSupportReplyMedia, handleTelegramSupportReplyText } from '@/lib/services/telegram-support';
 import { copyTelegramMessage } from '@/lib/services/telegram-runtime';
+import { handleTelegramWebAppCommand } from '@/lib/services/telegram-keys';
 import {
   handleEmailLink,
   handleLanguageCommand,
@@ -39,6 +40,7 @@ const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
   'setup',
   'switchserver',
   'support',
+  'webapp',
   'cancel',
 ]);
 
@@ -311,6 +313,12 @@ export async function handleTelegramUpdate(
       return handleStoreMyKeysCommand({
         chatId,
         telegramUserId,
+        locale,
+        botToken: config.botToken,
+      });
+    case 'webapp':
+      return handleTelegramWebAppCommand({
+        chatId,
         locale,
         botToken: config.botToken,
       });

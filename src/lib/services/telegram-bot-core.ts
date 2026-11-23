@@ -171,6 +171,7 @@ import {
   handleTelegramKeysCommerceView,
   handleUsageCommand,
   handleUserServerCommand,
+  handleTelegramWebAppCommand,
 } from '@/lib/services/telegram-keys';
 import {
   handleInboxCommand,
@@ -429,6 +430,7 @@ const ALLOWED_TELEGRAM_USER_COMMANDS = new Set([
   'setup',
   'switchserver',
   'support',
+  'webapp',
   'cancel',
 ]);
 
@@ -10875,6 +10877,12 @@ export async function handleTelegramUpdate(
       return handleMyKeysCommand({
         chatId,
         telegramUserId,
+        locale,
+        botToken: config.botToken,
+      });
+    case 'webapp':
+      return handleTelegramWebAppCommand({
+        chatId,
         locale,
         botToken: config.botToken,
       });
