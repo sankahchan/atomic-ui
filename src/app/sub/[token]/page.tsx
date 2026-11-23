@@ -74,7 +74,7 @@ import {
   type CustomApp,
 } from '@/lib/subscription-themes';
 
-type Platform = 'android' | 'ios' | 'windows';
+type Platform = 'android' | 'ios' | 'windows' | 'macos';
 const LOCALE_STORAGE_KEY = 'atomic-ui-locale';
 const SHARE_PAGE_PASSWORD_KEY_PREFIX = 'atomic-share-password:';
 const DEVICE_INSTALL_STORAGE_KEY_PREFIX = 'atomic-device-install:';
@@ -176,6 +176,17 @@ function getManualSetupGuide(
           t('subscription.manual.guides.windows.step3'),
         ],
         tip: t('subscription.manual.guides.windows.tip'),
+      };
+    case 'macos':
+      return {
+        title: tr('subscription.manual.guides.macos.title', { app: clientName }),
+        summary: tr('subscription.manual.guides.macos.summary', { app: clientName }),
+        steps: [
+          tr('subscription.manual.guides.macos.step1', { app: clientName }),
+          tr('subscription.manual.guides.macos.step2', { app: clientName }),
+          t('subscription.manual.guides.macos.step3'),
+        ],
+        tip: t('subscription.manual.guides.macos.tip'),
       };
     default:
       return {
@@ -1013,6 +1024,7 @@ export default function SubscriptionPage() {
   const getPlatformLabel = (value: Platform): string => {
     if (value === 'ios') return t('subscription.platform.ios');
     if (value === 'windows') return t('subscription.platform.windows');
+    if (value === 'macos') return t('subscription.platform.macos');
     return t('subscription.platform.android');
   };
 
@@ -1693,8 +1705,8 @@ export default function SubscriptionPage() {
                           borderColor: controlBorder,
                         }}
                       >
-                        <div className="grid min-w-0 grid-cols-3 gap-1">
-                          {(['android', 'ios', 'windows'] as Platform[]).map((p) => (
+                        <div className="grid min-w-0 grid-cols-4 gap-1">
+                          {(['android', 'ios', 'windows', 'macos'] as Platform[]).map((p) => (
                             <button
                               key={p}
                               onClick={() => setPlatform(p)}
@@ -1712,7 +1724,9 @@ export default function SubscriptionPage() {
                                   ? t('subscription.platform.ios_short')
                                   : p === 'windows'
                                     ? t('subscription.platform.windows')
-                                    : t('subscription.platform.android')}
+                                    : p === 'macos'
+                                      ? t('subscription.platform.macos_short')
+                                      : t('subscription.platform.android')}
                               </span>
                               <span className="hidden truncate sm:inline">{getPlatformLabel(p)}</span>
                             </button>

@@ -6181,7 +6181,8 @@ export async function sendAccessKeyLifecycleTelegramNotification(input: {
     | 'ENABLED'
     | 'EXPIRING_7D'
     | 'EXPIRING_3D'
-    | 'EXPIRED';
+    | 'EXPIRED'
+    | 'DEPLETED';
   daysLeft?: number;
 }) {
   if (isPlaywrightSmokeEnv()) {

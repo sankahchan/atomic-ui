@@ -806,6 +806,7 @@ export const clientApps: ClientApp[] = [
       android: 'https://play.google.com/store/apps/details?id=org.outline.android.client',
       ios: 'https://apps.apple.com/app/outline-app/id1356177741',
       windows: 'https://s3.amazonaws.com/outline-releases/client/windows/stable/Outline-Client.exe',
+      macos: 'https://outline.com/download',
     },
   },
   {
@@ -851,6 +852,8 @@ export const clientApps: ClientApp[] = [
   },
 ];
 
-export function getAppsForPlatform(platform: 'android' | 'ios' | 'windows'): ClientApp[] {
+export function getAppsForPlatform(
+  platform: 'android' | 'ios' | 'windows' | 'macos',
+): ClientApp[] {
   return clientApps.filter((app) => app.platforms.includes(platform));
 }

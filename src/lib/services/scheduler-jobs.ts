@@ -276,11 +276,19 @@ export const SCHEDULER_JOB_DEFINITIONS: Record<string, SchedulerJobDefinition> =
   telegramBandwidthAlerts: {
     key: 'telegram_bandwidth_alerts',
     name: 'Telegram Bandwidth Alerts Workflow',
-    description: 'Processes proactive bandwidth usage alerts (80%/95%) for all keys.',
+    description: 'Processes proactive bandwidth usage alerts (80%/90%) for all keys.',
     category: 'TELEGRAM',
     cadenceLabel: 'Every 15 minutes',
     cronExpression: '*/15 * * * *',
     manualRunSupported: true,
+  },
+  telegramLifecycleAlerts: {
+    key: 'telegram_lifecycle_alerts',
+    name: 'Telegram Lifecycle Alerts',
+    description: 'Notifies linked Telegram chats when a key becomes data-depleted.',
+    category: 'TELEGRAM',
+    cadenceLabel: 'Every 15 minutes',
+    cronExpression: '*/15 * * * *',
   },
   telegramBroadcast: {
     key: 'telegram_broadcast',

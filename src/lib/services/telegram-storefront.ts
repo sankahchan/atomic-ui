@@ -3363,6 +3363,7 @@ export function buildTelegramStoreExpiryReminderView(input: {
   renewTarget?: TelegramStoreRenewTarget | null;
   sameDay?: boolean;
   daysLeft?: number | null;
+  depleted?: boolean;
   dataRemainingLabel?: string | null;
   locale?: SupportedLocale;
 }) {
@@ -3381,23 +3382,31 @@ export function buildTelegramStoreExpiryReminderView(input: {
 
   return {
     text: [
-      input.sameDay
-        ? (isMyanmar ? '⚠️ *Plan သက်တမ်း ယနေ့ကုန်မည်\\!*' : '⚠️ *Plan Expires Today\\!*')
-        : (isMyanmar ? '⏰ *Plan သက်တမ်း မကြာမီကုန်မည်\\!*' : '⏰ *Plan Expiring Soon\\!*'),
+      input.depleted
+        ? (isMyanmar ? '📶 *ဒေတာ ကုန်သွားပါပြီ\\!*' : '📶 *Data Limit Reached\\!*')
+        : input.sameDay
+          ? (isMyanmar ? '⚠️ *Plan သက်တမ်း ယနေ့ကုန်မည်\\!*' : '⚠️ *Plan Expires Today\\!*')
+          : (isMyanmar ? '⏰ *Plan သက်တမ်း မကြာမီကုန်မည်\\!*' : '⏰ *Plan Expiring Soon\\!*'),
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
-      input.sameDay
+      input.depleted
         ? (
           isMyanmar
-            ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* plan သည် ယနေ့ သက်တမ်းကုန်မည်,`
-            : `Your *${escapeTelegramMarkdownV2(input.planName)}* expires today,`
+            ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* plan ဒေတာ ကုန်သွားပါပြီ\\.`
+            : `Your *${escapeTelegramMarkdownV2(input.planName)}* plan has used all of its data\\.`
         )
-        : (
-          isMyanmar
-            ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* plan သည် *${escapeTelegramMarkdownV2(daysLeftLabel)}* အတွင်း သက်တမ်းကုန်မည်\\.`
-            : `Your *${escapeTelegramMarkdownV2(input.planName)}* expires in *${escapeTelegramMarkdownV2(daysLeftLabel)}*\\.`
-        ),
-      input.sameDay
+        : input.sameDay
+          ? (
+            isMyanmar
+              ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* plan သည် ယနေ့ သက်တမ်းကုန်မည်,`
+              : `Your *${escapeTelegramMarkdownV2(input.planName)}* expires today,`
+          )
+          : (
+            isMyanmar
+              ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* plan သည် *${escapeTelegramMarkdownV2(daysLeftLabel)}* အတွင်း သက်တမ်းကုန်မည်\\.`
+              : `Your *${escapeTelegramMarkdownV2(input.planName)}* expires in *${escapeTelegramMarkdownV2(daysLeftLabel)}*\\.`
+          ),
+      input.depleted || input.sameDay
         ? (
           isMyanmar
             ? `*${escapeTelegramMarkdownV2(input.firstName)}*\\. ဆက်လက်အသုံးပြုလိုပါက ယခု သက်တမ်းတိုးပါ\\.`
@@ -3405,11 +3414,15 @@ export function buildTelegramStoreExpiryReminderView(input: {
         )
         : (isMyanmar ? 'ဆက်လက်အသုံးပြုလိုပါက ယခု သက်တမ်းတိုးပါ\\.' : 'Renew now to stay connected\\.'),
       '',
-      `${isMyanmar ? '📶 ကျန်ရှိဒေတာ      :  ' : '📶 Data remaining  :  '}${escapeTelegramMarkdownV2(input.dataRemainingLabel || '—')}`,
-      `${isMyanmar ? '⏳ ကျန်ရှိရက်      :  ' : '⏳ Days left       :  '}${escapeTelegramMarkdownV2(daysLeftLabel)}`,
+      input.depleted
+        ? `${isMyanmar ? '📶 အသုံးပြုဒေတာ      :  ' : '📶 Data used       :  '}${escapeTelegramMarkdownV2(input.dataRemainingLabel || '—')}`
+        : `${isMyanmar ? '📶 ကျန်ရှိဒေတာ      :  ' : '📶 Data remaining  :  '}${escapeTelegramMarkdownV2(input.dataRemainingLabel || '—')}`,
+      ...(input.depleted
+        ? []
+        : [`${isMyanmar ? '⏳ ကျန်ရှိရက်      :  ' : '⏳ Days left       :  '}${escapeTelegramMarkdownV2(daysLeftLabel)}`]),
     ].join('\n'),
     replyMarkup: {
-      inline_keyboard: input.sameDay
+      inline_keyboard: input.sameDay || input.depleted
         ? [[{ text: isMyanmar ? `🔄 ယခု သက်တမ်းတိုးမည် — ${input.priceLabel}` : `🔄 Renew Now — ${input.priceLabel}`, callback_data: renewCallbackData }]]
         : [
             [{ text: isMyanmar ? `🔄 ယခု သက်တမ်းတိုးမည် — ${input.priceLabel}` : `🔄 Renew Now — ${input.priceLabel}`, callback_data: renewCallbackData }],
@@ -3429,17 +3442,21 @@ export function buildTelegramStoreDataWarningView(input: {
   plan: TelegramStoreResolvedPlan | null;
   renewTarget?: TelegramStoreRenewTarget | null;
   locale?: SupportedLocale;
+  threshold?: 80 | 90;
 }) {
   const locale = input.locale || 'en';
   const isMyanmar = locale === 'my';
+  const threshold = input.threshold ?? 80;
   return {
     text: [
-      isMyanmar ? '📶 *ဒေတာ နည်းနေပါပြီ\\!*' : '📶 *Low Data Warning\\!*',
+      threshold === 90
+        ? (isMyanmar ? '📶 *ဒေတာ ကုန်ခါနီးပါပြီ\\!*' : '📶 *Data Almost Gone\\!*')
+        : (isMyanmar ? '📶 *ဒေတာ နည်းနေပါပြီ\\!*' : '📶 *Low Data Warning\\!*'),
       '━━━━━━━━━━━━━━━━━━━━━━━━━━',
       '',
       isMyanmar
-        ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* data ကို *80%* အသုံးပြုပြီးပါပြီ\\.`
-        : `You've used *80%* of your *${escapeTelegramMarkdownV2(input.planName)}* data\\.`,
+        ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* data ကို *${threshold}%* အသုံးပြုပြီးပါပြီ\\.`
+        : `You've used *${threshold}%* of your *${escapeTelegramMarkdownV2(input.planName)}* data\\.`,
       '',
       escapeTelegramMarkdownV2(input.progressBar),
       isMyanmar

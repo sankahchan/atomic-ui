@@ -41,6 +41,7 @@ import { runTelegramPremiumRegionAlertCycle } from '@/lib/services/telegram-prem
 import { runTelegramSupportSlaAlertCycle } from '@/lib/services/telegram-support';
 import { runTelegramTrialLifecycleCycle } from '@/lib/services/telegram-trial-lifecycle';
 import { runTelegramBandwidthAlertCycle } from '@/lib/services/telegram-bandwidth-alerts';
+import { runTelegramLifecycleAlertCycle } from '@/lib/services/telegram-lifecycle-alerts';
 import { collectTrafficActivity } from '@/lib/services/traffic-activity';
 import { logger } from '@/lib/logger';
 import { runAdminLoginIncidentDigestCycle } from '@/lib/services/admin-login-protection';
@@ -739,15 +740,38 @@ export function initScheduler() {
                     return {
                         value: result,
                         status: 'SUCCESS',
-                        summary: `${result.alerted80} alerted 80%, ${result.alerted95} alerted 95%`,
+                        summary: `${result.alerted80} alerted 80%, ${result.alerted90} alerted 90%`,
                         resultPreview: result,
                     };
                 },
             );
-            if (result.alerted80 > 0 || result.alerted95 > 0) {
+            if (result.alerted80 > 0 || result.alerted90 > 0) {
                 logger.info(
-                    `Telegram bandwidth alerts: ${result.alerted80} alerted 80%, ${result.alerted95} alerted 95%`,
+                    `Telegram bandwidth alerts: ${result.alerted80} alerted 80%, ${result.alerted90} alerted 90%`,
                 );
+            }
+    });
+
+    // 20b. Telegram lifecycle alerts (Every 15 minutes)
+    scheduleManagedJob('*/15 * * * *', SCHEDULER_JOB_DEFINITIONS.telegramLifecycleAlerts, 'Telegram lifecycle alerts failed', async () => {
+            const result = await runObservedSchedulerJob(
+                SCHEDULER_JOB_DEFINITIONS.telegramLifecycleAlerts,
+                'SCHEDULED',
+                async () => {
+                    const result = await runTelegramLifecycleAlertCycle();
+                    if (result.errors.length > 0) {
+                        throw new Error(`Cycle failed with ${result.errors.length} errors: ${result.errors[0]}`);
+                    }
+                    return {
+                        value: result,
+                        status: 'SUCCESS',
+                        summary: `${result.sent} depleted notices sent`,
+                        resultPreview: result,
+                    };
+                },
+            );
+            if (result.sent > 0) {
+                logger.info(`Telegram lifecycle alerts: ${result.sent} depleted notice(s) sent`);
             }
     });
     // Run initial checks on startup
