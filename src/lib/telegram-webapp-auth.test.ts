@@ -31,7 +31,10 @@ function buildInitData(input: {
     .update(input.botToken ?? BOT_TOKEN)
     .digest();
   const hash = createHmac('sha256', secret).update(dataCheckString).digest('hex');
-  params.set('hash', input.Tamper ? `0${hash.slice(1)}` : hash);
+  params.set(
+    'hash',
+    input.Tamper ? `${hash.startsWith('0') ? '1' : '0'}${hash.slice(1)}` : hash,
+  );
 
   return params.toString();
 }

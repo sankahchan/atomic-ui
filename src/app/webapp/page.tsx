@@ -4,6 +4,11 @@ import * as React from 'react';
 import Script from 'next/script';
 import { PlopProvider } from '@plop-ui/react';
 import { withBasePath } from '@/lib/base-path';
+import {
+  TELEGRAM_WEBAPP_BRIDGE_TIMEOUT_ERROR,
+  waitForTelegramWebAppBridge,
+  type TelegramWebAppBridge,
+} from '@/lib/telegram-webapp-bridge';
 
 type WebAppKey = {
   id: string;
@@ -32,22 +37,6 @@ type WebAppData = {
   botUsername: string | null;
   keys: WebAppKey[];
 };
-
-interface TelegramWebAppBridge {
-  initData: string;
-  colorScheme?: 'light' | 'dark';
-  ready: () => void;
-  expand: () => void;
-  openLink: (url: string) => void;
-  openTelegramLink: (url: string) => void;
-  showToast?: (message: string) => void;
-}
-
-declare global {
-  interface Window {
-    Telegram?: { WebApp?: TelegramWebAppBridge };
-  }
-}
 
 const COPY = {
   en: {
@@ -99,27 +88,29 @@ export default function TelegramWebAppPage() {
   const [notice, setNotice] = React.useState<string | null>(null);
   const [busyKey, setBusyKey] = React.useState<string | null>(null);
   const [theme, setTheme] = React.useState<'light' | 'dark'>('dark');
+  const [webApp, setWebApp] = React.useState<TelegramWebAppBridge | null>(null);
   const [links, setLinks] = React.useState<Record<string, KeyLinks>>({});
 
   React.useEffect(() => {
-    const webApp = window.Telegram?.WebApp;
-    if (!webApp?.initData) {
-      setError(COPY.en.unconfigured);
-      return;
-    }
-
-    webApp.ready();
-    webApp.expand();
-    if (webApp.colorScheme) setTheme(webApp.colorScheme);
-
+    const controller = new AbortController();
     let cancelled = false;
 
     (async () => {
       try {
+        // Telegram's bridge script can load after hydration. Wait for it so
+        // ready() is always called and the client loading placeholder clears.
+        const bridge = await waitForTelegramWebAppBridge({ signal: controller.signal });
+        if (cancelled) return;
+
+        bridge.ready();
+        bridge.expand();
+        setWebApp(bridge);
+        if (bridge.colorScheme) setTheme(bridge.colorScheme);
+
         const sessionResponse = await fetch(withBasePath('/api/telegram/webapp/session'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData: webApp.initData }),
+          body: JSON.stringify({ initData: bridge.initData }),
         });
         const sessionBody = (await sessionResponse.json()) as { token?: string; error?: string };
         if (!sessionResponse.ok || !sessionBody.token) {
@@ -135,19 +126,25 @@ export default function TelegramWebAppPage() {
         if (!keysResponse.ok) throw new Error(keysBody.error || COPY.en.error);
         if (!cancelled) setData(keysBody);
       } catch (caught) {
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : COPY.en.error);
+        if (cancelled || (caught instanceof DOMException && caught.name === 'AbortError')) return;
+        if (
+          caught instanceof Error &&
+          caught.message === TELEGRAM_WEBAPP_BRIDGE_TIMEOUT_ERROR
+        ) {
+          setError(COPY.en.unconfigured);
+          return;
         }
+        setError(caught instanceof Error ? caught.message : COPY.en.error);
       }
     })();
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, []);
 
   const t = data?.locale === 'my' ? COPY.my : COPY.en;
-  const webApp = typeof window === 'undefined' ? null : window.Telegram?.WebApp;
 
   const fetchLinks = React.useCallback(
     async (key: WebAppKey) => {
