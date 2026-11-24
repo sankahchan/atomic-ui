@@ -573,18 +573,18 @@ export default function AuditPage() {
           </div>
 
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-1">
-              <div className="ops-inline-stat">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.total_entries')}</p>
-                <p className="mt-3 text-2xl font-semibold">{totalEntries}</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="ops-inline-stat flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase leading-tight tracking-[0.14em] text-muted-foreground">{t('audit.summary.total_entries')}</p>
+                <p className="text-xl font-semibold tabular-nums">{totalEntries}</p>
               </div>
-              <div className="ops-inline-stat">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.current_page')}</p>
-                <p className="mt-3 text-2xl font-semibold">{page}</p>
+              <div className="ops-inline-stat flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase leading-tight tracking-[0.14em] text-muted-foreground">{t('audit.summary.current_page')}</p>
+                <p className="text-xl font-semibold tabular-nums">{page}</p>
               </div>
-              <div className="ops-inline-stat col-span-2 md:col-span-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{t('audit.summary.visible_rows')}</p>
-                <p className="mt-3 text-2xl font-semibold">{currentItems.length}</p>
+              <div className="ops-inline-stat flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase leading-tight tracking-[0.14em] text-muted-foreground">{t('audit.summary.visible_rows')}</p>
+                <p className="text-xl font-semibold tabular-nums">{currentItems.length}</p>
               </div>
             </div>
 

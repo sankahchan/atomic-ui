@@ -100,6 +100,7 @@ import {
   Pencil,
   ArrowRightLeft,
   Sparkles,
+  MoreHorizontal,
 } from 'lucide-react';
 import { MobileCardView } from '@/components/mobile-card-view';
 import { TrafficSparkline } from '@/components/ui/traffic-chart';
@@ -6319,26 +6320,31 @@ export default function KeysPage() {
                     <FileSpreadsheet className="mr-2 h-4 w-4" />
                     {locale === 'my' ? 'CSV ထည့်သွင်းရန်' : 'Import CSV'}
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
-                    asChild
-                  >
-                    <Link href="/dashboard/templates">
-                      <FileText className="mr-2 h-4 w-4" />
-                      {locale === 'my' ? 'တမ်းပလိတ်များကို ဖွင့်မည်' : 'Open templates'}
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
-                    asChild
-                  >
-                    <Link href="/dashboard/archived">
-                      <Archive className="mr-2 h-4 w-4" />
-                      {locale === 'my' ? 'အဟောင်းမှတ်တမ်းကို ကြည့်မည်' : 'View archive'}
-                    </Link>
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        aria-label={locale === 'my' ? 'နောက်ထပ် လုပ်ဆောင်ချက်များ' : 'More actions'}
+                        className="h-10 rounded-full border-border/70 bg-background/70 px-3 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard/templates">
+                          <FileText className="mr-2 h-4 w-4" />
+                          {locale === 'my' ? 'တမ်းပလိတ်များကို ဖွင့်မည်' : 'Open templates'}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/dashboard/archived">
+                          <Archive className="mr-2 h-4 w-4" />
+                          {locale === 'my' ? 'အဟောင်းမှတ်တမ်းကို ကြည့်မည်' : 'View archive'}
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               )}
             </div>
