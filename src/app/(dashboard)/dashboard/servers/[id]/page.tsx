@@ -358,7 +358,7 @@ export default function ServerDetailPage() {
     { enabled: !!serverId },
   );
   const serverUsageHistoryQuery = trpc.analytics.serverUsageHistory.useQuery(
-    { serverId, days: 30 },
+    { serverId, days: 30, topConsumersLimit: 5 },
     { enabled: !!serverId },
   );
   const loadStatsQuery = trpc.servers.getLoadStats.useQuery(undefined, {
@@ -1337,6 +1337,38 @@ export default function ServerDetailPage() {
                     : 'No bandwidth history available for this server yet.'}
                 </div>
               )}
+              {serverUsageHistoryQuery.data?.topConsumers && serverUsageHistoryQuery.data.topConsumers.length > 0 ? (
+                <div className="mt-5 space-y-2 border-t border-border/60 pt-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {isMyanmar ? 'ဤဆာဗာ၏ ထိပ်ဆုံးအသုံးပြုသူများ' : 'Top consumers on this server'}
+                  </p>
+                  {serverUsageHistoryQuery.data.topConsumers.map((consumer) => (
+                    <div
+                      key={`${consumer.type}-${consumer.keyId}`}
+                      className="flex items-center justify-between gap-3 rounded-[0.9rem] border border-border/50 px-3 py-2"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Link
+                          href={consumer.type === 'DYNAMIC_KEY'
+                            ? `/dashboard/dynamic-keys/${consumer.keyId}`
+                            : `/dashboard/keys/${consumer.keyId}`}
+                          className="truncate text-sm font-medium hover:text-primary"
+                        >
+                          {consumer.name}
+                        </Link>
+                        <Badge variant="outline" className="shrink-0 text-[10px]">
+                          {consumer.type === 'DYNAMIC_KEY'
+                            ? (isMyanmar ? 'ပြောင်းလဲ' : 'Dynamic')
+                            : (isMyanmar ? 'သော့' : 'Key')}
+                        </Badge>
+                      </div>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                        {formatBytes(BigInt(consumer.deltaBytes))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>

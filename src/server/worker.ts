@@ -16,6 +16,11 @@
 
 import { PrismaClient } from '@prisma/client';
 import { createOutlineClient } from '../lib/outline-api';
+import {
+  ACCESS_KEY_SNAPSHOT_TYPE,
+  DYNAMIC_KEY_SNAPSHOT_TYPE,
+  buildDynamicKeySnapshot,
+} from '../lib/usage-snapshot-attribution';
 
 // Initialize Prisma
 const prisma = new PrismaClient();
@@ -251,7 +256,7 @@ async function collectServerSnapshots(server: {
       snapshots.push({
         serverId: server.id,
         keyId: key.id,
-        keyType: 'ACCESS_KEY',
+        keyType: ACCESS_KEY_SNAPSHOT_TYPE,
         usedBytes: currentBytes,
         deltaBytes,
       });
@@ -286,10 +291,12 @@ async function collectDynamicKeySnapshots(): Promise<number> {
       select: {
         id: true,
         usedBytes: true,
+        lastResolvedServerId: true,
       },
     });
 
     const snapshots: {
+      serverId: string | null;
       keyId: string;
       keyType: string;
       usedBytes: bigint;
@@ -299,7 +306,7 @@ async function collectDynamicKeySnapshots(): Promise<number> {
     for (const dak of dynamicKeys) {
       // Get last snapshot
       const lastSnapshot = await prisma.usageSnapshot.findFirst({
-        where: { keyId: dak.id, keyType: 'DYNAMIC_KEY' },
+        where: { keyId: dak.id, keyType: DYNAMIC_KEY_SNAPSHOT_TYPE },
         orderBy: { createdAt: 'desc' },
       });
 
@@ -307,12 +314,12 @@ async function collectDynamicKeySnapshots(): Promise<number> {
       const lastBytes = lastSnapshot?.usedBytes || BigInt(0);
       const deltaBytes = currentBytes > lastBytes ? currentBytes - lastBytes : BigInt(0);
 
-      snapshots.push({
-        keyId: dak.id,
-        keyType: 'DYNAMIC_KEY',
+      snapshots.push(buildDynamicKeySnapshot({
+        id: dak.id,
         usedBytes: currentBytes,
+        lastResolvedServerId: dak.lastResolvedServerId,
         deltaBytes,
-      });
+      }));
     }
 
     if (snapshots.length > 0) {

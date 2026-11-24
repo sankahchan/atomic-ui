@@ -9,6 +9,7 @@ import {
 import {
   escapeHtml,
   formatTelegramDateTime,
+  TELEGRAM_DIVIDER,
 } from '@/lib/services/telegram-ui';
 
 export const TELEGRAM_TRIAL_PLAN_CODE = 'trial_1d_3gb';
@@ -137,7 +138,7 @@ export function buildTelegramTrialActivatedMessage(input: {
   if (input.locale === 'my') {
     return [
       '🎁 *Trial စတင်ပြီးပါပြီ\\!*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       `ကြိုဆိုပါတယ်၊ *${firstName}*\\! သင်၏ အခမဲ့အစမ်းသုံးကို`,
       'ယခုချက်ချင်း အသုံးပြုနိုင်ပါပြီ\\! 🚀',
@@ -149,7 +150,7 @@ export function buildTelegramTrialActivatedMessage(input: {
       `🕐 သက်တမ်းကုန်မည့်နေ့ :  ${expiresAt}`,
       '💰 ပေးချေမှု     :  အခမဲ့',
       '',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '📲 _Setup Guide ကိုနှိပ်ပြီး ၂ မိနစ်အတွင်း ချိတ်ဆက်ပါ\\._',
       'သင်၏ အခမဲ့အစမ်းသုံးကို ပျော်ရွှင်စွာ အသုံးပြုပါ\\! 🎉',
     ].join('\n');
@@ -157,7 +158,7 @@ export function buildTelegramTrialActivatedMessage(input: {
 
   return [
     '🎁 *Trial Activated\\!*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     `Welcome, *${firstName}*\\! Your free trial`,
     'is ready to use right now\\! 🚀',
@@ -169,7 +170,7 @@ export function buildTelegramTrialActivatedMessage(input: {
     `🕐 Expires     :  ${expiresAt}`,
     '💰 Paid        :  FREE',
     '',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '📲 _Tap Setup Guide to connect in 2 minutes\\._',
     'Enjoy your free trial\\! 🎉',
   ].join('\n');

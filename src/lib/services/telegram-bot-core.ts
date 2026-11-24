@@ -70,6 +70,7 @@ import {
   getTelegramAccessKeyCategory,
   getTelegramUi,
   normalizeTelegramPremiumSupportLookupCodes,
+  TELEGRAM_DIVIDER,
 } from '@/lib/services/telegram-ui';
 import {
   TELEGRAM_ORDER_ACTIVE_STATUSES,
@@ -6630,7 +6631,7 @@ function buildTelegramStoreCouponPrompt(input: {
   const isMyanmar = input.locale === 'my';
   return [
     isMyanmar ? '🏷 *ကူပွန်ကုဒ် ထည့်မည်*' : '🏷 *Apply Coupon Code*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     `${isMyanmar ? 'အစီအစဉ်' : 'Plan'}: *${input.planName}*`,
     '',
@@ -7297,7 +7298,7 @@ export async function handleTelegramCallbackQuery(
             messageId,
             text: [
               '✅ *Checkout Started*',
-              '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+              TELEGRAM_DIVIDER,
               '',
               `Plan: *${escapeTelegramMarkdownV2(selectedPlan.detailName)}*`,
               '',

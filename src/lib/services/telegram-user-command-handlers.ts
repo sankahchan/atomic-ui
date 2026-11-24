@@ -45,7 +45,7 @@ import {
   resolveTelegramSalesPlanLabel,
   resolveTelegramSalesPriceLabel,
 } from '@/lib/services/telegram-sales';
-import { escapeHtml, getTelegramUi } from '@/lib/services/telegram-ui';
+import { escapeHtml, getTelegramUi, TELEGRAM_DIVIDER } from '@/lib/services/telegram-ui';
 import { buildTelegramLocaleSelectorKeyboard, buildTelegramLocaleSelectorMessage } from '@/lib/services/telegram-callbacks';
 import {
   buildTelegramStoreActiveKeysView,
@@ -503,7 +503,7 @@ export async function handleStoreMyKeysCommand(input: {
     const webAppButton = buildTelegramWebAppInlineButton(input.locale);
     const text = [
       input.locale === 'my' ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       input.locale === 'my' ? 'အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'No active keys right now\\.',
       '',
@@ -732,7 +732,7 @@ export async function handleStoreSwitchServerCommand(input: {
   if (keys.length === 0) {
     const text = [
       input.locale === 'my' ? '🔄 *Server ပြောင်းမည်*' : '🔄 *Switch Server*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       input.locale === 'my' ? 'Server ပြောင်းနိုင်သော အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'No switchable active keys found\\.',
     ].join('\n');
@@ -784,7 +784,7 @@ export async function handleStoreSwitchServerCommand(input: {
     if (!serverOptions || serverOptions.servers.length === 0) {
       const text = [
         input.locale === 'my' ? '🌍 *Server အသစ်ရွေးပါ*' : '🌍 *Select New Server*',
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        TELEGRAM_DIVIDER,
         '',
         `${input.locale === 'my' ? 'လက်ရှိ     :  *' : 'Current  :  *'}${escapeTelegramMarkdownV2(matchedKey.currentServerName)}*`,
         `${input.locale === 'my' ? 'အသုံးပြုပြီး :  ' : 'Used     :  '}${escapeTelegramMarkdownV2(String(matchedKey.switchesUsed))} / ${escapeTelegramMarkdownV2(matchedKey.switchesMaxLabel)}${input.locale === 'my' ? ' ကြိမ်' : ' switches'}`,
