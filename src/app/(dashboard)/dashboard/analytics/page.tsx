@@ -242,16 +242,23 @@ export default function AnalyticsPage() {
   const { toast } = useToast();
   const isMyanmar = locale === 'my';
   const [days, setDays] = useState(30);
+  const [selectedServerId, setSelectedServerId] = useState('all');
   const [topConsumersRange, setTopConsumersRange] = useState<'24h' | '7d' | '30d'>('24h');
   const [shareRange, setShareRange] = useState<'24h' | '7d' | '30d'>('7d');
   const [telegramSalesRange, setTelegramSalesRange] = useState<'24h' | '7d' | '30d'>('30d');
 
-  const { data: trafficHistory, isLoading: loadingTraffic } = trpc.dashboard.trafficHistory.useQuery({ days });
+  const filterServerId = selectedServerId === 'all' ? undefined : selectedServerId;
+  const { data: servers } = trpc.servers.list.useQuery({ includeInactive: true });
+  const { data: trafficHistory, isLoading: loadingTraffic } = trpc.dashboard.trafficHistory.useQuery({
+    days,
+    serverId: filterServerId,
+  });
   const { data: topUsers, isLoading: loadingTopUsers } = trpc.dashboard.topUsers.useQuery({ limit: 5 });
   const { data: peakHours, isLoading: loadingPeakHours } = trpc.dashboard.peakHours.useQuery({ days });
   const { data: topConsumers, isLoading: loadingTopConsumers } = trpc.analytics.topConsumers.useQuery({
     range: topConsumersRange,
     limit: 5,
+    ...(filterServerId ? { serverId: filterServerId } : {}),
   });
   const { data: anomalies, isLoading: loadingAnomalies } = trpc.analytics.anomalies.useQuery({
     range: '24h',
@@ -466,6 +473,25 @@ export default function AnalyticsPage() {
                 </div>
 
                 <div className="space-y-3">
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {isMyanmar ? 'ဆာဗာ' : 'Server'}
+                    </p>
+                    <Select value={selectedServerId} onValueChange={setSelectedServerId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isMyanmar ? 'ဆာဗာအားလုံး' : 'All servers'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{isMyanmar ? 'ဆာဗာအားလုံး' : 'All servers'}</SelectItem>
+                        {servers?.map((server) => (
+                          <SelectItem key={server.id} value={server.id}>
+                            {server.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="space-y-2">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       {isMyanmar ? 'လမ်းကြောင်း ကာလ' : 'Traffic window'}

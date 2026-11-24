@@ -398,6 +398,8 @@ export default function AuditPage() {
   const [pageSize, setPageSize] = useState(20);
   const [actionFilter, setActionFilter] = useState('');
   const [actionPreset, setActionPreset] = useState<AuditActionPreset>('ALL');
+  const [searchFilter, setSearchFilter] = useState('');
+  const [ipFilter, setIpFilter] = useState('');
   const [entityFilter, setEntityFilter] = useState<(typeof ENTITY_OPTIONS)[number]>('ALL');
   const [userFilter, setUserFilter] = useState('ALL');
   const [dateFromFilter, setDateFromFilter] = useState('');
@@ -414,24 +416,28 @@ export default function AuditPage() {
       pageSize,
       action: actionPreset === 'ALL' ? actionFilter.trim() || undefined : undefined,
       actions: actionPreset === 'RENEWALS' ? [...RENEWAL_AUDIT_ACTIONS] : undefined,
+      search: searchFilter.trim() || undefined,
+      ip: ipFilter.trim() || undefined,
       entity: entityFilter === 'ALL' ? undefined : entityFilter,
       userId: userFilter === 'ALL' ? undefined : userFilter,
       dateFrom,
       dateTo,
     }),
-    [actionFilter, actionPreset, dateFrom, dateTo, entityFilter, page, pageSize, userFilter],
+    [actionFilter, actionPreset, dateFrom, dateTo, entityFilter, ipFilter, page, pageSize, searchFilter, userFilter],
   );
 
   const auditExportQueryInput = useMemo(
     () => ({
       action: actionPreset === 'ALL' ? actionFilter.trim() || undefined : undefined,
       actions: actionPreset === 'RENEWALS' ? [...RENEWAL_AUDIT_ACTIONS] : undefined,
+      search: searchFilter.trim() || undefined,
+      ip: ipFilter.trim() || undefined,
       entity: entityFilter === 'ALL' ? undefined : entityFilter,
       userId: userFilter === 'ALL' ? undefined : userFilter,
       dateFrom,
       dateTo,
     }),
-    [actionFilter, actionPreset, dateFrom, dateTo, entityFilter, userFilter],
+    [actionFilter, actionPreset, dateFrom, dateTo, entityFilter, ipFilter, searchFilter, userFilter],
   );
 
   const { data: auditLogs, isLoading } = trpc.audit.list.useQuery(auditQueryInput, {
@@ -453,6 +459,16 @@ export default function AuditPage() {
     setPage(1);
     setActionPreset('ALL');
     setActionFilter(value);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setPage(1);
+    setSearchFilter(value);
+  };
+
+  const handleIpChange = (value: string) => {
+    setPage(1);
+    setIpFilter(value);
   };
 
   const handleRenewalQuickFilter = () => {
@@ -526,6 +542,8 @@ export default function AuditPage() {
     setPage(1);
     setActionFilter('');
     setActionPreset('ALL');
+    setSearchFilter('');
+    setIpFilter('');
     setEntityFilter('ALL');
     setUserFilter('ALL');
     setDateFromFilter('');
@@ -594,6 +612,30 @@ export default function AuditPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="ops-table-toolbar grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="searchFilter">{t('notifications.delivery.search')}</Label>
+              <Input
+                id="searchFilter"
+                placeholder="Search action, entity, target ID, IP, or details..."
+                value={searchFilter}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ipFilter">{t('audit.table.ip')}</Label>
+              <Input
+                id="ipFilter"
+                placeholder="IP address..."
+                value={ipFilter}
+                onChange={(e) => handleIpChange(e.target.value)}
+                className="h-11 rounded-[1.15rem] border-border/70 bg-background/70 dark:bg-[rgba(4,10,20,0.72)]"
+              />
+            </div>
+          </div>
+
           <div className="ops-table-toolbar grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-2">
               <Label htmlFor="actionFilter">{t('audit.filters.action')}</Label>

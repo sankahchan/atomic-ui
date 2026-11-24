@@ -183,6 +183,7 @@ export const analyticsRouter = router({
       range: timeRangeSchema.default('24h'),
       limit: z.number().int().min(1).max(50).default(10),
       keyType: z.enum(['ACCESS_KEY', 'DYNAMIC_KEY', 'ALL']).default('ALL'),
+      serverId: z.string().optional(),
     }))
     .query(async ({ input }) => {
       const cutoff = getDateCutoff(input.range);
@@ -194,6 +195,7 @@ export const analyticsRouter = router({
           createdAt: { gte: cutoff },
           keyId: { not: null },
           ...(input.keyType !== 'ALL' ? { keyType: input.keyType } : {}),
+          ...(input.serverId ? { serverId: input.serverId } : {}),
         },
         _sum: {
           deltaBytes: true,
@@ -273,6 +275,118 @@ export const analyticsRouter = router({
       );
 
       return results.filter((r): r is NonNullable<typeof r> => r !== null);
+    }),
+
+  /**
+   * Get day-bucketed bandwidth for a server, with optional per-key top consumers.
+   */
+  serverUsageHistory: adminProcedure
+    .input(z.object({
+      serverId: z.string(),
+      days: z.number().int().min(1).max(365).default(30),
+      topConsumersLimit: z.number().int().min(1).max(10).optional(),
+    }))
+    .query(async ({ input }) => {
+      const server = await db.server.findUnique({
+        where: { id: input.serverId },
+        select: { id: true },
+      });
+
+      if (!server) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Server not found',
+        });
+      }
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - input.days);
+
+      const snapshots = await db.usageSnapshot.findMany({
+        where: {
+          serverId: input.serverId,
+          createdAt: { gte: startDate },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          deltaBytes: true,
+          createdAt: true,
+        },
+      });
+
+      // Group by date, then fill in missing days (same approach as dashboard.trafficHistory)
+      const dailyUsage: Record<string, bigint> = {};
+
+      for (const snapshot of snapshots) {
+        const dateKey = snapshot.createdAt.toISOString().split('T')[0];
+        dailyUsage[dateKey] = (dailyUsage[dateKey] || BigInt(0)) + snapshot.deltaBytes;
+      }
+
+      const data: Array<{ date: string; bytes: number; label: string }> = [];
+      const current = new Date(startDate);
+      const today = new Date();
+
+      while (current <= today) {
+        const dateKey = current.toISOString().split('T')[0];
+        data.push({
+          date: dateKey,
+          bytes: Number(dailyUsage[dateKey] || BigInt(0)),
+          label: current.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        });
+        current.setDate(current.getDate() + 1);
+      }
+
+      let topConsumers: Array<{
+        keyId: string;
+        name: string;
+        type: 'ACCESS_KEY';
+        deltaBytes: string;
+      }> | null = null;
+
+      if (input.topConsumersLimit) {
+        const grouped = await db.usageSnapshot.groupBy({
+          by: ['keyId'],
+          where: {
+            serverId: input.serverId,
+            createdAt: { gte: startDate },
+            keyId: { not: null },
+          },
+          _sum: { deltaBytes: true },
+          orderBy: {
+            _sum: { deltaBytes: 'desc' },
+          },
+          take: input.topConsumersLimit,
+        });
+
+        const consumers = await Promise.all(
+          grouped.map(async (group) => {
+            if (!group.keyId) return null;
+
+            const key = await db.accessKey.findUnique({
+              where: { id: group.keyId },
+              select: { id: true, name: true },
+            });
+
+            if (!key) return null;
+
+            return {
+              keyId: key.id,
+              name: key.name,
+              type: 'ACCESS_KEY' as const,
+              deltaBytes: (group._sum.deltaBytes || BigInt(0)).toString(),
+            };
+          })
+        );
+
+        topConsumers = consumers.filter((consumer): consumer is NonNullable<typeof consumer> => consumer !== null);
+      }
+
+      return {
+        serverId: input.serverId,
+        days: input.days,
+        data,
+        topConsumers,
+      };
     }),
 
   /**

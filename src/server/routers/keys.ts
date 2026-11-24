@@ -63,6 +63,7 @@ import {
 } from '@/lib/access-key-policies';
 import { getGeoIpCountry } from '@/lib/security';
 import { writeAuditLog } from '@/lib/audit';
+import { acquireSyncLock, releaseSyncLock } from '@/lib/sync-lock';
 import {
   hasSharePagePassword,
   hashSharePagePassword,
@@ -236,6 +237,15 @@ const bulkCreateSchema = z.object({
   confirmDrainingServers: z.boolean().optional(),
 });
 
+const bulkKeyIdsSchema = z.object({
+  keyIds: z.array(z.string()).min(1),
+});
+
+const bulkCreateFromCsvSchema = z.object({
+  csv: z.string().min(1).max(1_000_000),
+  confirmDrainingServers: z.boolean().optional(),
+});
+
 /**
  * Schema for listing keys with filters.
  */
@@ -361,6 +371,139 @@ const calculateExpiration = (
       return { expiresAt: null, status: 'ACTIVE' };
   }
 };
+
+/**
+ * Shared Outline + database creation path for bulk key operations.
+ *
+ * Both bulkCreate and bulkCreateFromCsv route through this helper so the
+ * first-use activation defaults (PENDING + durationDays) stay identical.
+ */
+async function createBulkAccessKeyOnServer(input: {
+  server: { id: string; apiUrl: string; apiCertSha256: string };
+  client: ReturnType<typeof createOutlineClient>;
+  name: string;
+  dataLimitGB?: number | null;
+  expirationType: 'NEVER' | 'FIXED_DATE' | 'DURATION_FROM_CREATION' | 'START_ON_FIRST_USE';
+  durationDays?: number | null;
+  expiresAt?: Date | null;
+}) {
+  const {
+    server,
+    client,
+    name,
+    dataLimitGB,
+    expirationType,
+    durationDays,
+    expiresAt,
+  } = input;
+
+  const outlineKey = await client.createAccessKey({ name });
+
+  if (dataLimitGB) {
+    const limitBytes = gbToBytes(dataLimitGB);
+    await client.setAccessKeyDataLimit(outlineKey.id, Number(limitBytes));
+  }
+
+  const calculated = calculateExpiration(expirationType, expiresAt ?? null, durationDays);
+
+  return db.accessKey.create({
+    data: {
+      outlineKeyId: outlineKey.id,
+      name,
+      serverId: server.id,
+      accessUrl: decorateOutlineAccessUrl(outlineKey.accessUrl, name),
+      password: outlineKey.password,
+      port: outlineKey.port,
+      method: outlineKey.method,
+      dataLimitBytes: dataLimitGB ? gbToBytes(dataLimitGB) : null,
+      expirationType,
+      expiresAt: calculated.expiresAt,
+      durationDays,
+      status: calculated.status,
+      subscriptionToken: generateRandomString(32),
+    },
+    select: { id: true, name: true },
+  });
+}
+
+const BULK_CSV_HEADER_ALIASES: Record<string, string[]> = {
+  serverId: ['serverId', 'server'],
+  name: ['name'],
+  dataLimitGB: ['dataLimitGB', 'dataLimit'],
+  expirationType: ['expirationType', 'expiryType'],
+  durationDays: ['durationDays'],
+  expiresAt: ['expiresAt'],
+};
+
+function normalizeBulkCsvHeader(value: string) {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, '');
+}
+
+/** Minimal RFC-4180 style parser: quoted fields, escaped quotes and CRLF. */
+function parseBulkCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  const source = text.replace(/^\uFEFF/, '');
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (source[index + 1] === '"') {
+          field += '"';
+          index += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field);
+      field = '';
+    } else if (char === '\n' || char === '\r') {
+      if (char === '\r' && source[index + 1] === '\n') {
+        index += 1;
+      }
+      row.push(field);
+      field = '';
+      rows.push(row);
+      row = [];
+    } else {
+      field += char;
+    }
+  }
+
+  if (row.length > 0 || field.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows.filter((candidate) => candidate.some((cell) => cell.trim().length > 0));
+}
+
+function getBulkCsvCell(
+  row: string[],
+  headerIndexes: Map<string, number>,
+  key: keyof typeof BULK_CSV_HEADER_ALIASES,
+) {
+  for (const alias of BULK_CSV_HEADER_ALIASES[key]) {
+    const index = headerIndexes.get(normalizeBulkCsvHeader(alias));
+    if (index !== undefined) {
+      return (row[index] ?? '').trim();
+    }
+  }
+
+  return '';
+}
 
 function currentRawMetricForAccessKey(key: {
   usedBytes: bigint;
@@ -2569,39 +2712,13 @@ export const keysRouter = router({
           const keyName = `${input.namePrefix}_${server.name}_${i}`;
 
           try {
-            // Create on Outline
-            const outlineKey = await client.createAccessKey({ name: keyName });
-
-            // Set data limit if specified
-            if (input.dataLimitGB) {
-              const limitBytes = gbToBytes(input.dataLimitGB);
-              await client.setAccessKeyDataLimit(outlineKey.id, Number(limitBytes));
-            }
-
-            // Calculate expiration
-            const { expiresAt, status } = calculateExpiration(
-              input.expirationType,
-              null,
-              input.durationDays
-            );
-
-            // Create database record
-            await db.accessKey.create({
-              data: {
-                outlineKeyId: outlineKey.id,
-                name: keyName,
-                serverId: server.id,
-                accessUrl: decorateOutlineAccessUrl(outlineKey.accessUrl, keyName),
-                password: outlineKey.password,
-                port: outlineKey.port,
-                method: outlineKey.method,
-                dataLimitBytes: input.dataLimitGB ? gbToBytes(input.dataLimitGB) : null,
-                expirationType: input.expirationType,
-                expiresAt,
-                durationDays: input.durationDays,
-                status,
-                subscriptionToken: generateRandomString(32),
-              },
+            await createBulkAccessKeyOnServer({
+              server,
+              client,
+              name: keyName,
+              dataLimitGB: input.dataLimitGB,
+              expirationType: input.expirationType,
+              durationDays: input.durationDays,
             });
 
             results.success++;
@@ -2609,6 +2726,344 @@ export const keysRouter = router({
             results.failed++;
             results.errors.push(`${keyName}: ${(error as Error).message}`);
           }
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Bulk expire keys: stamp them as expired now and deactivate their Outline
+   * keys using the same best-effort deletion pattern as bulkToggleStatus.
+   */
+  bulkExpire: adminProcedure
+    .input(bulkKeyIdsSchema)
+    .mutation(async ({ ctx, input }) => {
+      const keyIds = Array.from(new Set(input.keyIds));
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: keyIds } },
+        include: {
+          server: {
+            select: { apiUrl: true, apiCertSha256: true },
+          },
+        },
+      });
+      const keysById = new Map(keys.map((key) => [key.id, key]));
+      const now = new Date();
+
+      const results: {
+        success: number;
+        failed: number;
+        errors: { id: string; name: string; error: string }[];
+      } = { success: 0, failed: 0, errors: [] };
+
+      for (const id of keyIds) {
+        const key = keysById.get(id);
+
+        if (!key) {
+          results.failed++;
+          results.errors.push({ id, name: 'Unknown', error: 'Key not found' });
+          continue;
+        }
+
+        try {
+          try {
+            const client = createOutlineClient(key.server.apiUrl, key.server.apiCertSha256);
+            await client.deleteAccessKey(key.outlineKeyId);
+          } catch (error) {
+            // Same as bulkToggleStatus: a missing Outline key must not block
+            // the local status change.
+            logger.error(`Failed to delete key ${key.outlineKeyId} from Outline during bulk expire`, error);
+          }
+
+          await db.accessKey.update({
+            where: { id },
+            data: {
+              status: 'EXPIRED',
+              expiresAt: now,
+              expirationWarningStage: null,
+              lastWarningSentAt: null,
+              nextRotationAt: null,
+              estimatedDevices: 0,
+            },
+          });
+
+          await db.connectionSession.updateMany({
+            where: { accessKeyId: id, isActive: true },
+            data: { isActive: false, endedAt: now, endedReason: 'KEY_EXPIRED' },
+          });
+
+          await writeAuditLog({
+            userId: ctx.user.id,
+            ip: ctx.clientIp,
+            action: 'ACCESS_KEY_EXPIRED_BULK',
+            entity: 'ACCESS_KEY',
+            entityId: id,
+            details: {
+              bulk: true,
+              batchSize: keyIds.length,
+              name: key.name,
+              previousStatus: key.status,
+              previousExpiresAt: key.expiresAt?.toISOString() ?? null,
+              nextExpiresAt: now.toISOString(),
+            },
+          });
+
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            id,
+            name: key.name,
+            error: error instanceof Error ? error.message : 'Failed to expire access key',
+          });
+        }
+      }
+
+      return results;
+    }),
+
+  /**
+   * Sync every distinct server behind the selected keys. The shared sync lock
+   * is acquired for the whole batch so this cannot overlap with syncAll,
+   * post-create syncs, or auto-sync ticks.
+   */
+  bulkSync: adminProcedure
+    .input(bulkKeyIdsSchema)
+    .mutation(async ({ ctx, input }) => {
+      const keys = await db.accessKey.findMany({
+        where: { id: { in: Array.from(new Set(input.keyIds)) } },
+        select: { serverId: true },
+      });
+      const serverIds = Array.from(new Set(
+        keys.map((key) => key.serverId).filter((serverId): serverId is string => Boolean(serverId)),
+      ));
+
+      if (serverIds.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'The selected keys are not attached to a server.',
+        });
+      }
+
+      const operationId = `bulk-keys-sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const lockResult = acquireSyncLock(operationId);
+      if (!lockResult.acquired) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `Sync already in progress${lockResult.lockedFor ? ` (running for ${Math.round(lockResult.lockedFor / 1000)}s)` : ''}. Please wait for it to complete.`,
+        });
+      }
+
+      try {
+        // Loaded lazily to avoid a module cycle between the keys and root routers.
+        const { appRouter } = await import('@/server/routers');
+        const caller = appRouter.createCaller(ctx);
+
+        const servers = await db.server.findMany({
+          where: { id: { in: serverIds } },
+          select: { id: true, name: true },
+        });
+        const serverNames = new Map(servers.map((server) => [server.id, server.name]));
+
+        const results: {
+          synced: number;
+          failed: number;
+          servers: { serverId: string; serverName: string; success: boolean; error?: string }[];
+          errors: { serverId: string; serverName: string; error: string }[];
+        } = { synced: 0, failed: 0, servers: [], errors: [] };
+
+        for (const serverId of serverIds) {
+          const serverName = serverNames.get(serverId) ?? serverId;
+          try {
+            await caller.servers.sync({ id: serverId });
+            results.synced++;
+            results.servers.push({ serverId, serverName, success: true });
+          } catch (error) {
+            const message = error instanceof TRPCError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : 'Failed to sync server';
+            results.failed++;
+            results.errors.push({ serverId, serverName, error: message });
+            results.servers.push({ serverId, serverName, success: false, error: message });
+          }
+        }
+
+        return results;
+      } finally {
+        releaseSyncLock(operationId);
+      }
+    }),
+
+  /**
+   * Create keys from CSV rows.
+   *
+   * Headers: serverId,name,dataLimitGB,expirationType,durationDays,expiresAt
+   * Blank expirationType defaults to START_ON_FIRST_USE with a 30-day duration,
+   * matching the bulk-create dialog defaults.
+   */
+  bulkCreateFromCsv: adminProcedure
+    .input(bulkCreateFromCsvSchema)
+    .mutation(async ({ ctx, input }) => {
+      const expirationTypeSchema = z.enum([
+        'NEVER',
+        'FIXED_DATE',
+        'DURATION_FROM_CREATION',
+        'START_ON_FIRST_USE',
+      ]);
+      const parsedRows = parseBulkCsv(input.csv);
+
+      if (parsedRows.length < 2) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'CSV needs a header row and at least one data row.',
+        });
+      }
+
+      const headerIndexes = new Map(
+        parsedRows[0].map((header, index) => [normalizeBulkCsvHeader(header), index]),
+      );
+      const requiredHeaders = ['serverId', 'name'] as const;
+      for (const header of requiredHeaders) {
+        const aliases = BULK_CSV_HEADER_ALIASES[header];
+        if (!aliases.some((alias) => headerIndexes.has(normalizeBulkCsvHeader(alias)))) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `CSV is missing the "${header}" column.`,
+          });
+        }
+      }
+
+      const dataRows = parsedRows.slice(1);
+      if (dataRows.length > 200) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'CSV import supports at most 200 rows at a time.',
+        });
+      }
+
+      const requestedServerIds = Array.from(new Set(
+        dataRows
+          .map((row) => getBulkCsvCell(row, headerIndexes, 'serverId'))
+          .filter(Boolean),
+      ));
+      const servers = await db.server.findMany({
+        where: { id: { in: requestedServerIds } },
+      });
+      const serversById = new Map(servers.map((server) => [server.id, server]));
+      const clientsByServerId = new Map<string, ReturnType<typeof createOutlineClient>>();
+
+      const results: {
+        success: number;
+        failed: number;
+        errors: { row: number; name: string; error: string }[];
+      } = { success: 0, failed: 0, errors: [] };
+
+      for (let index = 0; index < dataRows.length; index++) {
+        const row = dataRows[index];
+        const rowNumber = index + 2;
+        const name = getBulkCsvCell(row, headerIndexes, 'name');
+        const label = name || `row ${rowNumber}`;
+
+        try {
+          if (!name) {
+            throw new Error('Name is required.');
+          }
+          if (name.length > 100) {
+            throw new Error('Name must be 100 characters or fewer.');
+          }
+
+          const serverId = getBulkCsvCell(row, headerIndexes, 'serverId');
+          const server = serversById.get(serverId);
+          if (!server) {
+            throw new Error(`Server "${serverId}" was not found.`);
+          }
+          const assignmentCheck = canAssignKeysToServer(server, { allowDraining: true });
+          if (!assignmentCheck.allowed) {
+            throw new Error(assignmentCheck.reason ?? 'Server is not assignable.');
+          }
+          if (server.lifecycleMode === 'DRAINING' && !input.confirmDrainingServers) {
+            throw new Error(`Server "${server.name}" is draining. Confirm draining targets before importing.`);
+          }
+
+          let client = clientsByServerId.get(serverId);
+          if (!client) {
+            client = createOutlineClient(server.apiUrl, server.apiCertSha256);
+            clientsByServerId.set(serverId, client);
+          }
+
+          const rawDataLimit = getBulkCsvCell(row, headerIndexes, 'dataLimitGB');
+          let dataLimitGB: number | null = null;
+          if (rawDataLimit) {
+            const parsed = Number(rawDataLimit);
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+              throw new Error('dataLimitGB must be a positive number.');
+            }
+            dataLimitGB = parsed;
+          }
+
+          const rawExpirationType = getBulkCsvCell(row, headerIndexes, 'expirationType') || 'START_ON_FIRST_USE';
+          const expirationTypeResult = expirationTypeSchema.safeParse(rawExpirationType);
+          if (!expirationTypeResult.success) {
+            throw new Error(`Invalid expirationType "${rawExpirationType}".`);
+          }
+          const expirationType = expirationTypeResult.data;
+
+          let durationDays: number | null = null;
+          if (expirationType === 'START_ON_FIRST_USE' || expirationType === 'DURATION_FROM_CREATION') {
+            const rawDuration = getBulkCsvCell(row, headerIndexes, 'durationDays');
+            durationDays = rawDuration ? Number(rawDuration) : 30;
+            if (!Number.isInteger(durationDays) || durationDays <= 0) {
+              throw new Error('durationDays must be a positive integer.');
+            }
+          }
+
+          let expiresAt: Date | null = null;
+          if (expirationType === 'FIXED_DATE') {
+            const rawExpiresAt = getBulkCsvCell(row, headerIndexes, 'expiresAt');
+            const parsedDate = new Date(rawExpiresAt);
+            if (!rawExpiresAt || Number.isNaN(parsedDate.getTime())) {
+              throw new Error('expiresAt must be a valid ISO date for FIXED_DATE rows.');
+            }
+            expiresAt = parsedDate;
+          }
+
+          const createdKey = await createBulkAccessKeyOnServer({
+            server,
+            client,
+            name,
+            dataLimitGB,
+            expirationType,
+            durationDays,
+            expiresAt,
+          });
+
+          await writeAuditLog({
+            userId: ctx.user.id,
+            ip: ctx.clientIp,
+            action: 'ACCESS_KEY_CREATED',
+            entity: 'ACCESS_KEY',
+            entityId: createdKey.id,
+            details: {
+              source: 'csv',
+              bulk: true,
+              batchSize: dataRows.length,
+              serverId,
+              expirationType,
+              dataLimitGB: dataLimitGB ?? null,
+            },
+          });
+
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            row: rowNumber,
+            name: label,
+            error: error instanceof Error ? error.message : 'Failed to create key',
+          });
         }
       }
 
