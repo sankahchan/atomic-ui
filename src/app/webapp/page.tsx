@@ -139,11 +139,19 @@ function localeFromInitData(initData: string): DisplayLocale {
   }
 }
 
+const MYANMAR_MONTHS = [
+  'ဇန်', 'ဖေ', 'မတ်', 'ဧပြီ', 'မေ', 'ဇွန်',
+  'ဇူလိုင်', 'ဩဂုတ်', 'စက်', 'အောက်', 'နိုဝ်', 'ဒီ',
+] as const;
+
 function formatShortDate(iso: string | null, locale: DisplayLocale) {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(locale === 'my' ? 'my-MM' : 'en-US', {
+  if (locale === 'my') {
+    return `${date.getUTCDate()} ${MYANMAR_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  }
+  return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
