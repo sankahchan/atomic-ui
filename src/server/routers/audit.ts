@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { router, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { writeAuditLog } from '@/lib/audit';
+import { isPostgresDatabaseUrl } from '@/lib/database-engine';
 import {
   auditAlertRuleSchema,
   getAuditAlertRules,
@@ -26,6 +27,8 @@ const auditLogFiltersSchema = z.object({
   actions: z.array(z.string()).max(50).optional(),
   entity: z.string().optional(),
   userId: z.string().optional(),
+  search: z.string().optional(),
+  ip: z.string().optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
 });
@@ -51,8 +54,20 @@ const exportAuditLogsSchema = auditLogFiltersSchema
     },
   );
 
-function buildAuditLogWhere(
+type AuditLogWhereOptions = {
+  // The SQLite Prisma client rejects `mode`, and its `contains` is already
+  // case-insensitive for ASCII; Postgres needs the explicit mode.
+  insensitiveSearch?: boolean;
+};
+
+function buildContainsFilter(value: string, insensitive: boolean): Prisma.StringFilter {
+  const filter = insensitive ? { contains: value, mode: 'insensitive' as const } : { contains: value };
+  return filter as Prisma.StringFilter;
+}
+
+export function buildAuditLogWhere(
   input?: z.infer<typeof listAuditLogsSchema> | z.infer<typeof exportAuditLogsSchema>,
+  options: AuditLogWhereOptions = {},
 ): Prisma.AuditLogWhereInput {
   const where: Prisma.AuditLogWhereInput = {};
   const actions = input?.actions?.filter((action) => action.trim().length > 0);
@@ -69,6 +84,23 @@ function buildAuditLogWhere(
 
   if (input?.userId) {
     where.userId = input.userId;
+  }
+
+  const search = input?.search?.trim();
+  if (search) {
+    const contains = buildContainsFilter(search, options.insensitiveSearch ?? false);
+    where.OR = [
+      { action: contains },
+      { entity: contains },
+      { entityId: contains },
+      { ip: contains },
+      { details: contains },
+    ];
+  }
+
+  const ip = input?.ip?.trim();
+  if (ip) {
+    where.ip = buildContainsFilter(ip, options.insensitiveSearch ?? false);
   }
 
   if (input?.dateFrom || input?.dateTo) {
@@ -130,7 +162,7 @@ export const auditRouter = router({
       const page = input?.page ?? 1;
       const pageSize = input?.pageSize ?? 20;
 
-      const where = buildAuditLogWhere(input);
+      const where = buildAuditLogWhere(input, { insensitiveSearch: isPostgresDatabaseUrl() });
 
       const [logs, total] = await Promise.all([
         db.auditLog.findMany({
@@ -162,7 +194,7 @@ export const auditRouter = router({
   exportCsv: adminProcedure
     .input(exportAuditLogsSchema.optional())
     .query(async ({ input }) => {
-      const where = buildAuditLogWhere(input);
+      const where = buildAuditLogWhere(input, { insensitiveSearch: isPostgresDatabaseUrl() });
       const logs = await db.auditLog.findMany({
         where,
         orderBy: { createdAt: 'desc' },

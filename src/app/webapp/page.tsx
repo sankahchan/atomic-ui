@@ -38,6 +38,23 @@ type WebAppData = {
   keys: WebAppKey[];
 };
 
+type UsageRange = '7d' | '30d';
+type UsageDay = { date: string; bytes: string };
+type UsageData = {
+  keyId: string;
+  kind: 'normal' | 'dynamic';
+  range: UsageRange;
+  days: UsageDay[];
+  totalBytes: string;
+};
+type ActionEligibility = {
+  keyId: string;
+  canExtend: boolean;
+  extendDays: number | null;
+  canRequestData: boolean;
+};
+type ActionMessage = { text: string; ok: boolean };
+
 const COPY = {
   en: {
     title: 'My VPN keys',
@@ -53,6 +70,18 @@ const COPY = {
     copyFailed: 'Could not copy. Open the share page instead.',
     unconfigured: 'Open this page from the Telegram bot.',
     error: 'Could not load your keys. Please try again from Telegram.',
+    usage: 'Usage',
+    usageLoading: 'Loading usage…',
+    usageError: 'Usage unavailable',
+    usage7d: '7D',
+    usage30d: '30D',
+    usageTotal: 'Total',
+    extendDays: 'Extend {days}d',
+    requestData: 'Request data',
+    actionBusy: 'Working…',
+    extendSuccess: 'Key extended',
+    requestSuccess: 'Request sent to support',
+    actionFailed: 'Action failed. Please try again.',
   },
   my: {
     title: 'ကျွန်တော့် VPN keys',
@@ -68,6 +97,18 @@ const COPY = {
     copyFailed: 'ကူးလို့မရပါ။ Share page ကို ဖွင့်ပါ။',
     unconfigured: 'ဒီစာမျက်နှာကို Telegram bot ကနေ ဖွင့်ပါ။',
     error: 'Key တွေ မရနိုင်ပါ။ Telegram ကနေ ပြန်ကြိုးစားပါ။',
+    usage: 'အသုံးပြုမှု',
+    usageLoading: 'အသုံးပြုမှု တင်နေသည်…',
+    usageError: 'အသုံးပြုမှု မရနိုင်ပါ',
+    usage7d: '၇ ရက်',
+    usage30d: '၃၀ ရက်',
+    usageTotal: 'စုစုပေါင်း',
+    extendDays: '{days} ရက် တိုးမည်',
+    requestData: 'Data တိုးရန် တောင်းဆိုမည်',
+    actionBusy: 'လုပ်ဆောင်နေသည်…',
+    extendSuccess: 'သက်တမ်းတိုးပြီး',
+    requestSuccess: 'အကူအညီကို တောင်းဆိုပြီး',
+    actionFailed: 'မလုပ်ဆောင်နိုင်ပါ။ ပြန်ကြိုးစားပါ။',
   },
 } as const;
 
@@ -81,6 +122,35 @@ function formatBytes(value: string | null) {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
+function UsageSparkline({ days }: { days: UsageDay[] }) {
+  const values = days.map((day) => Number(day.bytes) || 0);
+  if (values.length === 0) return null;
+  const max = Math.max(1, ...values);
+  const height = 24;
+  const step = values.length > 1 ? 100 / (values.length - 1) : 0;
+  const points = values
+    .map((value, index) => `${(index * step).toFixed(1)},${(height - (value / max) * (height - 2)).toFixed(1)}`)
+    .join(' ');
+
+  return (
+    <svg
+      viewBox={`0 0 100 ${height}`}
+      preserveAspectRatio="none"
+      className="h-6 w-full opacity-80"
+      aria-hidden="true"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 export default function TelegramWebAppPage() {
   const [token, setToken] = React.useState<string | null>(null);
   const [data, setData] = React.useState<WebAppData | null>(null);
@@ -90,6 +160,12 @@ export default function TelegramWebAppPage() {
   const [theme, setTheme] = React.useState<'light' | 'dark'>('dark');
   const [webApp, setWebApp] = React.useState<TelegramWebAppBridge | null>(null);
   const [links, setLinks] = React.useState<Record<string, KeyLinks>>({});
+  const [usageRange, setUsageRange] = React.useState<UsageRange>('7d');
+  const [usage, setUsage] = React.useState<Record<string, UsageData>>({});
+  const [usageErrors, setUsageErrors] = React.useState<Record<string, string>>({});
+  const [eligibility, setEligibility] = React.useState<Record<string, ActionEligibility>>({});
+  const [actionBusy, setActionBusy] = React.useState<string | null>(null);
+  const [actionMessages, setActionMessages] = React.useState<Record<string, ActionMessage>>({});
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -143,6 +219,75 @@ export default function TelegramWebAppPage() {
       controller.abort();
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!token || !data) return;
+    const controller = new AbortController();
+    let cancelled = false;
+
+    void Promise.all(
+      data.keys
+        .filter((key) => key.kind === 'normal')
+        .map(async (key) => {
+          try {
+            const response = await fetch(
+              withBasePath(`/api/telegram/webapp/keys/${encodeURIComponent(key.id)}/actions`),
+              { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal },
+            );
+            const body = (await response.json()) as ActionEligibility & { error?: string };
+            if (!response.ok) throw new Error(body.error || COPY.en.error);
+            if (!cancelled) setEligibility((current) => ({ ...current, [key.id]: body }));
+          } catch (caught) {
+            // Keep self-action buttons hidden when eligibility cannot be confirmed.
+            if (cancelled || (caught instanceof DOMException && caught.name === 'AbortError')) return;
+          }
+        }),
+    );
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [data, token]);
+
+  React.useEffect(() => {
+    if (!token || !data) return;
+    const controller = new AbortController();
+    let cancelled = false;
+
+    void Promise.all(
+      data.keys.map(async (key) => {
+        try {
+          const response = await fetch(
+            withBasePath(
+              `/api/telegram/webapp/keys/${encodeURIComponent(key.id)}/usage?range=${usageRange}`,
+            ),
+            { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal },
+          );
+          const body = (await response.json()) as UsageData & { error?: string };
+          if (!response.ok) throw new Error(body.error || COPY.en.error);
+          if (cancelled) return;
+          setUsage((current) => ({ ...current, [key.id]: body }));
+          setUsageErrors((current) => {
+            const next = { ...current };
+            delete next[key.id];
+            return next;
+          });
+        } catch (caught) {
+          if (cancelled || (caught instanceof DOMException && caught.name === 'AbortError')) return;
+          setUsageErrors((current) => ({
+            ...current,
+            [key.id]: caught instanceof Error ? caught.message : COPY.en.error,
+          }));
+        }
+      }),
+    );
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [data, token, usageRange]);
 
   const t = data?.locale === 'my' ? COPY.my : COPY.en;
 
@@ -205,6 +350,40 @@ export default function TelegramWebAppPage() {
     }
   };
 
+  const runAction = async (key: WebAppKey, action: 'extend' | 'request-data') => {
+    if (!token) return;
+    try {
+      setActionBusy(key.id);
+      setActionMessages((current) => {
+        const next = { ...current };
+        delete next[key.id];
+        return next;
+      });
+      const response = await fetch(
+        withBasePath(`/api/telegram/webapp/keys/${encodeURIComponent(key.id)}/actions`),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ action }),
+        },
+      );
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(body.error || t.actionFailed);
+      const text = action === 'extend' ? t.extendSuccess : t.requestSuccess;
+      setActionMessages((current) => ({ ...current, [key.id]: { text, ok: true } }));
+      setNotice(text);
+      webApp?.showToast?.(text);
+    } catch {
+      setActionMessages((current) => ({
+        ...current,
+        [key.id]: { text: t.actionFailed, ok: false },
+      }));
+      webApp?.showToast?.(t.actionFailed);
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
   const renewUrl = data?.botUsername
     ? `https://t.me/${data.botUsername}?start=renew`
     : null;
@@ -228,7 +407,11 @@ export default function TelegramWebAppPage() {
           {data && data.keys.length === 0 ? <p className="ops-card p-4 text-sm">{t.empty}</p> : null}
 
           <div className="space-y-3">
-            {data?.keys.map((key) => (
+            {data?.keys.map((key) => {
+              const keyUsage = usage[key.id];
+              const keyEligibility = eligibility[key.id];
+              const keyActionMessage = actionMessages[key.id];
+              return (
               <article key={key.id} className="ops-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -245,6 +428,42 @@ export default function TelegramWebAppPage() {
                   {formatBytes(key.usedBytes)} / {formatBytes(key.dataLimitBytes)}
                   {key.expiresAt ? ` · ${new Date(key.expiresAt).toLocaleDateString()}` : ''}
                 </p>
+
+                <div className="mt-3 rounded-lg bg-white/5 px-2 py-2">
+                  <div className="flex items-center justify-between gap-2 text-[11px] opacity-70">
+                    <span>
+                      {t.usage}
+                      {keyUsage ? ` · ${t.usageTotal} ${formatBytes(keyUsage.totalBytes)}` : ''}
+                    </span>
+                    <span className="flex gap-1">
+                      <button
+                        type="button"
+                        className="px-1.5 py-0.5"
+                        style={{ opacity: usageRange === '7d' ? 1 : 0.5 }}
+                        onClick={() => setUsageRange('7d')}
+                      >
+                        {t.usage7d}
+                      </button>
+                      <button
+                        type="button"
+                        className="px-1.5 py-0.5"
+                        style={{ opacity: usageRange === '30d' ? 1 : 0.5 }}
+                        onClick={() => setUsageRange('30d')}
+                      >
+                        {t.usage30d}
+                      </button>
+                    </span>
+                  </div>
+                  <div className="mt-1 min-h-6">
+                    {usageErrors[key.id] ? (
+                      <p className="text-[11px] opacity-60">{t.usageError}</p>
+                    ) : keyUsage ? (
+                      <UsageSparkline days={keyUsage.days} />
+                    ) : (
+                      <p className="text-[11px] opacity-60">{t.usageLoading}</p>
+                    )}
+                  </div>
+                </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
@@ -263,6 +482,28 @@ export default function TelegramWebAppPage() {
                   >
                     {t.share}
                   </button>
+                  {keyEligibility?.canExtend && keyEligibility.extendDays ? (
+                    <button
+                      type="button"
+                      className="ops-button text-sm"
+                      disabled={busyKey === key.id || actionBusy === key.id}
+                      onClick={() => void runAction(key, 'extend')}
+                    >
+                      {actionBusy === key.id
+                        ? t.actionBusy
+                        : t.extendDays.replace('{days}', String(keyEligibility.extendDays))}
+                    </button>
+                  ) : null}
+                  {keyEligibility?.canRequestData ? (
+                    <button
+                      type="button"
+                      className="ops-button text-sm"
+                      disabled={busyKey === key.id || actionBusy === key.id}
+                      onClick={() => void runAction(key, 'request-data')}
+                    >
+                      {actionBusy === key.id ? t.actionBusy : t.requestData}
+                    </button>
+                  ) : null}
                   {renewUrl ? (
                     <button
                       type="button"
@@ -291,8 +532,16 @@ export default function TelegramWebAppPage() {
                     </button>
                   ) : null}
                 </div>
+                {keyActionMessage ? (
+                  <p
+                    className={`mt-2 text-xs ${keyActionMessage.ok ? 'opacity-80' : 'text-red-400'}`}
+                  >
+                    {keyActionMessage.text}
+                  </p>
+                ) : null}
               </article>
-            ))}
+              );
+            })}
           </div>
         </main>
       </PlopProvider>

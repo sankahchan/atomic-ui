@@ -3,11 +3,13 @@
 import {
   Archive,
   ArrowRightLeft,
+  Ban,
   CheckCircle2,
   Clock,
   Loader2,
   Plus,
   Power,
+  RefreshCw,
   Tag,
   Trash2,
   X,
@@ -34,7 +36,13 @@ export function KeysBulkActionsBar(props: {
   bulkMovePending: boolean;
   bulkArchivePending: boolean;
   bulkDeletePending: boolean;
+  bulkSyncPending: boolean;
+  bulkExpirePending: boolean;
+  syncSelectedLabel: string;
+  expireSelectedLabel: string;
   onToggleStatus: (enabled: boolean) => void;
+  onSyncSelected: () => void;
+  onExpireSelected: () => void;
   onOpenRenew: () => void;
   onOpenAddTags: () => void;
   onOpenRemoveTags: () => void;
@@ -53,7 +61,13 @@ export function KeysBulkActionsBar(props: {
     bulkMovePending,
     bulkArchivePending,
     bulkDeletePending,
+    bulkSyncPending,
+    bulkExpirePending,
+    syncSelectedLabel,
+    expireSelectedLabel,
     onToggleStatus,
+    onSyncSelected,
+    onExpireSelected,
     onOpenRenew,
     onOpenAddTags,
     onOpenRemoveTags,
@@ -96,6 +110,36 @@ export function KeysBulkActionsBar(props: {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-full px-3 text-xs"
+          onClick={onSyncSelected}
+          disabled={isBulkBusy || bulkSyncPending}
+        >
+          {bulkSyncPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" />
+          )}
+          {syncSelectedLabel}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-full px-3 text-xs text-orange-600 dark:text-orange-400"
+          onClick={onExpireSelected}
+          disabled={isBulkBusy || bulkExpirePending}
+        >
+          {bulkExpirePending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Ban className="mr-2 h-4 w-4" />
+          )}
+          {expireSelectedLabel}
+        </Button>
 
         <Button
           variant="outline"

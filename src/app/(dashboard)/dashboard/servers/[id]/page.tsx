@@ -18,6 +18,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
+  Bar as RechartsBar,
+  BarChart as RechartsBarChart,
   Line as RechartsLine,
   LineChart as RechartsLineChart,
   ReferenceLine,
@@ -353,6 +355,10 @@ export default function ServerDetailPage() {
   );
   const healthDiagnosticsQuery = trpc.servers.healthDiagnostics.useQuery(
     { id: serverId, limit: 36 },
+    { enabled: !!serverId },
+  );
+  const serverUsageHistoryQuery = trpc.analytics.serverUsageHistory.useQuery(
+    { serverId, days: 30 },
     { enabled: !!serverId },
   );
   const loadStatsQuery = trpc.servers.getLoadStats.useQuery(undefined, {
@@ -1258,6 +1264,77 @@ export default function ServerDetailPage() {
               ) : (
                 <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
                   {isMyanmar ? 'ဤဆာဗာအတွက် ကျန်းမာရေးစစ်ဆေးချက် မရှိသေးပါ။' : 'No health diagnostics available for this server yet.'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="ops-detail-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                {isMyanmar ? 'နေ့စဉ် bandwidth' : 'Daily bandwidth'}
+              </CardTitle>
+              <CardDescription>
+                {isMyanmar
+                  ? 'ဤဆာဗာအတွက် နောက်ဆုံး ၃၀ ရက်အတွင်း လွှဲပြောင်းခဲ့သော bandwidth။'
+                  : 'Bandwidth transferred by this server over the last 30 days.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {serverUsageHistoryQuery.isLoading ? (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  {isMyanmar ? 'Bandwidth မှတ်တမ်းကို တင်နေသည်…' : 'Loading bandwidth history…'}
+                </div>
+              ) : serverUsageHistoryQuery.data && serverUsageHistoryQuery.data.data.length > 0 ? (
+                <div className="h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart
+                      data={serverUsageHistoryQuery.data.data}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                    >
+                      <RechartsCartesianGrid strokeDasharray="3 10" stroke="rgba(125, 211, 252, 0.1)" vertical={false} />
+                      <RechartsXAxis
+                        dataKey="label"
+                        stroke="rgba(186, 230, 253, 0.58)"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                      />
+                      <RechartsYAxis
+                        stroke="rgba(186, 230, 253, 0.44)"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => formatBytes(value)}
+                        width={64}
+                      />
+                      <RechartsTooltip
+                        formatter={(value) => formatBytes(Number(value))}
+                        contentStyle={{
+                          backgroundColor: 'rgba(5, 12, 26, 0.94)',
+                          border: '1px solid rgba(34, 211, 238, 0.18)',
+                          borderRadius: '0.75rem',
+                          color: '#fff',
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: 'rgba(207, 250, 254, 0.9)' }}
+                      />
+                      <RechartsBar
+                        dataKey="bytes"
+                        name="Bandwidth"
+                        fill="rgba(34, 211, 238, 0.8)"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="rounded-[1.1rem] border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+                  {isMyanmar
+                    ? 'ဤဆာဗာအတွက် bandwidth မှတ်တမ်း မရှိသေးပါ။'
+                    : 'No bandwidth history available for this server yet.'}
                 </div>
               )}
             </CardContent>

@@ -3660,6 +3660,256 @@ function BulkCreateDialog({
   );
 }
 
+function CsvImportDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (result: CsvImportResult) => void;
+}) {
+  const { locale } = useLocale();
+  const isMyanmar = locale === 'my';
+  const { toast } = useToast();
+  const { data: servers } = trpc.servers.list.useQuery(undefined, {
+    enabled: open,
+  });
+  const [csv, setCsv] = useState('');
+  const [confirmDrainingServers, setConfirmDrainingServers] = useState(false);
+  const [result, setResult] = useState<CsvImportResult | null>(null);
+
+  const csvImportMutation = trpc.keys.bulkCreateFromCsv.useMutation({
+    onSuccess: (data) => {
+      setResult(data);
+      toast({
+        title: isMyanmar ? 'CSV ထည့်သွင်းမှု ပြီးဆုံးပါပြီ' : 'CSV import finished',
+        description: isMyanmar
+          ? `သော့ ${data.success} ခု ဖန်တီးပြီး၊ ${data.failed} ခု မအောင်မြင်ပါ။`
+          : `${data.success} keys created, ${data.failed} failed.`,
+        variant: data.failed > 0 ? 'destructive' : 'default',
+      });
+      onSuccess(data);
+    },
+    onError: (error) => {
+      toast({
+        title: isMyanmar ? 'CSV ထည့်သွင်းမှု မအောင်မြင်ပါ' : 'CSV import failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!open) {
+      setCsv('');
+      setConfirmDrainingServers(false);
+      setResult(null);
+    }
+  }, [open]);
+
+  const preview = useMemo(() => getCsvPreview(csv), [csv]);
+  const serverIdColumn = preview.headers.findIndex(
+    (header) => ['serverid', 'server'].includes(header.toLowerCase().replace(/[\s-]+/g, '')),
+  );
+  const usesDrainingServer = useMemo(() => {
+    if (serverIdColumn < 0) return false;
+    return preview.rows.some((row) => {
+      const serverId = (row[serverIdColumn] ?? '').trim();
+      return (servers ?? []).some(
+        (server) => server.id === serverId && server.lifecycleMode === 'DRAINING',
+      );
+    });
+  }, [preview.rows, serverIdColumn, servers]);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      setCsv(await file.text());
+      setResult(null);
+    } catch {
+      toast({
+        title: isMyanmar ? 'CSV ဖို့ ဖတ်မရပါ' : 'Could not read CSV file',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-[calc(100vw-1rem)] overflow-y-auto p-0 sm:max-w-[min(960px,calc(100vw-2rem))]">
+        <DialogHeader className="space-y-2 border-b ops-modal-divider px-6 pb-5 pt-6">
+          <DialogTitle>
+            {isMyanmar ? 'CSV မှ သော့များ ထည့်သွင်းရန်' : 'Import access keys from CSV'}
+          </DialogTitle>
+          <DialogDescription>
+            {isMyanmar
+              ? 'ကောလံများ - serverId, name, dataLimitGB, expirationType, durationDays, expiresAt။ expirationType ဗလာဖြစ်ပါက START_ON_FIRST_USE နှင့် ရက် 30 ကို သုံးပါသည်။'
+              : 'Columns: serverId, name, dataLimitGB, expirationType, durationDays, expiresAt. A blank expirationType uses START_ON_FIRST_USE with a 30-day duration.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogBody>
+          <DialogSection>
+            <DialogSectionHeader>
+              <DialogSectionTitle>{isMyanmar ? 'CSV ဖို့ သို့မဟုတ် စာသား' : 'CSV file or text'}</DialogSectionTitle>
+              <DialogSectionDescription>
+                {isMyanmar
+                  ? 'ဖို့ရွေးပါ သို့မဟုတ် အောက်ပါ စာသားနေရာတွင် တိုက်ရိုက် ကူးထည့်ပါ။ ပထမတန်းက header ဖြစ်ရပါမည်။'
+                  : 'Pick a file or paste rows below. The first row must be the header row.'}
+              </DialogSectionDescription>
+            </DialogSectionHeader>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleFileChange}
+                className="max-w-xs"
+                aria-label={isMyanmar ? 'CSV ဖို့ ရွေးပါ' : 'Choose CSV file'}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => downloadTextFile(CSV_IMPORT_TEMPLATE, 'access-keys-import-template.csv', 'text/csv;charset=utf-8;')}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isMyanmar ? 'နမူနာ ရယူရန်' : 'Download template'}
+              </Button>
+            </div>
+            <Textarea
+              value={csv}
+              onChange={(event) => {
+                setCsv(event.target.value);
+                setResult(null);
+              }}
+              rows={8}
+              className="mt-3 font-mono text-xs"
+              placeholder={CSV_IMPORT_TEMPLATE}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              {isMyanmar
+                ? 'FIXED_DATE အတွက် expiresAt (ISO ရက်စွဲ) လိုအပ်သည်။ NEVER တွင် durationDays မလိုအပ်ပါ။'
+                : 'FIXED_DATE rows need an ISO expiresAt. NEVER rows do not need durationDays.'}
+            </p>
+          </DialogSection>
+
+          {(servers ?? []).length > 0 ? (
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>{isMyanmar ? 'ဆာဗာ ID များ' : 'Server IDs'}</DialogSectionTitle>
+                <DialogSectionDescription>
+                  {isMyanmar ? 'CSV ထဲတွင် ဤ serverId တန်ဖိုးများကို သုံးပါ။' : 'Use one of these serverId values in the CSV.'}
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="flex max-h-24 flex-wrap gap-2 overflow-y-auto">
+                {(servers ?? []).map((server) => (
+                  <code
+                    key={server.id}
+                    className="rounded-lg border border-border/60 bg-background/45 px-2 py-1 text-[11px] text-muted-foreground"
+                  >
+                    {server.name}: {server.id}
+                  </code>
+                ))}
+              </div>
+            </DialogSection>
+          ) : null}
+
+          {preview.rows.length > 0 ? (
+            <DialogSection>
+              <DialogSectionHeader>
+                <DialogSectionTitle>{isMyanmar ? 'ကြိုတင်ကြည့်ရှုချက်' : 'Preview'}</DialogSectionTitle>
+                <DialogSectionDescription>
+                  {isMyanmar
+                    ? 'ပထမတန်း ၈ ခုကိုသာ ပြထားသည်။ မှန်ကန်မှုကို server က တန်းတိုင်း စစ်ဆေးပါသည်။'
+                    : 'First 8 rows shown. Every row is validated on the server before creation.'}
+                </DialogSectionDescription>
+              </DialogSectionHeader>
+              <div className="overflow-x-auto rounded-xl border border-border/60">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 text-muted-foreground">
+                    <tr>
+                      {preview.headers.map((header, index) => (
+                        <th key={`${header}-${index}`} className="whitespace-nowrap px-3 py-2 font-medium">{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.rows.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="border-t border-border/40">
+                        {preview.headers.map((_, columnIndex) => (
+                          <td key={columnIndex} className="whitespace-nowrap px-3 py-2">{row[columnIndex] ?? ''}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </DialogSection>
+          ) : null}
+
+          {usesDrainingServer ? (
+            <DialogSection>
+              <label className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm">
+                <Checkbox
+                  checked={confirmDrainingServers}
+                  onCheckedChange={(checked) => setConfirmDrainingServers(Boolean(checked))}
+                />
+                <span>
+                  {isMyanmar
+                    ? 'လက်ခံမှုလျှော့ထားသော ဆာဗာများကို အတည်ပြုပါ'
+                    : 'Confirm draining servers in this import'}
+                </span>
+              </label>
+            </DialogSection>
+          ) : null}
+
+          {result ? (
+            <DialogSection>
+              <div className="rounded-xl border border-border/60 bg-background/45 px-4 py-3 text-sm">
+                <p className="font-medium">
+                  {isMyanmar
+                    ? `ဖန်တီးပြီး ${result.success} ခု၊ မအောင်မြင် ${result.failed} ခု`
+                    : `${result.success} created, ${result.failed} failed`}
+                </p>
+                {result.errors.length > 0 ? (
+                  <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-red-500">
+                    {result.errors.map((error) => (
+                      <li key={`${error.row}-${error.name}`}>
+                        {isMyanmar ? `တန်း ${error.row}` : `Row ${error.row}`} ({error.name}): {error.error}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </DialogSection>
+          ) : null}
+        </DialogBody>
+
+        <DialogFooter className="ops-modal-sticky-footer">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {isMyanmar ? 'ပိတ်မည်' : 'Close'}
+          </Button>
+          <Button
+            type="button"
+            disabled={!csv.trim() || csvImportMutation.isPending}
+            onClick={() => csvImportMutation.mutate({
+              csv,
+              confirmDrainingServers: usesDrainingServer ? confirmDrainingServers : undefined,
+            })}
+          >
+            {csvImportMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+            {isMyanmar ? 'သော့များ ထည့်သွင်းမည်' : 'Import keys'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /**
  * Online indicator component with blinking animation
  */
@@ -4194,6 +4444,51 @@ function downloadTextFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
+const CSV_IMPORT_TEMPLATE = [
+  'serverId,name,dataLimitGB,expirationType,durationDays,expiresAt',
+  'YOUR_SERVER_ID,Example key,,START_ON_FIRST_USE,30,',
+].join('\n');
+
+type CsvImportResult = {
+  success: number;
+  failed: number;
+  errors: { row: number; name: string; error: string }[];
+};
+
+function splitCsvPreviewLine(line: string) {
+  const cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    if (char === '"') {
+      if (quoted && line[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === ',' && !quoted) {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += char;
+    }
+  }
+
+  cells.push(cell.trim());
+  return cells;
+}
+
+function getCsvPreview(csv: string) {
+  const lines = csv.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim().length > 0);
+  return {
+    headers: lines[0] ? splitCsvPreviewLine(lines[0]) : [],
+    rows: lines.slice(1, 9).map(splitCsvPreviewLine),
+  };
+}
+
 export default function KeysPage() {
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -4203,6 +4498,7 @@ export default function KeysPage() {
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [bulkCreateDialogOpen, setBulkCreateDialogOpen] = useState(false);
+  const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
   const [createdKey, setCreatedKey] = useState<CreatedKeySummary | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [qrDialogKey, setQrDialogKey] = useState<{ id: string; name: string } | null>(null);
@@ -5339,6 +5635,55 @@ export default function KeysPage() {
     },
   });
 
+  // Bulk sync mutation: acquires the shared server sync lock server-side.
+  const bulkSyncMutation = trpc.keys.bulkSync.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: locale === 'my' ? 'ဆာဗာများ sync လုပ်ပြီးပါပြီ' : 'Selected servers synced',
+        description: locale === 'my'
+          ? `ဆာဗာ ${result.synced} ခု sync လုပ်ပြီး၊ ${result.failed} ခု မအောင်မြင်ပါ။`
+          : `Synced ${result.synced} server(s), ${result.failed} failed.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      setSelectedKeys(new Set());
+      refetch();
+      refetchStats();
+      refetchOnline();
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'Sync မအောင်မြင်ပါ' : 'Sync failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Bulk expire mutation
+  const bulkExpireMutation = trpc.keys.bulkExpire.useMutation({
+    onSuccess: (result) => {
+      toast({
+        title: locale === 'my' ? 'သော့များ သက်တမ်းကုန်ပြီး' : 'Selected keys expired',
+        description: locale === 'my'
+          ? `သော့ ${result.success} ခု သက်တမ်းကုန်ပြီး၊ ${result.failed} ခု မအောင်မြင်ပါ။`
+          : `${result.success} key(s) expired, ${result.failed} failed.`,
+        variant: result.failed > 0 ? 'destructive' : 'default',
+      });
+      setBulkProgressResults(result);
+      setSelectedKeys(new Set());
+      refetch();
+      refetchStats();
+    },
+    onError: (error) => {
+      toast({
+        title: locale === 'my' ? 'သက်တမ်းကုန်စေမှု မအောင်မြင်ပါ' : 'Bulk expire failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setBulkProgressDialogOpen(false);
+    },
+  });
+
   // Bulk add tags mutation
   const bulkAddTagsMutation = trpc.keys.bulkAddTags.useMutation({
     onSuccess: (result) => {
@@ -5566,6 +5911,44 @@ export default function KeysPage() {
     });
   };
 
+  const handleBulkSync = () => {
+    if (selectedKeys.size === 0) return;
+    if (syncAllMutation.isPending || syncServerMutation.isPending || syncInFlightRef.current) {
+      toast({
+        title: locale === 'my' ? 'Sync လုပ်နေဆဲ ဖြစ်ပါသည်' : 'A sync is already running',
+        description: locale === 'my'
+          ? 'လက်ရှိ sync ပြီးဆုံးသည်အထိ စောင့်ပါ။'
+          : 'Wait for the current sync to finish before starting another one.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    syncInFlightRef.current = true;
+    bulkSyncMutation.mutate(
+      { keyIds: Array.from(selectedKeys) },
+      {
+        onSettled: () => {
+          syncInFlightRef.current = false;
+        },
+      },
+    );
+  };
+
+  const handleBulkExpire = () => {
+    if (selectedKeys.size === 0) return;
+    const confirmed = confirm(
+      locale === 'my'
+        ? `ရွေးထားသော သော့ ${selectedKeys.size} ခုကို သက်တမ်းကုန်စေမည်မှန်း အတည်ပြုပါသည်။ ဆက်လုပ်မည်လား?`
+        : `Expire ${selectedKeys.size} selected key(s)? This deactivates their Outline keys.`,
+    );
+    if (!confirmed) return;
+
+    setBulkProgressTitle(locale === 'my' ? 'သော့များ သက်တမ်းကုန်စေနေသည်' : 'Expiring selected keys');
+    setBulkProgressResults(null);
+    setBulkProgressDialogOpen(true);
+    bulkExpireMutation.mutate({ keyIds: Array.from(selectedKeys) });
+  };
+
   const handleBulkTags = (tags: string) => {
     if (selectedKeys.size === 0) return;
     if (bulkTagsMode === 'add') {
@@ -5766,6 +6149,8 @@ export default function KeysPage() {
     prepareRenewalOutreachPackMutation.isPending ||
     markRenewalOutreachResultMutation.isPending ||
     bulkToggleStatusMutation.isPending ||
+    bulkSyncMutation.isPending ||
+    bulkExpireMutation.isPending ||
     bulkAddTagsMutation.isPending ||
     bulkRemoveTagsMutation.isPending ||
     bulkArchiveMutation.isPending ||
@@ -5925,6 +6310,14 @@ export default function KeysPage() {
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     {locale === 'my' ? 'အစုလိုက် ဖန်တီးရန်' : 'Bulk create'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border/70 bg-background/70 px-4 dark:border-cyan-400/14 dark:bg-[linear-gradient(180deg,rgba(6,14,28,0.88),rgba(5,12,24,0.78))]"
+                    onClick={() => setCsvImportDialogOpen(true)}
+                  >
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    {locale === 'my' ? 'CSV ထည့်သွင်းရန်' : 'Import CSV'}
                   </Button>
                   <Button
                     variant="outline"
@@ -7943,7 +8336,13 @@ export default function KeysPage() {
           bulkMovePending={bulkMoveMutation.isPending}
           bulkArchivePending={bulkArchiveMutation.isPending}
           bulkDeletePending={bulkDeleteMutation.isPending}
+          bulkSyncPending={bulkSyncMutation.isPending}
+          bulkExpirePending={bulkExpireMutation.isPending}
+          syncSelectedLabel={locale === 'my' ? 'ရွေးထားသည်ကို Sync လုပ်မည်' : 'Sync selected'}
+          expireSelectedLabel={locale === 'my' ? 'ရွေးထားသည်ကို သက်တမ်းကုန်စေမည်' : 'Expire selected'}
           onToggleStatus={handleBulkToggleStatus}
+          onSyncSelected={handleBulkSync}
+          onExpireSelected={handleBulkExpire}
           onOpenRenew={() => setBulkRenewDialogOpen(true)}
           onOpenAddTags={() => {
             setBulkTagsMode('add');
@@ -8408,6 +8807,16 @@ export default function KeysPage() {
       <BulkCreateDialog
         open={bulkCreateDialogOpen}
         onOpenChange={setBulkCreateDialogOpen}
+        onSuccess={() => {
+          refetch();
+          refetchStats();
+          syncTriggerRef.current?.();
+        }}
+      />
+
+      <CsvImportDialog
+        open={csvImportDialogOpen}
+        onOpenChange={setCsvImportDialogOpen}
         onSuccess={() => {
           refetch();
           refetchStats();
