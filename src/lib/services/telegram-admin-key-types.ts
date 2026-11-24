@@ -1,4 +1,5 @@
 import { type SupportedLocale } from '@/lib/i18n/config';
+import { type TelegramAnnouncementCardStyle } from '@/lib/services/telegram-announcements';
 import { type TelegramAdminActor } from '@/lib/services/telegram-admin-core';
 import { type TelegramAdminKeyDeps } from '@/lib/services/telegram-domain-types';
 import { type RecipientTarget } from '@/lib/services/telegram-admin-key-recipients';
@@ -66,12 +67,13 @@ export type SupportReplyDraft = {
 
 export type DirectMessageDraft = {
   kind: 'direct_message';
-  step: 'message';
+  step: 'style' | 'message';
   recipientChatId: string;
   recipientLabel: string;
   userId: string | null;
   accessKeyId: string | null;
   dynamicKeyId: string | null;
+  cardStyle?: TelegramAnnouncementCardStyle;
 };
 
 export type PendingAdminFlow =

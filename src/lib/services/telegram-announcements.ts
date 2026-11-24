@@ -300,7 +300,7 @@ async function buildTelegramAnnouncementCustomerStateMap() {
   return stateByChatId;
 }
 
-function normalizeAnnouncementCardStyle(
+export function normalizeAnnouncementCardStyle(
   value?: string | null,
 ): TelegramAnnouncementCardStyle {
   switch ((value || '').trim().toUpperCase()) {
@@ -513,10 +513,11 @@ export function buildTelegramAnnouncementMessage(input: {
   title: string;
   message: string;
   cardStyle?: TelegramAnnouncementCardStyle | string | null;
+  heading?: string | null;
   preview?: boolean;
 }) {
   const cardStyle = normalizeAnnouncementCardStyle(input.cardStyle);
-  const heading =
+  const heading = input.heading?.trim() || (
     cardStyle === 'PREMIUM'
       ? '💠 <b>Premium update</b>'
       : cardStyle === 'PROMO'
@@ -531,7 +532,8 @@ export function buildTelegramAnnouncementMessage(input: {
                 ? '🛠 <b>Service update</b>'
                 : input.type === 'INFO'
                   ? 'ℹ️ <b>Information</b>'
-                  : '📣 <b>Announcement</b>';
+                  : '📣 <b>Announcement</b>'
+  );
 
   const accentLine =
     cardStyle === 'PREMIUM'

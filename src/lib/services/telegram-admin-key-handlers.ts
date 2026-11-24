@@ -33,7 +33,14 @@ import {
   resolveAdminKeyQuery,
   setAccessKeyEnabledState,
 } from '@/lib/services/telegram-admin-review';
-import { startTelegramAdminDirectMessageFlow } from '@/lib/services/telegram-admin-key-delivery';
+import {
+  buildTelegramAdminDirectMessagePromptMessage,
+  startTelegramAdminDirectMessageFlow,
+} from '@/lib/services/telegram-admin-key-delivery';
+import {
+  buildTelegramAnnouncementMessage,
+  normalizeAnnouncementCardStyle,
+} from '@/lib/services/telegram-announcements';
 import { replyTelegramSupportThreadAsAdmin } from '@/lib/services/telegram-support-admin';
 import {
   buildRecipientGuidanceLines,
@@ -2295,16 +2302,23 @@ export async function handleTelegramAdminKeyTextInput(input: {
   }
 
   if (flow.kind === 'direct_message') {
+    const cardStyle = flow.cardStyle ?? 'DEFAULT';
+    const messageTitle = input.locale === 'my'
+      ? 'Admin မှ မက်ဆေ့ချ်'
+      : 'Message from admin';
+    const formattedMessage = buildTelegramAnnouncementMessage({
+      type: 'ANNOUNCEMENT',
+      title: messageTitle,
+      message: text,
+      cardStyle,
+      heading: input.locale === 'my'
+        ? '📨 <b>Admin မှ မက်ဆေ့ချ်</b>'
+        : '📨 <b>Message from admin</b>',
+    });
     const delivered = await input.deps.sendTelegramMessage(
       input.botToken,
       flow.recipientChatId,
-      [
-        input.locale === 'my'
-          ? '📨 <b>Admin မှ မက်ဆေ့ချ်</b>'
-          : '📨 <b>Message from admin</b>',
-        '',
-        escapeHtml(text),
-      ].join('\n'),
+      formattedMessage,
     );
 
     if (!delivered) {
@@ -2318,8 +2332,8 @@ export async function handleTelegramAdminKeyTextInput(input: {
           createdByUserId: input.adminActor.userId,
           kind: 'DIRECT_MESSAGE',
           note: text,
-          telegramMessageTitle: 'Message from admin',
-          telegramCardStyle: 'DEFAULT',
+          telegramMessageTitle: messageTitle,
+          telegramCardStyle: cardStyle,
         },
       });
     }
@@ -2332,6 +2346,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
       details: {
         recipientChatId: flow.recipientChatId,
         recipientLabel: flow.recipientLabel,
+        cardStyle,
         messageLength: text.length,
       },
     });
@@ -3128,7 +3143,7 @@ export async function handleTelegramAdminKeyMediaInput(input: {
           input.caption?.trim()
           || (input.mediaKind === 'IMAGE' ? 'Admin sent an image attachment.' : 'Admin sent a file attachment.'),
         telegramMessageTitle: 'Message from admin',
-        telegramCardStyle: 'DEFAULT',
+        telegramCardStyle: flow.cardStyle ?? 'DEFAULT',
         telegramMediaKind: input.mediaKind,
       },
     });
@@ -3188,6 +3203,30 @@ export async function handleTelegramAdminKeyCallback(input: {
         : '🛑 Cancelled the Telegram admin key wizard.',
     );
     return { handled: true, callbackText: input.locale === 'my' ? 'ပယ်ဖျက်ပြီးပါပြီ။' : 'Cancelled.' };
+  }
+
+  if (
+    flow.kind === 'direct_message'
+    && flow.step === 'style'
+    && input.action === 'card_style'
+  ) {
+    const cardStyle = normalizeAnnouncementCardStyle(input.primary);
+    await savePendingAdminFlow(input.telegramUserId, input.chatId, {
+      ...flow,
+      step: 'message',
+      cardStyle,
+    });
+    await input.deps.sendTelegramMessage(
+      input.botToken,
+      input.chatId,
+      buildTelegramAdminDirectMessagePromptMessage({
+        locale: input.locale,
+        recipientLabel: flow.recipientLabel,
+        cardStyle,
+      }),
+      { replyMarkup: buildCancelKeyboard(input.locale) },
+    );
+    return { handled: true, callbackText: input.locale === 'my' ? 'ကတ်ပုံစံ ရွေးပြီးပါပြီ။' : 'Card style selected.' };
   }
 
   if (flow.kind === 'create_access') {
