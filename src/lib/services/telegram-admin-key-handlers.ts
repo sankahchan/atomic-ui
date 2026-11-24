@@ -2300,7 +2300,7 @@ export async function handleTelegramAdminKeyTextInput(input: {
       flow.recipientChatId,
       [
         input.locale === 'my'
-          ? '📨 <b>Message from admin</b>'
+          ? '📨 <b>Admin မှ မက်ဆေ့ချ်</b>'
           : '📨 <b>Message from admin</b>',
         '',
         escapeHtml(text),

@@ -1054,6 +1054,29 @@ export function formatTelegramDateTime(value: Date | null | undefined, locale: S
   });
 }
 
+/** One localized vocabulary for access-key status across bot cards and notifications. */
+export function formatTelegramAccessKeyStatusLabel(
+  status: string,
+  locale: SupportedLocale = 'en',
+) {
+  switch (status) {
+    case 'ACTIVE':
+      return locale === 'my' ? 'အသက်ဝင်' : 'Active';
+    case 'PENDING':
+      return locale === 'my' ? 'စောင့်ဆိုင်း' : 'Pending';
+    case 'DISABLED':
+      return locale === 'my' ? 'ပိတ်ထား' : 'Disabled';
+    case 'EXPIRED':
+      return locale === 'my' ? 'သက်တမ်းကုန်' : 'Expired';
+    case 'DEPLETED':
+      return locale === 'my' ? 'Data ကုန်' : 'Depleted';
+    default:
+      if (locale === 'my') return status;
+      const humanized = status.replace(/_/g, ' ').toLowerCase();
+      return humanized.charAt(0).toUpperCase() + humanized.slice(1);
+  }
+}
+
 export function formatTelegramOrderStatusLabel(status: string, ui: TelegramUi) {
   switch (status) {
     case 'AWAITING_KEY_SELECTION':

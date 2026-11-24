@@ -1,4 +1,7 @@
-import { withAbsoluteBasePath } from '@/lib/base-path';
+import {
+  buildTelegramWebAppInlineButton,
+  buildTelegramWebAppKeyboard,
+} from '@/lib/services/telegram-miniapp-button';
 import { db } from '@/lib/db';
 import { type SupportedLocale } from '@/lib/i18n/config';
 import { resolveLocalizedTemplate } from '@/lib/localized-templates';
@@ -42,6 +45,7 @@ import {
   buildTelegramProgressBar,
   escapeHtml,
   formatExpirationSummary,
+  formatTelegramAccessKeyStatusLabel,
   formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
   formatTelegramPremiumFollowUpState,
@@ -135,17 +139,19 @@ export async function findLinkedDynamicAccessKeys(
   });
 }
 
-function formatTelegramKeyStatusChip(status: string) {
-  switch (status) {
-    case 'ACTIVE':
-      return '🟢 ACTIVE';
-    case 'PENDING':
-      return '🟡 PENDING';
-    case 'DISABLED':
-      return '🔴 DISABLED';
-    default:
-      return `⚪ ${status}`;
-  }
+function formatTelegramKeyStatusChip(status: string, locale: SupportedLocale) {
+  const icon = status === 'ACTIVE'
+    ? '🟢'
+    : status === 'PENDING'
+      ? '🟡'
+      : status === 'DISABLED'
+        ? '🔴'
+        : status === 'EXPIRED'
+          ? '⌛'
+          : status === 'DEPLETED'
+            ? '📶'
+            : '⚪';
+  return `${icon} ${formatTelegramAccessKeyStatusLabel(status, locale)}`;
 }
 
 function formatTelegramKeySectionTitle(title: string, count: number) {
@@ -280,7 +286,7 @@ async function buildTelegramCommerceKeyItems(input: {
           ui,
         }),
         expirationSummary: formatExpirationSummary(key, input.locale),
-        summaryLine: `${formatTelegramKeyStatusChip(key.status)} • ${serverLabel}`,
+        summaryLine: `${formatTelegramKeyStatusChip(key.status, input.locale)} • ${serverLabel}`,
         detailLines: [
           `${ui.quotaLabel}: ${formatTelegramQuotaSummary({
             usedBytes: key.usedBytes,
@@ -329,7 +335,7 @@ async function buildTelegramCommerceKeyItems(input: {
         ui,
       }),
       expirationSummary: formatExpirationSummary(key, input.locale),
-      summaryLine: `${formatTelegramKeyStatusChip(key.status)} • ${currentRouteLabel}`,
+      summaryLine: `${formatTelegramKeyStatusChip(key.status, input.locale)} • ${currentRouteLabel}`,
       detailLines: [
         `${ui.premiumCurrentPoolLabel}: ${poolSummary}`,
         `${ui.premiumRegionCurrentRouteLabel}: ${currentRouteLabel}`,
@@ -435,11 +441,11 @@ export function buildTelegramKeyDetailMessage(input: {
     intro:
       input.item.kind === 'premium'
         ? input.locale === 'my'
-          ? 'Region, status, renew, and support actions stay in the buttons below.'
-          : 'Region, status, renew, and support actions stay in the buttons below.'
-        : input.locale === 'my'
-          ? 'Open, renew, and support actions stay in the buttons below.'
-          : 'Open, renew, and support actions stay in the buttons below.',
+        ? 'ဒေသ၊ အခြေအနေ၊ သက်တမ်းတိုးခြင်းနှင့် အကူအညီကို အောက်ပါ button များမှ ဆက်လုပ်နိုင်ပါသည်။'
+        : 'Region, status, renew, and support actions stay in the buttons below.'
+      : input.locale === 'my'
+        ? 'ဖွင့်ရန်၊ သက်တမ်းတိုးရန်နှင့် အကူအညီအတွက် အောက်ပါ button များကို သုံးပါ။'
+        : 'Open, renew, and support actions stay in the buttons below.',
     cards: [
       buildTelegramCommerceCard(
         input.item.kind === 'premium'
@@ -453,36 +459,11 @@ export function buildTelegramKeyDetailMessage(input: {
   });
 }
 
-export function getTelegramWebAppUrl() {
-  const hasOrigin = Boolean(
-    process.env.NEXT_PUBLIC_APP_URL
-    || process.env.APP_URL
-    || process.env.NEXTAUTH_URL,
-  );
-  if (!hasOrigin) return null;
-  try {
-    return new URL(withAbsoluteBasePath('/webapp')).toString();
-  } catch {
-    return null;
-  }
-}
-
-export function buildTelegramWebAppInlineButton(locale: SupportedLocale) {
-  const webAppUrl = getTelegramWebAppUrl();
-  if (!webAppUrl) return null;
-
-  return {
-    text: locale === 'my' ? '📲 Mini App ဖွင့်မည်' : '📲 Open Mini App',
-    web_app: { url: webAppUrl },
-  };
-}
-
-export function buildTelegramWebAppKeyboard(locale: SupportedLocale) {
-  const button = buildTelegramWebAppInlineButton(locale);
-  if (!button) return null;
-
-  return { inline_keyboard: [[button]] };
-}
+export {
+  buildTelegramWebAppInlineButton,
+  buildTelegramWebAppKeyboard,
+  getTelegramWebAppUrl,
+} from '@/lib/services/telegram-miniapp-button';
 
 export async function handleTelegramWebAppCommand(input: {
   chatId: number;
@@ -568,7 +549,12 @@ function buildTelegramKeyDetailKeyboard(input: {
   page: number;
   supportLink?: string | null;
 }) {
-  const rows: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+  const rows: Array<Array<{
+    text: string;
+    callback_data?: string;
+    url?: string;
+    web_app?: { url: string };
+  }>> = [];
 
   const primaryRow: Array<{ text: string; callback_data?: string; url?: string }> = [];
   if (input.item.sharePageUrl) {
@@ -625,6 +611,11 @@ function buildTelegramKeyDetailKeyboard(input: {
         : []),
       ...(input.supportLink ? [{ text: getTelegramUi(input.locale).myKeysOpenSupport, url: input.supportLink }] : []),
     ]);
+  }
+
+  const webAppButton = buildTelegramWebAppInlineButton(input.locale);
+  if (webAppButton) {
+    rows.push([webAppButton]);
   }
 
   rows.push([{
