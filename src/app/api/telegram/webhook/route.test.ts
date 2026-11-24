@@ -208,4 +208,5 @@ test('telegram webhook setup accepts authenticated POST requests', async () => {
   const body = await response.json();
   assert.equal(body.status, 'webhook_set');
   assert.equal(body.webhookUrl, 'https://example.com/panel/api/telegram/webhook');
+  assert.deepEqual(body.menuButton, { attempted: true, ok: true, description: null });
 });

@@ -16,6 +16,7 @@ import { TELEGRAM_WEBHOOK_SECRET_HEADER } from '@/lib/telegram-webhook-secret';
 import { getConfiguredPublicAppOrigin, getPublicBasePath } from '@/lib/subscription-links';
 import { requireAdminRouteScope } from '@/lib/admin-route-guard';
 import { hasTelegramAnnouncementManageScope } from '@/lib/admin-scope';
+import { syncTelegramWebAppMenuButton } from '@/lib/services/telegram-webapp-menu';
 
 function hasMatchingSecretToken(actual: string | null, expected: string) {
   if (!actual) {
@@ -123,10 +124,17 @@ export async function handleTelegramWebhookSetup(
       );
     }
 
+    const menuButton = await syncTelegramWebAppMenuButton({
+      botToken: config.botToken,
+      webAppUrl: `${appOrigin}${deps.getPublicBasePath()}/webapp`,
+      fetchImpl: deps.fetchImpl,
+    });
+
     return NextResponse.json({
       status: 'webhook_set',
       webhookUrl,
       telegramResponse: result,
+      menuButton,
     });
   } catch {
     return NextResponse.json(

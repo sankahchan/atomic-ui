@@ -61,6 +61,7 @@ import {
   updateTelegramOrderDraft,
 } from '@/lib/services/telegram-bot';
 import { getTelegramWebhookSecret } from '@/lib/services/telegram-runtime';
+import { syncTelegramWebAppMenuButton } from '@/lib/services/telegram-webapp-menu';
 import { parseDynamicRoutingPreferences } from '@/lib/services/dynamic-subscription-routing';
 import {
   maskTelegramBotSettingsForClient,
@@ -2306,7 +2307,11 @@ export const telegramBotRouter = router({
         });
       }
 
-      return { success: true };
+      const menuButton = await syncTelegramWebAppMenuButton({
+        botToken: targetBotToken,
+      });
+
+      return { success: true, menuButton };
     }),
 
   deleteWebhook: adminProcedure

@@ -82,6 +82,13 @@ const COPY = {
     extendSuccess: 'Key extended',
     requestSuccess: 'Request sent to support',
     actionFailed: 'Action failed. Please try again.',
+    usageEmpty: 'No usage in this range',
+    statusACTIVE: 'Active',
+    statusPENDING: 'Pending',
+    statusEXPIRED: 'Expired',
+    statusDEPLETED: 'Depleted',
+    kindNormal: 'Standard',
+    kindDynamic: 'Dynamic',
   },
   my: {
     title: 'ကျွန်တော့် VPN keys',
@@ -109,8 +116,46 @@ const COPY = {
     extendSuccess: 'သက်တမ်းတိုးပြီး',
     requestSuccess: 'အကူအညီကို တောင်းဆိုပြီး',
     actionFailed: 'မလုပ်ဆောင်နိုင်ပါ။ ပြန်ကြိုးစားပါ။',
+    usageEmpty: 'ဒီကာလအတွင်း အသုံးပြုမှု မရှိပါ',
+    statusACTIVE: 'အသက်ဝင်',
+    statusPENDING: 'စောင့်ဆိုင်း',
+    statusEXPIRED: 'သက်တမ်းကုန်',
+    statusDEPLETED: 'Data ကုန်',
+    kindNormal: 'ပုံမှန်',
+    kindDynamic: 'Dynamic',
   },
 } as const;
+
+type DisplayLocale = 'en' | 'my';
+type WebAppCopy = (typeof COPY)[DisplayLocale];
+
+function localeFromInitData(initData: string): DisplayLocale {
+  try {
+    const rawUser = new URLSearchParams(initData).get('user') || '{}';
+    const languageCode = String((JSON.parse(rawUser) as { language_code?: unknown }).language_code || '');
+    return languageCode.toLowerCase().startsWith('my') ? 'my' : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
+function formatShortDate(iso: string | null, locale: DisplayLocale) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(locale === 'my' ? 'my-MM' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+function statusLabel(status: string, t: WebAppCopy) {
+  const key = `status${status}` as keyof WebAppCopy;
+  const value = t[key];
+  return typeof value === 'string' ? value : status;
+}
 
 function formatBytes(value: string | null) {
   if (!value) return '∞';
@@ -166,6 +211,7 @@ export default function TelegramWebAppPage() {
   const [eligibility, setEligibility] = React.useState<Record<string, ActionEligibility>>({});
   const [actionBusy, setActionBusy] = React.useState<string | null>(null);
   const [actionMessages, setActionMessages] = React.useState<Record<string, ActionMessage>>({});
+  const [displayLocale, setDisplayLocale] = React.useState<DisplayLocale>('en');
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -181,6 +227,7 @@ export default function TelegramWebAppPage() {
         bridge.ready();
         bridge.expand();
         setWebApp(bridge);
+        setDisplayLocale(localeFromInitData(bridge.initData));
         if (bridge.colorScheme) setTheme(bridge.colorScheme);
 
         const sessionResponse = await fetch(withBasePath('/api/telegram/webapp/session'), {
@@ -219,6 +266,21 @@ export default function TelegramWebAppPage() {
       controller.abort();
     };
   }, []);
+
+  // The dashboard's global ThemeProvider defaults the root to `dark`. Telegram
+  // sends the user's preferred color scheme in initData, so mirror it here or
+  // the Plop light palette ends up with dark card tokens and unreadable text.
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const hadDark = root.classList.contains('dark');
+    const previousColorScheme = root.style.colorScheme;
+    root.classList.toggle('dark', theme === 'dark');
+    root.style.colorScheme = theme;
+    return () => {
+      root.classList.toggle('dark', hadDark);
+      root.style.colorScheme = previousColorScheme;
+    };
+  }, [theme]);
 
   React.useEffect(() => {
     if (!token || !data) return;
@@ -289,7 +351,9 @@ export default function TelegramWebAppPage() {
     };
   }, [data, token, usageRange]);
 
-  const t = data?.locale === 'my' ? COPY.my : COPY.en;
+  const locale: DisplayLocale =
+    data?.locale === 'my' || data?.locale === 'en' ? data.locale : displayLocale;
+  const t: WebAppCopy = locale === 'my' ? COPY.my : COPY.en;
 
   const fetchLinks = React.useCallback(
     async (key: WebAppKey) => {
@@ -390,6 +454,8 @@ export default function TelegramWebAppPage() {
   const setupUrl = data?.botUsername
     ? `https://t.me/${data.botUsername}?start=setup`
     : null;
+  const supportUrl = data?.supportUrl
+    || (data?.botUsername ? `https://t.me/${data.botUsername}?start=support` : null);
 
   return (
     <>
@@ -411,126 +477,166 @@ export default function TelegramWebAppPage() {
               const keyUsage = usage[key.id];
               const keyEligibility = eligibility[key.id];
               const keyActionMessage = actionMessages[key.id];
+              const used = Number(key.usedBytes) || 0;
+              const limit = Number(key.dataLimitBytes) || 0;
+              const percent = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
+              const hasUsage = Boolean(keyUsage?.days.some((day) => Number(day.bytes) > 0));
+              const rangeButton = (range: UsageRange, label: string) => (
+                <button
+                  type="button"
+                  aria-pressed={usageRange === range}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                    usageRange === range
+                      ? 'bg-[var(--plop-panel-stroke)] text-[var(--plop-panel-text-on-fill)]'
+                      : 'opacity-70'
+                  }`}
+                  onClick={() => setUsageRange(range)}
+                >
+                  {label}
+                </button>
+              );
               return (
               <article key={key.id} className="ops-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-bold">{key.name}</h2>
                     <p className="mt-1 text-xs opacity-70">
-                      {key.kind === 'dynamic' ? 'Dynamic' : 'Standard'} · {key.status}
+                      {key.kind === 'dynamic' ? t.kindDynamic : t.kindNormal}
                       {key.serverName ? ` · ${key.serverName}` : ''}
+                      {key.expiresAt ? ` · ${formatShortDate(key.expiresAt, locale)}` : ''}
                     </p>
                   </div>
-                  <span className="ops-badge text-xs">{formatBytes(key.usedBytes)}</span>
+                  <span className="ops-badge text-xs">{statusLabel(key.status, t)}</span>
                 </div>
 
-                <p className="mt-2 text-xs opacity-70">
-                  {formatBytes(key.usedBytes)} / {formatBytes(key.dataLimitBytes)}
-                  {key.expiresAt ? ` · ${new Date(key.expiresAt).toLocaleDateString()}` : ''}
-                </p>
+                <div className="mt-2 flex items-center justify-between gap-3 text-xs opacity-80">
+                  <span>
+                    {formatBytes(key.usedBytes)} / {formatBytes(key.dataLimitBytes)}
+                  </span>
+                  {limit > 0 ? <span className="tabular-nums">{percent.toFixed(0)}%</span> : null}
+                </div>
+                {limit > 0 ? (
+                  <div
+                    className="mt-2 h-1.5 overflow-hidden rounded-full"
+                    style={{ backgroundColor: 'var(--plop-panel-muted)' }}
+                    role="progressbar"
+                    aria-valuenow={Math.round(percent)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${percent}%`, backgroundColor: 'var(--plop-panel-stroke)' }}
+                    />
+                  </div>
+                ) : null}
 
-                <div className="mt-3 rounded-lg bg-white/5 px-2 py-2">
-                  <div className="flex items-center justify-between gap-2 text-[11px] opacity-70">
+                <div
+                  className="mt-3 rounded-lg px-2.5 py-2"
+                  style={{ backgroundColor: 'var(--plop-panel-muted)' }}
+                >
+                  <div className="flex items-center justify-between gap-2 text-[11px] opacity-80">
                     <span>
                       {t.usage}
                       {keyUsage ? ` · ${t.usageTotal} ${formatBytes(keyUsage.totalBytes)}` : ''}
                     </span>
                     <span className="flex gap-1">
-                      <button
-                        type="button"
-                        className="px-1.5 py-0.5"
-                        style={{ opacity: usageRange === '7d' ? 1 : 0.5 }}
-                        onClick={() => setUsageRange('7d')}
-                      >
-                        {t.usage7d}
-                      </button>
-                      <button
-                        type="button"
-                        className="px-1.5 py-0.5"
-                        style={{ opacity: usageRange === '30d' ? 1 : 0.5 }}
-                        onClick={() => setUsageRange('30d')}
-                      >
-                        {t.usage30d}
-                      </button>
+                      {rangeButton('7d', t.usage7d)}
+                      {rangeButton('30d', t.usage30d)}
                     </span>
                   </div>
                   <div className="mt-1 min-h-6">
                     {usageErrors[key.id] ? (
                       <p className="text-[11px] opacity-60">{t.usageError}</p>
                     ) : keyUsage ? (
-                      <UsageSparkline days={keyUsage.days} />
+                      hasUsage ? (
+                        <UsageSparkline days={keyUsage.days} />
+                      ) : (
+                        <p className="text-[11px] opacity-60">{t.usageEmpty}</p>
+                      )
                     ) : (
                       <p className="text-[11px] opacity-60">{t.usageLoading}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="ops-button text-sm"
-                    disabled={busyKey === key.id}
-                    onClick={() => void copyConfig(key)}
-                  >
-                    {t.copy}
-                  </button>
-                  <button
-                    type="button"
-                    className="ops-button text-sm"
-                    disabled={busyKey === key.id || !key.hasSharePage}
-                    onClick={() => void openShare(key)}
-                  >
-                    {t.share}
-                  </button>
-                  {keyEligibility?.canExtend && keyEligibility.extendDays ? (
+                <div className="mt-4 space-y-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
+                      data-plop-button-variant="default"
                       className="ops-button text-sm"
-                      disabled={busyKey === key.id || actionBusy === key.id}
-                      onClick={() => void runAction(key, 'extend')}
+                      disabled={busyKey === key.id}
+                      onClick={() => void copyConfig(key)}
                     >
-                      {actionBusy === key.id
-                        ? t.actionBusy
-                        : t.extendDays.replace('{days}', String(keyEligibility.extendDays))}
+                      {t.copy}
                     </button>
-                  ) : null}
-                  {keyEligibility?.canRequestData ? (
                     <button
                       type="button"
+                      data-plop-button-variant="secondary"
                       className="ops-button text-sm"
-                      disabled={busyKey === key.id || actionBusy === key.id}
-                      onClick={() => void runAction(key, 'request-data')}
+                      disabled={busyKey === key.id || !key.hasSharePage}
+                      onClick={() => void openShare(key)}
                     >
-                      {actionBusy === key.id ? t.actionBusy : t.requestData}
+                      {t.share}
                     </button>
-                  ) : null}
-                  {renewUrl ? (
-                    <button
-                      type="button"
-                      className="ops-button text-sm"
-                      onClick={() => openUrl(renewUrl, true)}
-                    >
-                      {t.renew}
-                    </button>
-                  ) : null}
-                  {setupUrl ? (
-                    <button
-                      type="button"
-                      className="ops-button text-sm"
-                      onClick={() => openUrl(setupUrl, true)}
-                    >
-                      {t.setup}
-                    </button>
-                  ) : null}
-                  {data.supportUrl ? (
-                    <button
-                      type="button"
-                      className="ops-button text-sm"
-                      onClick={() => openUrl(data.supportUrl as string, true)}
-                    >
-                      {t.support}
-                    </button>
-                  ) : null}
+                    {keyEligibility?.canExtend && keyEligibility.extendDays ? (
+                      <button
+                        type="button"
+                        data-plop-button-variant="default"
+                        className="ops-button text-sm"
+                        disabled={busyKey === key.id || actionBusy === key.id}
+                        onClick={() => void runAction(key, 'extend')}
+                      >
+                        {actionBusy === key.id
+                          ? t.actionBusy
+                          : t.extendDays.replace('{days}', String(keyEligibility.extendDays))}
+                      </button>
+                    ) : null}
+                    {keyEligibility?.canRequestData ? (
+                      <button
+                        type="button"
+                        data-plop-button-variant="secondary"
+                        className="ops-button text-sm"
+                        disabled={busyKey === key.id || actionBusy === key.id}
+                        onClick={() => void runAction(key, 'request-data')}
+                      >
+                        {actionBusy === key.id ? t.actionBusy : t.requestData}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {renewUrl ? (
+                      <button
+                        type="button"
+                        data-plop-button-variant="ghost"
+                        className="ops-button text-xs"
+                        onClick={() => openUrl(renewUrl, true)}
+                      >
+                        {t.renew}
+                      </button>
+                    ) : null}
+                    {setupUrl ? (
+                      <button
+                        type="button"
+                        data-plop-button-variant="ghost"
+                        className="ops-button text-xs"
+                        onClick={() => openUrl(setupUrl, true)}
+                      >
+                        {t.setup}
+                      </button>
+                    ) : null}
+                    {supportUrl ? (
+                      <button
+                        type="button"
+                        data-plop-button-variant="ghost"
+                        className="ops-button text-xs"
+                        onClick={() => openUrl(supportUrl, true)}
+                      >
+                        {t.support}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 {keyActionMessage ? (
                   <p
