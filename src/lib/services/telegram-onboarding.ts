@@ -57,7 +57,7 @@ async function sendTelegramOfferNudgeIfAny(input: {
     input.botToken,
     input.chatId,
     input.locale === 'my'
-      ? `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /buy or /renew before you place the next order.`
+      ? `🎟 သင့်မှာ အသုံးပြုနိုင်တဲ့ <b>${activeOffers}</b> ခု ရှိပါတယ်။\nနောက်တစ်ခေါက် order မတင်မီ /buy သို့မဟုတ် /renew ကို သုံးပါ။`
       : `🎟 You have <b>${activeOffers}</b> active offer${activeOffers === 1 ? '' : 's'}.\nUse /buy or /renew before you place the next order.`,
   );
 }

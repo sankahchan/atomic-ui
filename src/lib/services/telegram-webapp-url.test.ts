@@ -7,6 +7,7 @@ import {
   getTelegramWebAppUrl,
 } from '@/lib/services/telegram-keys';
 import {
+  buildTelegramStoreActiveKeysView,
   buildTelegramStoreHelpView,
   buildTelegramStoreMainMenuView,
   buildTelegramStoreMyKeysEmptyView,
@@ -101,6 +102,24 @@ test('Mini App buttons are visible from the main menu, empty key state, and help
           locale: 'my',
         }).replyMarkup.inline_keyboard,
         buildTelegramStoreMyKeysEmptyView('my').replyMarkup.inline_keyboard,
+        buildTelegramStoreActiveKeysView([
+          {
+            id: 'key_1',
+            kind: 'access',
+            planId: 'plan_basic',
+            planName: 'Basic',
+            categoryLabel: 'Flash',
+            usedLabel: '10 GB',
+            totalLabel: '50 GB',
+            progressBar: '█████░░░░░',
+            percentLabel: '20%',
+            expiryLabel: '23 Dec 2026',
+            switchesUsed: 0,
+            switchesMaxLabel: '3',
+            renewPriceLabel: '5,000 Ks',
+            currentServerName: 'SG 🇸🇬',
+          },
+        ], 'my').replyMarkup.inline_keyboard,
         buildTelegramStoreHelpView({ locale: 'my' }).replyMarkup.inline_keyboard,
       ]) {
         assert.ok(

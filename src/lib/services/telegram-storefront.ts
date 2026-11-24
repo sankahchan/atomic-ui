@@ -2295,44 +2295,53 @@ export function buildTelegramStoreActiveKeysView(
 
   lines.push(isMyanmar ? 'အောက်မှ သော့ကိုနှိပ်ပြီး အသေးစိတ်ကို ဖွင့်ပါ 👇' : 'Tap a key below to open details 👇');
 
+  const keyboardRows: Array<Array<{
+    text: string;
+    callback_data?: string;
+    web_app?: { url: string };
+  }>> = [
+    ...items.map((item) => (
+      [
+        {
+          text: isMyanmar ? `📄 ${item.planName} ဖွင့်မည်` : `📄 Open ${item.planName}`,
+          callback_data: buildTelegramStorefrontCallbackData({
+            action: 'key_page',
+            keyId: item.id,
+          }),
+        },
+        {
+          text: item.planId
+            ? (isMyanmar ? '🔄 သက်တမ်းတိုးမည်' : '🔄 Renew')
+            : (isMyanmar ? '🛒 အစီအစဉ်များ' : '🛒 Plans'),
+          callback_data: item.planId
+            ? buildTelegramStorefrontCallbackData({
+                action: 'renew_plan',
+                planId: item.planId,
+                keyId: item.id,
+                kind: item.kind,
+              })
+            : buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
+        },
+      ]
+    )),
+    [
+      { text: isMyanmar ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup Guide', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }) },
+      { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
+    ],
+    [
+      { text: isMyanmar ? '➕  အစီအစဉ်အသစ် ဝယ်မည်' : '➕  Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
+      { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
+    ],
+  ];
+
+  const webAppButton = buildTelegramWebAppInlineButton(locale);
+  if (webAppButton) {
+    keyboardRows.push([webAppButton]);
+  }
+
   return {
     text: lines.join('\n').trim(),
-    replyMarkup: {
-      inline_keyboard: [
-        ...items.map((item) => (
-          [
-            {
-              text: isMyanmar ? `📄 ${item.planName} ဖွင့်မည်` : `📄 Open ${item.planName}`,
-              callback_data: buildTelegramStorefrontCallbackData({
-                action: 'key_page',
-                keyId: item.id,
-              }),
-            },
-            {
-              text: item.planId
-                ? (isMyanmar ? '🔄 သက်တမ်းတိုးမည်' : '🔄 Renew')
-                : (isMyanmar ? '🛒 အစီအစဉ်များ' : '🛒 Plans'),
-              callback_data: item.planId
-                ? buildTelegramStorefrontCallbackData({
-                    action: 'renew_plan',
-                    planId: item.planId,
-                    keyId: item.id,
-                    kind: item.kind,
-                  })
-                : buildTelegramStorefrontCallbackData({ action: 'show_plans' }),
-            },
-          ]
-        )),
-        [
-          { text: isMyanmar ? '📲 ချိတ်ဆက်နည်း' : '📲 Setup Guide', callback_data: buildTelegramStorefrontCallbackData({ action: 'setup_home' }) },
-          { text: isMyanmar ? '💬 အကူအညီ' : '💬 Support', callback_data: buildTelegramStorefrontCallbackData({ action: 'support_contact' }) },
-        ],
-        [
-          { text: isMyanmar ? '➕  အစီအစဉ်အသစ် ဝယ်မည်' : '➕  Buy New Plan', callback_data: buildTelegramStorefrontCallbackData({ action: 'show_plans' }) },
-          { text: isMyanmar ? '🏠 ပင်မမီနူး' : '🏠 Menu', callback_data: buildTelegramStorefrontCallbackData({ action: 'main_menu' }) },
-        ],
-      ],
-    },
+    replyMarkup: { inline_keyboard: keyboardRows },
   };
 }
 

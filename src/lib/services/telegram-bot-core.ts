@@ -56,6 +56,7 @@ import {
   buildTelegramOrderTimelineLines,
   escapeHtml,
   formatExpirationSummary,
+  formatTelegramAccessKeyStatusLabel,
   formatTelegramDateTime,
   formatTelegramDynamicPoolSummary,
   getDynamicKeyRegionChoices,
@@ -184,6 +185,7 @@ import {
   buildTelegramGiftUsageMessage,
   buildTelegramReferralCenterMessage,
 } from '@/lib/services/telegram-storefront-shortcuts';
+import { buildTelegramWebAppInlineButton } from '@/lib/services/telegram-miniapp-button';
 import {
   handleAdminHomeCommand,
   handleAdminCreateAccessKeyCommand,
@@ -5827,7 +5829,7 @@ export async function sendAccessKeySharePageToTelegram(input: {
     '',
     `🔑 ${ui.keyLabel}: <b>${escapeHtml(key.name)}</b>`,
     `🖥 ${ui.serverLabel}: ${escapeHtml(key.server.name)}${key.server.countryCode ? ` ${getFlagEmoji(key.server.countryCode)}` : ''}`,
-    `📈 ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+    `📈 ${ui.statusLineLabel}: ${escapeHtml(formatTelegramAccessKeyStatusLabel(key.status, locale))}`,
     `⏳ ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
     key.dataLimitBytes ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
     '',
@@ -5858,7 +5860,12 @@ export async function sendAccessKeySharePageToTelegram(input: {
     );
   }
 
-  const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [
+  const inlineKeyboard: Array<Array<{
+    text: string;
+    url?: string;
+    callback_data?: string;
+    web_app?: { url: string };
+  }>> = [
     [{ text: ui.openSharePage, url: sharePageUrl }],
   ];
 
@@ -5894,6 +5901,11 @@ export async function sendAccessKeySharePageToTelegram(input: {
 
   if (supportLink) {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  const webAppButton = buildTelegramWebAppInlineButton(locale);
+  if (webAppButton) {
+    inlineKeyboard.push([webAppButton]);
   }
 
   await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
@@ -6034,7 +6046,7 @@ export async function sendDynamicKeySharePageToTelegram(input: {
       'ချိတ်ထားသော key',
     )}`,
     `🌍 ${ui.coverageLabel}: ${escapeHtml(coverageSummary)}`,
-    `📈 ${ui.statusLineLabel}: ${escapeHtml(key.status)}`,
+    `📈 ${ui.statusLineLabel}: ${escapeHtml(formatTelegramAccessKeyStatusLabel(key.status, locale))}`,
     `⏳ ${ui.expirationLabel}: ${escapeHtml(formatExpirationSummary(key, locale))}`,
     key.dataLimitBytes ? `📦 ${ui.quotaLabel}: ${formatBytes(key.usedBytes)} / ${formatBytes(key.dataLimitBytes)}` : `📦 ${ui.quotaLabel}: ${ui.unlimited}`,
     '',
@@ -6077,7 +6089,12 @@ export async function sendDynamicKeySharePageToTelegram(input: {
     );
   }
 
-  const inlineKeyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [];
+  const inlineKeyboard: Array<Array<{
+    text: string;
+    url?: string;
+    callback_data?: string;
+    web_app?: { url: string };
+  }>> = [];
   if (key.sharePageEnabled && sharePageUrl) {
     inlineKeyboard.push([{ text: ui.openSharePage, url: sharePageUrl }]);
   }
@@ -6136,6 +6153,11 @@ export async function sendDynamicKeySharePageToTelegram(input: {
 
   if (supportLink) {
     inlineKeyboard.push([{ text: ui.getSupport, url: supportLink }]);
+  }
+
+  const webAppButton = buildTelegramWebAppInlineButton(locale);
+  if (webAppButton) {
+    inlineKeyboard.push([webAppButton]);
   }
 
   await sendTelegramMessage(config.botToken, destinationChatId, lines.join('\n'), {
