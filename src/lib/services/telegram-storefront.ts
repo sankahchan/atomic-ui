@@ -26,6 +26,7 @@ import { buildTelegramSupportThreadCallbackData } from '@/lib/services/telegram-
 import {
   getFlagEmoji,
   getTelegramAccessKeyCategory,
+  TELEGRAM_DIVIDER,
 } from '@/lib/services/telegram-ui';
 
 export type TelegramStorePlanId =
@@ -1984,7 +1985,7 @@ export function buildTelegramStoreMainMenuView(input: {
   const isMyanmar = locale === 'my';
   const text = [
     '🛰 *VPN Plan Store*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     isMyanmar
       ? `ပြန်လည်ကြိုဆိုပါတယ်၊ *${escapeTelegramMarkdownV2(input.firstName)}*\\! 👋`
@@ -2045,7 +2046,7 @@ export function buildTelegramStorePlanListView(
 
   const lines = [
     '🛰 *VPN Plan Store*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
   ];
 
@@ -2106,7 +2107,7 @@ export function buildTelegramStoreOrderSummaryView(input: {
     isRenewal
       ? (isMyanmar ? '🧾 *သက်တမ်းတိုး အနှစ်ချုပ်*' : '🧾 *Renewal Summary*')
       : (isMyanmar ? '🧾 *အော်ဒါ အနှစ်ချုပ်*' : '🧾 *Order Summary*'),
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     `${isMyanmar ? '📦 အစီအစဉ်     :  ' : '📦 Plan        :  '}${escapeTelegramMarkdownV2(input.plan.detailName)}`,
     `${isMyanmar ? '📶 ဒေတာ        :  ' : '📶 Data        :  '}${escapeTelegramMarkdownV2(input.plan.dataLabel)}`,
@@ -2205,7 +2206,7 @@ export function buildTelegramStoreRenewView(input: {
   const isMyanmar = locale === 'my';
   const text = [
     isMyanmar ? '🔄 *အစီအစဉ် သက်တမ်းတိုးမည်*' : '🔄 *Renew Your Plan*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     isMyanmar ? 'သင် နောက်ဆုံးအသုံးပြုခဲ့သော အစီအစဉ်:' : 'Your last plan:',
     '',
@@ -2278,7 +2279,7 @@ export function buildTelegramStoreActiveKeysView(
   const isMyanmar = locale === 'my';
   const lines = [
     isMyanmar ? '🔑 *သင်၏ အသက်ဝင်သော သော့များ*' : '🔑 *Your Active Keys*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
   ];
 
@@ -2369,7 +2370,7 @@ export function buildTelegramStoreMyKeysEmptyView(locale: SupportedLocale = 'en'
   return {
     text: [
       isMyanmar ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? 'Active key မရှိသေးပါ\\.' : 'No active keys right now\\.',
       '',
@@ -2394,7 +2395,7 @@ export function buildTelegramStoreMyAccountView(input: {
   const isMyanmar = locale === 'my';
   const lines = [
     isMyanmar ? '👤 *ကျွန်ုပ်၏အကောင့်*' : '👤 *My Account*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     `${isMyanmar ? '🔑 အသုံးပြုနေသော သော့များ :  ' : '🔑 Active keys   :  '}${escapeTelegramMarkdownV2(String(input.activeKeyCount))}`,
     `${isMyanmar ? '📅 နောက်ဆုံးသက်တမ်း :  ' : '📅 Next expiry   :  '}${escapeTelegramMarkdownV2(input.nextExpiryLabel)}`,
@@ -2496,7 +2497,7 @@ export function buildTelegramStoreQuickStatusView(input: {
   return {
     text: [
       isMyanmar ? '📊 *သင်၏အခြေအနေ*' : '📊 *Your Status*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       `${isMyanmar ? '🔑 အသုံးပြုနေသော သော့များ :  ' : '🔑 Active keys   :  '}${escapeTelegramMarkdownV2(String(input.activeKeyCount))}`,
       `${isMyanmar ? '📅 နောက်ဆုံးသက်တမ်း :  ' : '📅 Next expiry   :  '}${escapeTelegramMarkdownV2(input.nextExpiryLabel)}`,
       `${isMyanmar ? '📶 ကျန်ရှိဒေတာ      :  ' : '📶 Data left     :  '}${escapeTelegramMarkdownV2(input.dataLeftLabel)}`,
@@ -2512,7 +2513,7 @@ export function buildTelegramStoreSwitchKeySelectionView(
   return {
     text: [
       isMyanmar ? '🔄 *ဆာဗာ ပြောင်းမည်*' : '🔄 *Switch Server*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? 'ဘယ်သော့ကို ဆာဗာပြောင်းလိုပါသလဲ?' : 'Which key do you want to switch?',
     ].join('\n'),
@@ -2548,7 +2549,7 @@ export function buildTelegramStoreSwitchServerSelectionView(input: {
   return {
     text: [
       isMyanmar ? '🌍 *ဆာဗာအသစ် ရွေးပါ*' : '🌍 *Select New Server*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       `${isMyanmar ? 'လက်ရှိ     :  *' : 'Current  :  *'}${escapeTelegramMarkdownV2(input.currentServer)}*`,
       `${isMyanmar ? 'အသုံးပြုပြီး :  ' : 'Used     :  '}${escapeTelegramMarkdownV2(String(input.used))} / ${escapeTelegramMarkdownV2(input.maxLabel)}${isMyanmar ? ' ကြိမ်' : ' switches'}`,
@@ -2590,7 +2591,7 @@ export function buildTelegramStoreSwitchConfirmationView(input: {
   return {
     text: [
       isMyanmar ? '⚠️ *ဆာဗာပြောင်းခြင်းကို အတည်ပြုပါ*' : '⚠️ *Confirm Server Switch*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       `${isMyanmar ? 'မှ: *' : 'From: *'}${escapeTelegramMarkdownV2(input.currentServer)}*`,
       `${isMyanmar ? 'သို့: *' : 'To  : *'}${escapeTelegramMarkdownV2(input.newServer)}*`,
@@ -2641,7 +2642,7 @@ export function buildTelegramStoreSwitchSuccessView(input: {
   return {
     text: [
       isMyanmar ? '✅ *ဆာဗာပြောင်းပြီးပါပြီ\\!*' : '✅ *Server Switched\\!*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar
         ? `*${escapeTelegramMarkdownV2(input.newServer)}* သို့ ပြောင်းပြီးပါပြီ\\.`
@@ -2708,7 +2709,7 @@ export function buildTelegramStoreSwitchLimitReachedView(input: {
   return {
     text: [
       isMyanmar ? '❌ *ပြောင်းနိုင်သောအကြိမ် ပြည့်သွားပါပြီ*' : '❌ *Switch Limit Reached*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar
         ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* plan အတွက်`
@@ -2852,7 +2853,7 @@ export function buildTelegramStoreKeyPageView(input: {
     isTrial
       ? (isMyanmar ? '🎁 *အစမ်းသော့ အသေးစိတ်*' : '🎁 *Trial Key Details*')
       : (isMyanmar ? '🔑 *သော့ အသေးစိတ်*' : '🔑 *Key Details*'),
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     `📦 *${escapeTelegramMarkdownV2(input.planName)}*  ·  ${escapeTelegramMarkdownV2(input.categoryLabel)}`,
     `${isMyanmar ? '🟢 အခြေအနေ   :  ' : '🟢 Status      :  '}${escapeTelegramMarkdownV2(input.statusLabel)}`,
@@ -2904,7 +2905,7 @@ export function buildTelegramStoreTrialKeyPageView(input: {
   return {
     text: [
       isMyanmar ? '🎁 *အစမ်းသုံး စတင်ပြီးပါပြီ\\!*' : '🎁 *Trial Activated\\!*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar
         ? `ကြိုဆိုပါတယ်၊ *${escapeTelegramMarkdownV2(input.firstName)}*\\! သင်၏ အခမဲ့အစမ်းသုံးကို`
@@ -2918,7 +2919,7 @@ export function buildTelegramStoreTrialKeyPageView(input: {
       `${isMyanmar ? '🕐 သက်တမ်းကုန်မည့်နေ့ :  ' : '🕐 Expires     :  '}${escapeTelegramMarkdownV2(input.expiryLabel)}`,
       isMyanmar ? '💰 ပေးချေမှု     :  အခမဲ့' : '💰 Paid        :  FREE',
       '',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       isMyanmar ? '📲 _ချိတ်ဆက်နည်းကိုနှိပ်ပြီး ၂ မိနစ်အတွင်း ချိတ်ဆက်ပါ\\._' : '📲 _Tap Setup Guide to connect in 2 minutes\\._',
       isMyanmar ? 'သင်၏ အခမဲ့အစမ်းသုံးကို ပျော်ရွှင်စွာ အသုံးပြုပါ\\! 🎉' : 'Enjoy your free trial\\! 🎉',
     ].join('\n'),
@@ -3079,7 +3080,7 @@ export function buildTelegramStoreOrderConfirmedView(input: {
   return {
     text: [
       isMyanmar ? '✅ *အော်ဒါ အတည်ပြုပြီးပါပြီ\\!*' : '✅ *Order Confirmed\\!*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar
         ? `*${escapeTelegramMarkdownV2(input.plan.detailName)}* ကို ယခုအသုံးပြုနိုင်ပါပြီ၊ *${escapeTelegramMarkdownV2(input.firstName)}*\\! 🎉`
@@ -3093,7 +3094,7 @@ export function buildTelegramStoreOrderConfirmedView(input: {
       `${isMyanmar ? '🔄 ပြောင်းနိုင်မှု :  ' : '🔄 Switches   :  '}${escapeTelegramMarkdownV2(localizeStoreSwitchesLabel(input.plan.switchesLabel, locale))}`,
       `${isMyanmar ? '💵 ပေးချေမှု     :  ' : '💵 Paid        :  '}${escapeTelegramMarkdownV2(input.paidLabel)}`,
       '',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       isMyanmar ? '📲 _ချိတ်ဆက်နည်းကိုနှိပ်ပြီး ၂ မိနစ်အတွင်း ချိတ်ဆက်ပါ\\._' : '📲 _Tap Setup Guide to connect in 2 minutes\\._',
       isMyanmar ? 'ဝယ်ယူမှုအတွက် ကျေးဇူးတင်ပါသည်\\! 🙏' : 'Thank you for your purchase\\! 🙏',
     ].join('\n'),
@@ -3114,7 +3115,7 @@ export function buildTelegramStorePlatformSelectView(input: {
   return {
     text: [
       isMyanmar ? '📱 *ချိတ်ဆက်ရန် အဆင်သင့်ပါ\\!*' : "📱 *Let's Get You Connected\\!*",
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? 'ချိတ်ဆက်ရန် *၂ မိနစ်မပြည့်* အချိန်သာလိုသည် ⚡' : 'Setting up takes less than *2 minutes* ⚡',
       isMyanmar ? 'သင်၏ သော့ကို စက်ပစ္စည်းအားလုံးတွင် အသုံးပြုနိုင်သည် 📱 💻' : 'Your key works on all devices 📱 💻',
@@ -3122,7 +3123,7 @@ export function buildTelegramStorePlatformSelectView(input: {
       isMyanmar ? '🔑 *သင်၏ သော့:*' : '🔑 *Your Key:*',
       formatTelegramMarkdownCode(input.accessKey),
       '',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       isMyanmar ? '🌟 *အကြံပြုထားသည်*   →  Outline' : '🌟 *Recommended*   →  Outline',
       isMyanmar ? '🔧 *အဆင့်မြင့်သုံးစွဲသူများ*   →  Hiddify / V2Ray' : '🔧 *Power Users*   →  Hiddify or V2Ray',
       '',
@@ -3242,15 +3243,15 @@ export function buildTelegramStorePlatformGuideView(input: {
   return {
     text: [
       config.title,
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? '*Step 1* — သင်၏ key ကို copy ကူးပါ 👇' : '*Step 1* — Copy your key 👇',
       `🔑 ${formatTelegramMarkdownCode(input.accessKey)}`,
       '',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       ...config.bodyLines,
       '',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       isMyanmar
         ? '💡 _ပထမဆုံးအသုံးပြုခြင်းဆိုလျှင် Outline ကိုသုံးပါ — တစ်ချက်နှိပ်ရုံဖြင့် ချိတ်ဆက်နိုင်သည်\\._'
         : '💡 _First time? Use Outline — one tap to connect\\._',
@@ -3396,7 +3397,7 @@ export function buildTelegramStoreExpiryReminderView(input: {
         : input.sameDay
           ? (isMyanmar ? '⚠️ *Plan သက်တမ်း ယနေ့ကုန်မည်\\!*' : '⚠️ *Plan Expires Today\\!*')
           : (isMyanmar ? '⏰ *Plan သက်တမ်း မကြာမီကုန်မည်\\!*' : '⏰ *Plan Expiring Soon\\!*'),
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       input.depleted
         ? (
@@ -3461,7 +3462,7 @@ export function buildTelegramStoreDataWarningView(input: {
       threshold === 90
         ? (isMyanmar ? '📶 *ဒေတာ ကုန်ခါနီးပါပြီ\\!*' : '📶 *Data Almost Gone\\!*')
         : (isMyanmar ? '📶 *ဒေတာ နည်းနေပါပြီ\\!*' : '📶 *Low Data Warning\\!*'),
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar
         ? `သင်၏ *${escapeTelegramMarkdownV2(input.planName)}* data ကို *${threshold}%* အသုံးပြုပြီးပါပြီ\\.`
@@ -3527,7 +3528,7 @@ export function buildTelegramStoreSupportContactView(input: {
   const supportText = input.locale === 'my'
     ? [
         '🛟 *အကူအညီ စင်တာ*',
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        TELEGRAM_DIVIDER,
         '',
         'အောက်က လမ်းကြောင်းထဲမှ သင့်အတွက် အမြန်ဆုံးကို ရွေးပါ\\.',
         '',
@@ -3538,7 +3539,7 @@ export function buildTelegramStoreSupportContactView(input: {
       ]
     : [
         '🛟 *Support Center*',
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+        TELEGRAM_DIVIDER,
         '',
         'Pick the fastest path below for your issue\\.',
         '',
@@ -3604,7 +3605,7 @@ export function buildTelegramStoreHelpView(input?: {
   return {
     text: [
       isMyanmar ? '❓ *အကူအညီ & Setup*' : '❓ *Help & Setup*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? '🔑 Active key မရှိသေးလျှင် plan ကို အရင်ဝယ်ပါ\\.' : '🔑 If you do not have an active key yet, buy a plan first\\.',
       isMyanmar ? '📲 Key ရှိပြီးသားဆိုလျှင် Setup Guide သို့မဟုတ် My Keys ကို ဖွင့်ပါ\\.' : '📲 If you already have a key, open Setup Guide or My Keys\\.',
@@ -3635,7 +3636,7 @@ export function buildTelegramStoreSetupHomeView(locale: SupportedLocale = 'en') 
   return {
     text: [
       isMyanmar ? '📱 *ချိတ်ဆက်ရန် အဆင်သင့်ပါ\\!*' : "📱 *Let's Get You Connected\\!*",
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? 'ချိတ်ဆက်ရန် *၂ မိနစ်မပြည့်* အချိန်သာလိုသည် ⚡' : 'Setting up takes less than *2 minutes* ⚡',
       isMyanmar ? 'သင်၏ သော့ကို စက်ပစ္စည်းအားလုံးတွင် အသုံးပြုနိုင်သည် 📱 💻' : 'Your key works on all devices 📱 💻',
@@ -3683,7 +3684,7 @@ export function buildTelegramStoreSetupKeyPickerView(input: {
   return {
     text: [
       `📱 *${input.platform === 'ios' ? 'iOS' : input.platform === 'macos' ? 'macOS' : input.platform === 'windows' ? 'Windows' : 'Android'} ${isMyanmar ? 'ချိတ်ဆက်နည်း' : 'Setup'}*`,
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? 'ဤစက်ပစ္စည်းတွင် ဖွင့်မည့် အသုံးပြုနေသော သော့ကို ရွေးပါ 👇' : 'Choose which active key you want to open on this device 👇',
       isMyanmar ? 'မတွေ့သေးလျှင် My Keys သို့မဟုတ် Support ကို သုံးပါ\\.' : 'Use My Keys or Support if you need a different route\\.',
@@ -3718,7 +3719,7 @@ export function buildTelegramStoreSetupNoKeyView(locale: SupportedLocale = 'en')
   return {
     text: [
       isMyanmar ? '📲 *ချိတ်ဆက်နည်း*' : '📲 *Setup Guide*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? 'သင့်တွင် အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'You do not have an active key yet\\.',
       '',
@@ -3759,7 +3760,7 @@ export function buildTelegramStoreReferralView(input: {
   return {
     text: [
       isMyanmar ? '🎁 *မိတ်ဆွေကို ဖိတ်ခေါ်ပါ*' : '🎁 *Refer a Friend*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       isMyanmar ? 'သင့် link ကိုမျှဝေပြီး free data ရယူပါ\\.' : 'Share your link and earn free data\\.',
       '',
@@ -3782,7 +3783,7 @@ export function buildTelegramStoreSetupGuideText(locale: SupportedLocale) {
   if (locale === 'my') {
     return [
       '📲 *ချိတ်ဆက်နည်း*',
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      TELEGRAM_DIVIDER,
       '',
       '1\\. [Outline app ကို ဤနေရာမှ ဒေါင်းလုဒ်ဆွဲပါ](https://getoutline.org/get-started/)',
       '2\\. ပို့ပေးထားသော key သို့မဟုတ် share page ကိုဖွင့်ပါ။',
@@ -3793,7 +3794,7 @@ export function buildTelegramStoreSetupGuideText(locale: SupportedLocale) {
 
   return [
     '📲 *Setup Guide*',
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    TELEGRAM_DIVIDER,
     '',
     '1\\. [Download the Outline app here](https://getoutline.org/get-started/)',
     '2\\. Open the access key or share page we sent you\\.',

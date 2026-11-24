@@ -13,6 +13,13 @@ import { TRPCError } from '@trpc/server';
 import { SUBSCRIPTION_EVENT_TYPES } from '@/lib/services/subscription-events';
 import { resolveTelegramRejectionReasonLabel } from '@/lib/services/telegram-sales';
 import { buildTelegramSalesFunnel } from '@/lib/services/telegram-sales-analytics';
+import {
+  ACCESS_KEY_SNAPSHOT_TYPE,
+  DYNAMIC_KEY_SNAPSHOT_TYPE,
+  isServerBandwidthSnapshot,
+  resolveUsageSnapshotKeyType,
+  type UsageSnapshotKeyType,
+} from '@/lib/usage-snapshot-attribution';
 
 // Time range options
 const timeRangeSchema = z.enum(['24h', '7d', '30d']);
@@ -213,7 +220,7 @@ export const analyticsRouter = router({
         snapshots.map(async (s) => {
           const deltaBytes = s._sum.deltaBytes || BigInt(0);
 
-          if (s.keyType === 'ACCESS_KEY') {
+          if (resolveUsageSnapshotKeyType(s.keyType) === ACCESS_KEY_SNAPSHOT_TYPE) {
             const key = await db.accessKey.findUnique({
               where: { id: s.keyId || '' },
               select: {
@@ -306,11 +313,13 @@ export const analyticsRouter = router({
         where: {
           serverId: input.serverId,
           createdAt: { gte: startDate },
+          keyType: ACCESS_KEY_SNAPSHOT_TYPE,
         },
         orderBy: { createdAt: 'asc' },
         select: {
           deltaBytes: true,
           createdAt: true,
+          keyType: true,
         },
       });
 
@@ -318,6 +327,8 @@ export const analyticsRouter = router({
       const dailyUsage: Record<string, bigint> = {};
 
       for (const snapshot of snapshots) {
+        // Dynamic key usage is already counted through its attached access keys.
+        if (!isServerBandwidthSnapshot(snapshot)) continue;
         const dateKey = snapshot.createdAt.toISOString().split('T')[0];
         dailyUsage[dateKey] = (dailyUsage[dateKey] || BigInt(0)) + snapshot.deltaBytes;
       }
@@ -339,17 +350,18 @@ export const analyticsRouter = router({
       let topConsumers: Array<{
         keyId: string;
         name: string;
-        type: 'ACCESS_KEY';
+        type: UsageSnapshotKeyType;
         deltaBytes: string;
       }> | null = null;
 
       if (input.topConsumersLimit) {
         const grouped = await db.usageSnapshot.groupBy({
-          by: ['keyId'],
+          by: ['keyId', 'keyType'],
           where: {
             serverId: input.serverId,
             createdAt: { gte: startDate },
             keyId: { not: null },
+            keyType: { in: [ACCESS_KEY_SNAPSHOT_TYPE, DYNAMIC_KEY_SNAPSHOT_TYPE] },
           },
           _sum: { deltaBytes: true },
           orderBy: {
@@ -362,6 +374,27 @@ export const analyticsRouter = router({
           grouped.map(async (group) => {
             if (!group.keyId) return null;
 
+            const deltaBytes = (group._sum.deltaBytes || BigInt(0)).toString();
+            const snapshotType = resolveUsageSnapshotKeyType(group.keyType);
+
+            if (snapshotType === DYNAMIC_KEY_SNAPSHOT_TYPE) {
+              const dynamicKey = await db.dynamicAccessKey.findUnique({
+                where: { id: group.keyId },
+                select: { id: true, name: true },
+              });
+
+              if (!dynamicKey) return null;
+
+              return {
+                keyId: dynamicKey.id,
+                name: dynamicKey.name,
+                type: 'DYNAMIC_KEY' as const,
+                deltaBytes,
+              };
+            }
+
+            if (snapshotType !== ACCESS_KEY_SNAPSHOT_TYPE) return null;
+
             const key = await db.accessKey.findUnique({
               where: { id: group.keyId },
               select: { id: true, name: true },
@@ -373,7 +406,7 @@ export const analyticsRouter = router({
               keyId: key.id,
               name: key.name,
               type: 'ACCESS_KEY' as const,
-              deltaBytes: (group._sum.deltaBytes || BigInt(0)).toString(),
+              deltaBytes,
             };
           })
         );

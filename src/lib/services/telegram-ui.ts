@@ -21,6 +21,9 @@ export function getFlagEmoji(countryCode: string) {
   return String.fromCodePoint(...codePoints);
 }
 
+/** Shared section divider used by bot cards and storefront messages. */
+export const TELEGRAM_DIVIDER = '━'.repeat(26);
+
 export function buildTelegramProgressBar(percent: number, length = 10) {
   const filledLength = Math.max(0, Math.min(length, Math.round((percent / 100) * length)));
   const emptyLength = length - filledLength;
