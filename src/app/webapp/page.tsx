@@ -227,6 +227,29 @@ export default function TelegramWebAppPage() {
 
     (async () => {
       try {
+        if (new URLSearchParams(window.location.search).get('magic') === '1') {
+          const magicToken = window.sessionStorage.getItem('atomic-magic-session');
+          if (!magicToken) {
+            throw new Error('This self-service session has expired. Open the link again.');
+          }
+
+          const magicLocale = window.sessionStorage.getItem('atomic-magic-locale') === 'my'
+            ? 'my'
+            : 'en';
+          setDisplayLocale(magicLocale);
+          setTheme('light');
+          setToken(magicToken);
+
+          const magicKeysResponse = await fetch(withBasePath('/api/telegram/webapp/keys'), {
+            headers: { Authorization: `Bearer ${magicToken}` },
+            signal: controller.signal,
+          });
+          const magicKeysBody = (await magicKeysResponse.json()) as WebAppData & { error?: string };
+          if (!magicKeysResponse.ok) throw new Error(magicKeysBody.error || COPY.en.error);
+          if (!cancelled) setData(magicKeysBody);
+          return;
+        }
+
         // Telegram's bridge script can load after hydration. Wait for it so
         // ready() is always called and the client loading placeholder clears.
         const bridge = await waitForTelegramWebAppBridge({ signal: controller.signal });

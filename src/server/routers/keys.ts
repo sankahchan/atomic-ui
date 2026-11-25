@@ -14,7 +14,12 @@ import { router, protectedProcedure, adminProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { createOutlineClient } from '@/lib/outline-api';
 import { TRPCError } from '@trpc/server';
+import { withAbsoluteBasePath } from '@/lib/base-path';
 import { generateRandomString } from '@/lib/utils';
+import {
+  MAGIC_LINK_TTL_MINUTES,
+  MAGIC_LINK_TOKEN_KIND,
+} from '@/lib/magic-link-auth';
 import { logger } from '@/lib/logger';
 import QRCode from 'qrcode';
 import { Prisma } from '@prisma/client';
@@ -1162,6 +1167,19 @@ async function resolveAccessKeySlug(requestedSlug: string | null | undefined, na
   }
 
   return normalizedSlug;
+}
+
+async function isMagicLinkSelfServiceEnabled() {
+  const setting = await db.settings.findUnique({
+    where: { key: 'magicLinkSelfServiceEnabled' },
+    select: { value: true },
+  });
+  if (!setting) return false;
+  try {
+    return JSON.parse(setting.value) === true;
+  } catch {
+    return setting.value === 'true';
+  }
 }
 
 export const keysRouter = router({
@@ -4444,6 +4462,68 @@ export const keysRouter = router({
         accessUrl: decorateOutlineAccessUrl(key.accessUrl, key.name),
         token,
         publicSlug,
+      };
+    }),
+
+  /**
+   * Issue a single-use self-service link for one key. Disabled by default;
+   * enable the `magicLinkSelfServiceEnabled` setting to expose this flow.
+   */
+  createMagicLink: adminProcedure
+    .input(z.object({
+      keyId: z.string(),
+      keyType: z.enum(['ACCESS_KEY', 'DYNAMIC_KEY']).default('ACCESS_KEY'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!await isMagicLinkSelfServiceEnabled()) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Magic-link self-service is disabled for this instance.',
+        });
+      }
+
+      const key = input.keyType === 'ACCESS_KEY'
+        ? await db.accessKey.findUnique({
+          where: { id: input.keyId },
+          select: { id: true, name: true },
+        })
+        : await db.dynamicAccessKey.findUnique({
+          where: { id: input.keyId },
+          select: { id: true, name: true },
+        });
+
+      if (!key) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Key not found' });
+      }
+
+      const token = generateRandomString(48);
+      const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MINUTES * 60 * 1000);
+      await db.telegramLinkToken.create({
+        data: {
+          token,
+          kind: MAGIC_LINK_TOKEN_KIND,
+          expiresAt,
+          createdByUserId: ctx.user.id,
+          ...(input.keyType === 'ACCESS_KEY'
+            ? { accessKeyId: input.keyId }
+            : { dynamicAccessKeyId: input.keyId }),
+        },
+      });
+
+      await writeAuditLog({
+        userId: ctx.user.id,
+        action: 'MAGIC_LINK_ISSUED',
+        entity: input.keyType,
+        entityId: input.keyId,
+        details: {
+          expiresAt: expiresAt.toISOString(),
+          keyName: key.name,
+        },
+      });
+
+      return {
+        url: `${withAbsoluteBasePath('/magic-link')}#${token}`,
+        expiresAt: expiresAt.toISOString(),
       };
     }),
 

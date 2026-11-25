@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { escapeHtml } from '@/lib/services/telegram-ui';
 import { getTelegramConfig, sendTelegramMessage } from '@/lib/services/telegram-runtime';
 import { findLinkedAccessKeys } from '@/lib/services/telegram-keys';
-import { verifyTelegramWebAppSession } from '@/lib/telegram-webapp-auth';
+import { authorizeWebAppToken } from '@/lib/magic-link-auth';
 import { getSelfActionEligibility } from '../self-service';
 
 export const runtime = 'nodejs';
@@ -26,11 +26,35 @@ function jsonError(message: string, status: number) {
 
 async function loadOwnedKey(request: Request, id: string) {
   const token = readBearerToken(request);
-  const identity = token ? await verifyTelegramWebAppSession(token) : null;
-  if (!identity) {
+  const auth = token ? await authorizeWebAppToken(token) : null;
+  if (!auth) {
     return { error: jsonError('Unauthorized', 401) } as const;
   }
 
+  if (auth.type === 'magic') {
+    if (auth.claims.keyId !== id || auth.claims.kind !== 'normal') {
+      return { error: jsonError('Key not found', 404) } as const;
+    }
+    const key = await db.accessKey.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        userId: true,
+        usedBytes: true,
+        dataLimitBytes: true,
+        expiresAt: true,
+        autoRenewPolicy: true,
+        autoRenewDurationDays: true,
+      },
+    });
+    if (!key) {
+      return { error: jsonError('Key not found', 404) } as const;
+    }
+    return { key, source: { type: 'magic' as const } } as const;
+  }
+
+  const identity = auth.identity;
   const chatId = identity.chatId ?? identity.telegramUserId;
   const owned = await findLinkedAccessKeys(chatId, identity.telegramUserId, true);
   const key = owned.find((candidate) => candidate.id === id);
@@ -38,7 +62,7 @@ async function loadOwnedKey(request: Request, id: string) {
     return { error: jsonError('Key not found', 404) } as const;
   }
 
-  return { key, identity } as const;
+  return { key, source: { type: 'telegram' as const, telegramUserId: identity.telegramUserId } } as const;
 }
 
 export async function GET(
@@ -67,7 +91,8 @@ export async function POST(
   const { id } = await params;
   const loaded = await loadOwnedKey(request, id);
   if ('error' in loaded) return loaded.error;
-  const { key, identity } = loaded;
+  const { key, source } = loaded;
+  const telegramUserId = source.type === 'telegram' ? source.telegramUserId : null;
 
   let rawBody: unknown;
   try {
@@ -121,8 +146,8 @@ export async function POST(
       details: {
         days,
         expiresAt: newExpiresAt.toISOString(),
-        source: 'TELEGRAM_WEBAPP',
-        telegramUserId: identity.telegramUserId,
+        source: source.type === 'telegram' ? 'TELEGRAM_WEBAPP' : 'MAGIC_LINK',
+        telegramUserId,
       },
     });
 
@@ -167,7 +192,9 @@ export async function POST(
         `Key: <b>${escapeHtml(key.name)}</b>`,
         `Usage: ${key.usedBytes.toString()} / ${key.dataLimitBytes?.toString() ?? 'unlimited'}`,
         message ? `Message: ${escapeHtml(message)}` : null,
-        `Source: Telegram Mini App (user ${identity.telegramUserId})`,
+        source.type === 'telegram'
+          ? `Source: Telegram Mini App (user ${source.telegramUserId})`
+          : 'Source: magic-link self-service',
       ].filter(Boolean).join('\n');
 
       for (const adminId of telegramConfig.adminChatIds) {
@@ -187,8 +214,8 @@ export async function POST(
       entityId: id,
       details: {
         noteId: note.id,
-        source: 'TELEGRAM_WEBAPP',
-        telegramUserId: identity.telegramUserId,
+        source: source.type === 'telegram' ? 'TELEGRAM_WEBAPP' : 'MAGIC_LINK',
+        telegramUserId,
       },
     });
 

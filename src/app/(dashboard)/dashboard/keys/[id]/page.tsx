@@ -925,6 +925,29 @@ function SubscriptionShareCard({
       });
     },
   });
+  const magicLinkMutation = trpc.keys.createMagicLink.useMutation({
+    onSuccess: async (result) => {
+      await copyToClipboard(
+        result.url,
+        isMyanmar ? 'Magic link ကူးယူပြီး' : 'Magic link copied',
+        isMyanmar ? 'Magic link ကို ကလစ်ဘုတ်သို့ ကူးယူပြီးပါပြီ။' : 'Magic link copied to clipboard.',
+      );
+      toast({
+        title: isMyanmar ? 'Magic link ဖန်တီးပြီး' : 'Magic link created',
+        description: isMyanmar
+          ? 'ဒီလင့်ခ်က တစ်ကြိမ်သာ အသုံးပြုနိုင်ပါသည်။'
+          : 'This link can only be used once.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: isMyanmar ? 'Magic link မဖန်တီးနိုင်ပါ' : 'Could not create magic link',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const regenerateSlugMutation = trpc.keys.regeneratePublicSlug.useMutation({
     onSuccess: (result) => {
       setSlugInput(result.publicSlug || '');
@@ -1526,6 +1549,17 @@ function SubscriptionShareCard({
           >
             <Copy className="w-4 h-4 mr-2" />
             {shareUi.copyLink}
+          </Button>
+          <Button
+            variant="outline"
+            className={cn('w-full', shareActionButtonClassName)}
+            disabled={magicLinkMutation.isPending}
+            onClick={() => magicLinkMutation.mutate({ keyId, keyType: 'ACCESS_KEY' })}
+          >
+            <Link2 className="w-4 h-4 mr-2" />
+            {magicLinkMutation.isPending
+              ? (isMyanmar ? 'ဖန်တီးနေသည်…' : 'Creating…')
+              : (isMyanmar ? 'Magic link ဖန်တီးမည်' : 'Create magic link')}
           </Button>
           <Button
             variant="outline"
