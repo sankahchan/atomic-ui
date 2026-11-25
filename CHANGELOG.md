@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.21 - 2026-11-25
+
+### Changed
+
+- Access-key status labels in Telegram storefront and admin cards now use the shared localized vocabulary, including a trial-specific Active label.
+- Both `/mykeys` empty states share one localized MarkdownV2-safe header while keeping their existing buttons and guidance.
+
 ## v1.2.20 - 2026-11-25
 
 ### Added
