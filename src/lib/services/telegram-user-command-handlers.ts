@@ -45,7 +45,7 @@ import {
   resolveTelegramSalesPlanLabel,
   resolveTelegramSalesPriceLabel,
 } from '@/lib/services/telegram-sales';
-import { escapeHtml, getTelegramUi, TELEGRAM_DIVIDER } from '@/lib/services/telegram-ui';
+import { buildTelegramMyKeysEmptyText, escapeHtml, getTelegramUi, TELEGRAM_DIVIDER } from '@/lib/services/telegram-ui';
 import { buildTelegramLocaleSelectorKeyboard, buildTelegramLocaleSelectorMessage } from '@/lib/services/telegram-callbacks';
 import {
   buildTelegramStoreActiveKeysView,
@@ -501,16 +501,12 @@ export async function handleStoreMyKeysCommand(input: {
 
   if (items.length === 0) {
     const webAppButton = buildTelegramWebAppInlineButton(input.locale);
-    const text = [
-      input.locale === 'my' ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
-      TELEGRAM_DIVIDER,
-      '',
-      input.locale === 'my' ? 'အသုံးပြုနေသော key မရှိသေးပါ\\.' : 'No active keys right now\\.',
-      '',
-      input.locale === 'my'
+    const text = buildTelegramMyKeysEmptyText({
+      locale: input.locale,
+      guidanceLine: input.locale === 'my'
         ? 'အောက်မှ နှိပ်ပြီး plan အသစ်ဝယ်ပါ။ Mini App ကိုလည်း ဖွင့်ကြည့်နိုင်ပါသည်\\.'
         : 'Tap below to buy a new plan. You can also open the Mini App\\.',
-    ].join('\n');
+    });
 
     return sendTelegramStoreView({
       botToken: input.botToken,

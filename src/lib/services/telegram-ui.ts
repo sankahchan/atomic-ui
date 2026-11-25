@@ -1061,9 +1061,13 @@ export function formatTelegramDateTime(value: Date | null | undefined, locale: S
 export function formatTelegramAccessKeyStatusLabel(
   status: string,
   locale: SupportedLocale = 'en',
+  variant: 'paid' | 'trial' = 'paid',
 ) {
   switch (status) {
     case 'ACTIVE':
+      if (variant === 'trial') {
+        return locale === 'my' ? 'အစမ်းသုံးနေသည်' : 'Trial active';
+      }
       return locale === 'my' ? 'အသက်ဝင်' : 'Active';
     case 'PENDING':
       return locale === 'my' ? 'စောင့်ဆိုင်း' : 'Pending';
@@ -1078,6 +1082,22 @@ export function formatTelegramAccessKeyStatusLabel(
       const humanized = status.replace(/_/g, ' ').toLowerCase();
       return humanized.charAt(0).toUpperCase() + humanized.slice(1);
   }
+}
+
+/** Shared MarkdownV2-safe header for the two /mykeys empty states. */
+export function buildTelegramMyKeysEmptyText(input: {
+  locale: SupportedLocale;
+  guidanceLine: string;
+}) {
+  const isMyanmar = input.locale === 'my';
+  return [
+    isMyanmar ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
+    TELEGRAM_DIVIDER,
+    '',
+    isMyanmar ? 'Active key မရှိသေးပါ\\.' : 'No active keys right now\\.',
+    '',
+    input.guidanceLine,
+  ].join('\n');
 }
 
 export function formatTelegramOrderStatusLabel(status: string, ui: TelegramUi) {
