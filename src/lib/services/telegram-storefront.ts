@@ -24,6 +24,8 @@ import {
 } from '@/lib/services/telegram-sales';
 import { buildTelegramSupportThreadCallbackData } from '@/lib/services/telegram-callbacks';
 import {
+  buildTelegramMyKeysEmptyText,
+  formatTelegramAccessKeyStatusLabel,
   getFlagEmoji,
   getTelegramAccessKeyCategory,
   TELEGRAM_DIVIDER,
@@ -805,37 +807,6 @@ function formatTelegramStoreDeviceLimitLabel(input: {
     : `${input.limit} estimated device${input.limit === 1 ? '' : 's'}`;
 }
 
-function formatTelegramStoreStatusLabel(
-  status: string,
-  variant: 'paid' | 'trial',
-  locale: SupportedLocale = 'en',
-) {
-  if (status === 'ACTIVE') {
-    if (locale === 'my') {
-      return variant === 'trial' ? 'အစမ်းသုံးနေသည်' : 'အသုံးပြုနိုင်သည်';
-    }
-    return variant === 'trial' ? 'Trial active' : 'Active';
-  }
-
-  if (status === 'DISABLED') {
-    return locale === 'my' ? 'ပိတ်ထားသည်' : 'Disabled';
-  }
-
-  if (status === 'PENDING') {
-    return locale === 'my' ? 'စောင့်ဆိုင်းနေသည်' : 'Pending';
-  }
-
-  if (status === 'EXPIRED') {
-    return locale === 'my' ? 'သက်တမ်းကုန်သွားသည်' : 'Expired';
-  }
-
-  if (locale === 'my') {
-    return status;
-  }
-
-  return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-}
-
 function localizeStoreDurationLabel(label: string, locale: SupportedLocale = 'en') {
   if (locale !== 'my') {
     return label;
@@ -1479,7 +1450,7 @@ export async function loadTelegramStoreGuideKeyData(input: {
       planId: plan?.id || null,
       planName: plan?.detailName || accessKey.name,
       categoryLabel: variant === 'trial' ? (input.locale === 'my' ? 'အစမ်းသုံး' : 'Trial') : plan ? formatCategoryLabel(plan.category, input.locale) : 'Flash',
-      statusLabel: formatTelegramStoreStatusLabel(accessKey.status, variant, input.locale),
+      statusLabel: formatTelegramAccessKeyStatusLabel(accessKey.status, input.locale, variant),
       currentServerName: formatCurrentServerName({
         name: accessKey.server?.name,
         countryCode: accessKey.server?.countryCode,
@@ -1551,7 +1522,7 @@ export async function loadTelegramStoreGuideKeyData(input: {
     planId: plan?.id || null,
     planName: plan?.detailName || dynamicKey.name,
     categoryLabel: plan ? formatCategoryLabel(plan.category, input.locale) : 'Dynamic',
-    statusLabel: formatTelegramStoreStatusLabel(dynamicKey.status, 'paid', input.locale),
+    statusLabel: formatTelegramAccessKeyStatusLabel(dynamicKey.status, input.locale),
     currentServerName: formatCurrentServerName({
       name: currentServer?.name || null,
       countryCode: currentServer?.countryCode || null,
@@ -2368,16 +2339,12 @@ export function buildTelegramStoreMyKeysEmptyView(locale: SupportedLocale = 'en'
   }
 
   return {
-    text: [
-      isMyanmar ? '🔑 *သင်၏ Active Key များ*' : '🔑 *Your Active Keys*',
-      TELEGRAM_DIVIDER,
-      '',
-      isMyanmar ? 'Active key မရှိသေးပါ\\.' : 'No active keys right now\\.',
-      '',
-      isMyanmar
+    text: buildTelegramMyKeysEmptyText({
+      locale,
+      guidanceLine: isMyanmar
         ? 'ပထမဦးစွာ plan တစ်ခုဝယ်ပါ။ Activate ဖြစ်ပြီးနောက် setup, QR, renew ကို ဒီနေရာမှ ဖွင့်နိုင်ပါမည်\\.'
         : 'Buy a plan first. After activation, setup, QR, and renew actions will open from here\\.',
-    ].join('\n'),
+    }),
     replyMarkup: {
       inline_keyboard: keyboardRows,
     },

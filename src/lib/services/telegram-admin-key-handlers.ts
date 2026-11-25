@@ -53,6 +53,7 @@ import {
 import {
   escapeHtml,
   formatExpirationSummary,
+  formatTelegramAccessKeyStatusLabel,
   formatTelegramDynamicPoolSummary,
   getFlagEmoji,
   getDynamicKeyRegionChoices,
@@ -1182,7 +1183,7 @@ function formatAccessManageSummary(key: {
     '',
     `🔑 <b>${escapeHtml(key.name)}</b>`,
     `🆔 <code>${key.id}</code>`,
-    `📈 ${escapeHtml(key.status)}`,
+    `📈 ${escapeHtml(formatTelegramAccessKeyStatusLabel(key.status, locale))}`,
     `🖥 ${escapeHtml(renderServerChoiceLabel(key.server))}`,
     `📦 ${escapeHtml(
       key.dataLimitBytes
@@ -1240,7 +1241,7 @@ function formatDynamicManageSummary(key: {
     '',
     `💎 <b>${escapeHtml(key.name)}</b>`,
     `🆔 <code>${key.id}</code>`,
-    `📈 ${escapeHtml(key.status)}`,
+    `📈 ${escapeHtml(formatTelegramAccessKeyStatusLabel(key.status, locale))}`,
     `🧭 ${escapeHtml(key.type)}`,
     `🖥 ${locale === 'my' ? 'ချိတ်ထားသော သော့များ' : 'Attached keys'}: ${key.accessKeys.length}`,
     `📦 ${escapeHtml(
@@ -1405,7 +1406,7 @@ export async function promptManageMatches(input: {
         : (isMyanmar ? '🔎 <b>ကိုက်ညီသော ဒိုင်နမစ်သော့များ</b>' : '🔎 <b>Matching dynamic keys</b>'),
       '',
       ...input.matches.flatMap((match, index) => [
-        `${index + 1}. <b>${escapeHtml(match.name)}</b> • ${escapeHtml(match.status)}`,
+        `${index + 1}. <b>${escapeHtml(match.name)}</b> • ${escapeHtml(formatTelegramAccessKeyStatusLabel(match.status, isMyanmar ? 'my' : 'en'))}`,
         ...match.details.map((detail) => `   ${escapeHtml(detail)}`),
         '',
       ]),
