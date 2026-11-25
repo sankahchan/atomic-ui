@@ -188,6 +188,9 @@ This repository now uses semver-style Git tags:
 - `v1.2.2` Telegram smoke + VPS install lockfile hardening
 - `v1.2.3` dependency security refresh
 - `v1.2.17` PlopUI dashboard, portaled surface theming, sync/activation hardening, and performance work
+- `v1.2.18` Telegram Mini App, custom Myanmar font, alerts/digest, phase-two analytics and bot UI consistency
+- `v1.2.19` admin card-style and media delivery wiring for Telegram customer messages
+- `v1.2.20` shared Telegram dividers and per-server dynamic-key top consumers
 - `v2.0.0` breaking release
 
 ### Recommended release flow

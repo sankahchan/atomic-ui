@@ -1,5 +1,50 @@
 # Changelog
 
+## v1.2.20 - 2026-11-25
+
+### Added
+
+- Dynamic access key snapshots now record the last resolved server, and per-server analytics lists both access keys and dynamic keys as top consumers.
+- Server detail pages render the per-server top-consumer list.
+
+### Changed
+
+- Consolidated 43 duplicated Telegram section dividers into a shared `TELEGRAM_DIVIDER` helper.
+
+### Fixed
+
+- Server bandwidth totals still count only access-key snapshots, so dynamic traffic is not double counted.
+
+## v1.2.19 - 2026-11-24
+
+### Added
+
+- Admin direct-message flow now offers a localized card-style picker (plain, promo, premium, service) before composing the customer message.
+- The selected style is stored on the flow, support note and audit record, and is applied to both text and media delivery.
+- The shared announcement builder accepts a custom heading so admin messages keep their heading while still receiving the chosen style accent.
+
+## v1.2.18 - 2026-11-24
+
+### Added
+
+- Telegram Mini App with `initData` authentication, short-lived session tokens, linked-key usage cards, self-service actions, one-tap buttons and localized dark/light themes.
+- Support queue claim, assignment and SLA handling, plus a persistent `web_app` menu button.
+- Self-hosted Unicode Myanmar font with `unicode-range` loading and a glyph-coverage regression guard.
+- Telegram usage alerts (80%/90%), depleted-key notices, admin daily digest, and QR/client setup guides on share pages.
+- Server selector with daily bandwidth chart, Mini App usage sparkline and self-extend/data requests, bulk key expire/sync/CSV import, and audit keyword/IP filters.
+
+### Changed
+
+- Unified Telegram bot cards with the Mini App: shared Mini App buttons, localized status labels and consistent compact layouts.
+- Polished the audit summary and Access Keys header for dense desktop and mobile views.
+
+### Fixed
+
+- Ignored stale Telegram webhook delivery errors so old deploy-time 502s no longer trigger endless health alerts.
+- Split AccessKey and DynamicAccessKey alert queries after a runtime field mismatch on production.
+- Used configured key duration for Mini App self-extension instead of arbitrary fixed values.
+- Replaced Chromium's English fallback for Myanmar dates with explicit localized month labels.
+
 ## v1.2.17 - 2026-11-23
 
 ### Added
