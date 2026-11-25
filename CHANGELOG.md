@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.22 - 2026-11-25
+
+### Added
+
+- Dynamic key usage is now split across the servers of its active attached access keys, proportional to each server's in-cycle usage. Rounding preserves the exact dynamic total and falls back to the last resolved server when no per-server data is available.
+
 ## v1.2.21 - 2026-11-25
 
 ### Changed
