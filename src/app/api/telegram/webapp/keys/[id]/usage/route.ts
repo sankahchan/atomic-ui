@@ -4,7 +4,7 @@ import {
   findLinkedAccessKeys,
   findLinkedDynamicAccessKeys,
 } from '@/lib/services/telegram-keys';
-import { verifyTelegramWebAppSession } from '@/lib/telegram-webapp-auth';
+import { authorizeWebAppToken } from '@/lib/magic-link-auth';
 import { bucketDailyUsage, getUsageDayKeys } from '../self-service';
 
 export const runtime = 'nodejs';
@@ -28,8 +28,8 @@ export async function GET(
 ) {
   const { id } = await params;
   const token = readBearerToken(request);
-  const identity = token ? await verifyTelegramWebAppSession(token) : null;
-  if (!identity) {
+  const auth = token ? await authorizeWebAppToken(token) : null;
+  if (!auth) {
     return jsonError('Unauthorized', 401);
   }
 
@@ -39,19 +39,33 @@ export async function GET(
     return jsonError('Unsupported usage range', 400);
   }
 
-  const chatId = identity.chatId ?? identity.telegramUserId;
-  const [accessKeys, dynamicKeys] = await Promise.all([
-    findLinkedAccessKeys(chatId, identity.telegramUserId, true),
-    findLinkedDynamicAccessKeys(chatId, identity.telegramUserId, true),
-  ]);
+  let keyType: 'ACCESS_KEY' | 'DYNAMIC_KEY';
 
-  const accessKey = accessKeys.find((key) => key.id === id);
-  const dynamicKey = accessKey ? null : dynamicKeys.find((key) => key.id === id);
-  if (!accessKey && !dynamicKey) {
-    return jsonError('Key not found', 404);
+  if (auth.type === 'magic') {
+    if (auth.claims.keyId !== id) {
+      return jsonError('Key not found', 404);
+    }
+    keyType = auth.claims.kind === 'normal' ? 'ACCESS_KEY' : 'DYNAMIC_KEY';
+    const exists = keyType === 'ACCESS_KEY'
+      ? await db.accessKey.count({ where: { id } })
+      : await db.dynamicAccessKey.count({ where: { id } });
+    if (exists === 0) {
+      return jsonError('Key not found', 404);
+    }
+  } else {
+    const identity = auth.identity;
+    const chatId = identity.chatId ?? identity.telegramUserId;
+    const [accessKeys, dynamicKeys] = await Promise.all([
+      findLinkedAccessKeys(chatId, identity.telegramUserId, true),
+      findLinkedDynamicAccessKeys(chatId, identity.telegramUserId, true),
+    ]);
+
+    const accessKey = accessKeys.find((key) => key.id === id);
+    if (!accessKey && !dynamicKeys.some((key) => key.id === id)) {
+      return jsonError('Key not found', 404);
+    }
+    keyType = accessKey ? 'ACCESS_KEY' : 'DYNAMIC_KEY';
   }
-
-  const keyType = accessKey ? 'ACCESS_KEY' : 'DYNAMIC_KEY';
   const cutoff = new Date(`${getUsageDayKeys(days)[0]}T00:00:00.000Z`);
   const snapshots = await db.usageSnapshot.findMany({
     where: {
@@ -69,7 +83,7 @@ export async function GET(
   return NextResponse.json(
     {
       keyId: id,
-      kind: accessKey ? 'normal' : 'dynamic',
+      kind: keyType === 'ACCESS_KEY' ? 'normal' : 'dynamic',
       range,
       days: usage,
       totalBytes: totalBytes.toString(),
