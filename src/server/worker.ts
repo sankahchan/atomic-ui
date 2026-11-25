@@ -19,7 +19,7 @@ import { createOutlineClient } from '../lib/outline-api';
 import {
   ACCESS_KEY_SNAPSHOT_TYPE,
   DYNAMIC_KEY_SNAPSHOT_TYPE,
-  buildDynamicKeySnapshot,
+  buildDynamicKeyServerSnapshots,
 } from '../lib/usage-snapshot-attribution';
 
 // Initialize Prisma
@@ -199,12 +199,12 @@ async function collectServerSnapshots(server: {
   name: string;
   apiUrl: string;
   apiCertSha256: string;
-}): Promise<{ success: boolean; keysProcessed: number }> {
+}): Promise<{ success: boolean; keysProcessed: number; dynamicDeltas: Map<string, bigint> }> {
   // Check backoff
   const backoffDelay = getBackoffDelay(server.id);
   if (backoffDelay > 0) {
     log('INFO', `Skipping server ${server.name} (in backoff for ${Math.round(backoffDelay / 1000)}s)`);
-    return { success: false, keysProcessed: 0 };
+    return { success: false, keysProcessed: 0, dynamicDeltas: new Map() };
   }
 
   try {
@@ -224,11 +224,14 @@ async function collectServerSnapshots(server: {
         id: true,
         outlineKeyId: true,
         usedBytes: true,
+        dynamicKeyId: true,
+        status: true,
       },
     });
 
     // Create a map of outlineKeyId to our internal key
     const keyMap = new Map(accessKeys.map(k => [k.outlineKeyId, k]));
+    const dynamicDeltas = new Map<string, bigint>();
 
     // Collect snapshots
     const snapshots: {
@@ -253,6 +256,13 @@ async function collectServerSnapshots(server: {
       const lastBytes = lastSnapshot?.usedBytes || BigInt(0);
       const deltaBytes = currentBytes > lastBytes ? currentBytes - lastBytes : BigInt(0);
 
+      if (key.dynamicKeyId && key.status === 'ACTIVE' && deltaBytes > BigInt(0)) {
+        dynamicDeltas.set(
+          key.dynamicKeyId,
+          (dynamicDeltas.get(key.dynamicKeyId) || BigInt(0)) + deltaBytes,
+        );
+      }
+
       snapshots.push({
         serverId: server.id,
         keyId: key.id,
@@ -273,18 +283,20 @@ async function collectServerSnapshots(server: {
     clearBackoff(server.id);
 
     log('INFO', `Server ${server.name}: collected ${snapshots.length} snapshots`);
-    return { success: true, keysProcessed: snapshots.length };
+    return { success: true, keysProcessed: snapshots.length, dynamicDeltas };
   } catch (error) {
     log('ERROR', `Failed to collect snapshots from server ${server.name}`, error);
     setBackoff(server.id);
-    return { success: false, keysProcessed: 0 };
+    return { success: false, keysProcessed: 0, dynamicDeltas: new Map() };
   }
 }
 
 /**
  * Collect snapshots for dynamic keys (aggregated from their attached keys)
  */
-async function collectDynamicKeySnapshots(): Promise<number> {
+async function collectDynamicKeySnapshots(
+  serverDeltasByKey: ReadonlyMap<string, ReadonlyMap<string, bigint>>,
+): Promise<number> {
   try {
     const dynamicKeys = await prisma.dynamicAccessKey.findMany({
       where: { status: 'ACTIVE' },
@@ -314,11 +326,12 @@ async function collectDynamicKeySnapshots(): Promise<number> {
       const lastBytes = lastSnapshot?.usedBytes || BigInt(0);
       const deltaBytes = currentBytes > lastBytes ? currentBytes - lastBytes : BigInt(0);
 
-      snapshots.push(buildDynamicKeySnapshot({
+      snapshots.push(...buildDynamicKeyServerSnapshots({
         id: dak.id,
         usedBytes: currentBytes,
-        lastResolvedServerId: dak.lastResolvedServerId,
+        fallbackServerId: dak.lastResolvedServerId,
         deltaBytes,
+        serverDeltas: serverDeltasByKey.get(dak.id) ?? new Map(),
       }));
     }
 
@@ -358,6 +371,7 @@ async function collectSnapshots(): Promise<void> {
   let totalSuccess = 0;
   let totalFailed = 0;
   let totalKeys = 0;
+  const dynamicServerDeltas = new Map<string, Map<string, bigint>>();
 
   // Process each server
   for (const server of servers) {
@@ -365,13 +379,19 @@ async function collectSnapshots(): Promise<void> {
     if (result.success) {
       totalSuccess++;
       totalKeys += result.keysProcessed;
+
+      for (const [dynamicKeyId, deltaBytes] of result.dynamicDeltas) {
+        const byServer = dynamicServerDeltas.get(dynamicKeyId) ?? new Map<string, bigint>();
+        byServer.set(server.id, (byServer.get(server.id) || BigInt(0)) + deltaBytes);
+        dynamicServerDeltas.set(dynamicKeyId, byServer);
+      }
     } else {
       totalFailed++;
     }
   }
 
   // Collect dynamic key snapshots
-  const dynamicKeysProcessed = await collectDynamicKeySnapshots();
+  const dynamicKeysProcessed = await collectDynamicKeySnapshots(dynamicServerDeltas);
 
   log('INFO', `Snapshot collection complete: ${totalSuccess} servers succeeded, ${totalFailed} failed, ${totalKeys + dynamicKeysProcessed} keys processed`);
 }
