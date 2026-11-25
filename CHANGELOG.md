@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.23 - 2026-11-25
+
+### Added
+
+- Optional magic-link self-service for access keys, disabled by default behind the `magicLinkSelfServiceEnabled` setting. Admins can issue a single-use 30-minute link from the Share Page card.
+- Magic links mint a key-scoped session accepted only by the Mini App self-service APIs; they never grant an admin session.
+
+### Security
+
+- Tokens travel in the URL fragment, consumption is rate limited and atomic single-use, and issue/consume actions are audited.
+
 ## v1.2.22 - 2026-11-25
 
 ### Added

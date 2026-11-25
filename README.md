@@ -194,6 +194,7 @@ This repository now uses semver-style Git tags:
 - `v1.2.20` shared Telegram dividers and per-server dynamic-key top consumers
 - `v1.2.21` unified Telegram status labels and `/mykeys` empty-state copy
 - `v1.2.22` per-server dynamic-key usage attribution
+- `v1.2.23` optional scoped magic-link self-service auth
 - `v2.0.0` breaking release
 
 ### Recommended release flow
